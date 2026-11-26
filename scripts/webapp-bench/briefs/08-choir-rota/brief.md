@@ -1,0 +1,3 @@
+I look after the Ashby Village Choir. We are about thirty singers and we rehearse on Tuesday evenings in the village hall. The rota for who unlocks the hall, who makes the tea and who brings the cake lives in a group chat, and it is chaos: nobody can ever find who said they would do what.
+
+I would like one place where I can keep the singers, with which voice they sing and a phone number, then each rehearsal, with the date, where it was and how many people turned up, and then who has been given which job at which rehearsal and whether they have done it. When I open it I want to see how many jobs have still not been done, and how many people usually come to a rehearsal, on average. Anyone in the choir committee who logs in should see exactly the same as me.

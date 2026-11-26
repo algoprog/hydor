@@ -1,0 +1,37 @@
+{
+  "name": "Kestrel Crews",
+  "build": "npm ci --omit=dev --no-audit --no-fund",
+  "start": "node --disable-warning=ExperimentalWarning server.js",
+  "env": {
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "url": "APP_URL"
+  },
+  "ready": "/sign-in",
+  "signIn": "own",
+  "database": {
+    "file": "kestrel.db",
+    "sqlite": true
+  },
+  "accounts": {
+    "signUp": {
+      "method": "POST",
+      "path": "/api/sign-up",
+      "send": "json",
+      "body": {
+        "name": "{name}",
+        "email": "{email}",
+        "password": "{password}"
+      }
+    },
+    "signIn": {
+      "method": "POST",
+      "path": "/api/sign-in",
+      "send": "json",
+      "body": {
+        "email": "{email}",
+        "password": "{password}"
+      }
+    }
+  }
+}

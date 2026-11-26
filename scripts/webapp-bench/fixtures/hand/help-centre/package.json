@@ -1,0 +1,9 @@
+{
+  "name": "fenwick-help",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A help centre with drafts, categories and search, written by hand: a reference the judge's self-test uses.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "better-sqlite3": "13.0.3" }
+}

@@ -75,12 +75,39 @@ export function standAll(db: DB): string[] {
   return [...keys];
 }
 
-/** A standing form's answers as the user's message: each field's label and what they gave. */
-export function answersText(f: OpenForm, content: Record<string, unknown>): string {
+type StandingHandler = (card: ApprovalRequest, content: Record<string, unknown>) => Promise<string | null> | string | null;
+const handlers = new Set<StandingHandler>();
+
+/**
+ * A kind of card that does something with its answer as it is given, even when the agent's wait has ended (webapp_choose's: the answer is
+ * kept as a decision of the app). The handler gets the card and the answers and returns a
+ * sentence for the agent ("recorded already"), or null.
+ */
+export function registerStandingAnswer(kind: 'webapp-choose', fn: StandingHandler): () => void {
+  void kind;
+  handlers.add(fn);
+  return () => void handlers.delete(fn);
+}
+
+/** What a standing card's kind does with its answers before they are sent as the user's message; the sentence it gives goes with them. */
+export async function recordStandingAnswer(f: OpenForm, content: Record<string, unknown>): Promise<string | null> {
+  if (!f.card.choose) return null;
+  // The first that has the card's app says what it did (an app's own database knows its own cards).
+  for (const fn of handlers) {
+    try {
+      const said = await fn(f.card, content);
+      if (said !== null) return said;
+    } catch {}
+  }
+  return null;
+}
+
+/** A standing form's answers as the user's message: each field's label and what they gave (and what was done with them, when something was). */
+export function answersText(f: OpenForm, content: Record<string, unknown>, note?: string | null): string {
   const label = (id: string) => f.card.form?.fields.find((x) => x.id === id)?.label ?? id;
   const show = (v: unknown) => (Array.isArray(v) ? v.join(', ') : typeof v === 'boolean' ? (v ? 'yes' : 'no') : v && typeof v === 'object' ? JSON.stringify(v) : String(v));
   const lines = Object.entries(content)
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
     .map(([k, v]) => `- ${label(k)}: ${show(v)}`);
-  return `My answers to “${f.card.title}”:\n${lines.join('\n') || '(I left it empty.)'}`;
+  return `My answers to “${f.card.title}”:\n${lines.join('\n') || '(I left it empty.)'}${note ? `\n${note}` : ''}`;
 }

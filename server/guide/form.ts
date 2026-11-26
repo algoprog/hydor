@@ -23,7 +23,21 @@ export type FormAnswer = { ok: true; content: Record<string, unknown> } | { ok: 
  * Shows a form on a card in the run's conversation and waits for the user's answer. With `stand` (ask_form), a form not
  * answered by the time its tool call ends stays open in the conversation, its answers coming as a message.
  */
-export async function fillForm(ctx: RunCtx, o: { title: string; message?: string; schema: { properties: Json; required?: string[] }; submit?: string; waitMs?: number; stand?: boolean }): Promise<FormAnswer> {
+export async function fillForm(
+  ctx: RunCtx,
+  o: {
+    title: string;
+    message?: string;
+    schema: { properties: Json; required?: string[] };
+    submit?: string;
+    waitMs?: number;
+    stand?: boolean;
+    /** More of the card than a form: a payload the page draws its own card from (webapp_choose's options). */
+    card?: Partial<ApprovalRequest>;
+    /** Checks an answer's values after the schema has: a sentence for the user when it is not right (the card stays open). */
+    validate?: (content: Record<string, unknown>) => string | null;
+  },
+): Promise<FormAnswer> {
   const schema = { type: 'object' as const, properties: o.schema.properties, required: o.schema.required ?? [] };
   const fields = formFields(schema);
   if (!fields.length) return { ok: false, why: 'empty' };
@@ -41,13 +55,16 @@ export async function fillForm(ctx: RunCtx, o: { title: string; message?: string
       { id: 'decline', label: 'Not now' },
     ],
     form: { fields },
+    ...o.card,
     createdAt: Date.now(),
   };
   const limit = AbortSignal.timeout(o.waitMs ?? WAIT_MS);
   const check = (x: ApprovalAnswer) => {
     if (x.decision !== 'accept') return null;
-    const [field, why] = Object.entries(formContent(schema, x.form ?? {}).errors)[0] ?? [];
-    return field ? `${fields.find((f) => f.id === field)?.label ?? field}: ${why}` : null;
+    const checked = formContent(schema, x.form ?? {});
+    const [field, why] = Object.entries(checked.errors)[0] ?? [];
+    if (field) return `${fields.find((f) => f.id === field)?.label ?? field}: ${why}`;
+    return o.validate?.(checked.content) ?? null;
   };
   const db = ctx.deps.db;
   if (o.stand) keepForm(db, { key: ctx.key, card, schema, live: true });

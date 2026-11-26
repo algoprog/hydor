@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "start": {
+    "command": "node server.js",
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "env": { "SESSION_SECRET": "{secret}" },
+    "secrets": ["SESSION_SECRET"],
+    "browserFolders": ["public"]
+  },
+  "accounts": {
+    "signUp": { "path": "/api/sign-up", "body": { "name": "{name}", "email": "{email}", "password": "{password}" } },
+    "signIn": { "path": "/api/sign-in", "body": { "email": "{email}", "password": "{password}" } }
+  },
+  "things": {
+    "hours": {
+      "list": { "path": "/api/hours", "rows": "rows" },
+      "add": { "path": "/api/hours" },
+      "fields": { "weekday": "weekday", "start": "start", "end": "end" }
+    },
+    "days off": {
+      "list": { "path": "/api/daysoff", "rows": "rows" },
+      "add": { "path": "/api/daysoff" },
+      "fields": { "day": "date" }
+    },
+    "bookings": {
+      "list": { "path": "/api/bookings", "rows": "rows" },
+      "one": { "path": "/api/bookings/{id}", "remove": "DELETE" },
+      "fields": { "name": "name", "email": "email", "date": "date", "time": "time" }
+    }
+  },
+  "slots": { "path": "/api/slots?date={date}", "rows": "slots", "time": "time" },
+  "site": { "slots": "/book?date={date}" },
+  "actions": {
+    "book": { "path": "/api/book", "input": { "date": "date", "time": "time", "name": "name", "email": "email" } }
+  }
+}

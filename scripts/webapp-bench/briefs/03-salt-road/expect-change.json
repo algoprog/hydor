@@ -1,0 +1,59 @@
+{
+  "id": "03-salt-road",
+  "group": "accounts",
+  "product": "The Salt Road",
+  "phrases": [
+    ["April"],
+    ["Larkspur Books", "Larkspur"],
+    ["Norfolk"],
+    ["1950s", "nineteen fifties", "nineteen-fifties", "1950's", "the fifties", "1950-59", "1950 to 1959", "re:\\b(the )?fifties\\b"]
+  ],
+  "pages": [
+    {
+      "id": "about",
+      "paths": ["/about", "/the-book", "/book", "/author", "/about-the-book", "/about-me", "/first-lines", "/excerpt", "/read"],
+      "phrases": [["The tide had been out for three days when Ada found the boat"], ["Mara Lindqvist"], ["geography"]]
+    },
+    {
+      "id": "events",
+      "paths": ["/events", "/event", "/dates", "/readings", "/launch", "/whats-on", "/talks"],
+      "phrases": [
+        ["Launch evening", "re:launch (evening|event|night|party)|book launch"],
+        ["Cromer Library", "Cromer library"],
+        ["18 April", "April 18", "18th April", "re:\\b18(th)?( of)? april\\b|\\bapril 18(th)?\\b"],
+        ["Holt"],
+        ["2 May", "May 2", "2nd May", "re:\\b2(nd)?( of)? may\\b|\\bmay 2(nd)?\\b"]
+      ]
+    }
+  ],
+  "accounts": "owner-only",
+  "access": "owner",
+  "kinds": [
+    {
+      "id": "signups",
+      "names": ["signups", "signup", "waitlist", "waitinglist", "list", "entries", "readers", "emails", "subscribers", "interested", "people", "mailinglist", "who signed up"],
+      "visitorAdds": true,
+      "ops": [],
+      "fields": [
+        {
+          "id": "email",
+          "names": ["email", "emailaddress", "mail", "youremail", "their email"],
+          "kind": "text",
+          "email": true,
+          "required": true,
+          "said": ["email", "their email"]
+        }
+      ],
+      "said": ["who signed up", "readers can leave their email"]
+    }
+  ],
+  "rows": {
+    "signups": [
+      { "email": "reader.one@judge.test" },
+      { "email": "reader.two@judge.test" },
+      { "email": "reader.three@judge.test" }
+    ]
+  },
+  "later": {},
+  "numbers": []
+}

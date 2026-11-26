@@ -255,7 +255,7 @@ Clique no lápis (**Hosts, nota e como é enviada**), altere os hosts, se comand
 
 ### Excluir uma chave
 
-Clique na lixeira (**Excluir**) e confirme. Os agentes não podem mais usar a chave, e o valor dela é apagado de vez.
+Clique na lixeira (**Excluir**) e confirme. Os agentes não podem mais usar a chave, e o valor dela é apagado de vez. A pergunta nomeia antes os apps que a usam e os apps web que têm um valor próprio com esse nome (o deles fica).
 
 ### O que os agentes podem e não podem fazer com uma chave
 
@@ -290,6 +290,20 @@ Para entrar em um site ou serviço, o agente pede tudo de uma vez: **O agente pe
 3. Clique em **Salvar no cofre**.
 
 Cada segredo vai para o cofre como uma chave própria, com o nome baseado no login (uma senha do Voltaro vira VOLTARO_PASSWORD). Um campo marcado como **O agente vê esta** é um detalhe que não é secreto, como o endereço de um servidor: o agente recebe o que você digita ali, e isso não fica guardado no cofre. Um campo que o cofre já tem avisa isso: deixe-o vazio para manter o que está salvo. Depois de salvo, o cartão lista as chaves, e o agente pode entrar com elas no navegador dele, apenas nesses hosts, sem vê-las.
+
+### Várias chaves em um só cartão, com como obtê-las
+
+Quando uma tarefa precisa de mais de uma chave, ou o agente sabe dizer como obter uma, ele coloca todas em um só cartão: uma aba para cada uma (no celular, uma linha que se abre). Cada uma diz quem fornece a chave e por que ela é necessária, lista em **How to get it** passos curtos numerados, tem o link para a página do provedor (abre em uma nova aba) e os seus campos.
+
+1. Siga os passos e cole cada valor no seu campo. Ele fica oculto enquanto você digita; o olho o mostra. A linha sob um campo diz como é um valor certo, e avisa quando o que você colou claramente não é (ela nunca impede você).
+2. Clique em **Salvar** nessa aba, ou em **Pular por enquanto** onde isso for oferecido.
+3. Passe para a próxima. As marcas nas abas dizem o que foi salvo, pulado ou ainda falta, e o canto faz a contagem.
+
+- Uma chave que o cofre já tem nunca é mostrada: escolha **Use the one saved on** (com a data) ou **Substituir**.
+- O agente fica sabendo quando todas as chaves necessárias estiverem salvas, ou quando você clica em **Close without the rest**: de cada uma, salva, pulada ou pendente, e nada do valor. Uma opcional que você adicionar depois também chega ao conhecimento dele.
+- Para um app que roda dentro do Hydor, os pagamentos só aceitam uma chave de teste (começa com sk_test_): uma chave real é recusada ali.
+- Para um app web, o cartão avisa quando o que foi colado é claramente outra coisa (uma chave publicável onde vai a secreta).
+- Um campo marcado **O agente vê esta** chega ao agente como você digitou, como no cartão de um login.
 
 ## Comandos que usam uma chave
 
@@ -410,3 +424,4 @@ Os agentes podem fazer isto por você, com o seu OK em um cartão. Eles nunca di
 - "Mostre os plugins do Claude Code mais instalados e depois instale o que eu escolher."
 - "Entre na minha conta do Voltaro e baixe as faturas deste ano para esta pasta." (Na primeira vez, ele pede o login em um cartão.)
 - "Envie este branch para o GitHub com o token do cofre."
+- "Peça as chaves de que a minha loja precisa, todas em um cartão, e diga como obter cada uma."

@@ -1,0 +1,9 @@
+{
+  "name": "ash-physiotherapy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A booking page for half-hour appointments, written by hand: a reference the judge's self-test uses.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "better-sqlite3": "13.0.3" }
+}

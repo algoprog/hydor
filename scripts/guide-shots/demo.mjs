@@ -133,7 +133,7 @@ export function makeData(dataDir) {
 // ---- sessions: Claude Code transcripts -----------------------------------------------------------------
 
 /** One Claude Code transcript, line by line, as the CLI writes it. */
-class Transcript {
+export class Transcript {
   constructor({ cwd, at, branch }) {
     this.id = uuid();
     this.cwd = cwd;
@@ -192,7 +192,7 @@ class Transcript {
   }
 }
 
-const own = (tool) => `mcp__hydor__${tool}`;
+export const own = (tool) => `mcp__hydor__${tool}`;
 const numbered = (text) =>
   text
     .split('\n')

@@ -1,0 +1,76 @@
+{
+  "id": "01-kiln-share",
+  "group": "accounts",
+  "product": "Hatch End Kiln Share",
+  "phrases": [
+    ["every second Thursday", "every other Thursday", "second Thursday", "alternate Thursdays", "every two weeks on a Thursday", "re:(every|each) (second|other|2nd|alternate)[a-z ,]{0,14}thursday|alternate thursday|(every|each) (two|2) weeks[a-z ,]{0,24}thursday|thursday[a-z ,]{0,24}(every|each) (second|other|2nd|two|2)|fortnight[a-z ,]{0,24}thursday|thursday[a-z ,]{0,14}fortnight|bi-?weekly[a-z ,]{0,14}thursday"],
+    ["£18", "£ 18", "18 pounds", "gbp 18", "gbp18"],
+    ["twelve shelves", "12 shelves", "twelve shelf places", "12 shelf places", "twelve places", "12 places", "room for twelve", "room for 12", "re:\\b(twelve|12)\\b[a-z ]{0,3}(shelves|shelf|spaces|slots|places|spots)|room for (twelve|12)|\\b(twelve|12) (per|each|a) (firing|batch|time)"],
+    ["kiln"],
+    ["four shelves", "re:\\b(up to|at most|maximum of|max|no more than|a maximum of|as many as|between one and|1 (to|-|and)) ?(four|4)\\b|\\b(four|4)\\b[a-z ]{0,10}(shelves|shelf)|\\b1 ?(to|-) ?4\\b|one (to|and) four"]
+  ],
+  "accounts": "owner-only",
+  "access": "owner",
+  "kinds": [
+    {
+      "id": "signups",
+      "names": ["signups", "signup", "waitlist", "waitinglist", "list", "entries", "people", "names", "interested", "applicants", "subscribers", "potters", "signedup", "list of names"],
+      "visitorAdds": true,
+      "ops": [],
+      "fields": [
+        {
+          "id": "email",
+          "names": ["email", "emailaddress", "mail", "youremail"],
+          "kind": "text",
+          "email": true,
+          "mayHave": true,
+          "said": []
+        },
+        {
+          "id": "name",
+          "names": ["name", "fullname", "person", "yourname", "contact", "their name"],
+          "kind": "text",
+          "required": true,
+          "said": ["their name"]
+        },
+        {
+          "id": "whatFor",
+          "names": ["whatfor", "wanttofire", "whattofire", "firing", "fire", "what", "use", "purpose", "reason", "idea", "interest", "message", "notes", "about", "pots", "what they would fire"],
+          "kind": "text",
+          "required": false,
+          "mayHave": true,
+          "said": ["what they would want to fire", "what they would fire"]
+        },
+        {
+          "id": "shelves",
+          "names": ["shelves", "shelf", "numberofshelves", "howmanyshelves", "shelfcount", "places", "spaces", "quantity", "count", "howmany", "amount"],
+          "kind": "integer",
+          "required": true,
+          "min": 1,
+          "max": 4,
+          "said": ["how many shelves they want", "how many shelves they would like"]
+        }
+      ],
+      "said": ["names", "list of names"]
+    }
+  ],
+  "rows": {
+    "signups": [
+      {
+        "email": "ada.quenby@judge.test",
+        "name": "Ada Quenby",
+        "whatFor": "Firing a set of six small bowls",
+        "shelves": 2
+      },
+      { "email": "brigid.falconer@judge.test", "name": "Brigid Falconer", "shelves": 1 },
+      {
+        "email": "cora.penhaligon@judge.test",
+        "name": "Cora Penhaligon",
+        "whatFor": "Tall vases, glazed",
+        "shelves": 4
+      }
+    ]
+  },
+  "later": {},
+  "numbers": []
+}

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "start": {
+    "command": "node server.js",
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "env": { "SESSION_SECRET": "{secret}" },
+    "secrets": ["SESSION_SECRET"],
+    "browserFolders": ["public"]
+  },
+  "accounts": {
+    "signUp": { "path": "/api/sign-up", "body": { "name": "{name}", "email": "{email}", "password": "{password}" } },
+    "signIn": { "path": "/api/sign-in", "body": { "email": "{email}", "password": "{password}" } }
+  },
+  "things": {
+    "signups": {
+      "list": { "path": "/api/signups", "rows": "rows" },
+      "add": { "path": "/api/signups" },
+      "one": { "path": "/api/signups/{id}", "read": "GET", "remove": "DELETE" },
+      "fields": { "email": "email", "name": "name", "what for": "whatFor" }
+    }
+  }
+}

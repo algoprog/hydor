@@ -22,6 +22,7 @@
 - [**文字大小**](/settings?s=general&find=Text%20size)：此设备上消息、帮助页面和输入框的文字大小：默认、较大或更大。
 - [**智能体工作时发送**](/settings?s=general&find=Sending%20while%20an%20agent%20works)：Enter 加入正在进行的这一轮，或等它结束。
 - [**终端建议**](/settings?s=general&find=Terminal%20suggestions)：终端中光标后的灰色补全建议。
+- [**技术细节**](/settings?s=general&find=Technical%20details)：用大白话呈现网页应用，或同时显示文件、命令和日志。
 - [**用量限制解除后继续**](/settings?s=general&find=Resume%20after%20usage%20limits)：在套餐额度重置一分钟后继续会话。
 - [**删除不活跃的会话**](/settings?s=general&find=Delete%20inactive%20sessions)：删除一年（或你选择的时长）无人使用的会话；在此之前，每个对话都会保留。
 - [**限制每个会话**](/settings?s=general&find=Limit%20each%20session)：一个会话的程序最多可用的内存和处理器。

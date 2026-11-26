@@ -1,0 +1,2041 @@
+{
+  "about": "Hydor's catalog of outside services an app can use: one where one is better overall, at most three otherwise, the first the default; with what each costs a small app (and the day it was read), its catches, and its keys as the keys card takes them. Providers' own pages; no figure that could not be read there. A step a provider's own page did not confirm is written {\"unconfirmed\": what} and shown as the link to it; a service with \"hold\" is left out until that line is taken away. Revisit each release.",
+  "pricesRead": "2026-11-25",
+  "stepsRead": "2026-11-26",
+  "needs": [
+    {
+      "id": "database",
+      "name": "A database",
+      "what": "a place for the app's data when its server keeps no disk",
+      "builtIn": {
+        "say": "SQLite on the app's own disk: free, with nothing to sign up for. Choose a service only where the app has no disk (Cloudflare, Vercel, a host's free tier).",
+        "until": "the app has no disk"
+      },
+      "services": [
+        {
+          "id": "neon",
+          "name": "Neon",
+          "default": true,
+          "why": "Plain Postgres, free with no card, and at its limit it stops writes rather than bill you.",
+          "free": {
+            "text": "1 GB a project and 100 compute hours a month, no card",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "By use, no minimum: $0.106 a compute hour and $0.35 a GB a month",
+            "read": "2026-11-25"
+          },
+          "catch": "It sleeps after 5 minutes idle, so the first request after a pause waits.",
+          "page": "https://neon.com/pricing",
+          "keys": [
+            {
+              "name": "DATABASE_URL",
+              "label": "Connection address",
+              "why": "The app uses it to reach your database and save and read its information.",
+              "how": [
+                "Go to console.neon.tech and sign in, making an account if you need one.",
+                "Click New Project, give it a name, pick the region closest to you, then click Create project.",
+                "On the project's main page, click Connect.",
+                "Copy the whole connection string shown. It contains your password, so share it only with this app."
+              ],
+              "url": "https://console.neon.tech",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "postgresql://"
+                ],
+                "say": "starts with postgresql://"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://neon.com/docs/get-started/connect-neon",
+            "https://neon.com/faqs/create-new-neon-project",
+            "https://neon.com/pricing"
+          ]
+        },
+        {
+          "id": "turso",
+          "name": "Turso",
+          "why": "SQLite as a service: code written for SQLite keeps working as it is.",
+          "free": {
+            "text": "100 databases and 5 GB, 500 million rows read and 10 million written a month",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$4.99 a month",
+            "read": "2026-11-25"
+          },
+          "catch": "It is not Postgres, and its pricing page does not say what happens past the free limit.",
+          "page": "https://turso.tech/pricing",
+          "keys": [
+            {
+              "name": "TURSO_DATABASE_URL",
+              "label": "Database address",
+              "why": "The app uses it to find your database.",
+              "how": [
+                "Go to app.turso.tech and sign up or sign in: databases and their access tokens are managed there.",
+                "Create a database and give it a name, or open one you already have.",
+                {
+                  "unconfirmed": "where the database's address is shown"
+                }
+              ],
+              "url": "https://app.turso.tech",
+              "secret": false,
+              "looks": {
+                "starts": [
+                  "libsql://",
+                  "turso://"
+                ],
+                "say": "starts with libsql:// or turso:// and ends with turso.io"
+              }
+            },
+            {
+              "name": "TURSO_AUTH_TOKEN",
+              "label": "Database access token",
+              "why": "The app uses it to prove it is allowed to read and change your database.",
+              "how": [
+                "At app.turso.tech, open the same database you took the address from.",
+                {
+                  "unconfirmed": "how to make a token there that may read and write"
+                },
+                "Paste the token into the app and keep it private."
+              ],
+              "url": "https://app.turso.tech",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.turso.tech/sdk/authentication.md",
+            "https://docs.turso.tech/quickstart",
+            "https://turso.tech/blog/we-built-a-brand-new-turso-web-app",
+            "https://turso.tech/pricing"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "Supabase",
+          "why": "its free tier pauses a project after a week idle, and the next step is a big one"
+        }
+      ]
+    },
+    {
+      "id": "mail",
+      "name": "Sending mail",
+      "what": "the mail an app sends people: sign-ups, notices, receipts",
+      "services": [
+        {
+          "id": "resend",
+          "name": "Resend",
+          "default": true,
+          "why": "Needs no approval, and its free allowance fits a small app.",
+          "free": {
+            "text": "3,000 mails a month, at most 100 a day",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$20 a month for 50,000",
+            "read": "2026-11-25"
+          },
+          "catch": "You verify a domain of your own first, and an account whose mail people report as spam can be closed.",
+          "page": "https://resend.com/pricing",
+          "keys": [
+            {
+              "name": "RESEND_API_KEY",
+              "label": "Resend key",
+              "why": "The app uses it to send email through your Resend account.",
+              "how": [
+                "Sign up at resend.com. To mail anyone but yourself you need a domain you own: without one, resend.dev reaches only your account's own address.",
+                "Open Domains, click Add Domain and enter your domain, or a part of it such as updates.yourdomain.com.",
+                "Copy the records Resend shows into the settings of the company where your domain is registered, exactly as written.",
+                "Return to Resend and verify. It often takes minutes but can take up to 72 hours.",
+                "Open API keys, click Create API Key, name it and choose Sending access.",
+                "Copy the key at once, because it is shown only one time."
+              ],
+              "url": "https://resend.com/api-keys",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "re_"
+                ],
+                "say": "starts with re_"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://resend.com/docs/create-an-api-key",
+            "https://resend.com/docs/add-a-domain",
+            "https://resend.com/docs/dashboard/domains/introduction",
+            "https://resend.com/docs/api-reference/introduction",
+            "https://resend.com/pricing",
+            "https://resend.com/docs/knowledge-base/403-error-resend-dev-domain"
+          ]
+        },
+        {
+          "id": "brevo",
+          "name": "Brevo",
+          "why": "Also sends newsletters, from the same account.",
+          "catch": "Brevo may hold a new account for review before it sends; you verify a sender or a domain there, and transactional mail is activated separately.",
+          "page": "https://www.brevo.com/pricing/",
+          "keys": [
+            {
+              "name": "BREVO_API_KEY",
+              "label": "Brevo key",
+              "why": "The app uses it to send email through your Brevo account.",
+              "how": [
+                "Make an account at brevo.com and complete your profile on My profile: Brevo reviews accounts from it.",
+                "Open Settings, then Senders, Domains, IPs. Click Add a sender and save; if its domain is not authenticated, enter the 6-digit code Brevo emails there.",
+                "Under Domains, add a domain you own and follow the steps to authenticate it. Free addresses such as Gmail cannot be authenticated.",
+                "Open Settings, SMTP & API, API Keys & MCP, then Generate API key. Enter the verification code, name it, set expiry and access, and copy it: it is shown only once.",
+                "A key unused for 90 days is switched off. Transactional mail is activated separately: if sending is refused as not activated, ask Brevo to activate it.",
+                "After 30 days with no new address, Brevo refuses the key from a new one: if the server moves, allow its address under Settings, Security, Authorized IPs."
+              ],
+              "url": "https://app.brevo.com/settings/keys/api",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "xkeysib-"
+                ],
+                "say": "starts with xkeysib- (not the separate SMTP key)"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://developers.brevo.com/docs/api-key-authentication",
+            "https://developers.brevo.com/docs/quickstart",
+            "https://developers.brevo.com/docs/v0-integration",
+            "https://developers.brevo.com/docs/ip-security",
+            "https://help.brevo.com/hc/en-us/articles/209467485",
+            "https://help.brevo.com/hc/en-us/articles/12163873383186",
+            "https://help.brevo.com/hc/en-us/articles/208836149",
+            "https://help.brevo.com/hc/en-us/articles/115000188150",
+            "https://help.brevo.com/hc/en-us/articles/360017299259",
+            "https://help.brevo.com/hc/en-us/articles/5740111683858",
+            "https://help.brevo.com/hc/en-us/articles/208580669",
+            "https://www.brevo.com/pricing/"
+          ],
+          "free": {
+            "text": "300 emails a day",
+            "read": "2026-11-26"
+          },
+          "paid": {
+            "text": "$9 a month from 5,000 emails",
+            "read": "2026-11-26"
+          }
+        },
+        {
+          "id": "postmark",
+          "name": "Postmark",
+          "why": "For mail that has to arrive: sign-in links, receipts.",
+          "free": {
+            "text": "100 mails a month, for trying it",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$15 a month for 10,000",
+            "read": "2026-11-25"
+          },
+          "catch": "Your account is approved by hand, usually within a day; until then it sends only to your own domains.",
+          "page": "https://postmarkapp.com/pricing",
+          "keys": [
+            {
+              "name": "POSTMARK_SERVER_TOKEN",
+              "label": "Postmark server token",
+              "why": "The app uses it to send email through your Postmark account.",
+              "how": [
+                "Sign up at postmarkapp.com. A first server is made for you.",
+                "Open Sender Signatures and add the address you will send from, then click the link in the confirmation email. Or verify your whole domain.",
+                "For a domain, open its DNS Settings, copy the record shown to your domain company, then click Verify. Allow up to 48 hours.",
+                "Request approval in your account. Until approved, you can only send to your own verified domains. Review usually takes under a day on weekdays.",
+                "Open Servers, choose your server, open the API Tokens tab and copy the Server API token."
+              ],
+              "url": "https://account.postmarkapp.com/",
+              "secret": true,
+              "looks": {
+                "say": "a long string of random letters and numbers, from the server's API Tokens tab, not the account's"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://postmarkapp.com/support/article/1002-getting-started-with-postmark",
+            "https://postmarkapp.com/support/article/1008-what-are-the-account-and-server-api-tokens",
+            "https://postmarkapp.com/support/article/1084-how-does-the-account-approval-process-work",
+            "https://postmarkapp.com/support/article/how-do-i-verify-a-domain",
+            "https://postmarkapp.com/pricing"
+          ]
+        }
+      ],
+      "also": [
+        {
+          "id": "mailbox",
+          "name": "A mailbox you have",
+          "why": "For a few mails a day, from your own address.",
+          "catch": "Not for newsletters: Gmail stops at about 500 a day, and Microsoft 365 turns password sign-in off by default from the end of December 2026.",
+          "notFor": [
+            "Cloudflare Workers: they cannot open the connection SMTP needs."
+          ],
+          "page": "https://support.google.com/mail/answer/22839",
+          "keys": [
+            {
+              "name": "SMTP_HOST",
+              "label": "Outgoing mail server",
+              "why": "The app uses it to know which server sends your email.",
+              "how": [
+                "Look up your email provider's help page for its outgoing mail server, also called SMTP server.",
+                "For Gmail it is smtp.gmail.com, using port 587. There is no extra charge for an existing mailbox.",
+                "Outlook.com and Hotmail require a Microsoft sign-in method instead of a plain password, so they may not work here."
+              ],
+              "url": "https://support.google.com/mail/answer/7104828",
+              "secret": false,
+              "looks": {
+                "say": "a server name such as smtp.gmail.com"
+              }
+            },
+            {
+              "name": "SMTP_USER",
+              "label": "Email address",
+              "why": "The app uses it to sign in to your mailbox and send from it.",
+              "how": [
+                "Use the mailbox you want the app's email to come from.",
+                "Type its full email address, including the part after the @ sign.",
+                "A personal Gmail may stop sending for up to a day after about 500 mails in one day."
+              ],
+              "url": "https://support.google.com/mail/answer/22839",
+              "secret": false,
+              "looks": {
+                "say": "a full email address"
+              }
+            },
+            {
+              "name": "SMTP_PASSWORD",
+              "label": "App password",
+              "why": "The app uses it to sign in to your mailbox without your normal password.",
+              "how": [
+                "For Gmail, first turn on 2-Step Verification in your Google Account.",
+                "Open Google's help page on app passwords and follow Create and manage your app passwords.",
+                "Create one for this app and copy the 16-digit passcode. Changing your Google password later cancels it.",
+                "No option? Work or school accounts, Advanced Protection, or security-key-only verification can hide it.",
+                "Microsoft 365 work mail: your administrator must allow Authenticated SMTP, and password sign-in is due to be off by default from end of December 2026."
+              ],
+              "url": "https://support.google.com/accounts/answer/185833",
+              "secret": true,
+              "looks": {
+                "say": "for Gmail, a 16-digit app passcode, not your normal password"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://support.google.com/accounts/answer/185833",
+            "https://support.google.com/mail/answer/7104828",
+            "https://support.google.com/mail/answer/22839",
+            "https://knowledge.workspace.google.com/admin/gmail/send-email-from-a-printer-scanner-or-app",
+            "https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/authenticated-client-smtp-submission",
+            "https://techcommunity.microsoft.com/blog/exchange/updated-exchange-online-smtp-auth-basic-authentication-deprecation-timeline/4489835",
+            "https://support.microsoft.com/en-us/outlook/pop-imap-and-smtp-settings-for-outlook-com"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "Amazon SES",
+          "why": "its approval and request signing are too hard for most people"
+        },
+        {
+          "name": "SendGrid",
+          "why": "there is no free plan any more"
+        }
+      ]
+    },
+    {
+      "id": "run",
+      "name": "A place to run",
+      "what": "where the app runs for other people",
+      "builtIn": {
+        "say": "Inside this Hydor: free, on this computer, signed in as you. Choose a service when other people use it.",
+        "until": "other people use it"
+      },
+      "services": [
+        {
+          "id": "digitalocean",
+          "name": "DigitalOcean",
+          "default": true,
+          "why": "A rented server that is easy to follow, in many regions.",
+          "paid": {
+            "text": "$12 a month for 2 GB of memory",
+            "read": "2026-11-25"
+          },
+          "catch": "Backups cost extra, and a server switched off is still billed: delete it when you are done.",
+          "page": "https://www.digitalocean.com/pricing/droplets",
+          "keys": [],
+          "setup": [
+            "Create a DigitalOcean account and add a payment method: servers cannot be made without one.",
+            "In Hydor, open the app's Launch tab and choose Add a server: it shows one line to paste.",
+            "In DigitalOcean, choose Create Droplet, a region near your users, Ubuntu and a size with 2 GB.",
+            "Under Authentication choose SSH Keys, add Hydor's line, then create the Droplet.",
+            "Copy its IP address into Hydor, compare the fingerprint it shows, and check the server."
+          ],
+          "server": {
+            "read": "2026-11-26",
+            "login": "root",
+            "open": "https://cloud.digitalocean.com/droplets/new",
+            "clicks": [
+              "Under “Choose a datacenter region”, pick the one nearest the people who will use your app.",
+              "Under “Choose an image” keep “Ubuntu”, and under “Choose a Droplet Plan” pick “Basic” with 2 GB of memory.",
+              "Under “Authentication”, open the “SSH Keys” tab and press “Add SSH Key”."
+            ],
+            "box": "Public Key",
+            "boxThen": "Give it any name under “Key Name”, press “Add SSH Key”, then press “Create Droplet” at the bottom.",
+            "address": "When it is ready, copy its “Public IPv4” address: four numbers shown beside its name, like 203.0.113.7.",
+            "compare": "In DigitalOcean, open your new server and press “Web Console”. In the black window that opens, paste the line below and press Enter. Compare the code it writes with the one here.",
+            "compareLine": "ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+            "sources": [
+              "https://docs.digitalocean.com/products/droplets/how-to/create/",
+              "https://docs.digitalocean.com/platform/teams/how-to/upload-ssh-keys/",
+              "https://docs.digitalocean.com/products/droplets/how-to/connect-with-console/"
+            ],
+            "text": {
+              "read": "2026-11-26",
+              "clicks": [
+                "Pick the nearest place under “Choose a datacenter region”, keep “Ubuntu” under “Choose an image”, and under “Choose a Droplet Plan” pick “Basic” with 2 GB of memory.",
+                "Under “Authentication”, choose “Password” and make up a long one. Hydor never needs it: the text switches signing in with it off.",
+                "Open “Additional Options”, switch on “Startup scripts”, paste the text into the box, then press “Create Droplet”."
+              ],
+              "box": "Startup scripts",
+              "sources": [
+                "https://docs.digitalocean.com/products/droplets/how-to/create/",
+                "https://docs.digitalocean.com/products/droplets/how-to/provide-user-data/"
+              ]
+            }
+          },
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.digitalocean.com/products/droplets/how-to/create/",
+            "https://docs.digitalocean.com/products/droplets/how-to/add-ssh-keys/",
+            "https://docs.digitalocean.com/platform/billing/manage-payment-methods/",
+            "https://docs.digitalocean.com/products/droplets/details/pricing/",
+            "https://www.digitalocean.com/pricing/droplets"
+          ]
+        },
+        {
+          "id": "hetzner",
+          "name": "Hetzner",
+          "why": "About the cheapest server for the memory, in Europe.",
+          "paid": {
+            "text": "From €9.99 a month for 2 GB (CPX12, Helsinki), before VAT",
+            "read": "2026-11-26"
+          },
+          "catch": "Hetzner restricts new cloud servers at the moment, for new customers among others, and its cheapest plans cannot be ordered: check before you count on it.",
+          "page": "https://www.hetzner.com/cloud/regular-performance",
+          "keys": [],
+          "setup": [
+            "Check first that Hetzner lets you order: it restricts new cloud servers at the moment.",
+            "Create an account with your details and a payment method, then open Hetzner Console and a project.",
+            "In Hydor, open the app's Launch tab and choose Add a server: it shows one line to paste.",
+            "In Hetzner, choose Add server: a location, Ubuntu, a size on offer, and Hydor's line as the SSH key.",
+            "Create it, copy its IP address into Hydor, compare the fingerprint, and check the server."
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.hetzner.com/cloud/servers/getting-started/creating-a-server/",
+            "https://docs.hetzner.com/cloud/general/faq",
+            "https://www.hetzner.com/cloud",
+            "https://www.hetzner.com/cloud/cost-optimized",
+            "https://www.hetzner.com/cloud/regular-performance",
+            "https://status.hetzner.com/incident/0a75c7ae-3377-41dc-aabe-601063724d24"
+          ],
+          "hold": {
+            "name": "Hetzner's servers",
+            "why": "new cloud servers cannot be ordered for now, as Hetzner has restricted them since June 2026, for new customers among others",
+            "url": "https://status.hetzner.com/incident/0a75c7ae-3377-41dc-aabe-601063724d24"
+          }
+        },
+        {
+          "id": "render",
+          "name": "Render",
+          "why": "A platform with a disk: no server to look after.",
+          "paid": {
+            "text": "$25 a month for 2 GB, and $0.25 a GB of disk",
+            "read": "2026-11-25"
+          },
+          "catch": "The free service has no disk and sleeps, so it cannot keep an app's data; each deploy of a service with a disk has a short outage.",
+          "page": "https://render.com/pricing",
+          "keys": [],
+          "setup": [
+            "Create a Render account.",
+            "On the app's Launch tab choose Render: Hydor writes the platform's file and lists the steps.",
+            "On Render, connect the app's Git repository and choose a paid plan: a disk needs one.",
+            "Add the disk at the folder where the app keeps its data, then its keys as environment variables.",
+            "Deploy, and open the address Render gives."
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://render.com/docs/web-services",
+            "https://render.com/docs/disks",
+            "https://render.com/pricing"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "Vercel's free plan",
+          "why": "no business use"
+        },
+        {
+          "name": "Fly.io",
+          "why": "a command-line tool and a card"
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "name": "Web search",
+      "what": "searching the web from an app's AI features",
+      "services": [
+        {
+          "id": "tavily",
+          "name": "Tavily",
+          "default": true,
+          "why": "A free allowance each month, with no card.",
+          "free": {
+            "text": "1,000 credits a month (a basic search is 1), no card",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$0.008 a credit, about $8 for 1,000 basic searches",
+            "read": "2026-11-25"
+          },
+          "catch": "An advanced search counts as two.",
+          "page": "https://docs.tavily.com/documentation/api-credits",
+          "keys": [
+            {
+              "name": "TAVILY_API_KEY",
+              "label": "Tavily search key",
+              "why": "The app uses it to search the web.",
+              "how": [
+                "Go to app.tavily.com and sign in or make an account.",
+                "In your dashboard, find the API keys section. Click the + button if you want a new key just for this app.",
+                "Name it, choose a key type and, if you like, a monthly limit.",
+                "Copy the key and paste it into the app."
+              ],
+              "url": "https://app.tavily.com",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "tvly-"
+                ],
+                "say": "starts with tvly-"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.tavily.com/documentation/quickstart",
+            "https://help.tavily.com/articles/9170796666-how-can-i-create-an-api-key",
+            "https://www.tavily.com/pricing"
+          ]
+        },
+        {
+          "id": "exa",
+          "name": "Exa",
+          "why": "The lowest price a search, with a larger free allowance.",
+          "free": {
+            "text": "$10 of credit a month, about 2,500 light searches, no card",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$4 to $7 for 1,000 searches",
+            "read": "2026-11-25"
+          },
+          "catch": "The text of a page is billed on top.",
+          "page": "https://exa.ai/pricing",
+          "keys": [
+            {
+              "name": "EXA_API_KEY",
+              "label": "Exa search key",
+              "why": "The app uses it to search the web.",
+              "how": [
+                "Go to dashboard.exa.ai/api-keys and sign in or make an account.",
+                "Create a key there.",
+                "Copy it and paste it into the app. Keep it private."
+              ],
+              "url": "https://dashboard.exa.ai/api-keys",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://exa.ai/docs/get-started/quickstart",
+            "https://exa.ai/pricing"
+          ]
+        },
+        {
+          "id": "brave",
+          "name": "Brave Search",
+          "why": "An index of its own, not Google's or Bing's.",
+          "free": {
+            "text": "$5 of credit a month, about 1,000 searches",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$5 for 1,000 searches",
+            "read": "2026-11-25"
+          },
+          "catch": "It needs a card, and its terms do not allow keeping the results.",
+          "page": "https://brave.com/search/api/",
+          "keys": [
+            {
+              "name": "BRAVE_API_KEY",
+              "label": "Brave Search key",
+              "why": "The app uses it to search the web; Brave's terms do not allow the results to be stored.",
+              "how": [
+                "Create an account on the Brave Search API dashboard with your email and a password, then verify your email.",
+                "Open the Plans page, choose the Search plan and enter a card: it is asked even for free use.",
+                "Read the terms: the results may not be stored.",
+                "Open the API Keys section, click Add API Key and name it.",
+                "Copy the key and paste it into the app."
+              ],
+              "url": "https://api-dashboard.search.brave.com/documentation/quickstart",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://api-dashboard.search.brave.com/documentation/quickstart",
+            "https://brave.com/search/api/",
+            "https://api-dashboard.search.brave.com/terms-of-service"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "Google's and Bing's search APIs",
+          "why": "closed to new customers or retired"
+        },
+        {
+          "name": "SerpApi",
+          "why": "three to five times the price"
+        }
+      ],
+      "note": "Or the model provider's own web search, where you already have that key: more a search than these, plus the model's tokens."
+    },
+    {
+      "id": "files",
+      "name": "Files and backups off the server",
+      "what": "files and a second copy of backups, kept away from the app's server",
+      "services": [
+        {
+          "id": "r2",
+          "name": "Cloudflare R2",
+          "default": true,
+          "why": "No charge for downloads, and a free allowance.",
+          "free": {
+            "text": "10 GB stored and no charge for downloads",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$0.015 a GB a month past 10 GB",
+            "read": "2026-11-25"
+          },
+          "catch": "Turning it on goes through a checkout, which may ask for a payment method.",
+          "page": "https://developers.cloudflare.com/r2/pricing/",
+          "keys": [
+            {
+              "name": "S3_ENDPOINT",
+              "label": "Endpoint",
+              "why": "It tells the app which web address to send files to.",
+              "how": [
+                "Sign in to Cloudflare, open Storage & databases, then R2, then Overview, and finish the checkout that adds R2 to your account.",
+                "Free each month: 10 GB stored and set amounts of requests. Usage above that is billed, so expect to add a payment method.",
+                "On the R2 Overview page, find the address for the S3 API and copy all of it. It is also shown after you create an API token.",
+                "If you made your bucket in a special jurisdiction such as the EU, use the address for it, which has .eu before .r2."
+              ],
+              "url": "https://dash.cloudflare.com/?to=/:account/r2/overview",
+              "secret": false,
+              "looks": {
+                "starts": [
+                  "https://"
+                ],
+                "say": "looks like https://your-account-id.r2.cloudflarestorage.com"
+              }
+            },
+            {
+              "name": "S3_BUCKET",
+              "label": "Bucket name",
+              "why": "It is the storage folder the app puts its files in.",
+              "how": [
+                "In the Cloudflare dashboard, open R2 object storage and select Create bucket.",
+                "Type a name, keep the suggested location unless you need a particular one, and select Create bucket.",
+                "Copy the bucket name exactly as you typed it. New buckets are private unless you make them public."
+              ],
+              "url": "https://dash.cloudflare.com/?to=/:account/r2/overview",
+              "secret": false
+            },
+            {
+              "name": "S3_ACCESS_KEY_ID",
+              "label": "Access Key ID",
+              "why": "It tells Cloudflare which key the app is using.",
+              "how": [
+                "On the R2 Overview page, select Manage next to API Tokens.",
+                "Select Create Account API token, or Create User API token (a user token stops working if that user is removed).",
+                "Choose Object Read & Write, apply it to your bucket only, then create the token.",
+                "Copy the Access Key ID. Keep the page open, because you need the secret from it too."
+              ],
+              "url": "https://dash.cloudflare.com/?to=/:account/r2/overview",
+              "secret": false
+            },
+            {
+              "name": "S3_SECRET_ACCESS_KEY",
+              "label": "Secret Access Key",
+              "why": "It is the password that goes with the Access Key ID.",
+              "how": [
+                "Create the token as described for the Access Key ID.",
+                "On the confirmation page, copy the Secret Access Key and paste it into the app.",
+                "It is shown only once. If you lose it, create a new token."
+              ],
+              "url": "https://dash.cloudflare.com/?to=/:account/r2/overview",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://developers.cloudflare.com/r2/get-started/",
+            "https://developers.cloudflare.com/r2/get-started/s3/",
+            "https://developers.cloudflare.com/r2/api/tokens/",
+            "https://developers.cloudflare.com/r2/reference/data-location/",
+            "https://developers.cloudflare.com/r2/pricing/",
+            "https://developers.cloudflare.com/billing/understand/billing-policy/"
+          ]
+        },
+        {
+          "id": "b2",
+          "name": "Backblaze B2",
+          "why": "The cheapest to keep more than a little in.",
+          "free": {
+            "text": "10 GB stored",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$6.95 a TB a month; downloads free up to 3 times what you store",
+            "read": "2026-11-25"
+          },
+          "catch": "No upload straight from a form in the browser.",
+          "page": "https://www.backblaze.com/cloud-storage/pricing",
+          "keys": [
+            {
+              "name": "S3_ENDPOINT",
+              "label": "Endpoint",
+              "why": "It tells the app which web address to send files to.",
+              "how": [
+                "Make a Backblaze B2 account, or sign in.",
+                "In the left menu under B2 Cloud Storage, click Buckets and make your bucket if you have none yet.",
+                "Find the Endpoint field of your bucket and copy it. It looks like s3.us-west-004.backblazeb2.com.",
+                "Type https:// in front of it when you paste it into the app."
+              ],
+              "url": "https://secure.backblaze.com/user_signin.htm",
+              "secret": false,
+              "looks": {
+                "starts": [
+                  "https://s3."
+                ],
+                "say": "looks like https://s3.your-region.backblazeb2.com"
+              }
+            },
+            {
+              "name": "S3_BUCKET",
+              "label": "Bucket name",
+              "why": "It is the storage folder the app puts its files in.",
+              "how": [
+                "Sign in, then in the left menu under B2 Cloud Storage click Buckets.",
+                "Click Create a Bucket, type a name (you are told if it is taken) and choose Private.",
+                "Click Create a Bucket and copy the name exactly."
+              ],
+              "url": "https://secure.backblaze.com/user_signin.htm",
+              "secret": false
+            },
+            {
+              "name": "S3_ACCESS_KEY_ID",
+              "label": "keyID",
+              "why": "It tells Backblaze which key the app is using.",
+              "how": [
+                "In the left menu under B2 Cloud Storage, click Application Keys, then Add a New Application Key. The master key will not work here.",
+                "Name it, choose your bucket under Allow Access to Bucket(s), and keep Read and Write.",
+                "If you chose one bucket, also tick Allow List All Bucket Names, which many apps need.",
+                "Click Create New Key and copy the keyID."
+              ],
+              "url": "https://secure.backblaze.com/user_signin.htm",
+              "secret": false
+            },
+            {
+              "name": "S3_SECRET_ACCESS_KEY",
+              "label": "applicationKey",
+              "why": "It is the password that goes with the keyID.",
+              "how": [
+                "Create the key as described for the keyID.",
+                "Copy the applicationKey at once and paste it into the app.",
+                "It appears only once. If you lose it, make a new key."
+              ],
+              "url": "https://secure.backblaze.com/user_signin.htm",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://www.backblaze.com/docs/cloud-storage-enable-backblaze-b2",
+            "https://www.backblaze.com/docs/cloud-storage-create-and-manage-buckets",
+            "https://www.backblaze.com/docs/cloud-storage-create-and-manage-app-keys",
+            "https://www.backblaze.com/docs/cloud-storage-s3-compatible-app-keys",
+            "https://www.backblaze.com/docs/cloud-storage-call-the-s3-compatible-api",
+            "https://www.backblaze.com/apidocs/introduction-to-the-s3-compatible-api",
+            "https://help.backblaze.com/hc/en-us/articles/360047425453-Getting-Started-with-the-S3-Compatible-API",
+            "https://www.backblaze.com/cloud-storage",
+            "https://www.backblaze.com/cloud-storage/pricing"
+          ]
+        },
+        {
+          "id": "hetzner-storage",
+          "name": "Hetzner Object Storage",
+          "why": "One flat price, kept in Germany.",
+          "paid": {
+            "text": "€6.49 a month plus VAT, with 1 TB stored and 1 TB downloaded",
+            "read": "2026-11-25"
+          },
+          "catch": "Billed while a bucket exists, even an empty one. New buckets in Helsinki are paused since 19 November 2026: choose Falkenstein or Nuremberg.",
+          "page": "https://www.hetzner.com/storage/object-storage/",
+          "keys": [
+            {
+              "name": "S3_ENDPOINT",
+              "label": "Endpoint",
+              "why": "It tells the app which web address to send files to.",
+              "how": [
+                "Note the location of your bucket: Falkenstein is fsn1 and Nuremberg is nbg1.",
+                "For Falkenstein the address is https://fsn1.your-objectstorage.com",
+                "For Nuremberg, swap fsn1 for nbg1, and paste the address into the app without the bucket name."
+              ],
+              "url": "https://console.hetzner.com/",
+              "secret": false,
+              "looks": {
+                "starts": [
+                  "https://"
+                ],
+                "say": "looks like https://fsn1.your-objectstorage.com"
+              }
+            },
+            {
+              "name": "S3_BUCKET",
+              "label": "Bucket name",
+              "why": "It is the storage folder the app puts its files in.",
+              "how": [
+                "Sign in to Hetzner Console (a new account needs your address and a payment method, and may be checked first) and open a project.",
+                "Click Object Storage in the left menu, then Create Bucket.",
+                "Pick Falkenstein or Nuremberg (new buckets in Helsinki are paused for now), a name nobody else at Hetzner uses, and Private.",
+                "Click Create & Buy now: it is paid for while the bucket exists, even empty.",
+                "Copy the bucket name exactly."
+              ],
+              "url": "https://console.hetzner.com/",
+              "secret": false
+            },
+            {
+              "name": "S3_ACCESS_KEY_ID",
+              "label": "Access key",
+              "why": "It tells Hetzner which key the app is using.",
+              "how": [
+                "In the same project as your bucket, click Security in the left menu.",
+                "Open S3 Credentials at the top and select Generate credentials.",
+                "Type a description, create them, and copy the access key from the top box.",
+                "By default these keys work for every bucket in that project."
+              ],
+              "url": "https://console.hetzner.com/",
+              "secret": false
+            },
+            {
+              "name": "S3_SECRET_ACCESS_KEY",
+              "label": "Secret key",
+              "why": "It is the password that goes with the access key.",
+              "how": [
+                "Generate the credentials as described for the access key.",
+                "Copy the secret key from the bottom box before you close the window.",
+                "It cannot be viewed again. If you lose it, generate new credentials."
+              ],
+              "url": "https://console.hetzner.com/",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.hetzner.com/storage/object-storage/overview/",
+            "https://docs.hetzner.com/storage/object-storage/getting-started/creating-a-bucket/",
+            "https://docs.hetzner.com/storage/object-storage/getting-started/generating-s3-keys/",
+            "https://www.hetzner.com/storage/object-storage/",
+            "https://docs.hetzner.com/general/billing-and-account-management/account-getting-started/",
+            "https://docs.hetzner.com/cloud/general/faq/",
+            "https://docs.hetzner.com/general/security-and-identify/fraud-prevention-faq/",
+            "https://status.hetzner.com/incident/b009f3fc-8508-48b3-877f-dcaada10e7bc"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "Amazon S3",
+          "why": "its account set-up and download fees"
+        },
+        {
+          "name": "Wasabi",
+          "why": "a 1 TB minimum"
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "name": "A model, with your own key",
+      "what": "the model an app's AI features ask once it runs outside Hydor (inside Hydor it uses your models)",
+      "services": [
+        {
+          "id": "anthropic",
+          "name": "Anthropic",
+          "default": true,
+          "why": "The one the AI features are written and tested against.",
+          "paid": {
+            "text": "Haiku 5.5 $0.10 in and $0.50 out, Sonnet 5.5 $2 and $10, a million tokens; paid in advance",
+            "read": "2026-11-25"
+          },
+          "catch": "No region in the EU, and no embeddings.",
+          "page": "https://platform.claude.com/docs/en/about-claude/pricing",
+          "keys": [
+            {
+              "name": "ANTHROPIC_API_KEY",
+              "label": "Claude API key",
+              "why": "It lets the app ask Claude questions, billed to your account.",
+              "how": [
+                "Sign in or create an account at platform.claude.com. This is billed apart from a Claude chat subscription.",
+                "It costs money: on the Billing page click Buy credits. Credits are paid in advance, expire after a year and are not refunded.",
+                "Open the API keys page and click Create key.",
+                "Name it, pick when it expires, link it to yourself and choose the Default workspace.",
+                "Copy the key right away, because it is shown only once. When it expires, make a new one."
+              ],
+              "url": "https://platform.claude.com/settings/keys",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "sk-ant-"
+                ],
+                "say": "starts with sk-ant-"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://platform.claude.com/docs/en/get-api-key",
+            "https://support.claude.com/en/articles/8977456-how-do-i-pay-for-my-claude-api-usage",
+            "https://academy.claude.com/courses/building-with-the-claude-api/getting-an-api-key",
+            "https://support.claude.com/en/articles/9876003-i-have-a-paid-claude-subscription-pro-max-team-or-enterprise-plans-why-is-claude-api-usage-billed-separately-from-my-paid-claude-plan"
+          ]
+        },
+        {
+          "id": "openai",
+          "name": "OpenAI",
+          "why": "One key for models and embeddings.",
+          "paid": {
+            "text": "GPT-6 Luna $0.10 in and $0.50 out a million tokens; from $5 of credit in advance",
+            "read": "2026-11-25"
+          },
+          "catch": "Automatic top-up is on when you first buy: turn it off if you do not want it.",
+          "page": "https://developers.openai.com/api/docs/pricing",
+          "keys": [
+            {
+              "name": "OPENAI_API_KEY",
+              "label": "OpenAI API key",
+              "why": "It lets the app use OpenAI's models, billed to your account.",
+              "how": [
+                "Sign in or create an account on the OpenAI platform. API use is billed apart from a ChatGPT subscription.",
+                "It costs money: in Billing, add payment details and buy credit in advance.",
+                "Auto-reload is on by default when you first buy. Turn it off if you do not want automatic charges. Credits expire.",
+                "Open the API keys page and create a new secret key.",
+                "Copy it right away, because the full key is shown only when you create it."
+              ],
+              "url": "https://platform.openai.com/api-keys",
+              "secret": true,
+              "looks": {
+                "say": "is the secret key OpenAI shows once"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://developers.openai.com/api/docs/quickstart",
+            "https://help.openai.com/en/articles/4936850-where-do-i-find-my-openai-api-key",
+            "https://help.openai.com/en/articles/8264644-setting-up-and-managing-prepaid-api-billing",
+            "https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform",
+            "https://developers.openai.com/api/docs/libraries/openai-cli"
+          ]
+        },
+        {
+          "id": "gemini",
+          "name": "Google Gemini",
+          "why": "Paid like the others for an app that serves people in the EEA, the UK or Switzerland, where its free tier may not be used; free to try elsewhere.",
+          "free": {
+            "text": "Limited models and use; not for people in the EEA, UK or Switzerland",
+            "read": "2026-11-26"
+          },
+          "paid": {
+            "text": "Gemini 3.5 Flash-Lite $0.30 in and $2.50 out a million tokens",
+            "read": "2026-11-25"
+          },
+          "catch": "Elsewhere, Google may use what you send on the free tier to improve its products.",
+          "page": "https://ai.google.dev/gemini-api/docs/pricing",
+          "keys": [
+            {
+              "name": "GEMINI_API_KEY",
+              "label": "Gemini API key",
+              "why": "It lets the app use Google's Gemini models.",
+              "how": [
+                "If the app serves people in the EEA, the UK or Switzerland, set up billing: Google's terms allow only the paid tier there.",
+                "Open Google AI Studio's API keys page and sign in with a Google account. You must be 18 or older.",
+                "New users get a key made for them. Otherwise click Create API key, then copy the key.",
+                "On the free tier elsewhere, Google may use what you send to improve its products, and people may review it: send nothing private.",
+                "For paid use, click Set up billing and add a payment method: what is sent then is not used that way."
+              ],
+              "url": "https://aistudio.google.com/apikey",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://aistudio.google.com/docs/api-key",
+            "https://ai.google.dev/gemini-api/docs/get-started",
+            "https://aistudio.google.com/docs/pricing",
+            "https://aistudio.google.com/docs/billing",
+            "https://aistudio.google.com/docs/terms"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "OpenRouter",
+          "why": "a fee on every top-up and a catalogue too long to choose from (an app may still use it as another provider)"
+        }
+      ]
+    },
+    {
+      "id": "payments",
+      "name": "Taking payments",
+      "what": "charging people: sales, subscriptions, donations",
+      "services": [
+        {
+          "id": "stripe",
+          "name": "Stripe",
+          "default": true,
+          "why": "The only one that also allows physical goods, services, donations and club fees.",
+          "paid": {
+            "text": "2.9% + 30¢ a US card sale, no monthly fee",
+            "read": "2026-11-25"
+          },
+          "catch": "Sales tax is yours to handle (Stripe Tax costs extra), and you can sign up only in some countries.",
+          "page": "https://stripe.com/pricing",
+          "keys": [
+            {
+              "name": "STRIPE_SECRET_KEY",
+              "label": "Secret key (test)",
+              "why": "It lets the app create checkouts and read what people have paid.",
+              "how": [
+                "Create a Stripe account or sign in. Testing in a sandbox is available at once and moves no real money.",
+                "Click the account picker, choose Sandboxes, and create or open a sandbox.",
+                "Open the API keys page. Copy the sandbox's secret key, or click Create secret key and enter the code Stripe sends you.",
+                "Real payments later need your account set up and a live key; Stripe has no monthly fee but takes a fee on each payment."
+              ],
+              "url": "https://dashboard.stripe.com/apikeys",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "sk_test_",
+                  "sk_live_",
+                  "rk_test_",
+                  "rk_live_"
+                ],
+                "say": "starts with sk_test_ while you try things, and sk_live_ for real money",
+                "not": [
+                  {
+                    "starts": "pk_",
+                    "say": "That is the publishable key. Paste the secret key, which starts sk_."
+                  },
+                  {
+                    "starts": "sk_live_",
+                    "when": "place = hydor or place = local",
+                    "say": "That is a live key: real money would move. Here use a test key, which starts sk_test_."
+                  }
+                ]
+              }
+            },
+            {
+              "name": "STRIPE_WEBHOOK_SECRET",
+              "label": "Webhook signing secret",
+              "why": "It lets the app be sure a message about a payment really came from Stripe.",
+              "how": [
+                "In the same sandbox, open the Webhooks tab in Workbench and click Create an event destination.",
+                "Choose Your account, then the payload style and events your app asks for, and continue.",
+                "Choose Webhook endpoint, and paste the app's public https address for Stripe messages.",
+                "Open the new endpoint, click Reveal secret and copy it. Live mode and each endpoint have their own secret."
+              ],
+              "url": "https://dashboard.stripe.com/webhooks",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "whsec_"
+                ],
+                "say": "starts with whsec_"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.stripe.com/keys",
+            "https://docs.stripe.com/webhooks",
+            "https://docs.stripe.com/sandboxes",
+            "https://docs.stripe.com/get-started/account",
+            "https://stripe.com/pricing"
+          ]
+        },
+        {
+          "id": "polar",
+          "name": "Polar",
+          "why": "Handles sales tax for software, courses and other digital things.",
+          "paid": {
+            "text": "5% + 50¢ a sale, no monthly fee",
+            "read": "2026-11-25"
+          },
+          "catch": "No physical goods, services or donations; new accounts wait 7 days for payouts.",
+          "page": "https://polar.sh/resources/pricing",
+          "keys": [
+            {
+              "name": "POLAR_ACCESS_TOKEN",
+              "label": "Organization access token (sandbox)",
+              "why": "It lets the app create checkouts and read your sales on Polar.",
+              "how": [
+                "Open Polar's sandbox and make an account and organization there. It is separate from real Polar and moves no real money.",
+                "In your organization's Settings, open Access Tokens and click Create token.",
+                "Give it a name, an expiry date and the permissions your app asks for, then create it and copy it.",
+                "To sell for real, repeat on polar.sh: Polar reviews your account first (up to 14 days) and takes a fee per sale."
+              ],
+              "url": "https://sandbox.polar.sh/start",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "polar_oat_"
+                ],
+                "say": "starts with polar_oat_"
+              }
+            },
+            {
+              "name": "POLAR_WEBHOOK_SECRET",
+              "label": "Webhook secret",
+              "why": "It lets the app be sure a message about a sale really came from Polar.",
+              "how": [
+                "In the same sandbox organization, open Settings, then Webhooks, and click Add Endpoint.",
+                "Paste the app's public address for Polar messages, leave the format on Raw and select the events it asks for.",
+                "Save, open the endpoint, click Copy Secret and paste it into the app. Real Polar has its own, different secret."
+              ],
+              "url": "https://sandbox.polar.sh/start",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "whsec_"
+                ],
+                "say": "starts with whsec_"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://polar.sh/docs/integrate/sandbox",
+            "https://polar.sh/docs/integrate/oat",
+            "https://polar.sh/docs/api-reference/2026-10/introduction",
+            "https://polar.sh/docs/integrate/webhooks/endpoints",
+            "https://polar.sh/docs/integrate/webhooks/delivery",
+            "https://polar.sh/docs/api-reference/2026-10/webhooks/create-webhook-endpoint",
+            "https://polar.sh/docs/merchant-of-record/account-reviews",
+            "https://polar.sh/resources/pricing"
+          ]
+        },
+        {
+          "id": "paddle",
+          "name": "Paddle",
+          "why": "Handles sales tax for software companies, and has done so for long.",
+          "paid": {
+            "text": "5% + 50¢ a sale",
+            "read": "2026-11-25"
+          },
+          "catch": "Software only: no physical goods or donations, and a live account is approved first.",
+          "page": "https://www.paddle.com/pricing",
+          "keys": [
+            {
+              "name": "PADDLE_API_KEY",
+              "label": "API key (sandbox)",
+              "why": "It lets the app read and manage your sales and subscriptions in Paddle.",
+              "how": [
+                "Sign up for a free Paddle sandbox account at sandbox-vendors.paddle.com/signup. It is separate and takes no real money.",
+                "Go to Paddle, then My account, Settings, Authentication, open the API keys tab and click New API key.",
+                "Name and describe it, tick only the permissions your app needs, and set an expiry (90 days by default, one year at most).",
+                "Click Save and copy the key right away, because it is shown only once. Replace it before it expires.",
+                "Selling for real needs a live account that Paddle approves (website, identity, business if not a sole trader) and a new live key."
+              ],
+              "url": "https://sandbox-vendors.paddle.com/",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "pdl_sdbx_apikey_",
+                  "pdl_live_apikey_"
+                ],
+                "say": "starts with pdl_sdbx_apikey_ for the sandbox",
+                "not": [
+                  {
+                    "starts": "pdl_live_",
+                    "when": "place = hydor or place = local",
+                    "say": "That is a live key: real money would move. Here use a sandbox key."
+                  }
+                ]
+              }
+            },
+            {
+              "name": "PADDLE_WEBHOOK_SECRET",
+              "label": "Webhook secret key",
+              "why": "It lets the app be sure a message about a sale really came from Paddle.",
+              "how": [
+                "In the same sandbox account, go to Paddle, then Events, Notifications, and click New destination.",
+                "Set the type to URL, paste the app's public address for Paddle messages and choose the events it asks for.",
+                "Click Save destination, open it again and copy its Secret key. A live account needs its own destination and secret."
+              ],
+              "url": "https://sandbox-vendors.paddle.com/",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "pdl_ntfset_"
+                ],
+                "say": "starts with pdl_ntfset_"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://developer.paddle.com/sdks/sandbox/",
+            "https://developer.paddle.com/api-reference/about/authentication/",
+            "https://developer.paddle.com/webhooks/about/",
+            "https://developer.paddle.com/webhooks/about/signature-verification/",
+            "https://developer.paddle.com/api-reference/notification-settings/create-notification-setting/",
+            "https://developer.paddle.com/build/go-live-checklist/",
+            "https://developer.paddle.com/get-started/starter-kits/nextjs-saas/",
+            "https://www.paddle.com/help/start/account-verification/what-is-account-verification",
+            "https://www.paddle.com/pricing"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "Lemon Squeezy",
+          "why": "it closes on 31 March 2027, by its own page"
+        }
+      ]
+    },
+    {
+      "id": "signin",
+      "name": "Sign-in with another account",
+      "what": "a \"Sign in with …\" button besides the app's own accounts",
+      "builtIn": {
+        "say": "A link sent by mail, and passkeys, need no service.",
+        "until": "people ask for a button"
+      },
+      "services": [
+        {
+          "id": "google",
+          "name": "Google",
+          "default": true,
+          "why": "Nearly everyone has an account, and plain sign-in needs no review.",
+          "catch": "Press Publish app before real people sign in; Google may ask to verify before it shows your name and logo.",
+          "page": "https://support.google.com/cloud/answer/15549945",
+          "keys": [
+            {
+              "name": "GOOGLE_CLIENT_ID",
+              "label": "Client ID",
+              "why": "It tells Google which app is asking to sign a person in.",
+              "how": [
+                "Open the Google Auth Platform in Google Cloud, sign in, and pick or create a project.",
+                "Fill in the Branding page (app name and contact details) and save. For people outside your organisation, choose External as the audience.",
+                "Open the Clients page, click Create client, and choose Web application as the application type.",
+                "Under Authorized redirect URIs add your app's address followed by the app's own callback path. It must start with https, except on localhost.",
+                "Click Create, then copy the Client ID. Copy the client secret now as well: it is shown only this once.",
+                "Before real users arrive, click Publish app. Google may ask for verification before showing your name and logo."
+              ],
+              "url": "https://console.developers.google.com/auth/clients",
+              "secret": false,
+              "looks": {
+                "pattern": ".+\\.apps\\.googleusercontent\\.com",
+                "say": "ends with .apps.googleusercontent.com"
+              }
+            },
+            {
+              "name": "GOOGLE_CLIENT_SECRET",
+              "label": "Client secret",
+              "why": "The app uses it to prove to Google that sign-in requests really come from it.",
+              "how": [
+                "Create the Web application client as described for the Client ID.",
+                "Copy the client secret from the box shown right after you click Create, and keep it somewhere safe.",
+                "If you lose it you cannot view it again: open the client on the Clients page and rotate the secret to get a new one."
+              ],
+              "url": "https://console.developers.google.com/auth/clients",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid",
+            "https://support.google.com/cloud/answer/15549257",
+            "https://support.google.com/cloud/answer/15549945"
+          ],
+          "unconfirmed": [
+            "What plain sign-in costs: no Google page read says it is free (the steps ask for no payment)."
+          ]
+        },
+        {
+          "id": "github",
+          "name": "GitHub",
+          "why": "For tools that developers use: the shortest set-up.",
+          "catch": "Most people outside software have no GitHub account.",
+          "page": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app",
+          "keys": [
+            {
+              "name": "GITHUB_CLIENT_ID",
+              "label": "Client ID",
+              "why": "It tells GitHub which app is asking to sign a person in.",
+              "how": [
+                "Sign in to GitHub, click your picture, then Settings, Developer settings, OAuth apps.",
+                "Click New OAuth App (it may read Register a new application) and enter the app's name and its web address as Homepage URL.",
+                "In Authorization callback URL enter your app's address followed by the app's own callback path.",
+                "Expire user access tokens is ticked by default; untick it only if your app says it cannot renew sign-ins.",
+                "Click Register application, then copy the Client ID."
+              ],
+              "url": "https://github.com/settings/developers",
+              "secret": false
+            },
+            {
+              "name": "GITHUB_CLIENT_SECRET",
+              "label": "Client secret",
+              "why": "The app uses it to prove to GitHub that sign-in requests really come from it.",
+              "how": [
+                "Open your OAuth app under Settings, Developer settings, OAuth apps.",
+                "Next to Client secrets click Generate a new client secret.",
+                "Copy the new secret right away and keep it somewhere safe; if it is lost or leaked, generate a new one."
+              ],
+              "url": "https://github.com/settings/developers",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app",
+            "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
+            "https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api"
+          ],
+          "unconfirmed": [
+            "What an OAuth app costs: no GitHub page read says it is free (GitHub's steps ask for no payment)."
+          ]
+        },
+        {
+          "id": "microsoft",
+          "name": "Microsoft",
+          "why": "Where people sign in with their work accounts.",
+          "free": {
+            "text": "Entra ID Free, included with an Azure or Microsoft 365 subscription",
+            "read": "2026-11-26"
+          },
+          "catch": "It needs an Azure subscription, and the free one asks for a credit or debit card. The app's secret lasts 24 months at most.",
+          "page": "https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app",
+          "keys": [
+            {
+              "name": "MICROSOFT_CLIENT_ID",
+              "label": "Application (client) ID",
+              "why": "It tells Microsoft which app is asking to sign a person in.",
+              "how": [
+                "You need an Azure account with a subscription: even the free one asks for a phone number and a bank card.",
+                "Sign in to the Microsoft Entra admin center, open Entra ID, then App registrations, and click New registration.",
+                "Enter a name people will recognise. Under Supported account types choose Any Entra ID Tenant + Personal Microsoft accounts, then Register.",
+                "Copy the Application (client) ID from the Overview page.",
+                "Open Authentication, click Add Redirect URI, choose Web, enter your app's address followed by its callback path, and click Configure."
+              ],
+              "url": "https://entra.microsoft.com",
+              "secret": false
+            },
+            {
+              "name": "MICROSOFT_CLIENT_SECRET",
+              "label": "Client secret value",
+              "why": "The app uses it to prove to Microsoft that sign-in requests really come from it.",
+              "how": [
+                "In the same app registration open Certificates & secrets, then Client secrets, and click New client secret.",
+                "Add a description, pick how long it lasts (24 months at most), and click Add.",
+                "Copy the text in the Value column straight away, not the Secret ID. It is never shown again after you leave the page.",
+                "Note the expiry date: sign-in with this secret needs a new one before then."
+              ],
+              "url": "https://entra.microsoft.com",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app",
+            "https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-redirect-uri",
+            "https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-credentials",
+            "https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant",
+            "https://azure.microsoft.com/en-us/pricing/purchase-options/azure-account",
+            "https://www.microsoft.com/en-us/security/microsoft-entra-pricing"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "Apple",
+          "why": "a yearly fee and a secret to renew twice a year, unless there is an iPhone app"
+        }
+      ]
+    },
+    {
+      "id": "sms",
+      "name": "Text messages",
+      "what": "texts to people's phones, only when they are asked for",
+      "builtIn": {
+        "say": "Not offered unless asked for: each text costs money and US senders wait days to register; a code by mail has neither.",
+        "until": "the person asks for texts"
+      },
+      "services": [
+        {
+          "id": "twilio",
+          "name": "Twilio",
+          "default": true,
+          "why": "The one to use when texts are wanted: well documented, with a sole-trader route in the US.",
+          "paid": {
+            "text": "About 1.2 to 1.3¢ a US text, about 11¢ one to Germany; a sign-in code 5¢ plus the text",
+            "read": "2026-11-25"
+          },
+          "catch": "US senders register first, which takes days, and bots can run up your bill with texts.",
+          "page": "https://www.twilio.com/en-us/sms/pricing/us",
+          "keys": [
+            {
+              "name": "TWILIO_ACCOUNT_SID",
+              "label": "Account SID",
+              "why": "It identifies your Twilio account when the app sends text messages.",
+              "how": [
+                "Make a Twilio account. The trial only texts numbers you have verified.",
+                "Sign in to the Twilio Console.",
+                "On the Console home page, copy the Account SID."
+              ],
+              "url": "https://console.twilio.com/",
+              "secret": false,
+              "looks": {
+                "starts": [
+                  "AC"
+                ],
+                "say": "starts with AC, 34 characters in all"
+              }
+            },
+            {
+              "name": "TWILIO_AUTH_TOKEN",
+              "label": "Auth Token",
+              "why": "It is the password the app uses to send messages from your account.",
+              "how": [
+                "Sign in to the Twilio Console.",
+                "Open Workbench's Overview tab and find the Auth Token.",
+                "Click the eye icon to show it, or the copy icon. Keep it private: with it and the SID, others can send messages that you pay for."
+              ],
+              "url": "https://console.twilio.com/",
+              "secret": true
+            },
+            {
+              "name": "TWILIO_FROM_NUMBER",
+              "label": "Sender phone number",
+              "why": "It is the number your app's text messages are sent from.",
+              "how": [
+                "Upgrade to a paid account (you add payment details) to send your own wording to any customer.",
+                "Open Phone Numbers, then Buy a number, choose one that can send texts and buy it (it is paid monthly).",
+                "To text US numbers from an ordinary 10-digit number, complete Twilio's A2P 10DLC registration, which has fees.",
+                "Copy the number with the plus sign and country code, with no spaces."
+              ],
+              "url": "https://console.twilio.com/us1/develop/phone-numbers/manage/search",
+              "secret": false,
+              "looks": {
+                "starts": [
+                  "+"
+                ],
+                "say": "starts with + and the country code"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://www.twilio.com/docs/usage/tutorials/how-to-use-your-free-trial-account",
+            "https://www.twilio.com/docs/glossary/what-is-a-sid",
+            "https://www.twilio.com/docs/glossary/what-e164",
+            "https://www.twilio.com/en-us/sms/pricing/us",
+            "https://www.twilio.com/docs/messaging/compliance/a2p-10dlc",
+            "https://www.twilio.com/docs/usage/workbench"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "Plivo, Telnyx and others",
+          "why": "no clearer fees for registration or Europe"
+        }
+      ]
+    },
+    {
+      "id": "visits",
+      "name": "Seeing how the app is used",
+      "what": "counting visits and what people do",
+      "row": "Seeing use and errors",
+      "builtIn": {
+        "say": "The app's own counts, in its database: no cookies and no outside service.",
+        "until": "the person asks for an outside service"
+      },
+      "services": [
+        {
+          "id": "umami",
+          "name": "Umami",
+          "default": true,
+          "why": "Free for one website, with no cookie banner to write for it.",
+          "free": {
+            "text": "100,000 events a month for one website",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$20 a month",
+            "read": "2026-11-25"
+          },
+          "catch": "Only one website free.",
+          "page": "https://umami.is/pricing",
+          "keys": [
+            {
+              "name": "UMAMI_WEBSITE_ID",
+              "label": "Website ID",
+              "why": "It tells Umami which website the visit counts belong to.",
+              "how": [
+                "Sign up at Umami Cloud and take the Hobby plan.",
+                "Click Websites in the sidebar, then Add website, enter a name and your domain, and click Save.",
+                "Click Edit on that website and find the Tracking code section.",
+                "Copy only the long code in quotes after data-website-id."
+              ],
+              "url": "https://cloud.umami.is/signup",
+              "secret": false,
+              "looks": {
+                "say": "a UUID: a long code of letters and numbers in groups joined by hyphens"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.umami.is/docs/cloud",
+            "https://docs.umami.is/docs/add-a-website",
+            "https://docs.umami.is/docs/collect-data",
+            "https://docs.umami.is/docs/metric-definitions",
+            "https://docs.umami.is/docs/tracker-configuration",
+            "https://umami.is/pricing"
+          ]
+        },
+        {
+          "id": "plausible",
+          "name": "Plausible",
+          "why": "The simplest reports, with no cookies.",
+          "paid": {
+            "text": "From $9 a month, after 30 days free to try",
+            "read": "2026-11-25"
+          },
+          "catch": "No free tier.",
+          "page": "https://plausible.io/",
+          "keys": [
+            {
+              "name": "PLAUSIBLE_DOMAIN",
+              "label": "Site domain",
+              "why": "It tells Plausible which website the visit counts belong to.",
+              "how": [
+                "Create a Plausible account. There is a 30-day free trial with no card; after that it is a paid service.",
+                "On the Add a website page, type your domain in the Domain field, without https:// or www.",
+                "Use that same text here, exactly as you entered it in Plausible."
+              ],
+              "url": "https://plausible.io/register",
+              "secret": false,
+              "looks": {
+                "say": "a bare domain such as yourdomain.com, without https:// or www"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://plausible.io/docs/add-website",
+            "https://plausible.io/"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "PostHog",
+          "why": "far more than a small app needs"
+        }
+      ]
+    },
+    {
+      "id": "errors",
+      "name": "Seeing errors",
+      "what": "knowing when the app breaks",
+      "row": "Seeing use and errors",
+      "builtIn": {
+        "say": "The app's own log, shown on its Run tab.",
+        "until": "the person asks for an outside service"
+      },
+      "services": [
+        {
+          "id": "sentry",
+          "name": "Sentry",
+          "default": true,
+          "why": "The standard, with a free plan that fits a small app.",
+          "free": {
+            "text": "5,000 errors a month for one person",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$29 a month ($26 paid yearly)",
+            "read": "2026-11-25"
+          },
+          "catch": "The free plan is for one person.",
+          "page": "https://sentry.io/pricing/",
+          "keys": [
+            {
+              "name": "SENTRY_DSN",
+              "label": "DSN",
+              "why": "It is the address the app sends its error reports to.",
+              "how": [
+                "Make a Sentry account and take the Developer plan.",
+                "Open Projects, click Create Project, choose the platform your app is built with, name it, and click Create Project.",
+                "Copy the DSN shown in the setup guide.",
+                "To find it later, open the project's Settings, then Client Keys (DSN)."
+              ],
+              "url": "https://sentry.io/signup/",
+              "secret": false,
+              "looks": {
+                "starts": [
+                  "https://"
+                ],
+                "say": "a web address with a key before an @ sign and a project number at the end"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.sentry.io/concepts/key-terms/dsn-explainer/",
+            "https://docs.sentry.io/product/sentry-basics/integrate-frontend/create-new-project/",
+            "https://sentry.io/pricing/"
+          ]
+        },
+        {
+          "id": "bugsink",
+          "name": "Bugsink",
+          "why": "More free events, the same libraries, and you can run it yourself.",
+          "free": {
+            "text": "15,000 events a month for one person",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$16 a month for 75,000",
+            "read": "2026-11-25"
+          },
+          "catch": "A small company's service.",
+          "page": "https://www.bugsink.com/",
+          "keys": [
+            {
+              "name": "SENTRY_DSN",
+              "label": "DSN",
+              "why": "It is the address in your Bugsink that the app sends its error reports to.",
+              "how": [
+                "Sign up for hosted Bugsink, or run it yourself on your own server.",
+                "Sign in and create a team if Bugsink asks. On your own install, change the default admin password.",
+                "On the Projects page, use the button at the top right to make a project, name it and save.",
+                "Copy the DSN from the Connect your Application instructions that appear."
+              ],
+              "url": "https://www.bugsink.com/register/15K/",
+              "secret": false,
+              "looks": {
+                "starts": [
+                  "https://",
+                  "http://"
+                ],
+                "say": "a web address pointing at your Bugsink, with a key before an @ sign"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://www.bugsink.com/",
+            "https://www.bugsink.com/docs/quickstart/",
+            "https://www.bugsink.com/docs/docker-install/"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "PostHog",
+          "why": "far more than a small app needs"
+        }
+      ]
+    },
+    {
+      "id": "uptime",
+      "name": "Knowing it is up",
+      "what": "being told when the app stops answering",
+      "row": "Seeing use and errors",
+      "services": [
+        {
+          "id": "uptimerobot",
+          "name": "UptimeRobot",
+          "default": true,
+          "why": "Free checks every few minutes, for business use too.",
+          "free": {
+            "text": "50 monitors, checked every 5 minutes",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$12 a month paid yearly",
+            "read": "2026-11-25"
+          },
+          "catch": "Checks every 5 minutes at most on the free plan.",
+          "page": "https://uptimerobot.com/pricing/",
+          "keys": [],
+          "setup": [
+            "Create a free UptimeRobot account (no card needed): 50 monitors, checked every 5 minutes.",
+            "Sign in and click Add New Monitor.",
+            "Choose HTTP(s) and enter your app's web address; the friendly name fills in and you can change it.",
+            "Select who gets the alerts, such as your own email.",
+            "Set the checking interval and region, then click Create monitor."
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://help.uptimerobot.com/en/articles/11358364-how-to-create-your-first-monitor",
+            "https://uptimerobot.com/pricing/"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "Better Stack",
+          "why": "its free tier is not for business use"
+        }
+      ]
+    },
+    {
+      "id": "domain",
+      "name": "A domain",
+      "what": "an address of your own, like yourname.com",
+      "services": [
+        {
+          "id": "cloudflare",
+          "name": "Cloudflare Registrar",
+          "default": true,
+          "why": "At cost, with no jump at renewal, and an agent can set its DNS with one token.",
+          "paid": {
+            "text": "Domains at cost: the price depends on the ending, and renewal has no surcharge",
+            "read": "2026-11-25"
+          },
+          "catch": "The domain uses Cloudflare's name servers.",
+          "page": "https://www.cloudflare.com/products/registrar/",
+          "keys": [
+            {
+              "name": "CLOUDFLARE_API_TOKEN",
+              "label": "API token (Edit zone DNS)",
+              "why": "It lets the app add and change your domain's DNS records so the address points to it.",
+              "how": [
+                "To buy a domain: verify your Cloudflare email, open Register domains, search, click Purchase, add contact and payment details. It costs money yearly.",
+                "Open My Profile, then API Tokens, and click Create Token.",
+                "Pick the Edit zone DNS template and limit it to your own domain.",
+                "Click Continue to summary, then Create Token.",
+                "Copy the token immediately; it is shown only once."
+              ],
+              "url": "https://dash.cloudflare.com/profile/api-tokens/",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "cfut_",
+                  "cfat_"
+                ],
+                "say": "starts with cfut_ (or cfat_ for an account token); older tokens have no prefix"
+              }
+            }
+          ],
+          "record": {
+            "read": "2026-11-26",
+            "open": "https://dash.cloudflare.com/?to=/:account/:zone/dns/records",
+            "where": "In Cloudflare, choose your domain, open “DNS” and then “Records”, and press “Add record”.",
+            "type": ["Type", "A"],
+            "name": "Name",
+            "value": "IPv4 address",
+            "then": "Set “Proxy status” to “DNS only”, then press “Save”.",
+            "apex": "@",
+            "sources": [
+              "https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/",
+              "https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-subdomain/"
+            ]
+          },
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://developers.cloudflare.com/registrar/",
+            "https://developers.cloudflare.com/registrar/get-started/register-domain/",
+            "https://developers.cloudflare.com/fundamentals/api/get-started/create-token/",
+            "https://developers.cloudflare.com/fundamentals/api/get-started/token-formats/"
+          ]
+        },
+        {
+          "id": "porkbun",
+          "name": "Porkbun",
+          "why": "About the same price, without a Cloudflare account.",
+          "paid": {
+            "text": "A .com about $11.81 a year",
+            "read": "2026-11-25"
+          },
+          "catch": "Turn on API access for each domain, or the key cannot change it.",
+          "page": "https://porkbun.com/tld/com",
+          "keys": [
+            {
+              "name": "PORKBUN_API_KEY",
+              "label": "API Key",
+              "why": "Together with the secret key, it lets the app change your domain's DNS records.",
+              "how": [
+                "Sign in to Porkbun, click Account at the top right, and choose API Access.",
+                "Name the key, choose its permissions, limit it to your domain if you like, and click Create API Key.",
+                "Copy the API Key, and copy the Secret Key at the same time.",
+                "Go to Domain Management, click Details beside your domain, and turn on API Access."
+              ],
+              "url": "https://porkbun.com/account/api",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "pk1_"
+                ],
+                "say": "starts with pk1_"
+              }
+            },
+            {
+              "name": "PORKBUN_SECRET_API_KEY",
+              "label": "Secret Key",
+              "why": "It is the private half of the key pair that proves the app may change your domain.",
+              "how": [
+                "Create the key as described for the API Key.",
+                "Copy the Secret Key before leaving the page; it is shown only once.",
+                "If you lose it, delete the key and create a new one."
+              ],
+              "url": "https://porkbun.com/account/api",
+              "secret": true,
+              "looks": {
+                "starts": [
+                  "sk1_"
+                ],
+                "say": "starts with sk1_"
+              }
+            }
+          ],
+          "record": {
+            "read": "2026-11-26",
+            "open": "https://porkbun.com/account/domains",
+            "where": "In Porkbun, open “Domain Management”, press “Details” beside your domain, edit “DNS Records”, and press “Add Record”.",
+            "type": ["Type", "A - Address record"],
+            "name": "Host",
+            "value": "Answer",
+            "then": "Press “Add”.",
+            "apex": "",
+            "sources": [
+              "https://kb.porkbun.com/article/231-how-to-add-dns-records-on-porkbun",
+              "https://kb.porkbun.com/article/68-how-to-edit-dns-records"
+            ]
+          },
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://kb.porkbun.com/article/190-getting-started-with-the-porkbun-api",
+            "https://porkbun.com/llms/guides/getting-started",
+            "https://porkbun.com/api/json/v3/documentation"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "GoDaddy, Namecheap and Gandi",
+          "why": "their renewal prices"
+        }
+      ]
+    },
+    {
+      "id": "bots",
+      "name": "Keeping bots out of forms",
+      "what": "stopping programs from filling in the app's forms",
+      "services": [
+        {
+          "id": "turnstile",
+          "name": "Cloudflare Turnstile",
+          "default": true,
+          "why": "Free with no cap, and most people solve nothing.",
+          "free": {
+            "text": "Unlimited checks and 20 widgets",
+            "read": "2026-11-25"
+          },
+          "catch": "It needs a Cloudflare account (the site need not be on Cloudflare).",
+          "page": "https://developers.cloudflare.com/turnstile/plans/",
+          "keys": [
+            {
+              "name": "TURNSTILE_SITE_KEY",
+              "label": "Sitekey",
+              "why": "It shows the bot check on your forms.",
+              "how": [
+                "Sign in to Cloudflare, or make an account, and open the Turnstile page.",
+                "Click Add widget, give it a name, and add the domains your app runs on (up to 10).",
+                "Choose a region and a widget mode (Managed is one of them), then click Create. The region cannot be changed later.",
+                "Copy the Sitekey."
+              ],
+              "url": "https://dash.cloudflare.com/?to=/:account/turnstile",
+              "secret": false
+            },
+            {
+              "name": "TURNSTILE_SECRET_KEY",
+              "label": "Secret key",
+              "why": "The app uses it to ask Cloudflare whether a visitor really passed the check.",
+              "how": [
+                "Create the widget as described for the Sitekey, or open it from the Turnstile page.",
+                "Copy the Secret key.",
+                "Keep it private: it belongs only on the server, never in the page visitors see."
+              ],
+              "url": "https://dash.cloudflare.com/?to=/:account/turnstile",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://developers.cloudflare.com/turnstile/get-started/widget-management/dashboard/",
+            "https://developers.cloudflare.com/turnstile/plans/"
+          ]
+        },
+        {
+          "id": "altcha",
+          "name": "ALTCHA",
+          "why": "No outside account and no cookie: your server does the check.",
+          "free": {
+            "text": "Open source and free",
+            "read": "2026-11-25"
+          },
+          "catch": "A puzzle of work only, so weaker against a determined bot.",
+          "page": "https://altcha.org/",
+          "keys": [
+            {
+              "name": "ALTCHA_HMAC_KEY",
+              "label": "HMAC secret key",
+              "why": "The app signs each bot-check puzzle with it so that nobody can forge one.",
+              "how": [
+                "No account is needed: the open-source library runs inside your own app.",
+                "It signs with a secret of your own (hmacSignatureSecret): let the app make one, or have a password manager make a long random one.",
+                "Keep it private on the server, and keep it the same so that puzzles already sent can still be checked."
+              ],
+              "url": "https://github.com/altcha-org/altcha-lib",
+              "secret": true,
+              "looks": {
+                "say": "a long random string"
+              }
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://altcha.org/llms.txt",
+            "https://altcha.org/open-source-captcha/",
+            "https://github.com/altcha-org/altcha-lib"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "reCAPTCHA",
+          "why": "a Google Cloud project and a hard cap"
+        }
+      ]
+    },
+    {
+      "id": "maps",
+      "name": "Maps",
+      "what": "maps and looking up addresses",
+      "services": [
+        {
+          "id": "geoapify",
+          "name": "Geoapify",
+          "default": true,
+          "why": "Maps and address lookup under one free key, for business use too.",
+          "free": {
+            "text": "3,000 credits a day, with a Powered by Geoapify line by the map",
+            "read": "2026-11-25"
+          },
+          "paid": {
+            "text": "$59 a month",
+            "read": "2026-11-25"
+          },
+          "catch": "The free plan asks for its credit line to show.",
+          "page": "https://www.geoapify.com/pricing/",
+          "keys": [
+            {
+              "name": "GEOAPIFY_API_KEY",
+              "label": "API key",
+              "why": "The app uses it to load maps and look up places or addresses.",
+              "how": [
+                "Sign up at Geoapify's My projects page with email, Google or GitHub.",
+                "Click Create project; its first API key is made automatically.",
+                "Open the project's API keys tab and copy the key. It works at once.",
+                "On the free plan, show Powered by Geoapify beside the map."
+              ],
+              "url": "https://myprojects.geoapify.com/",
+              "secret": true
+            }
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://www.geoapify.com/get-started-with-maps-api/",
+            "https://www.geoapify.com/pricing/",
+            "https://apidocs.geoapify.com/docs/maps/map-tiles/"
+          ]
+        },
+        {
+          "id": "map-file",
+          "name": "A map file of your own",
+          "why": "One file in your own storage: no outside service and no key.",
+          "free": {
+            "text": "The map data is free; you pay your storage",
+            "read": "2026-11-25"
+          },
+          "catch": "You make and upload the file yourself, and looking up addresses needs something else.",
+          "page": "https://docs.protomaps.com/basemaps/downloads",
+          "keys": [],
+          "setup": [
+            "Download the free pmtiles tool from the go-pmtiles releases page on GitHub.",
+            "Pick a recent daily map build at maps.protomaps.com/builds. The whole world is about 120 GB, so cut out only your area.",
+            "Use the tool's extract command with the build's address and your area's corner coordinates; bboxfinder.com helps find them.",
+            "Check the result by dragging the new file onto the viewer at maps.protomaps.com.",
+            "Upload it to your own storage that supports range requests (Cloudflare R2 is recommended) and allow your app's address in its CORS settings.",
+            "Show an OpenStreetMap credit on the map; it is required."
+          ],
+          "stepsRead": "2026-11-26",
+          "sources": [
+            "https://docs.protomaps.com/basemaps/downloads",
+            "https://docs.protomaps.com/guide/getting-started",
+            "https://docs.protomaps.com/pmtiles/cloud-storage"
+          ]
+        }
+      ],
+      "leftOut": [
+        {
+          "name": "OpenStreetMap's own tiles for a busy site",
+          "why": "their policy promises nothing"
+        }
+      ]
+    }
+  ]
+}

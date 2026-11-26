@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "start": {
+    "command": "node server.js",
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "ready": "/",
+    "browserFolders": ["public"]
+  },
+  "money": "units",
+  "actions": {
+    "work out": {
+      "path": "/api/work-out",
+      "method": "POST",
+      "send": "multipart",
+      "input": { "file": "file" },
+      "output": {
+        "total takings": "totalTakings",
+        "candles sold": "candlesSold",
+        "best seller": "bestSeller",
+        "refunds": "refunds",
+        "skipped lines": "skippedLines",
+        "takings for each day": { "path": "days", "item": { "date": "date", "takings": "takings" } }
+      }
+    }
+  }
+}

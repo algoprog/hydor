@@ -1,0 +1,9 @@
+{
+  "name": "kestrel-crews",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Crews that each see only their own customers, jobs and notes, with invitations by link: written by hand, a reference the judge's self-test uses.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "better-sqlite3": "13.0.3" }
+}

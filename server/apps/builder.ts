@@ -26,6 +26,7 @@ import { putAsset } from './media.ts';
 import { lookAtRun } from './look.ts';
 import { findApps } from './search.ts';
 import { TEMPLATES } from './templates.ts';
+import { sketchWeb } from '../webapps/sketch.ts';
 
 /** What saving checks a recipe with, and what follows a save (its packages): from index.ts. */
 export interface BuilderHelp {
@@ -300,10 +301,21 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         'Shows the user a sketch of a new app before anything is made, as a card in the conversation: its name, icon and description, what it asks (the form), what it does (the steps in order, in words), what they get (a made-up answer in its view, or the plain card), a rough time and cost a run, the keys it needs, what you assumed, and your questions as choices to click, with Build it and Change it. Nothing is saved.',
         'Give the draft as app_save takes a recipe (name, description, icon, color, fields, answer, ui if you designed its look, tier, and flow) or, before the steps are worked out, steps: a short list in words ([{ title, kind }]). It is checked as app_save checks it: what must change comes back in words, and no card shows.',
         'Then end your turn and wait: build it (app_save) when the user says Build it (their message has the choices they picked), or change the sketch as they ask.',
+        'For a WEB app (something people sign in to, come back to, keep things in, or find on the web: pages, accounts, a database of its own; see the web-app-builder skill) give kind: "web" and the web fields below instead of a form and steps: who, does, keeps, runs, assumed, questions (type: the idea it is closest to, if one).',
       ].join(' '),
       inputSchema: {
         type: 'object',
         properties: {
+          kind: { type: 'string', enum: ['agent', 'web'], description: 'agent (default): a small tool an agent runs. web: a web app, shown with the web fields.' },
+          type: { type: 'string', description: 'Web: the idea it is closest to (landing, internal-tool, saas, agent-app, content-site, ai-app, portfolio, directory, store, booking, courses, marketplace, community, realtime), if one.' },
+          who: { type: 'string', description: 'Web: who uses it, in a line ("Mechanics and the front desk of a bike shop").' },
+          does: { type: 'array', items: { type: 'string' }, description: 'Web: the few things they do there, each a short line (at most six).' },
+          keeps: {
+            type: 'array',
+            description: 'Web: the kinds of thing it keeps, each { title ("Customers"), line (what is kept of each, in words), who (who may see it: "Only you", "Everyone who signs in") }.',
+            items: { type: 'object', properties: { title: { type: 'string' }, line: { type: 'string' }, who: { type: 'string' } }, required: ['title', 'who'] },
+          },
+          runs: { type: 'string', description: 'Web: where it will run (default: inside this Hydor, signed in as you).' },
           name: { type: 'string' },
           description: { type: 'string', description: 'What it does, in a sentence.' },
           icon: { type: 'string' },
@@ -330,7 +342,8 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         required: ['name', 'description', 'assumed'],
       },
       annotations: { readOnlyHint: true },
-      async run(a) {
+      async run(a, ctx) {
+        if (a.kind === 'web') return sketchWeb(a);
         const errors: string[] = [];
         const flow = a.flow && typeof a.flow === 'object' ? (a.flow as Flow) : undefined;
         // Steps in words, while there is no flow yet.

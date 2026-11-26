@@ -1,0 +1,190 @@
+{
+  "id": "14-market-takings",
+  "group": "logic",
+  "product": "Market Day Sums",
+  "phrases": [
+    ["takings", "re:takings|took|total|sales"],
+    ["best seller", "re:best[ -]?sell|\\bbest\\b|top (seller|candle)|most popular|sold best"],
+    ["refunds", "re:refund|returns?\\b"],
+    ["file", "csv", "spreadsheet", "upload", "drop"]
+  ],
+  "accounts": "none",
+  "kinds": [],
+  "rows": {},
+  "later": {},
+  "numbers": [],
+  "actions": [
+    {
+      "id": "sum-up",
+      "names": ["sumup", "sums", "takings", "summary", "summarise", "summarize", "upload", "file", "drop", "report", "totals", "analyse", "analyze", "read", "process", "results", "market", "the sums"],
+      "inputs": [
+        {
+          "id": "file",
+          "names": ["file", "csv", "spreadsheet", "upload", "takingsfile", "data", "sales", "export", "text", "the file", "that file"],
+          "kind": "file",
+          "required": true,
+          "said": ["the file", "that file"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "total",
+          "names": ["totaltakings", "takings", "total", "totaltaken", "taken", "totalsales", "grandtotal", "revenue", "what I took"],
+          "kind": "number",
+          "tol": 0.005,
+          "said": ["total takings", "what I took"]
+        },
+        {
+          "id": "itemsSold",
+          "names": ["candlessold", "itemssold", "sold", "numbersold", "itemssoldtotal", "totalsold", "quantity", "unitssold", "count", "how many candles I sold"],
+          "kind": "number",
+          "tol": 0,
+          "said": ["candles sold", "how many candles I sold"]
+        },
+        {
+          "id": "bestSeller",
+          "names": ["bestseller", "bestselling", "topseller", "best", "top", "bestcandle", "topcandle", "bestsellingcandle", "bestsellingitem", "which one sold best"],
+          "kind": "text",
+          "said": ["best seller", "which one sold best"]
+        },
+        {
+          "id": "refunds",
+          "names": ["refunds", "refund", "refundcount", "numberofrefunds", "returns"],
+          "kind": "number",
+          "tol": 0,
+          "said": ["refunds", "how many refunds"]
+        },
+        {
+          "id": "skipped",
+          "names": ["skippedlines", "skipped", "linesskipped", "unreadable", "ignored", "badlines", "skippedcount", "rejected", "errors"],
+          "kind": "number",
+          "tol": 0,
+          "said": ["skipped lines"]
+        },
+        {
+          "id": "days",
+          "names": ["takingsforeachday", "days", "perday", "daily", "byday", "eachday", "dailytakings", "takingsperday", "takingsbyday", "daybyday"],
+          "kind": "rows",
+          "items": [
+            { "id": "date", "names": ["date", "day"], "kind": "day", "said": ["day", "date"] },
+            {
+              "id": "takings",
+              "names": ["takings", "total", "amount", "taken", "sales", "sum"],
+              "kind": "number",
+              "tol": 0.005,
+              "said": ["takings"]
+            }
+          ],
+          "said": ["takings for each day", "how much I took on each day"]
+        },
+        {
+          "id": "averageDay",
+          "names": ["averageaday", "averageperday", "dailyaverage", "averagetakings", "averageday", "avgperday", "averagedaily", "average"],
+          "kind": "number",
+          "tol": 0.01,
+          "said": ["average takings for a day"]
+        }
+      ],
+      "cases": [
+        {
+          "label": "a weekend with one refund",
+          "in": {
+            "file": "date,item,quantity,price\n2027-05-08,Lavender 200g,3,12.50\n2027-05-08,Cedar and Fig,2,14.00\n2027-05-08,Lavender 200g,-1,12.50\n2027-05-09,Cedar and Fig,4,14.00\n2027-05-09,Sea Salt,1,9.99\n"
+          },
+          "out": {
+            "total": 118.99,
+            "itemsSold": 9,
+            "bestSeller": "Cedar and Fig",
+            "refunds": 1,
+            "skipped": 0,
+            "days": [{ "date": "2027-05-08", "takings": 53 }, { "date": "2027-05-09", "takings": 65.99 }],
+            "averageDay": 59.5
+          }
+        },
+        {
+          "label": "two days, no refunds",
+          "in": {
+            "file": "date,item,quantity,price\n2027-06-12,Sea Salt,2,9.99\n2027-06-12,Amber,2,11.00\n2027-06-13,Sea Salt,1,9.99\n2027-06-13,Amber,1,11.00\n"
+          },
+          "out": {
+            "total": 62.97,
+            "itemsSold": 6,
+            "bestSeller": "Sea Salt",
+            "refunds": 0,
+            "skipped": 0,
+            "days": [{ "date": "2027-06-12", "takings": 41.98 }, { "date": "2027-06-13", "takings": 20.99 }],
+            "averageDay": 31.49
+          }
+        },
+        {
+          "label": "refunds that cancel a whole sale",
+          "in": {
+            "file": "date,item,quantity,price\n2027-07-03,Vanilla,5,8.00\n2027-07-03,Vanilla,-5,8.00\n2027-07-04,Pine,2,10.25\n2027-07-04,Pine,-1,10.25\n2027-07-04,Oak,1,10.00\n"
+          },
+          "out": {
+            "total": 20.25,
+            "itemsSold": 2,
+            "bestSeller": "Pine",
+            "refunds": 2,
+            "skipped": 0,
+            "days": [{ "date": "2027-07-03", "takings": 0 }, { "date": "2027-07-04", "takings": 20.25 }],
+            "averageDay": 10.13
+          }
+        }
+      ],
+      "edges": [
+        {
+          "label": "a comma and quotes inside a candle name",
+          "in": {
+            "file": "date,item,quantity,price\n2027-08-01,\"Lavender, large\",2,18.00\n2027-08-01,\"Candle \"\"Dusk\"\"\",1,15.50\n2027-08-02,\"Lavender, large\",1,18.00\n"
+          },
+          "out": {
+            "total": 69.5,
+            "itemsSold": 4,
+            "bestSeller": "Lavender, large",
+            "refunds": 0,
+            "skipped": 0,
+            "days": [{ "date": "2027-08-01", "takings": 51.5 }, { "date": "2027-08-02", "takings": 18 }],
+            "averageDay": 34.75
+          }
+        },
+        {
+          "label": "candles level on the most sold: the first in the file wins; capitals and spaces at the ends do not make a second candle",
+          "in": {
+            "file": "date,item,quantity,price\n2027-08-07,Rose,2,9.00\n2027-08-07,Plum,1,9.00\n2027-08-08,Fern,3,9.00\n2027-08-08,  plum,2,9.00\n"
+          },
+          "out": {
+            "total": 72,
+            "itemsSold": 8,
+            "bestSeller": "Plum",
+            "refunds": 0,
+            "skipped": 0,
+            "days": [{ "date": "2027-08-07", "takings": 27 }, { "date": "2027-08-08", "takings": 45 }],
+            "averageDay": 36
+          }
+        },
+        {
+          "label": "lines that cannot be read are skipped and counted, empty lines ignored",
+          "in": {
+            "file": "date,item,quantity,price\n2027-09-04,Fern,2,9.50\n\n2027-09-04,Fern,two,9.50\n2027-09-31,Fern,1,9.50\n2027-09-04,,1,9.50\n2027-09-04,Fern,1,abc\n2027-09-04,Fern,1\n2027-09-05,Moss,3,7.00\n"
+          },
+          "out": {
+            "total": 40,
+            "itemsSold": 5,
+            "bestSeller": "Moss",
+            "refunds": 0,
+            "skipped": 5,
+            "days": [{ "date": "2027-09-04", "takings": 19 }, { "date": "2027-09-05", "takings": 21 }],
+            "averageDay": 20
+          }
+        }
+      ],
+      "refused": [
+        { "label": "an empty file", "in": { "file": "" } },
+        { "label": "not the headings of a card reader", "in": { "file": "name,amount\nAnn,5\n" } },
+        { "label": "a letter, not a file of takings", "in": { "file": "Dear Ines, thank you for the candles.\n" } }
+      ],
+      "said": ["the sums"]
+    }
+  ]
+}

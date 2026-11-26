@@ -40,7 +40,9 @@ await build({
   sourcemap: true,
   packages: 'external',
   logLevel: 'warning',
-  define: { __SLIDES_RUNTIME__: JSON.stringify(runtimeSrc) },
+  // A script that draws the web app's pages (web apps' plain words) meets the files only a browser bundle takes.
+  loader: { '.woff': 'empty', '.woff2': 'empty', '.css': 'empty' },
+  define: { __SLIDES_RUNTIME__: JSON.stringify(runtimeSrc), 'import.meta.env.DEV': 'false' },
   banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
 });
 

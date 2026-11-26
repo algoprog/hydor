@@ -196,6 +196,14 @@ export function RunPage({ id }: { id: string }) {
                 </>
               )}
               <span className="shrink-0">{`${SOURCE_LABEL[r.source]}${r.row ? ` ${r.row}` : ''} · started ${ago(r.createdAt)}`}</span>
+              {(r.person || r.flow) && (
+                <>
+                  <span className="shrink-0">·</span>
+                  <span className="truncate text-fg-2" translate="no">
+                    {[r.flow, r.person && `${r.person.name} (${r.person.role})`].filter(Boolean).join(' · ')}
+                  </span>
+                </>
+              )}
             </span>
           ) : undefined
         }

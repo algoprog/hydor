@@ -1,0 +1,96 @@
+{
+  "id": "02-veg-box",
+  "group": "accounts",
+  "product": "Marrow & Thyme",
+  "phrases": [["Wednesday", "Wednesdays"], ["£14"], ["£22"], ["March"], ["veg box", "re:\\bbox(es)?\\b"]],
+  "accounts": "open",
+  "access": "team",
+  "kinds": [
+    {
+      "id": "signups",
+      "names": ["signups", "signup", "waitlist", "list", "entries", "interested", "applications", "customers", "enquiries", "orders", "people", "buyers"],
+      "visitorAdds": true,
+      "ops": [],
+      "fields": [
+        {
+          "id": "business",
+          "names": ["business", "businessname", "company", "cafe", "cafeorshop", "shop", "organisation", "customer", "venue", "buyer"],
+          "kind": "text",
+          "required": true,
+          "said": ["name of their café or shop", "café or shop"]
+        },
+        {
+          "id": "person",
+          "names": ["person", "contact", "contactname", "yourname", "fullname", "who", "ownname", "name"],
+          "kind": "text",
+          "required": false,
+          "mayHave": true,
+          "said": ["their own name"]
+        },
+        {
+          "id": "size",
+          "names": ["size", "boxsize", "boxtype", "sizeofbox", "whichbox", "smallorlarge"],
+          "kind": "text",
+          "choices": ["small", "large"],
+          "open": true,
+          "mayHave": true,
+          "said": ["small or large"]
+        },
+        {
+          "id": "often",
+          "names": ["often", "frequency", "howoften", "every", "schedule", "delivery", "deliveries", "cadence", "rhythm"],
+          "kind": "text",
+          "open": true,
+          "mayHave": true,
+          "said": ["how often"]
+        },
+        {
+          "id": "boxes",
+          "names": ["boxes", "howmany", "numberofboxes", "quantity", "count", "number", "amount", "boxcount"],
+          "kind": "integer",
+          "mayHave": true,
+          "said": ["how many boxes"]
+        },
+        {
+          "id": "use",
+          "names": ["use", "whatfor", "purpose", "wanted", "order", "requirements", "interest", "details", "message", "notes", "about", "wouldlike", "whattheywant", "whattheywoulduseitfor", "useitfor", "usedfor"],
+          "kind": "text",
+          "open": true,
+          "mayHave": true,
+          "said": ["what they would use it for"]
+        }
+      ],
+      "needOne": ["size", "often", "boxes", "use"],
+      "said": ["sign-up", "who is interested", "sign up"]
+    }
+  ],
+  "rows": {
+    "signups": [
+      {
+        "business": "The Corn Exchange Café",
+        "person": "Rosa Pell",
+        "size": "large",
+        "often": "every week",
+        "boxes": 2,
+        "use": "two large boxes for the café counter, every week"
+      },
+      {
+        "business": "Dunmore Greengrocers",
+        "size": "small",
+        "often": "every two weeks",
+        "boxes": 1,
+        "use": "one small box, every other week"
+      },
+      {
+        "business": "Home, Quarry Lane",
+        "person": "Tobias Venn",
+        "size": "small",
+        "often": "every week",
+        "boxes": 3,
+        "use": "three small boxes for the household, weekly"
+      }
+    ]
+  },
+  "later": {},
+  "numbers": []
+}

@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "start": {
+    "command": "node server.js",
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "env": { "SESSION_SECRET": "{secret}" },
+    "secrets": ["SESSION_SECRET"],
+    "browserFolders": ["public"]
+  },
+  "accounts": {
+    "signUp": { "path": "/api/sign-up", "body": { "name": "{name}", "email": "{email}", "password": "{password}" } },
+    "signIn": { "path": "/api/sign-in", "body": { "email": "{email}", "password": "{password}" } },
+    "grant": { "path": "/api/grant", "body": { "email": "{email}", "role": "{role}" } }
+  },
+  "payments": { "path": "/api/payments/webhook", "body": { "email": "{email}", "month": "{month}" }, "secretEnv": "PAYMENT_SECRET", "secretHeader": "x-webhook-secret" },
+  "things": {
+    "details": {
+      "list": { "path": "/api/details", "rows": "rows" },
+      "add": { "path": "/api/details" },
+      "one": { "path": "/api/details/{id}", "read": "GET", "change": "PATCH" },
+      "fields": { "full name": "fullName", "phone number": "phone", "emergency contact": "emergency", "paid this month": "paid" }
+    },
+    "notices": {
+      "list": { "path": "/api/notices", "rows": "rows" },
+      "add": { "path": "/api/notices" },
+      "one": { "path": "/api/notices/{id}", "read": "GET" },
+      "fields": { "title": "title", "message": "message" }
+    }
+  }
+}

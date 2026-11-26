@@ -1,0 +1,3 @@
+I sell hand-poured candles at weekend markets across Kent, and my card reader gives me a spreadsheet file at the end of every weekend that I cannot make head or tail of. I would like one page where I just drop that file in and it tells me what I took, how many candles I sold, which one sold best, and how much I took on each day of the weekend.
+
+The file has a line for each sale, with the date, the candle, how many and the price of one. When someone brings a candle back, the reader puts a minus in front of the number and that is a refund, which should come off my takings, and I would like to know how many refunds there were. Nothing should be kept anywhere, I just want the sums, and there is no need for logins. It is called Market Day Sums.

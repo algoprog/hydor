@@ -26,7 +26,12 @@ const NEEDS = {
   'server/computer/windows-test.ts': 'Windows',
   'server/computer/x11-test.ts': 'an X display',
   'server/desktop-test.ts': 'the desktop app built (desktop/)',
+  'server/webapps/pagechecks/pagechecks-test.ts': 'a Chromium (some minutes; ports 4700 to 4709)',
+  'server/webapps/pagechecks/pagechecks-proof-test.ts': 'a Chromium and the network (the real apps in server/webapps/fixtures/apps, one of which installs its packages)',
   'server/mail/live-test.ts': 'a test mail server (GreenMail; see the file)',
+  'server/webapps/server-proof-test.ts': 'Docker with privileged containers, a Chromium, the network and HYDOR_SERVER_PROOF=1',
+  'server/webapps/remote/launch-proof-test.ts': 'Docker with privileged containers, the network and HYDOR_LAUNCH_PROOF=1',
+  'server/webapps/walk-test.ts': 'a Chromium, HOME and DATA_DIR in scratch folders, ports 4760 to 4768 (with HYDOR_WALK_SERVER=1, Docker too)',
 };
 
 const found = [];
@@ -67,15 +72,27 @@ const run = (cmd, argv, env, ms) =>
 
 const results = [];
 let next = 0;
+// Web apps' tests listen on ports they share: one of them at a time, beside the others.
+const ONE_AT_A_TIME = /^server\/webapps\/|^server\/apps\/keyroutes-test\.ts$/;
+let turn = Promise.resolve();
 const worker = async () => {
   while (next < chosen.length) {
     const file = chosen[next++];
     const id = file.replace(/[/.]/g, '_');
+    let done = () => {};
+    if (ONE_AT_A_TIME.test(file)) {
+      const before = turn;
+      turn = new Promise((r) => (done = r));
+      await before;
+    }
     // Built inside the checkout two folders down, as dist/dev is, so its packages are found (node_modules) and the
     // app's root is where the server looks for it (server/config.ts); its data in a scratch folder.
     const out = path.join(root, 'dist', `test-${id}`);
     const data = path.join(scratch, id);
     fs.mkdirSync(data, { recursive: true });
+    // A test that asks for a home folder of its own (those of web apps, which start programs that write there) gets one beside its scratch folder.
+    const home = /Run with HOME/.test(fs.readFileSync(path.join(root, file), 'utf8')) ? path.join(scratch, `${id}-home`) : null;
+    if (home) fs.mkdirSync(home, { recursive: true });
     const t0 = Date.now();
     const built = await run(process.execPath, ['scripts/build-server.mjs', file], { OUTDIR: out }, 5 * 60_000);
     const js = path.join(out, `${path.basename(file, '.ts')}.js`);
@@ -83,13 +100,14 @@ const worker = async () => {
       ? await run(
           process.execPath,
           [js],
-          { DATA_DIR: data, CLAUDE_CONFIG_DIR: path.join(data, 'claude'), HYDOR_APPS_DIR: path.join(data, 'apps'), PRICES_URL: '', ONLINE: '0', CUDA_VISIBLE_DEVICES: '' },
+          { DATA_DIR: data, ...(home ? { HOME: home } : {}), CLAUDE_CONFIG_DIR: path.join(data, 'claude'), HYDOR_APPS_DIR: path.join(data, 'apps'), PRICES_URL: '', ONLINE: '0', CUDA_VISIBLE_DEVICES: '' },
           LIMIT_MS,
         )
       : built;
     const secs = ((Date.now() - t0) / 1000).toFixed(1);
     results.push({ file, ok: r.ok, secs, out: r.out, timedOut: r.timedOut });
     console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${file} (${secs} s)${r.timedOut ? ' (stopped after 15 min)' : ''}`);
+    done();
   }
 };
 await Promise.all(Array.from({ length: Math.min(jobs, chosen.length) }, worker));

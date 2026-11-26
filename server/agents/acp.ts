@@ -667,6 +667,7 @@ export class AcpLive extends LiveAdapter {
         this.approvals.set(id, {
           id,
           itemId: tc.toolCallId,
+          ...(typeof tc.rawInput?.description === 'string' && tc.rawInput.description.trim() ? { say: tc.rawInput.description.trim().slice(0, 300) } : {}),
           kind: tc.kind === 'execute' ? 'command' : tc.kind === 'edit' || tc.kind === 'delete' || tc.kind === 'move' ? 'file' : 'other',
           title: String(tc.title ?? 'The agent asks to go ahead'),
           detail: detail.slice(0, 4000),

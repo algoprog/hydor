@@ -1,0 +1,2 @@
+{ "name": "Eastgate Food Bank", "short_name": "Food Bank", "start_url": "/", "display": "standalone", "background_color": "#121714", "theme_color": "#121714",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }] }

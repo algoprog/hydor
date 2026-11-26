@@ -12,7 +12,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { SessionExtra } from '../../shared/features.ts';
-import type { AnswerField, AppRecipe, AppRun, RunAsk, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
+import type { AnswerField, AppDef, AppRecipe, AppRun, RunAsk, RunPerson, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
+import { signedInPerson } from './keyroutes.ts';
 import { ACTIVE, checkInputs, fillTemplate, inputsLine, isActive } from '../../shared/apps.ts';
 import { momentOf } from '../../shared/app-manifest.ts';
 import { languageLine, languageName, meVars } from '../../shared/app-me.ts';
@@ -35,6 +36,7 @@ import { aboutMe, keepAnswers, runLanguage, startsFor } from './me.ts';
 import { refMedia } from './media.ts';
 import { needSecrets } from './secrets.ts';
 import { addModels, modelStates, needModels } from './models.ts';
+import { runFunctions } from './appfns.ts';
 import { getApp, getRun, insertRun, listRuns, listSteps, reuseSteps, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
 import { titleOf } from '../../shared/app-manifest.ts';
 
@@ -111,8 +113,20 @@ const finishedHooks: ((r: RunRecord) => void)[] = [];
 /** Told when a run ends (runs over rows start the next one). */
 export const onFinished = (fn: (r: RunRecord) => void) => finishedHooks.push(fn);
 
+/** Runs of every kind being followed from outside the pages (the stream of the key routes): told each time a run changes. */
+const watchers = new Set<(r: RunRecord) => void>();
+export function watchRuns(fn: (r: RunRecord) => void): () => void {
+  watchers.add(fn);
+  return () => void watchers.delete(fn);
+}
+
 function changed(r: RunRecord | null) {
   if (!r) return;
+  for (const w of watchers) {
+    try {
+      w(r);
+    } catch {}
+  }
   // Not the answer so far: it changes with each step and may be long; the run's page reads it.
   const { partial: _p, ...run } = runView(r);
   d().broadcast({ t: 'feature', id: 'apps', data: { run } });
@@ -210,6 +224,10 @@ export interface StartInput {
   askedBy?: string;
   /** The language it writes in, as what started it says (a tag: the device's, a visitor's, the one a chat's agent gave); else About you's, else English. */
   lang?: string;
+  /** Who it acts for, proven by the route from the web app's signed token; null: nobody (a job of the web app). */
+  person?: RunPerson | null;
+  /** A short reference of the caller's own (an app's key: the id of the row the run belongs to), kept with the run and used to list them. */
+  ref?: string;
 }
 
 /** The questions a run answers: the template's form, or the inputs of the flow it runs. */
@@ -227,6 +245,10 @@ export function checkedInputs(recipe: AppRecipe, inputs: Record<string, unknown>
   const starts = app && !isPublic && fields.some((f) => f.from || f.remember) ? startsFor(d().db, fields, app) : undefined;
   return checkInputs(fields, raw, { maxLong: isPublic ? 12_000 : 60_000, maxText: isPublic ? 600 : 2000, starts });
 }
+
+/** Runs started by the person signed in to Hydor (the app's page, a session's use_app, a screen, another app, MCP) act for them when the app is the flows half of a web app; anything else acts for nobody. */
+const OWNER_SOURCES: RunSource[] = ['web', 'session', 'chat', 'screen', 'app', 'mcp'];
+const ownerOf = (o: StartInput): RunPerson | undefined => (OWNER_SOURCES.includes(o.source) && !o.public && !o.visitor ? signedInPerson({ id: o.app } as AppDef) : undefined);
 
 /** Creates the run and starts its session in the background (unless it waits in line). */
 export function startRun(o: StartInput): RunRecord {
@@ -247,7 +269,9 @@ export function startRun(o: StartInput): RunRecord {
     if (f.data.length * 0.75 > maxFile) throw new HttpError(413, `${f.name} is too big (at most ${maxFile >> 20} MB)`);
   }
   const lang = runLanguage(d().db, o.lang, !!o.public);
-  const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow, example: o.example, askedBy: o.askedBy, lang });
+  const made = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow, example: o.example, askedBy: o.askedBy, lang, person: o.person === undefined ? ownerOf(o) : o.person, ref: o.ref });
+  // The functions of the web app it belongs to, for its agents (appfns.ts): read, and the app started, before the first agent does anything.
+  const r = runFunctions()?.begin(made) ?? made;
   // The person's own answers to questions that remember theirs, for their next run.
   keepAnswers(d().db, o.app, o.source, formOf(o.recipe, o.flow), values);
   // Its first steps replay that run's (before it starts, so its flow finds them).

@@ -20,11 +20,12 @@ import { checkAnswer, cleanRecipe, isActive, MAX_MISSES, PUBLIC_WEB_TOOLS, quest
 import { cardLines } from '../../shared/app-cards.ts';
 import { languageLine, localeOf } from '../../shared/app-me.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
-import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
+import { allSteps, asText, cleanFlow, evalRule, FN_STEP_TOOL, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { isTier } from '../../shared/tiers.ts';
 import { extractText } from '../documents/extract.ts';
 import { runTools } from '../features/registry.ts';
+import { runFunctions } from './appfns.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import type { RunCtx } from '../features/types.ts';
 import { helper } from '../helper.ts';
@@ -652,7 +653,7 @@ async function agentStep(x: Exec, s: Extract<Step, { do: 'agent' }>, scope: Scop
       limits: { capUsd: capFor(x, s.capUsd) },
     });
     const pub = x.pub ? { ...x.pub, capUsd: capFor(x, s.capUsd) ?? x.pub.capUsd } : undefined;
-    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub, lang: x.run.lang }).id;
+    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub, lang: x.run.lang, ...(x.run.person !== undefined ? { person: x.run.person } : {}) }).id;
     record(x, at, s, { childRun: childId });
   }
   const done = await follow(x, childId);
@@ -733,7 +734,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
       limits: { capUsd: capFor(x) },
     });
     const pub = x.pub ? { ...x.pub, capUsd: capFor(x) ?? x.pub.capUsd } : undefined;
-    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub, lang: x.run.lang }).id;
+    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub, lang: x.run.lang, ...(x.run.person !== undefined ? { person: x.run.person } : {}) }).id;
     record(x, at, s, { status: 'running', rescued: true, childRun: childId, error: msg, endedAt: undefined });
   }
   const done = await follow(x, childId);
@@ -870,12 +871,22 @@ async function judge(x: Exec, question: string, cost: Cost): Promise<{ yes: bool
 // ---- tools ------------------------------------------------------------------------------------------------
 
 async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope, at: string): Promise<Record<string, unknown>> {
-  if (!STEP_TOOLS.includes(s.tool)) throw new Error(`${s.tool} cannot run as a step on its own: use it in an Ask an agent step`);
+  // One of the functions of the web app this app is the flows half of (fn:<name>): its own rules say if it is offered (appfns.ts); it goes through the same tools every call does.
+  const fn = FN_STEP_TOOL.test(s.tool);
+  let toolName = s.tool;
+  if (!fn && !STEP_TOOLS.includes(s.tool)) throw new Error(`${s.tool} cannot run as a step on its own: use it in an Ask an agent step`);
   if (x.pub && !(x.pub.web && PUBLIC_WEB_TOOLS.includes(s.tool))) throw new Error(`A run from a public page cannot use ${s.tool}`);
-  const allowed = x.run.recipe.tools;
-  if (allowed && !allowed.includes(s.tool)) throw new Error(`The app does not let its runs use ${s.tool} (Tools, in its settings)`);
+  if (fn) {
+    const given = runFunctions()?.stepTool(x.run, s.tool);
+    if (!given) throw new Error('The app’s functions are not available in this Hydor');
+    if ('problem' in given) throw new Error(given.problem);
+    toolName = given.name;
+  } else {
+    const allowed = x.run.recipe.tools;
+    if (allowed && !allowed.includes(s.tool)) throw new Error(`The app does not let its runs use ${s.tool} (Tools, in its settings)`);
+  }
   const ctx: RunCtx = { runId: `flow-${x.run.id}`, key: `acp:flow-${x.run.id}`, agent: 'acp', acpAgent: CONSOLE_ID, cwd: x.folder, deps: runDeps(), signal: x.abort.signal, notice: { url: `/apps/runs/${encodeURIComponent(x.run.id)}`, title: x.run.appName }, step: true };
-  const tool = runTools(ctx).find((t) => t.name === s.tool);
+  const tool = runTools(ctx).find((t) => t.name === toolName);
   if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of Hydor turned on?`);
   const args = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
   // A step's search is an exact call: its words are searched as written. A search otherwise has filters read out of its

@@ -505,6 +505,20 @@ for (const f of NAMED.map((x) => `server/${x}.ts`)) {
   const texts = (await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`)).default;
   for (const s of texts) add(s, 'server/apps/views.ts', true);
 }
+// The ideas of "What do you want to make?" (each one's name, who it is for and what such an app needs), and why an app cannot
+// go to a server of your own, as the pages show them.
+{
+  const built = buildSync({
+    stdin: { contents: "import { KINDS } from './server/webapps/ideas.ts'; import { SERVER_NEEDS_ACCOUNTS } from './shared/webapps.ts'; export default [...KINDS.flatMap((k) => [k.name, k.who, ...k.needs]), SERVER_NEEDS_ACCOUNTS];", resolveDir: ROOT, loader: 'ts' },
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    write: false,
+    logLevel: 'error',
+  });
+  const texts = (await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`)).default;
+  for (const s of texts) add(s, 'server/webapps/ideas.ts', true);
+}
 for (const f of fs.readdirSync(path.join(ROOT, 'catalog/connections')).filter((x) => x.endsWith('.json'))) {
   const e = JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog/connections', f), 'utf8'));
   for (const s of [e.name, e.description, ...(e.fields ?? []).flatMap((x) => [x.label, x.help])]) if (typeof s === 'string') add(s, `catalog/connections/${f}`);

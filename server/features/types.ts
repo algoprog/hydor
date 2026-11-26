@@ -218,4 +218,6 @@ export interface Feature {
   aboutMessage?(text: string, key: string, d: Deps): string | null | undefined | Promise<string | null | undefined>;
   /** Once, when the server is up. */
   start?(d: Deps): void;
+  /** The server is shutting down: end what the capability keeps running (the server waits two seconds for all of them at most). */
+  stop?(d: Deps): void | Promise<void>;
 }

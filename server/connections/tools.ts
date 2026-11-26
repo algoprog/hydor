@@ -2,12 +2,15 @@
 // enters a key or a whole sign-in, straight into the vault), http_request (an API call signed with keys
 // the agent never sees), run_with_secrets (a command with keys in its environment, its output masked)
 // and list_connections (what is connected and saved: names, never values).
-import { cleanDomains, fieldKey, SECRET_LIKE, SECRET_NAME, secretName, type SecretField, type SecretView } from '../../shared/connections.ts';
+import { cleanDomains, SECRET_NAME, secretName, type SecretView } from '../../shared/connections.ts';
+import { requestName } from '../../shared/keys.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { failureOf, retryAfterMs } from '../web/failure.ts';
 import { connections, isRemote, onFor, toolOn } from './apps.ts';
+import { asksForCard, createCard, FIELD_TYPES, parseCard, signInFields } from './cards.ts';
 import { httpCall, RefusedRequest } from './http.ts';
+import { OPENROUTER_REQUEST } from './openrouter-key.ts';
 import { listNames, runWithSecrets } from './run.ts';
 import { addRequest, latestRequest, listSecrets, maskUsed, readSecret, redact, secretView, touchSecret } from './vault.ts';
 
@@ -30,50 +33,30 @@ export function howToUse(names: string[], hosts: boolean, commands: boolean): st
 
 const where = (s: Pick<SecretView, 'domains' | 'commands'>) => [s.domains.length ? `for ${s.domains.join(', ')}` : '', s.commands ? 'for commands on this computer' : ''].filter(Boolean).join(' and ');
 
-const words = (id: string) => {
-  const s = id.replace(/[_-]+/g, ' ').trim().toLowerCase();
-  return s ? s[0].toUpperCase() + s.slice(1) : id;
+const FIELD_SCHEMA = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'Short: username, password, host.' },
+    label: { type: 'string', description: 'What the card shows: "Email or username".' },
+    secret: { type: 'boolean', description: 'false for a detail that is not secret (a server’s address, a port, a database’s name): you get its value. Secret by default.' },
+    type: { type: 'string', enum: [...FIELD_TYPES], description: 'password hides it as it is typed (the default for names like PASSWORD, TOKEN, KEY, SECRET or PIN); email, url and number bring the right keyboard.' },
+    help: { type: 'string', description: 'A short hint under the field.' },
+    looks: { type: 'object', properties: { prefix: { type: 'string' }, say: { type: 'string' } }, description: 'How a right value starts (prefix: "sk-"), with a sentence the card shows when a paste does not.' },
+    optional: { type: 'boolean' },
+  },
+  required: ['name'],
 };
-const clip = (v: unknown, n: number) => (typeof v === 'string' && v.trim() ? v.trim().replace(/\s+/g, ' ').slice(0, n) : undefined);
-const TYPES = ['password', 'text', 'email', 'url', 'number'] as const;
 
-/** A sign-in's fields as the agent wrote them (a list, or an object by name), each with the key it is saved as. */
-function signInFields(raw: unknown, name: string): SecretField[] {
-  if (raw === undefined || raw === null) return [];
-  const list: unknown[] = Array.isArray(raw)
-    ? raw
-    : typeof raw === 'object'
-      ? Object.entries(raw as Record<string, unknown>).map(([k, v]) => (v && typeof v === 'object' ? { name: k, ...(v as object) } : { name: k, label: v }))
-      : [];
-  if (!list.length) throw new Error('fields: a list like [{ "name": "username", "label": "Username" }, { "name": "password", "label": "Password" }]');
-  if (list.length > 10) throw new Error('fields: at most 10');
-  const out: SecretField[] = [];
-  for (const f of list) {
-    const o = (typeof f === 'string' ? { name: f } : f && typeof f === 'object' ? f : {}) as Record<string, unknown>;
-    const own = secretName(String(o.name ?? o.key ?? o.id ?? ''));
-    if (!own) throw new Error('fields: each needs a name, like "password"');
-    const key = fieldKey(name, own);
-    if (!SECRET_NAME.test(key)) throw new Error(`fields: ${String(o.name)} does not make a key’s name (it would be ${key})`);
-    if (out.some((x) => x.key === key)) throw new Error(`fields: ${key} is there twice`);
-    const secret = o.secret !== false;
-    const t = String(o.type ?? '').toLowerCase();
-    const type: SecretField['type'] = (TYPES as readonly string[]).includes(t)
-      ? (t as SecretField['type'])
-      : secret && SECRET_LIKE.test(own)
-        ? 'password'
-        : /EMAIL/.test(own)
-          ? 'email'
-          : /URL/.test(own)
-            ? 'url'
-            : /PORT/.test(own)
-              ? 'number'
-              : 'text';
-    const help = clip(o.help ?? o.description, 200);
-    out.push({ key, label: clip(o.label ?? o.title, 60) ?? words(own), secret, type, ...(help ? { help } : {}), ...(o.optional === true ? { optional: true } : {}) });
-  }
-  if (!out.some((f) => f.secret)) throw new Error('fields: none of them is secret. For details that are not secret, use ask_form.');
-  return out;
-}
+/** What a card says besides a name and why: how to get it. For the one key of a call, or each of its items. */
+const HOW_SCHEMA = {
+  title: { type: 'string', description: 'What the card calls it: "Stripe test key".' },
+  from: { type: 'string', description: 'Who gives it: "Stripe".' },
+  how: { type: 'array', items: { type: 'string' }, description: 'How to get it: three to six short steps, only what to click and copy.' },
+  url: { type: 'string', description: 'The provider’s page where they get it (https), opened in a new tab.' },
+  looks: { type: 'object', properties: { prefix: { type: 'string' }, say: { type: 'string' } }, description: 'How a right value starts, and the sentence the card shows (as a warning, never a block) when a paste does not.' },
+  hint: { type: 'string', description: 'What a right value looks like, in a few words.' },
+  optional: { type: 'boolean', description: 'Nothing waits for it: the card offers to skip it.' },
+};
 
 const REQUEST_SECRET: RunTool = {
   name: 'request_secret',
@@ -81,39 +64,50 @@ const REQUEST_SECRET: RunTool = {
     'Ask the user for a password, API key, token or a whole sign-in without it passing through the conversation.',
     'A card appears in the chat where they fill it in; it goes straight into the vault, and you never see it.',
     'For one key, give name. For a sign-in or anything in several parts (an email and a password; a database’s host, user and password), give fields too: each secret one becomes a key named after name (VOLTARO and password: VOLTARO_PASSWORD), and those you mark secret: false come back to you as typed.',
-    'It returns at once: carry on with what does not need it; a message tells you when it is saved (or declined).',
+    'When the person has to get it from somewhere, say how: how (three to six short steps), url (the provider’s page where they get it), from (the provider), looks (how a right value starts). Look up the provider’s current page before writing steps (web_search, read_page), and keep them to what the person must click and copy.',
+    'For several credentials at once give items (each with its own name, why, how, url, from, fields, optional…): one card with a tab each. Ask for all the keys of a step together, not one card after another.',
+    'It returns at once: carry on with what does not need it; a message tells you when it is saved (or declined). With items or how, that message comes once every needed item is saved (or the card is closed) and says for each: saved, skipped or left.',
     'Then use the keys by name: http_request (auth: NAME, or {{NAME}} in the address, headers or body), browser_act (a type step with "secret": NAME) and, with commands: true, run_with_secrets ($NAME).',
     'Never ask the user to type a secret into the chat.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
-      name: { type: 'string', description: 'What to call it, in capitals: OPENWEATHER_API_KEY, GITHUB_TOKEN. With fields: what their keys start with, like VOLTARO.' },
-      why: { type: 'string', description: 'One or two sentences for the user: what it is for, and where they can get it.' },
+      name: { type: 'string', description: 'What to call it, in capitals: OPENWEATHER_API_KEY, GITHUB_TOKEN. With fields: what their keys start with, like VOLTARO. Left out when you give items.' },
+      why: { type: 'string', description: 'One or two sentences for the user: what it is for (and, without how, where they can get it). With items: optional, a line for the whole card.' },
       domains: { type: 'array', items: { type: 'string' }, description: 'The hosts it may be sent to and typed on, like api.openweathermap.org (subdomains included). The user can change them.' },
       fields: {
         type: 'array',
         description: 'For a sign-in: what the card asks for, in order (at most 10).',
-        items: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'Short: username, password, host.' },
-            label: { type: 'string', description: 'What the card shows: "Email or username".' },
-            secret: { type: 'boolean', description: 'false for a detail that is not secret (a server’s address, a port, a database’s name): you get its value. Secret by default.' },
-            type: { type: 'string', enum: [...TYPES], description: 'password hides it as it is typed (the default for names like PASSWORD, TOKEN, KEY, SECRET or PIN); email, url and number bring the right keyboard.' },
-            help: { type: 'string', description: 'A short hint under the field.' },
-            optional: { type: 'boolean' },
-          },
-          required: ['name'],
-        },
+        items: FIELD_SCHEMA,
       },
       commands: { type: 'boolean', description: 'It is for commands on this computer (run_with_secrets): the card asks the user to allow that. Also for a saved key that is not allowed in commands yet.' },
       replace: { type: 'boolean', description: 'Ask again even though it is saved (it stopped working).' },
+      ...HOW_SCHEMA,
+      items: {
+        type: 'array',
+        description: 'Several credentials on one card, a tab each (at most 8). Give this instead of name and fields.',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'In capitals, as above: STRIPE_SECRET_KEY, or GOOGLE with fields client_id and client_secret.' },
+            why: { type: 'string', description: 'What it is for, in a sentence.' },
+            ...HOW_SCHEMA,
+            fields: { type: 'array', items: FIELD_SCHEMA },
+            domains: { type: 'array', items: { type: 'string' } },
+            commands: { type: 'boolean' },
+            replace: { type: 'boolean' },
+          },
+          required: ['name', 'why'],
+        },
+      },
     },
-    required: ['name', 'why'],
   },
   async run(a, ctx) {
     const db = ctx.deps.db;
+    // OpenRouter's key has a card of its own (it goes to Settings → Models), whatever the call adds to it.
+    if (requestName(a) === OPENROUTER_REQUEST) a = { name: OPENROUTER_REQUEST, why: a.why ?? (Array.isArray(a.items) ? a.items[0]?.why : undefined) };
+    else if (asksForCard(a)) return askWithCard(a, ctx);
     const name = secretName(String(a.name ?? ''));
     if (!SECRET_NAME.test(name)) throw new Error('name: capitals, digits and underscores, starting with a letter, like WEATHER_API_KEY');
     const why = String(a.why ?? '')
@@ -156,6 +150,34 @@ const REQUEST_SECRET: RunTool = {
     return `A card in the conversation asks the user for ${name}. You will get a message when it is saved (or if they decline); meanwhile carry on with anything that does not need it. You never see the value: use it by name (http_request with auth: "${name}"${commands ? `, or $${name} in run_with_secrets` : ''}).`;
   },
 };
+
+/** request_secret with items, or with how to get it: one card, a tab for each item (cards.ts). */
+function askWithCard(a: Record<string, any>, ctx: RunCtx): string {
+  const db = ctx.deps.db;
+  const card = parseCard(a);
+  const name = requestName(a);
+  const items = card.items;
+  const secrets = items.flatMap((i) => i.fields.filter((f) => f.secret));
+  const views = secrets.map((f) => secretView(db, f.key));
+  const enough = items.every((i) => !i.replace && i.fields.every((f) => f.secret) && i.fields.some((f) => secretView(db, f.key)) && i.fields.filter((f) => !f.optional).every((f) => {
+    const s = secretView(db, f.key);
+    return !!s && (!i.commands || s.commands);
+  }));
+  if (enough) {
+    const have = secrets.filter((_, n) => views[n]);
+    return `${listNames(have.map((f) => f.key))} ${have.length > 1 ? 'are' : 'is'} already in the vault. ${howToUse(have.map((f) => f.key), views.some((s) => s?.domains.length), views.every((s) => !s || s.commands))} If ${have.length > 1 ? 'they' : 'it'} stopped working, ask again with replace: true.`;
+  }
+  const open = latestRequest(db, ctx.key, name);
+  if (open?.state === 'pending') return `A card asking for ${name} is already in the conversation. You will get a message when the user answers it.`;
+  createCard(db, { key: ctx.key, name, ...(card.title && items.length > 1 ? { title: card.title } : {}), ...(items.length > 1 && card.why ? { why: card.why } : {}), items });
+  notifyRequest(ctx.key);
+  const needed = items.filter((i) => !i.optional);
+  return [
+    `A card in the conversation asks the user for ${listNames(items.map((i) => `${i.title}${i.optional ? ' (optional)' : ''}`))}${items.length > 1 ? ', a tab each' : ''}.`,
+    `You will get a message once ${needed.length ? 'every needed one is saved' : 'it is answered'} (or if they close the card), saying for each: saved, skipped or left; meanwhile carry on with anything that does not need ${secrets.length > 1 ? 'them' : 'it'}.`,
+    'You never see the secret values: use them by name (http_request, browser_act\'s "secret", run_with_secrets for those allowed in commands).',
+  ].join(' ');
+}
 
 /** {{NAME}} in a request: a key from the vault, put in by the server (capitals, as keys are named). */
 const PLACE = /\{\{\s*([A-Z][A-Z0-9_]{1,63})\s*\}\}/g;

@@ -1,0 +1,12 @@
+{
+  "name": "market-day-sums",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Drop in the card reader's weekend file and see what you took.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" }
+}

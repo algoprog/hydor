@@ -789,6 +789,7 @@ export class CodexLive extends LiveAdapter {
           id,
           itemId: p.itemId,
           kind: 'command',
+          ...(p.reason ? { say: String(p.reason).slice(0, 300) } : {}),
           title: p.reason ? `Run a command — ${firstLine(String(p.reason), 90)}` : 'Run a command',
           detail: `${cmd}${p.cwd ? `\n\n# in ${p.cwd}` : ''}`,
           options: opts,
@@ -803,6 +804,7 @@ export class CodexLive extends LiveAdapter {
           id,
           itemId: p.itemId,
           kind: 'file',
+          ...(p.reason ? { say: String(p.reason).slice(0, 300) } : {}),
           title: files.length === 1 ? `Edit ${files[0].path.split('/').pop()}` : `Apply changes to ${files.length || 'some'} files`,
           detail: [p.reason, ...files.map((f) => `${f.path}\n${f.diff ?? ''}`)].filter(Boolean).join('\n\n'),
           options: [
@@ -819,6 +821,7 @@ export class CodexLive extends LiveAdapter {
           id,
           itemId: p.itemId,
           kind: 'permissions',
+          ...(p.reason ? { say: String(p.reason).slice(0, 300) } : {}),
           title: 'Grant extra permissions',
           detail: [p.reason, JSON.stringify(p.permissions, null, 2)].filter(Boolean).join('\n\n'),
           options: [

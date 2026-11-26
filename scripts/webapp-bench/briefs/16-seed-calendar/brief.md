@@ -1,0 +1,3 @@
+I look after a community garden in Totnes. Our volunteers only come on Saturdays, so when we plan the year I work out by hand when each crop has to be sown or planted out, working from the date of the last frost, and then I move everything to a Saturday. I would like a page where I put in the date I expect the last frost and tick the crops we are growing, and it gives me the list of jobs, in date order, each on a Saturday.
+
+Every crop has its own timings, counted in weeks before or after the last frost. I will tell you them. Nobody needs to log in and it does not need to remember anything, I will print the list. It is called Totnes Seed Calendar.

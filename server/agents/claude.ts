@@ -984,7 +984,7 @@ const ASKS_USER = new Set(['AskUserQuestion', 'ExitPlanMode']);
 function buildApproval(id: string, r: Json): ApprovalRequest {
   const tool = String(r.tool_name ?? 'tool');
   const input: Json = r.input ?? {};
-  const base = { id, itemId: r.tool_use_id, createdAt: Date.now(), title: r.title ?? approvalTitleFor(tool, input) };
+  const base = { id, itemId: r.tool_use_id, createdAt: Date.now(), title: r.title ?? approvalTitleFor(tool, input), ...(typeof input.description === 'string' && input.description.trim() ? { say: input.description.trim().slice(0, 300) } : {}) };
   const allowAlways = !r.suppress_always_allow_rule && Array.isArray(r.permission_suggestions) && r.permission_suggestions.length > 0;
   const std = [
     { id: 'allow', label: 'Allow', style: 'primary' as const },

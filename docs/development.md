@@ -308,6 +308,28 @@ fails when the guide no longer matches the app (a link that points nowhere, a Se
 it does not describe, a picture that is missing). The guide's pictures (`docs/guide/images`) come from a demo copy
 of the app with made-up data: `scripts/guide-shots` takes them again when a page they show changes.
 
+## Web apps and their contract
+
+An app of any stack runs in Hydor through `hydor.json` (`shared/hydor-file.ts`, with `shared/hydor.schema.json`). Everything reads one shape
+(`server/webapps/shape.ts`), read from that file. The checker (`server/webapps/contract-check.ts`)
+is also one script a builder runs with nothing beyond Node, committed in `skills/web-app-builder/references/hydor-check.mjs`: run
+`npm run webapps:checker` after changing the checker, the reader or `server/webapps/run-app.ts` (`contract-check-test.ts` fails while it is
+stale). `contract-test.ts` proves the contract through a scratch Hydor, then with two of the real apps kept in
+`server/webapps/fixtures/apps/` (crews, whose build takes packages from npm, only with `HYDOR_PROOF_NETWORK=1`; ports 4780
+to 4799). The page checks are `server/webapps/pagechecks/` (run on the copy the checker starts, `page-run.ts`), and
+launching to a server is the engine in `server/webapps/remote/` (its README, and `REAL.md` for what was never tried on a
+real server), called by `server-launch.ts`. Two proofs need Docker and are off by default: `HYDOR_LAUNCH_PROOF=1` for the
+engine alone, `HYDOR_SERVER_PROOF=1` for `server-proof-test.ts`, through Hydor's own routes. What a build costs and
+whether the app is right is `scripts/webapp-bench/` (its README).
+
+With **Technical details** off (the default), the pages of web apps are `web/src/features/webapps/simple/`: views that
+draw what they are given, and the words and screens worked out in `plain.ts` and `onlinePath.ts`. The one list of what a
+simple page never says is `shared/plain-words.ts`, shared with what agents are told;
+`web/src/features/webapps/plain-words-test.ts` draws every simple page and card with realistic data and fails on any of
+it (draw a new one in `simple/screens.test.ts`). `server/webapps/walk-test.ts` walks the whole way as a person who does
+not code, with a stand-in agent, counting each screen's words and decisions (`HYDOR_WALK_SERVER=1` goes on to a
+stand-in server with Docker; ports 4760 to 4772; `WALK_WORDS=1` prints each screen's words).
+
 ## Wiki memory module
 
 The native Wiki memory capability and its integration boundaries are described in [Wiki memory development](wiki-memory-development.md).

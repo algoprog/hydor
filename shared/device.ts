@@ -22,6 +22,8 @@ export interface DeviceSettings {
   terminalSuggestions: boolean;
   /** Word suggestions: the grey rest of the word after the caret, in this browser (Settings → Capabilities → Word suggestions turns them on for the app). */
   wordSuggestions: boolean;
+  /** Web apps show files, commands and logs beside the plain words (Settings → General → Apps). Off unless turned on. */
+  technicalDetails: boolean;
   /** The sidebar shown on a computer. */
   sidebar: boolean;
   /** The sidebar's groups for projects and folders (false: sessions by day only). */
@@ -75,6 +77,7 @@ const SETTING: { [K in keyof DeviceSettings]: (v: unknown) => DeviceSettings[K] 
   enter: oneOf('join', 'queue'),
   terminalSuggestions: yesNo,
   wordSuggestions: yesNo,
+  technicalDetails: yesNo,
   sidebar: yesNo,
   groupSessions: yesNo,
   voiceLanguage: speechTag,
@@ -87,7 +90,7 @@ const SETTING: { [K in keyof DeviceSettings]: (v: unknown) => DeviceSettings[K] 
 export const DEVICE_KEYS = [...Object.keys(SETTING).filter((k) => k !== 'darkTheme' && k !== 'lightTheme'), 'themeName'];
 
 /** The values each takes, in words: for the agent told it got one wrong, and for the guide. */
-export const DEVICE_VALUES = `theme (dark, light, system), themeName (a theme's name: it shows in dark or light mode, as the theme's base is), motion (full, calm, off), textSize (default, large, larger), zoom (the conversation's zoom in percent, 67 to 200; 100 is normal), language (${LANGS.map((l) => l.id).join(', ')}), sound, terminalSuggestions, wordSuggestions, sidebar, groupSessions (true or false), enter (join, queue), voiceLanguage (the language spoken, for dictation: a tag such as "de-DE", or "" for the browser's), dictation (browser, server), readingVoice (a voice's name from GET /device, or "" for the browser's pick), readingSpeed (0.5 to 2)`;
+export const DEVICE_VALUES = `theme (dark, light, system), themeName (a theme's name: it shows in dark or light mode, as the theme's base is), motion (full, calm, off), textSize (default, large, larger), zoom (the conversation's zoom in percent, 67 to 200; 100 is normal), language (${LANGS.map((l) => l.id).join(', ')}), sound, terminalSuggestions, wordSuggestions, technicalDetails, sidebar, groupSessions (true or false), enter (join, queue), voiceLanguage (the language spoken, for dictation: a tag such as "de-DE", or "" for the browser's), dictation (browser, server), readingVoice (a voice's name from GET /device, or "" for the browser's pick), readingSpeed (0.5 to 2)`;
 
 /** An agent's change, checked: the settings to send, and the names it got wrong. */
 export function deviceChange(body: Record<string, unknown>): { set: Record<string, unknown>; bad: string[] } {

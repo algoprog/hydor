@@ -1,0 +1,35 @@
+{
+  "name": "Eastgate Food Bank",
+  "start": "node --disable-warning=ExperimentalWarning server.js",
+  "env": {
+    "port": "PORT",
+    "data": "DATA_DIR"
+  },
+  "ready": "/sign-in",
+  "signIn": "own",
+  "database": {
+    "file": "foodbank.db",
+    "sqlite": true
+  },
+  "accounts": {
+    "signUp": {
+      "method": "POST",
+      "path": "/api/sign-up",
+      "send": "json",
+      "body": {
+        "name": "{name}",
+        "email": "{email}",
+        "password": "{password}"
+      }
+    },
+    "signIn": {
+      "method": "POST",
+      "path": "/api/sign-in",
+      "send": "json",
+      "body": {
+        "email": "{email}",
+        "password": "{password}"
+      }
+    }
+  }
+}

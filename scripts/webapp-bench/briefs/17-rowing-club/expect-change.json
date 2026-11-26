@@ -1,0 +1,107 @@
+{
+  "id": "17-rowing-club",
+  "group": "larger",
+  "product": "Quayside Rowing Club",
+  "phrases": [
+    ["£18", "£ 18", "18 pounds"],
+    ["Hotwells"],
+    ["harbour", "harbor"],
+    ["new members are welcome", "re:new members (are )?(very )?welcome|welcome new members|new members welcome|everyone is welcome|all are welcome"]
+  ],
+  "accounts": "open",
+  "access": "own",
+  "kinds": [
+    {
+      "id": "details",
+      "names": ["details", "detail", "members", "member", "profiles", "profile", "records", "memberdetails", "mydetails", "people"],
+      "ops": [],
+      "onePerPerson": true,
+      "staffSeeAll": true,
+      "fields": [
+        {
+          "id": "fullName",
+          "names": ["fullname", "name", "yourname", "membername", "person", "their name"],
+          "kind": "text",
+          "required": true,
+          "said": ["full name", "their name"]
+        },
+        {
+          "id": "phone",
+          "names": ["phone", "phonenumber", "mobile", "tel", "telephone", "number"],
+          "kind": "text",
+          "required": false,
+          "said": ["phone number"]
+        },
+        {
+          "id": "emergency",
+          "names": ["emergency", "emergencycontact", "emergencynumber", "ice", "whotoring", "incaseofemergency", "nextofkin"],
+          "kind": "text",
+          "required": true,
+          "said": ["who to ring in an emergency"]
+        },
+        {
+          "id": "paid",
+          "names": ["paid", "paidthismonth", "haspaid", "paidup", "ispaid", "paymentstatus", "subscriptionpaid", "feepaid", "uptodate"],
+          "kind": "yesno",
+          "readOnly": true,
+          "mayHave": true,
+          "said": ["whether they have paid this month", "who has paid this month"]
+        },
+        {
+          "id": "boat",
+          "names": ["boat", "boattype", "usualboat", "whichboat", "boatsrowed", "usuallyrow"],
+          "kind": "choice",
+          "required": false,
+          "choices": ["single", "double", "eight"],
+          "said": ["which boat they usually row"]
+        }
+      ],
+      "said": ["own details", "their own details", "details"]
+    },
+    {
+      "id": "notices",
+      "names": ["notices", "notice", "posts", "post", "news", "announcements", "announcement", "messages", "noticeboard"],
+      "fields": [
+        {
+          "id": "title",
+          "names": ["title", "heading", "subject", "name", "a title"],
+          "kind": "text",
+          "required": true,
+          "said": ["a title", "title"]
+        },
+        {
+          "id": "message",
+          "names": ["message", "text", "body", "content", "details", "note"],
+          "kind": "long",
+          "required": true,
+          "said": ["message", "a message"]
+        }
+      ],
+      "said": ["notices"]
+    }
+  ],
+  "rows": {
+    "details": [
+      { "fullName": "Charlie Chairperson", "phone": "07700 900101", "emergency": "Sam Chairperson 07700 900102", "boat": "double" }
+    ],
+    "notices": [
+      {
+        "title": "Saturday outing from Hotwells",
+        "message": "We meet at the pontoon at eight for a long row down the harbour."
+      },
+      {
+        "title": "Training on Tuesday evening",
+        "message": "Bring a light jacket: we will be out on the water until nine."
+      }
+    ]
+  },
+  "later": {},
+  "theirs": { "details": [{ "fullName": "Bryn Sculler", "emergency": "Kit Sculler 07700 900106" }] },
+  "numbers": [],
+  "club": {
+    "details": "details",
+    "notices": "notices",
+    "paid": "paid",
+    "roles": { "treasurer": "treasurer", "coach": "coach" }
+  }
+}

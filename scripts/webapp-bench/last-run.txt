@@ -1,0 +1,689 @@
+== 1. The fourteen briefs and the instructions, read without any app
+  ok    there are fourteen briefs: 01-kiln-share, 02-veg-box, 03-salt-road, 07-food-bank, 08-choir-rota, 10-translator, 13-dough-sums, 14-market-takings, 15-times-tables-race, 16-seed-calendar, 17-rowing-club, 18-crews, 19-help-centre, 20-booking-page
+  ok    01-kiln-share: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    01-kiln-share: brief.md is 2 paragraph(s) in the maker's words
+  ok    01-kiln-share: answers.md ends with "the maker says: you decide"
+  ok    01-kiln-share: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    01-kiln-share: expect.json and expect-change.json say id 01-kiln-share
+  ok    01-kiln-share: it is in the group accounts
+  ok    01-kiln-share: expect.json holds: 1 kind(s), 0 number(s), 0 rule(s), accounts owner-only, owner
+  ok    01-kiln-share: the judge has 14 lines for expect.json
+  ok    01-kiln-share: expect-change.json holds: 1 kind(s), 0 number(s), 0 rule(s), accounts owner-only, owner
+  ok    01-kiln-share: the judge has 14 lines for expect-change.json
+  ok    01-kiln-share: the change request asks for something the first plan does not
+  ok    01-kiln-share: it has accounts (or a list owned by one person) and rows to keep
+  ok    02-veg-box: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    02-veg-box: brief.md is 2 paragraph(s) in the maker's words
+  ok    02-veg-box: answers.md ends with "the maker says: you decide"
+  ok    02-veg-box: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    02-veg-box: expect.json and expect-change.json say id 02-veg-box
+  ok    02-veg-box: it is in the group accounts
+  ok    02-veg-box: expect.json holds: 1 kind(s), 0 number(s), 0 rule(s), accounts open, team
+  ok    02-veg-box: the judge has 15 lines for expect.json
+  ok    02-veg-box: expect-change.json holds: 1 kind(s), 0 number(s), 0 rule(s), accounts open, team
+  ok    02-veg-box: the judge has 15 lines for expect-change.json
+  ok    02-veg-box: the change request asks for something the first plan does not
+  ok    02-veg-box: it has accounts (or a list owned by one person) and rows to keep
+  ok    03-salt-road: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    03-salt-road: brief.md is 2 paragraph(s) in the maker's words
+  ok    03-salt-road: answers.md ends with "the maker says: you decide"
+  ok    03-salt-road: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    03-salt-road: expect.json and expect-change.json say id 03-salt-road
+  ok    03-salt-road: it is in the group accounts
+  ok    03-salt-road: expect.json holds: 1 kind(s), 0 number(s), 0 rule(s), accounts owner-only, owner
+  ok    03-salt-road: the judge has 15 lines for expect.json
+  ok    03-salt-road: expect-change.json holds: 1 kind(s), 0 number(s), 0 rule(s), accounts owner-only, owner
+  ok    03-salt-road: the judge has 15 lines for expect-change.json
+  ok    03-salt-road: the change request asks for something the first plan does not
+  ok    03-salt-road: it has accounts (or a list owned by one person) and rows to keep
+  ok    07-food-bank: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    07-food-bank: brief.md is 2 paragraph(s) in the maker's words
+  ok    07-food-bank: answers.md ends with "the maker says: you decide"
+  ok    07-food-bank: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    07-food-bank: expect.json and expect-change.json say id 07-food-bank
+  ok    07-food-bank: it is in the group accounts
+  ok    07-food-bank: expect.json holds: 2 kind(s), 3 number(s), 0 rule(s), accounts any, team
+  ok    07-food-bank: the judge has 16 lines for expect.json
+  ok    07-food-bank: expect-change.json holds: 2 kind(s), 3 number(s), 0 rule(s), accounts any, team
+  ok    07-food-bank: the judge has 16 lines for expect-change.json
+  ok    07-food-bank: the change request asks for something the first plan does not
+  ok    07-food-bank: it has accounts (or a list owned by one person) and rows to keep
+  ok    08-choir-rota: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    08-choir-rota: brief.md is 2 paragraph(s) in the maker's words
+  ok    08-choir-rota: answers.md ends with "the maker says: you decide"
+  ok    08-choir-rota: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    08-choir-rota: expect.json and expect-change.json say id 08-choir-rota
+  ok    08-choir-rota: it is in the group accounts
+  ok    08-choir-rota: expect.json holds: 3 kind(s), 2 number(s), 0 rule(s), accounts any, team
+  ok    08-choir-rota: the judge has 16 lines for expect.json
+  ok    08-choir-rota: expect-change.json holds: 3 kind(s), 3 number(s), 0 rule(s), accounts any, team
+  ok    08-choir-rota: the judge has 16 lines for expect-change.json
+  ok    08-choir-rota: the change request asks for something the first plan does not
+  ok    08-choir-rota: it has accounts (or a list owned by one person) and rows to keep
+  ok    10-translator: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    10-translator: brief.md is 2 paragraph(s) in the maker's words
+  ok    10-translator: answers.md ends with "the maker says: you decide"
+  ok    10-translator: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    10-translator: expect.json and expect-change.json say id 10-translator
+  ok    10-translator: it is in the group accounts
+  ok    10-translator: expect.json holds: 2 kind(s), 3 number(s), 0 rule(s), accounts any, own
+  ok    10-translator: the judge has 16 lines for expect.json
+  ok    10-translator: expect-change.json holds: 2 kind(s), 3 number(s), 0 rule(s), accounts any, own
+  ok    10-translator: the judge has 16 lines for expect-change.json
+  ok    10-translator: the change request asks for something the first plan does not
+  ok    10-translator: it has accounts (or a list owned by one person) and rows to keep
+  ok    13-dough-sums: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    13-dough-sums: brief.md is 2 paragraph(s) in the maker's words
+  ok    13-dough-sums: answers.md ends with "the maker says: you decide"
+  ok    13-dough-sums: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    13-dough-sums: expect.json and expect-change.json say id 13-dough-sums
+  ok    13-dough-sums: it is in the group logic
+  ok    13-dough-sums: expect.json holds: 0 kind(s), 0 number(s), 1 rule(s), accounts none
+  ok    13-dough-sums: the judge has 10 lines for expect.json
+  ok    13-dough-sums: expect-change.json holds: 0 kind(s), 0 number(s), 1 rule(s), accounts none
+  ok    13-dough-sums: the judge has 10 lines for expect-change.json
+  ok    13-dough-sums: the change request asks for something the first plan does not
+  ok    13-dough-sums: nobody signs in, no home page of numbers, no rows to add: it is a rule of its own
+  ok    13-dough-sums: it has worked cases, edge cases and refused inputs
+  ok    13-dough-sums: every worked example in expect.json is what the rules in rules.ts say
+  ok    13-dough-sums: every worked example in expect-change.json is what the rules in rules.ts say
+  ok    14-market-takings: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    14-market-takings: brief.md is 2 paragraph(s) in the maker's words
+  ok    14-market-takings: answers.md ends with "the maker says: you decide"
+  ok    14-market-takings: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    14-market-takings: expect.json and expect-change.json say id 14-market-takings
+  ok    14-market-takings: it is in the group logic
+  ok    14-market-takings: expect.json holds: 0 kind(s), 0 number(s), 1 rule(s), accounts none
+  ok    14-market-takings: the judge has 10 lines for expect.json
+  ok    14-market-takings: expect-change.json holds: 0 kind(s), 0 number(s), 1 rule(s), accounts none
+  ok    14-market-takings: the judge has 10 lines for expect-change.json
+  ok    14-market-takings: the change request asks for something the first plan does not
+  ok    14-market-takings: nobody signs in, no home page of numbers, no rows to add: it is a rule of its own
+  ok    14-market-takings: it has worked cases, edge cases and refused inputs
+  ok    14-market-takings: every worked example in expect.json is what the rules in rules.ts say
+  ok    14-market-takings: every worked example in expect-change.json is what the rules in rules.ts say
+  ok    15-times-tables-race: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    15-times-tables-race: brief.md is 2 paragraph(s) in the maker's words
+  ok    15-times-tables-race: answers.md ends with "the maker says: you decide"
+  ok    15-times-tables-race: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    15-times-tables-race: expect.json and expect-change.json say id 15-times-tables-race
+  ok    15-times-tables-race: it is in the group logic
+  ok    15-times-tables-race: expect.json holds: 1 kind(s), 0 number(s), 1 rule(s), accounts none
+  ok    15-times-tables-race: the judge has 12 lines for expect.json
+  ok    15-times-tables-race: expect-change.json holds: 1 kind(s), 0 number(s), 1 rule(s), accounts none
+  ok    15-times-tables-race: the judge has 12 lines for expect-change.json
+  ok    15-times-tables-race: the change request asks for something the first plan does not
+  ok    15-times-tables-race: nobody signs in, no home page of numbers, no rows to add: it is a rule of its own and a score board that is kept
+  ok    15-times-tables-race: it has worked cases, edge cases and refused inputs
+  ok    15-times-tables-race: every worked example in expect.json is what the rules in rules.ts say
+  ok    15-times-tables-race: every worked example in expect-change.json is what the rules in rules.ts say
+  ok    15-times-tables-race: the board after 10 plays is the 5 places the rules give
+  ok    15-times-tables-race: the board after 10 plays is the 10 places the rules give
+  ok    16-seed-calendar: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    16-seed-calendar: brief.md is 2 paragraph(s) in the maker's words
+  ok    16-seed-calendar: answers.md ends with "the maker says: you decide"
+  ok    16-seed-calendar: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    16-seed-calendar: expect.json and expect-change.json say id 16-seed-calendar
+  ok    16-seed-calendar: it is in the group logic
+  ok    16-seed-calendar: expect.json holds: 0 kind(s), 0 number(s), 1 rule(s), accounts none
+  ok    16-seed-calendar: the judge has 10 lines for expect.json
+  ok    16-seed-calendar: expect-change.json holds: 0 kind(s), 0 number(s), 1 rule(s), accounts none
+  ok    16-seed-calendar: the judge has 10 lines for expect-change.json
+  ok    16-seed-calendar: the change request asks for something the first plan does not
+  ok    16-seed-calendar: nobody signs in, no home page of numbers, no rows to add: it is a rule of its own
+  ok    16-seed-calendar: it has worked cases, edge cases and refused inputs
+  ok    16-seed-calendar: every worked example in expect.json is what the rules in rules.ts say
+  ok    16-seed-calendar: every worked example in expect-change.json is what the rules in rules.ts say
+  ok    17-rowing-club: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    17-rowing-club: brief.md is 2 paragraph(s) in the maker's words
+  ok    17-rowing-club: answers.md ends with "the maker says: you decide"
+  ok    17-rowing-club: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    17-rowing-club: expect.json and expect-change.json say id 17-rowing-club
+  ok    17-rowing-club: it is in the group larger
+  ok    17-rowing-club: expect.json holds: 2 kind(s), 0 number(s), 0 rule(s), accounts open, own
+  ok    17-rowing-club: the judge has 17 lines for expect.json
+  ok    17-rowing-club: expect-change.json holds: 2 kind(s), 0 number(s), 0 rule(s), accounts open, own
+  ok    17-rowing-club: the judge has 17 lines for expect-change.json
+  ok    17-rowing-club: the change request asks for something the first plan does not
+  ok    17-rowing-club: it has accounts and its own part (club) for the judge's new lines
+  ok    17-rowing-club: the description is longer than the small ones (184 words)
+  ok    17-rowing-club: members' own records are seen by the chair and the treasurer, and "paid" is read back
+  ok    18-crews: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    18-crews: brief.md is 2 paragraph(s) in the maker's words
+  ok    18-crews: answers.md ends with "the maker says: you decide"
+  ok    18-crews: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    18-crews: expect.json and expect-change.json say id 18-crews
+  ok    18-crews: it is in the group larger
+  ok    18-crews: expect.json holds: 3 kind(s), 0 number(s), 0 rule(s), accounts open
+  ok    18-crews: the judge has 19 lines for expect.json
+  ok    18-crews: expect-change.json holds: 3 kind(s), 0 number(s), 0 rule(s), accounts open
+  ok    18-crews: the judge has 19 lines for expect-change.json
+  ok    18-crews: the change request asks for something the first plan does not
+  ok    18-crews: it has accounts and its own part (teams) for the judge's new lines
+  ok    18-crews: the description is longer than the small ones (175 words)
+  ok    18-crews: three kinds belong to teams
+  ok    19-help-centre: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    19-help-centre: brief.md is 2 paragraph(s) in the maker's words
+  ok    19-help-centre: answers.md ends with "the maker says: you decide"
+  ok    19-help-centre: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    19-help-centre: expect.json and expect-change.json say id 19-help-centre
+  ok    19-help-centre: it is in the group larger
+  ok    19-help-centre: expect.json holds: 1 kind(s), 0 number(s), 0 rule(s), accounts owner-only, owner
+  ok    19-help-centre: the judge has 20 lines for expect.json
+  ok    19-help-centre: expect-change.json holds: 1 kind(s), 0 number(s), 0 rule(s), accounts owner-only, owner
+  ok    19-help-centre: the judge has 20 lines for expect-change.json
+  ok    19-help-centre: the change request asks for something the first plan does not
+  ok    19-help-centre: it has accounts and its own part (kb) for the judge's new lines
+  ok    19-help-centre: the description is longer than the small ones (200 words)
+  ok    19-help-centre: the expect.json articles begin with the fifty the rules make
+  ok    19-help-centre: expect.json has 50 articles
+  ok    19-help-centre: every search in expect.json gives what the rule gives
+  ok    19-help-centre: every category page in expect.json is what the rule gives
+  ok    19-help-centre: the draft in expect.json is a draft and its word finds nothing
+  ok    19-help-centre: every article of expect.json has an address of its own
+  ok    19-help-centre: no title of expect.json is a part of another (a page can tell them apart)
+  ok    19-help-centre: the expect-change.json articles begin with the fifty the rules make
+  ok    19-help-centre: expect-change.json has 53 articles
+  ok    19-help-centre: every search in expect-change.json gives what the rule gives
+  ok    19-help-centre: every category page in expect-change.json is what the rule gives
+  ok    19-help-centre: the draft in expect-change.json is a draft and its word finds nothing
+  ok    19-help-centre: every article of expect-change.json has an address of its own
+  ok    19-help-centre: no title of expect-change.json is a part of another (a page can tell them apart)
+  ok    20-booking-page: has brief.md, answers.md, expect.json, change.md and expect-change.json
+  ok    20-booking-page: brief.md is 2 paragraph(s) in the maker's words
+  ok    20-booking-page: answers.md ends with "the maker says: you decide"
+  ok    20-booking-page: change.md is the maker's request and what they say if asked, without a word of a program
+  ok    20-booking-page: expect.json and expect-change.json say id 20-booking-page
+  ok    20-booking-page: it is in the group larger
+  ok    20-booking-page: expect.json holds: 3 kind(s), 0 number(s), 1 rule(s), accounts owner-only, owner
+  ok    20-booking-page: the judge has 19 lines for expect.json
+  ok    20-booking-page: expect-change.json holds: 3 kind(s), 0 number(s), 1 rule(s), accounts owner-only, owner
+  ok    20-booking-page: the judge has 19 lines for expect-change.json
+  ok    20-booking-page: the change request asks for something the first plan does not
+  ok    20-booking-page: it has accounts and its own part (booking) for the judge's new lines
+  ok    20-booking-page: the description is longer than the small ones (191 words)
+  ok    20-booking-page: the slots of every day in expect.json are what the maker's 30-minute rule gives
+  ok    20-booking-page: the summer, the winter and the day-off days of expect.json are Mondays
+  ok    20-booking-page: one day is in summer time and one in winter time
+  ok    20-booking-page: the slots of every day in expect-change.json are what the maker's 45-minute rule gives
+  ok    20-booking-page: the summer, the winter and the day-off days of expect-change.json are Mondays
+  ok    20-booking-page: one day is in summer time and one in winter time
+  ok    no two briefs ask for the same thing
+  ok    the build instruction has no number left to fill in
+  ok    the build instruction says the budget and the time
+  ok    the build instruction names no framework
+  ok    the change instruction has no number left to fill in
+  ok    the change instruction says the budget and the time
+  ok    the change instruction names no framework
+
+== 2. Correct apps, written by hand: the judge must pass every line of each
+
+  hand-kiln (01-kiln-share)
+    pass judge-json: judge.json says where everything the brief names is: 1 kind(s) of thing, 0 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Hatch End Kiln Share" is on the first page
+    pass phrases-shown: all 4 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 2 secret(s) of the environment (SESSION_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 2 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass signup-policy: a second person is refused (403 "Sign-up is closed: only the owner has an account."): only the first person has an account
+    pass add-and-read: 3 row(s) in 1 kind(s) were added (by a visitor where the maker said so) and come back in the list with each value as given. Fields: signups: email, name, whatFor; rows found by name
+    pass required-fields: 1 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: signups: email, name, whatFor; rows found by name
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on the first page
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.0 s after it was asked, and nothing answers on the port
+    score 14 of 14
+  ok    hand-kiln: all 14 lines pass
+
+  hand-kiln-no-email (01-kiln-share)
+    pass judge-json: judge.json says where everything the brief names is: 1 kind(s) of thing, 0 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Hatch End Kiln Share" is on the first page
+    pass phrases-shown: all 4 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 2 secret(s) of the environment (SESSION_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 2 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass signup-policy: a second person is refused (403 "Sign-up is closed: only the owner has an account."): only the first person has an account
+    pass add-and-read: 3 row(s) in 1 kind(s) were added (by a visitor where the maker said so) and come back in the list with each value as given. Fields: signups: name, whatFor; rows found by name; email not in the app, left out of every row
+    pass required-fields: 1 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: signups: name, whatFor; rows found by name; email not in the app, left out of every row
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on the first page
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.0 s after it was asked, and nothing answers on the port
+    score 14 of 14
+  ok    hand-kiln-no-email: all 14 lines pass
+
+  hand-translator (10-translator)
+    pass judge-json: judge.json says where everything the brief names is: 2 kind(s) of thing, 0 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Kovač Translations" is on the first page
+    pass phrases-shown: all 2 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 2 secret(s) of the environment (SESSION_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 5 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass add-and-read: 6 row(s) in 2 kind(s) were added (by the first person) and come back in the list with each value as given. Fields: clients: name, country, notes; rows found by name | jobs: client, title, words, fee, due, deliveredOn, source; rows found by 
+    pass required-fields: 2 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: clients: name, country, notes; rows found by name | jobs: client, title, words, fee, due, deliveredOn, 
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass change-remove: 2 kind(s): read, change, remove tried (a row is changed and the list shows it; reading and removing are tried only where judge.json gives them)
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on /home or the first page
+    pass others-cannot: a second person's list has none of the first person's rows, no address (nor the id guessed) reads, changes or removes one, and what they add is theirs alone
+    pass home-numbers: 3 number(s) on /home, read from the HTML, are what the rows come to and move when rows are added: invoiced this month 1300.00 then 1450.00; jobs still open 1 then 3; average words per job 4050 then 3000 (the other person's rows are not in t
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.0 s after it was asked, and nothing answers on the port
+    score 16 of 16
+  ok    hand-translator: all 16 lines pass
+
+  hand-club (17-rowing-club)
+    pass judge-json: judge.json says where everything the brief names is: 2 kind(s) of thing, 0 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Quayside Rowing Club" is on the first page
+    pass phrases-shown: all 4 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 3 secret(s) of the environment (SESSION_SECRET, PAYMENT_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 2 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass signup-policy: a second person makes their own account and signs in
+    pass add-and-read: 3 row(s) in 2 kind(s) were added (by the first person) and come back in the list with each value as given. Fields: details: fullName, phone, emergency, paid; rows found by fullName | notices: title, message; rows found by title
+    pass required-fields: 2 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: details: fullName, phone, emergency, paid; rows found by fullName | notices: title, message; rows found
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on the first page
+    pass others-cannot: a second person's list has none of the first person's rows, no address (nor the id guessed) reads, changes or removes one, and what they add is theirs alone
+    pass club-roles: the chair gives the two helpers their roles and nobody else can; the chair and the treasurer see everybody's details, the treasurer cannot change them, the coach and members see only their own; the coach and the chair post notices and nobod
+    pass club-payments: the payment service is believed only with the shared secret; a member who paid for this month reads the notices and one who did not (or paid for last month) cannot; who has paid next to each member: read from the field judge.json names: tru
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.0 s after it was asked, and nothing answers on the port
+    score 17 of 17
+  ok    hand-club: all 17 lines pass
+  ok    hand-club: with "paid" declared, who has paid is read from the treasurer's list
+
+  hand-club-one-record (17-rowing-club)
+    pass judge-json: judge.json says where everything the brief names is: 2 kind(s) of thing, 0 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Quayside Rowing Club" is on the first page
+    pass phrases-shown: all 4 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 3 secret(s) of the environment (SESSION_SECRET, PAYMENT_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 2 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass signup-policy: a second person makes their own account and signs in
+    pass add-and-read: 3 row(s) in 2 kind(s) were added (by the first person) and come back in the list with each value as given. Fields: details: fullName, phone, emergency, paid; rows found by fullName | notices: title, message; rows found by title
+    pass required-fields: 2 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: details: fullName, phone, emergency, paid; rows found by fullName | notices: title, message; rows found
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on the first page
+    pass others-cannot: a second person's list has none of the first person's rows, no address (nor the id guessed) reads, changes or removes one, and what they add is theirs alone
+    pass club-roles: the chair gives the two helpers their roles and nobody else can; the chair and the treasurer see everybody's details, the treasurer cannot change them, the coach and members see only their own; the coach and the chair post notices and nobod
+    pass club-payments: the payment service is believed only with the shared secret; a member who paid for this month reads the notices and one who did not (or paid for last month) cannot; who has paid next to each member: read from the field judge.json names: tru
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.0 s after it was asked, and nothing answers on the port
+    score 17 of 17
+  ok    hand-club-one-record: all 17 lines pass
+
+  hand-club-no-paid (17-rowing-club)
+    pass judge-json: judge.json says where everything the brief names is: 2 kind(s) of thing, 0 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Quayside Rowing Club" is on the first page
+    pass phrases-shown: all 4 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 3 secret(s) of the environment (SESSION_SECRET, PAYMENT_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 2 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass signup-policy: a second person makes their own account and signs in
+    pass add-and-read: 3 row(s) in 2 kind(s) were added (by the first person) and come back in the list with each value as given. Fields: details: fullName, phone, emergency; rows found by fullName; paid not in the app, left out of every row | notices: title, mes
+    pass required-fields: 2 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: details: fullName, phone, emergency; rows found by fullName; paid not in the app, left out of every row
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on the first page
+    pass others-cannot: a second person's list has none of the first person's rows, no address (nor the id guessed) reads, changes or removes one, and what they add is theirs alone
+    pass club-roles: the chair gives the two helpers their roles and nobody else can; the chair and the treasurer see everybody's details, the treasurer cannot change them, the coach and members see only their own; the coach and the chair post notices and nobod
+    pass club-payments: the payment service is believed only with the shared secret; a member who paid for this month reads the notices and one who did not (or paid for last month) cannot; who has paid next to each member: read from the page the treasurer reaches 
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.0 s after it was asked, and nothing answers on the port
+    score 17 of 17
+  ok    hand-club-no-paid: all 17 lines pass
+  ok    hand-club-no-paid: club-roles and club-payments are checked and pass without a name for "paid"
+  ok    hand-club-no-paid: who has paid is read from the page the treasurer reaches from the home page
+
+  hand-club-no-page (17-rowing-club)
+    pass judge-json: judge.json says where everything the brief names is: 2 kind(s) of thing, 0 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Quayside Rowing Club" is on the first page
+    pass phrases-shown: all 4 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 3 secret(s) of the environment (SESSION_SECRET, PAYMENT_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 2 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass signup-policy: a second person makes their own account and signs in
+    pass add-and-read: 3 row(s) in 2 kind(s) were added (by the first person) and come back in the list with each value as given. Fields: details: fullName, phone, emergency; rows found by fullName; paid not in the app, left out of every row | notices: title, mes
+    pass required-fields: 2 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: details: fullName, phone, emergency; rows found by fullName; paid not in the app, left out of every row
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on the first page
+    pass others-cannot: a second person's list has none of the first person's rows, no address (nor the id guessed) reads, changes or removes one, and what they add is theirs alone
+    pass club-roles: the chair gives the two helpers their roles and nobody else can; the chair and the treasurer see everybody's details, the treasurer cannot change them, the coach and members see only their own; the coach and the chair post notices and nobod
+    pass club-payments: the payment service is believed only with the shared secret; a member who paid for this month reads the notices and one who did not (or paid for last month) cannot; who has paid next to each member: not checked, because judge.json names no 
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.0 s after it was asked, and nothing answers on the port
+    score 17 of 17
+  ok    hand-club-no-page: all 17 lines pass
+  ok    hand-club-no-page: club-payments passes on what people may do, and says that who has paid next to each member was not checked, and why
+  ok    hand-club-no-page: no line is left out of the count for it
+
+  hand-crews (18-crews)
+    pass judge-json: judge.json says where everything the brief names is: 3 kind(s) of thing, 0 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Kestrel Crews" is on the first page
+    pass phrases-shown: all 4 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 2 secret(s) of the environment (SESSION_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 2 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass signup-policy: a second person makes their own account and signs in
+    pass add-and-read: 8 row(s) in 3 kind(s) were added (by the first person) and come back in the list with each value as given. Fields: customers: name, address and __team (not in the brief, sent as they are); rows found by name | jobs: title, day, done and __t
+    pass required-fields: 3 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: customers: name, address and __team (not in the brief, sent as they are); rows found by name | jobs: ti
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass change-remove: 3 kind(s): read, change, remove tried (a row is changed and the list shows it; reading and removing are tried only where judge.json gives them)
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on the first page
+    pass teams-isolation: two crews, 3 kinds each: nobody reads, lists, changes or removes another crew's row by any address (the id guessed too), and cannot add one to a crew they are not in
+    pass teams-invite: a lead invites by a link and the role is the one chosen; the link works once; an ordinary member cannot invite or take anyone out; a lead who came in by a link can invite
+    pass teams-two: a person invited into two crews sees the rows of both, adds to either, and cannot add to a third
+    pass teams-removal: a person taken out of a crew loses its rows on their next request, by list, by address and by adding, and keeps the other crew
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.1 s after it was asked, and nothing answers on the port
+    score 19 of 19
+  ok    hand-crews: all 19 lines pass
+
+  hand-help-centre (19-help-centre)
+    pass judge-json: judge.json says where everything the brief names is: 1 kind(s) of thing, 0 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Fenwick Help" is on the first page
+    pass phrases-shown: all 6 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 2 secret(s) of the environment (SESSION_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 7 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass signup-policy: a second person is refused (403 "Sign-up is closed: only the owner has an account."): only the first person has an account
+    pass add-and-read: 50 row(s) in 1 kind(s) were added (by the first person) and come back in the list with each value as given. Fields: articles: title, text, status, category, slug; rows found by title
+    pass required-fields: 1 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: articles: title, text, status, category, slug; rows found by title
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass change-remove: 1 kind(s): read, change, remove tried (a row is changed and the list shows it; reading and removing are tried only where judge.json gives them)
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on the first page
+    pass kb-reading: published articles are at an address made from the title in lower case with hyphens, with their title and text in the HTML; a draft shows nothing
+    pass kb-search: 8 searches show exactly the published articles with every word, title matches first, alphabetical, in the HTML (no draft, none when nothing matches)
+    pass kb-category: 5 category pages list their published articles in alphabetical order and nothing else
+    pass kb-address: an article's address is the same after its title is changed, and shows the new title
+    pass kb-drafts: a draft is not in a search, a category page, at its address or in a visitor's list; a visitor cannot write; publishing shows it and making it a draft again hides it
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.0 s after it was asked, and nothing answers on the port
+    score 20 of 20
+  ok    hand-help-centre: all 20 lines pass
+
+  hand-booking (20-booking-page)
+    pass judge-json: judge.json says where everything the brief names is: 3 kind(s) of thing, 1 rule(s), how to make an account and sign in
+    pass build: judge.json names no build: nothing has to be built
+    pass starts: the app answered 0.2 s after it was started, in an empty data folder, on the port the judge gave
+    pass name-shown: "Ash Physiotherapy" is on the first page
+    pass phrases-shown: all 2 things the maker's words need are on the pages a person reads
+    pass no-secret-in-browser: 2 secret(s) of the environment (SESSION_SECRET, JUDGE_PLANTED_SECRET; the last one is planted by the judge) are in none of 3 page(s), 1 file(s) the pages load or 1 file(s) of public
+    pass account: a person makes an account and is let in, signs in again with the same email and password, and a wrong password is refused
+    pass signup-policy: a second person is refused (403 "Sign-up is closed: only the owner has an account."): only the first person has an account
+    pass add-and-read: 3 row(s) in 2 kind(s) were added (by the first person) and come back in the list with each value as given. Fields: hours: weekday, start, end; rows found by their id | days off: date; rows found by their id
+    pass required-fields: 2 kind(s): what the maker said is needed cannot be left out or blank (refused, nothing kept), what may be left out can be. Fields tried: hours: weekday, start, end; rows found by their id | days off: date; rows found by their id
+    pass bad-values: values that make no sense (fractions, words for numbers, days that do not exist, words that are not a choice, rows that are not there, numbers past the maker's limits, an email that is not an address) are refused and nothing is kept. Fields
+    pass visitor-shut-out: a visitor lists, reads, changes and removes nothing (every address, the id guessed), adds only where the maker said, and sees no row on the first page
+    pass booking-slots: each day offers the slots the maker's hours give (summer and winter, a Wednesday, a Sunday with none); a booked slot is gone and cannot be booked again; times that are no slot, an email that is no address, no name and words for a day are re
+    pass booking-once: 6 requests for one slot at the same moment: exactly one accepted, the others refused, one booking, the slot gone
+    pass booking-cancel: the owner cancels a booking, its slot is free again and can be booked; a visitor cannot cancel
+    pass booking-dayoff: a day off has no free slots and cannot be booked; the other days are as they were
+    pass booking-timezone: the booking page shows the free times in Europe/London time on a summer day and a winter day
+    pass keeps-after-restart: the rows (and the score board) are all still there after the app is stopped and started again in the same data folder
+    pass stops: the app stopped 0.0 s after it was asked, and nothing answers on the port
+    score 19 of 19
+  ok    hand-booking: all 19 lines pass
+
+== 3. 32 spoiled copies: each is wrong in one way, and the judge must name that one line and no other
+
+  hand-kiln-list-open (a copy of hand-kiln): the waiting list can be read by anybody
+    FAIL visitor-shut-out: a visitor reads signups at /api/signups
+    score 13 of 14
+  ok    hand-kiln-list-open: the judge fails visitor-shut-out
+  ok    hand-kiln-list-open: and every other line could run
+
+  hand-kiln-name-optional (a copy of hand-kiln): the name is left optional on the list (the maker needs it)
+    FAIL required-fields: signups: name left out was accepted; signups: name left blank was accepted; signups: a refused row was kept anyway (2 of them are in the list)
+    score 13 of 14
+  ok    hand-kiln-name-optional: the judge fails required-fields
+  ok    hand-kiln-name-optional: and every other line could run
+
+  hand-kiln-signup-open (a copy of hand-kiln): anyone can make an account (the maker said nobody else)
+    FAIL signup-policy: a second person could make an account and sign in with it: the maker said nobody but them
+    score 13 of 14
+  ok    hand-kiln-signup-open: the judge fails signup-policy
+  ok    hand-kiln-signup-open: and every other line could run
+
+  hand-kiln-secret-in-public (a copy of hand-kiln): the session secret is written in a file of the public folder
+    FAIL no-secret-in-browser: SESSION_SECRET is in public/config.js
+    score 13 of 14
+  ok    hand-kiln-secret-in-public: the judge fails no-secret-in-browser
+  ok    hand-kiln-secret-in-public: and every other line could run
+
+  hand-kiln-forgets (a copy of hand-kiln): the list is kept in memory: it is gone when the app is stopped and started again
+    FAIL keeps-after-restart: signups: the list answered 401 "Please sign in first." after the restart
+    score 13 of 14
+  ok    hand-kiln-forgets: the judge fails keeps-after-restart
+  ok    hand-kiln-forgets: and every other line could run
+
+  hand-kiln-email-not-checked (a copy of hand-kiln): the app has an email for each name and takes "not an address" for it
+    FAIL bad-values: signups: email as not an email address was accepted; signups: a refused row was kept anyway (1 of them are in the list)
+    score 13 of 14
+  ok    hand-kiln-email-not-checked: the judge fails bad-values
+  ok    hand-kiln-email-not-checked: and every other line could run
+
+  hand-kiln-no-email-name-optional (a copy of hand-kiln-no-email): the app without an email leaves the name optional (the maker must have it)
+    FAIL required-fields: signups: name left out was accepted; signups: name left blank was accepted; signups: a refused row was kept anyway (2 of them are in the list)
+    score 13 of 14
+  ok    hand-kiln-no-email-name-optional: the judge fails required-fields
+  ok    hand-kiln-no-email-name-optional: and every other line could run
+
+  hand-kiln-no-email-list-open (a copy of hand-kiln-no-email): the app without an email lets anybody read the list
+    FAIL visitor-shut-out: a visitor reads signups at /api/signups
+    score 13 of 14
+  ok    hand-kiln-no-email-list-open: the judge fails visitor-shut-out
+  ok    hand-kiln-no-email-list-open: and every other line could run
+
+  club-any-secret (a copy of hand-club): the payment service is believed with any secret
+    FAIL club-payments: the payment service is believed with the wrong secret; the payment service is believed with no secret at all; a member who has not paid, and whom a call with no right to be believed named, reads the notices
+    score 16 of 17
+  ok    club-any-secret: the judge fails club-payments
+  ok    club-any-secret: and every other line could run
+
+  club-last-month-counts (a copy of hand-club): a member who paid for last month only is counted as paid for this month
+    FAIL club-payments: a member who paid for last month only reads this month's notices; the treasurer sees a member who paid only for last month as having paid
+    score 16 of 17
+  ok    club-last-month-counts: the judge fails club-payments
+  ok    club-last-month-counts: and every other line could run
+
+  club-page-says-paid-for-all (a copy of hand-club-no-paid): with no name for "paid" in judge.json, the treasurer's page shows every member as paid
+    FAIL club-payments: the page that lists the members shows a member who paid only for last month as paid
+    score 16 of 17
+  ok    club-page-says-paid-for-all: the judge fails club-payments
+  ok    club-page-says-paid-for-all: and every other line could run
+
+  club-treasurer-changes (a copy of hand-club): the treasurer can change other members' details (the maker said they only look)
+    FAIL club-roles: the treasurer changed a member's details (200); the maker said they only look
+    score 16 of 17
+  ok    club-treasurer-changes: the judge fails club-roles
+  ok    club-treasurer-changes: and every other line could run
+
+  club-anyone-grants (a copy of hand-club): any member can give themselves a role (the maker said only the chair gives roles); the member made a coach then reads notices unpaid
+    FAIL club-roles: an ordinary member could give themselves the role of coach (the maker said nobody but the chair gives roles); a member posted a notice (201); only the coach and the chair post; a notice posted by someone who may not post is in the list; mia
+    FAIL club-payments: a member who has not paid, and whom a call with no right to be believed named, reads the notices
+    score 15 of 17
+  ok    club-anyone-grants: the judge fails club-roles and club-payments
+  ok    club-anyone-grants: and every other line could run
+
+  crews-removal-forgotten (a copy of hand-crews): taking a person out of a crew is said to be done and is not
+    FAIL teams-removal: a person taken out of the crew still sees its rows on their very next request; a person taken out of the crew can still read a row of it by its address; a person taken out of the crew can still add to it
+    score 18 of 19
+  ok    crews-removal-forgotten: the judge fails teams-removal
+  ok    crews-removal-forgotten: and every other line could run
+
+  crews-members-invite (a copy of hand-crews): an ordinary member can invite people into the crew
+    FAIL teams-invite: an ordinary member can invite people into the crew
+    score 18 of 19
+  ok    crews-members-invite: the judge fails teams-invite
+  ok    crews-members-invite: and every other line could run
+
+  crews-link-reusable (a copy of hand-crews): an invitation link can be used again and again
+    FAIL teams-invite: a link that had been used got a second person into the crew
+    score 18 of 19
+  ok    crews-link-reusable: the judge fails teams-invite
+  ok    crews-link-reusable: and every other line could run
+
+  crews-only-first-crew (a copy of hand-crews): a person who is in two crews sees the rows of the first only
+    FAIL teams-two: a person in two crews does not see the rows of both crews
+    score 18 of 19
+  ok    crews-only-first-crew: the judge fails teams-two
+  ok    crews-only-first-crew: and every other line could run
+
+  crews-everyone-sees-all (a copy of hand-crews): every crew's rows are in everybody's lists (so a used link, and a person taken out, change nothing)
+    FAIL teams-isolation: the first crew's lead sees the second crew's rows; the second crew's lead sees the first crew's rows; someone from another crew reads customers at /api/customers; someone from another crew reads jobs at /api/jobs; someone from another crew 
+    FAIL teams-invite: a link that had been used got a second person into the crew
+    FAIL teams-two: the first crew's lead sees rows a shared person added to the second crew
+    FAIL teams-removal: a person taken out of the crew still sees its rows on their very next request
+    score 15 of 19
+  ok    crews-everyone-sees-all: the judge fails teams-isolation and teams-invite and teams-two and teams-removal
+  ok    crews-everyone-sees-all: and every other line could run
+
+  help-draft-in-search (a copy of hand-help-centre): a search finds drafts
+    FAIL kb-search: a search for "thermostat" shows 2 article(s) (How we check the thermostat | When the tank thermostat needs an engineer…), the maker's rule gives 1 (How we check the thermostat…); a search for "clock" shows 23 article(s) (How we check the di
+    FAIL kb-drafts: a draft: a search for its word shows it; a draft: a search for its title shows it; a published article made a draft again: a search for its word shows it; a published article made a draft again: a search for its title shows it
+    score 18 of 20
+  ok    help-draft-in-search: the judge fails kb-search and kb-drafts
+  ok    help-draft-in-search: and every other line could run
+
+  help-draft-in-visitors-list (a copy of hand-help-centre): a visitor's list of articles has the drafts
+    FAIL kb-drafts: a draft: a visitor's list of articles has it; a published article made a draft again: a visitor's list of articles has it
+    score 19 of 20
+  ok    help-draft-in-visitors-list: the judge fails kb-drafts
+  ok    help-draft-in-visitors-list: and every other line could run
+
+  help-address-follows-title (a copy of hand-help-centre): an article's address is made again when its title is changed
+    FAIL kb-address: the address of an article changed with its title (why-your-radiator-stops-working became radiators-that-will-not-warm-up); the old address does not show the article with its new title
+    score 19 of 20
+  ok    help-address-follows-title: the judge fails kb-address
+  ok    help-address-follows-title: and every other line could run
+
+  booking-no-lock (a copy of hand-booking): the slot is checked, then booked a moment later with nothing to stop two at once
+    FAIL booking-once: 6 of 6 requests for the same slot at the same moment were accepted, not exactly 1; the owner has 6 bookings for that slot, not 1
+    score 18 of 19
+  ok    booking-no-lock: the judge fails booking-once
+  ok    booking-no-lock: and every other line could run
+
+  booking-dayoff-ignored (a copy of hand-booking): a day off is offered and can be booked
+    FAIL booking-dayoff: a day off (2031-07-21, a Monday) offers 09:00 09:30 10:00 10:30 11:00 11:30; a day off was booked
+    score 18 of 19
+  ok    booking-dayoff-ignored: the judge fails booking-dayoff
+  ok    booking-dayoff-ignored: and every other line could run
+
+  booking-page-in-utc (a copy of hand-booking): the page shows the times of a summer day an hour early, as UTC would
+    FAIL booking-timezone: the page for 2031-07-14 (summer time) does not show 11:00, 11:30, the times of the maker's zone
+    score 18 of 19
+  ok    booking-page-in-utc: the judge fails booking-timezone
+  ok    booking-page-in-utc: and every other line could run
+
+  booking-cancel-does-nothing (a copy of hand-booking): cancelling says it is done and the booking stays
+    FAIL booking-cancel: a cancelled booking is still in the owner's list; a cancelled booking's slot is not free again; a slot that was cancelled could not be booked (409 "That time is not a free appointment.")
+    score 18 of 19
+  ok    booking-cancel-does-nothing: the judge fails booking-cancel
+  ok    booking-cancel-does-nothing: and every other line could run
+
+  booking-any-time (a copy of hand-booking): any time is taken, even one that is no slot (and so a day off is booked too)
+    FAIL booking-slots: a booking with a time that is not the start of a slot was accepted; a booking with a time after the hours was accepted; a booking with a day with no hours was accepted
+    FAIL booking-dayoff: a day off was booked
+    score 17 of 19
+  ok    booking-any-time: the judge fails booking-slots and booking-dayoff
+  ok    booking-any-time: and every other line could run
+
+  hand-translator-unknown-word (a copy of hand-translator): judge.json names the title of a job "blurb", a word the judge does not know (the app is right)
+    FAIL judge-json: "jobs": your name "blurb" matches none of the maker's words and the field "title" has no name: it may be the one, but the judge does not guess (the names it reads for title are title, name, jobname, jobtitle, description, project, job, proj
+    n/a  home-numbers: not checked, because every number on the home page is worked out from jobs, which cannot be checked (jobs: judge.json has no field for title); counted once, in judge-json
+    score 14 of 15
+  ok    hand-translator-unknown-word: the judge fails judge-json
+  ok    hand-translator-unknown-word: judge-json says which of the builder's names matched nothing and which field has no name, and does not guess
+  ok    hand-translator-unknown-word: home-numbers (worked out from the jobs) is not checked, and says so
+  ok    hand-translator-unknown-word: every line about rows passes for the clients and says it was not checked for the jobs, and why
+  ok    hand-translator-unknown-word: the score loses one line (judge-json) and the one left out, not the six that needed the jobs
+  ok    hand-translator-unknown-word: and every other line could run
+
+  hand-translator-clients-readable (a copy of hand-translator): every client of everybody is in each person's list and can be read by its id
+    FAIL others-cannot: the second person sees the first person's clients; the second person reads clients at /api/clients; the second person reads a clients row at /api/clients/4; the second person reads a clients row by guessing the id 2; rows the second person 
+    score 15 of 16
+  ok    hand-translator-clients-readable: the judge fails others-cannot
+  ok    hand-translator-clients-readable: and every other line could run
+
+  hand-translator-title-optional (a copy of hand-translator): a job's title is left optional (the maker needs it)
+    FAIL required-fields: jobs: title left out was accepted; jobs: title left blank was accepted
+    score 15 of 16
+  ok    hand-translator-title-optional: the judge fails required-fields
+  ok    hand-translator-title-optional: and every other line could run
+
+  hand-translator-number-typed (a copy of hand-translator): the average length on the home page is typed in, not worked out from the rows
+    FAIL home-numbers: average words per job: expected 4050 and then 3000 from the rows, and the page shows neither
+    score 15 of 16
+  ok    hand-translator-number-typed: the judge fails home-numbers
+  ok    hand-translator-number-typed: and every other line could run
+
+  hand-translator-words-taken (a copy of hand-translator): a number of words may be a fraction or a word
+    FAIL bad-values: jobs: words as a fraction (1.5) was accepted; jobs: words as a word was accepted; jobs: a refused row was kept anyway (2 of them are in the list)
+    score 15 of 16
+  ok    hand-translator-words-taken: the judge fails bad-values
+  ok    hand-translator-words-taken: and every other line could run
+
+  hand-translator-secret-in-public (a copy of hand-translator): the session secret is written in a file of the public folder
+    FAIL no-secret-in-browser: SESSION_SECRET is in public/config.js
+    score 15 of 16
+  ok    hand-translator-secret-in-public: the judge fails no-secret-in-browser
+  ok    hand-translator-secret-in-public: and every other line could run
+
+   spoiled copy                       line that must fail            actually failed
+   hand-kiln-list-open                visitor-shut-out               visitor-shut-out
+   hand-kiln-name-optional            required-fields                required-fields
+   hand-kiln-signup-open              signup-policy                  signup-policy
+   hand-kiln-secret-in-public         no-secret-in-browser           no-secret-in-browser
+   hand-kiln-forgets                  keeps-after-restart            keeps-after-restart
+   hand-kiln-email-not-checked        bad-values                     bad-values
+   hand-kiln-no-email-name-optional   required-fields                required-fields
+   hand-kiln-no-email-list-open       visitor-shut-out               visitor-shut-out
+   club-any-secret                    club-payments                  club-payments
+   club-last-month-counts             club-payments                  club-payments
+   club-page-says-paid-for-all        club-payments                  club-payments
+   club-treasurer-changes             club-roles                     club-roles
+   club-anyone-grants                 club-roles, club-payments      club-roles, club-payments
+   crews-removal-forgotten            teams-removal                  teams-removal
+   crews-members-invite               teams-invite                   teams-invite
+   crews-link-reusable                teams-invite                   teams-invite
+   crews-only-first-crew              teams-two                      teams-two
+   crews-everyone-sees-all            teams-isolation, teams-invite, teams-two, teams-removal teams-isolation, teams-invite, teams-two, teams-removal
+   help-draft-in-search               kb-search, kb-drafts           kb-search, kb-drafts
+   help-draft-in-visitors-list        kb-drafts                      kb-drafts
+   help-address-follows-title         kb-address                     kb-address
+   booking-no-lock                    booking-once                   booking-once
+   booking-dayoff-ignored             booking-dayoff                 booking-dayoff
+   booking-page-in-utc                booking-timezone               booking-timezone
+   booking-cancel-does-nothing        booking-cancel                 booking-cancel
+   booking-any-time                   booking-slots, booking-dayoff  booking-slots, booking-dayoff
+   hand-translator-unknown-word       judge-json                     judge-json
+   hand-translator-clients-readable   others-cannot                  others-cannot
+   hand-translator-title-optional     required-fields                required-fields
+   hand-translator-number-typed       home-numbers                   home-numbers
+   hand-translator-words-taken        bad-values                     bad-values
+   hand-translator-secret-in-public   no-secret-in-browser           no-secret-in-browser
+
+   how long the correct apps took to build and to start
+   hand-kiln        build -, start 0.2 s
+   hand-kiln-no-email build -, start 0.2 s
+   hand-translator  build -, start 0.2 s
+   hand-club        build -, start 0.2 s
+   hand-club-one-record build -, start 0.2 s
+   hand-club-no-paid build -, start 0.2 s
+   hand-club-no-page build -, start 0.2 s
+   hand-crews       build -, start 0.2 s
+   hand-help-centre build -, start 0.2 s
+   hand-booking     build -, start 0.2 s
+
+   27 of the judge's 39 lines have a spoiled copy that fails them (the rules' lines in logic.test.ts). Shown to pass on correct apps, with no spoiled copy of their own: build, starts, name-shown, phrases-shown, second-page, account, add-and-read, change-remove, team-shares, stops, kb-reading, kb-category
+
+299 of 299 checks held

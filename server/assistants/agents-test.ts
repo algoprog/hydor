@@ -363,10 +363,19 @@ test('a project’s kind: from what its folder holds first, the words it was des
   assert.equal(k({ 'chapter1.docx': '', 'chapter2.md': '' }), 'writing');
   assert.equal(k({ 'talk.pptx': '' }), 'slides');
   assert.equal(k({ '1.png': '', '2.png': '', '3.jpg': '', '4.mp4': '', '5.svg': '' }), 'media');
+  // A web app of Hydor's (a hydor.json at its top) gets the web developer.
+  assert.equal(k({ 'hydor.json': '{}', 'server.mjs': '' }), 'web');
   // Folders tools make are passed over; an empty folder goes by the words.
   assert.equal(k({ 'node_modules/x/index.js': '', 'node_modules/y/index.js': '', 'node_modules/z/index.js': '' }), 'default');
   assert.equal(k({}, 'My PhD thesis on proactive retrieval'), 'paper');
   assert.equal(k({}, 'Garden'), 'default');
+});
+
+test('the web developer knows a web app of Hydor’s by its hydor.json and its skill', () => {
+  const a = fromTemplate(templateOf('web'), { id: 'sp9', name: 'Shop' });
+  assert.equal(a.name, 'Shop web developer');
+  assert.match(a.instructions!, /hydor\.json.*web-app-builder skill/);
+  assert.deepEqual(a.projects, ['sp9']);
 });
 
 test('a project’s agent from its template: named after the project, working there only, with the template’s tier and skills', () => {

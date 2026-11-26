@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "start": {
+    "command": "node server.js",
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "env": { "SESSION_SECRET": "{secret}" },
+    "secrets": ["SESSION_SECRET"],
+    "browserFolders": ["public"]
+  },
+  "accounts": {
+    "signUp": { "path": "/api/sign-up", "body": { "name": "{name}", "email": "{email}", "password": "{password}" } },
+    "signIn": { "path": "/api/sign-in", "body": { "email": "{email}", "password": "{password}" } }
+  },
+  "teams": {
+    "create": { "path": "/api/crews", "body": { "name": "{name}" }, "id": "id" },
+    "invite": { "path": "/api/invitations", "body": { "crew": "{team}", "email": "{email}", "role": "{role}" }, "link": "link" },
+    "remove": { "path": "/api/crews/remove", "body": { "crew": "{team}", "email": "{email}" } },
+    "roles": { "lead": "lead", "member": "member" }
+  },
+  "things": {
+    "customers": {
+      "list": { "path": "/api/customers", "rows": "rows" },
+      "add": { "path": "/api/customers" },
+      "one": { "path": "/api/customers/{id}", "read": "GET", "change": "PATCH", "remove": "DELETE" },
+      "teamKey": "crew",
+      "fields": { "name": "name", "address": "address" }
+    },
+    "jobs": {
+      "list": { "path": "/api/jobs", "rows": "rows" },
+      "add": { "path": "/api/jobs" },
+      "one": { "path": "/api/jobs/{id}", "read": "GET", "change": "PATCH", "remove": "DELETE" },
+      "teamKey": "crew",
+      "fields": { "title": "title", "day": "day", "done": "done" }
+    },
+    "notes": {
+      "list": { "path": "/api/notes", "rows": "rows" },
+      "add": { "path": "/api/notes" },
+      "one": { "path": "/api/notes/{id}", "read": "GET", "change": "PATCH", "remove": "DELETE" },
+      "teamKey": "crew",
+      "fields": { "title": "title", "text": "text" }
+    }
+  }
+}

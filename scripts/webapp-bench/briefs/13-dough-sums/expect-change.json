@@ -1,0 +1,155 @@
+{
+  "id": "13-dough-sums",
+  "group": "logic",
+  "product": "Dough Sums",
+  "phrases": [["flour"], ["water"], ["salt"], ["starter"], ["loaves", "loaf"]],
+  "accounts": "none",
+  "kinds": [],
+  "rows": {},
+  "later": {},
+  "numbers": [],
+  "actions": [
+    {
+      "id": "work-out",
+      "names": ["worksout", "workout", "dough", "doughsums", "sums", "calculate", "calculator", "scale", "scaler", "plan", "recipe", "weighout", "weights", "batch", "compute", "mix", "bake", "quantities", "amounts", "ingredients", "result", "doughcalc", "the sums"],
+      "inputs": [
+        {
+          "id": "loaves",
+          "names": ["loaves", "loaf", "numberofloaves", "howmanyloaves", "count", "quantity", "batch"],
+          "kind": "whole",
+          "required": true,
+          "said": ["the number of loaves", "how many loaves"]
+        },
+        {
+          "id": "loafWeight",
+          "names": ["loafweight", "weightofloaf", "weightofoneloaf", "weightperloaf", "weightofeachloaf", "loafsize", "grams", "weight", "gramsperloaf", "eachloaf", "loafgrams", "how much each one should weigh"],
+          "kind": "whole",
+          "required": true,
+          "said": ["the weight of one loaf in grams", "how much each one should weigh"]
+        },
+        {
+          "id": "water",
+          "names": ["water", "waterpercent", "waterpercentage", "hydration", "waterpc", "the water in percent"],
+          "kind": "number",
+          "required": false,
+          "said": ["the water in percent", "water"]
+        },
+        {
+          "id": "salt",
+          "names": ["salt", "saltpercent", "saltpercentage", "saltpc", "the salt in percent"],
+          "kind": "number",
+          "required": false,
+          "said": ["the salt in percent", "salt"]
+        },
+        {
+          "id": "starter",
+          "names": ["starter", "starterpercent", "starterpercentage", "starterpc", "leaven", "levain"],
+          "kind": "number",
+          "required": false,
+          "said": ["the starter in percent", "starter"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "flour",
+          "names": ["flour", "flourgrams", "flourweight", "the flour"],
+          "kind": "number",
+          "tol": 1,
+          "said": ["the flour", "flour"]
+        },
+        {
+          "id": "water",
+          "names": ["water", "watergrams", "waterweight", "the water"],
+          "kind": "number",
+          "tol": 1,
+          "said": ["the water", "water"]
+        },
+        {
+          "id": "salt",
+          "names": ["salt", "saltgrams", "saltweight", "the salt"],
+          "kind": "number",
+          "tol": 0.15,
+          "said": ["the salt", "salt"]
+        },
+        {
+          "id": "starter",
+          "names": ["starter", "startergrams", "starterweight", "leaven", "levain"],
+          "kind": "number",
+          "tol": 1,
+          "said": ["the starter", "starter"]
+        },
+        {
+          "id": "totalDough",
+          "names": ["totaldough", "total", "dough", "doughtotal", "totalweight", "doughweight", "totaldoughgrams"],
+          "kind": "number",
+          "tol": 0.5,
+          "said": ["the total dough", "total dough"]
+        }
+      ],
+      "cases": [
+        {
+          "label": "four loaves of 800 g, the usual percentages given",
+          "in": { "loaves": 4, "loafWeight": 800, "water": 72, "salt": 2, "starter": 20 },
+          "out": { "flour": 1655, "water": 1140, "salt": 36.8, "starter": 368, "totalDough": 3200 }
+        },
+        {
+          "label": "ten loaves of 450 g, nothing else given: 72, 2 and 20",
+          "in": { "loaves": 10, "loafWeight": 450 },
+          "out": { "flour": 2328, "water": 1603, "salt": 51.7, "starter": 517, "totalDough": 4500 }
+        },
+        {
+          "label": "two loaves of 500 g at 75 percent water",
+          "in": { "loaves": 2, "loafWeight": 500, "water": 75, "salt": 2, "starter": 20 },
+          "out": { "flour": 508, "water": 367, "salt": 11.3, "starter": 113, "totalDough": 1000 }
+        }
+      ],
+      "edges": [
+        {
+          "label": "no starter at all",
+          "in": { "loaves": 3, "loafWeight": 600, "starter": 0 },
+          "out": { "flour": 1034, "water": 745, "salt": 20.7, "starter": 0, "totalDough": 1800 }
+        },
+        {
+          "label": "a decimal point in the salt, wetter dough, more starter",
+          "in": { "loaves": 5, "loafWeight": 750, "water": 80, "salt": 2.5, "starter": 30 },
+          "out": { "flour": 1747, "water": 1336, "salt": 51.4, "starter": 616, "totalDough": 3750 }
+        },
+        {
+          "label": "the most loaves and the heaviest loaf",
+          "in": { "loaves": 120, "loafWeight": 1500 },
+          "out": { "flour": 93103, "water": 64138, "salt": 2069, "starter": 20690, "totalDough": 180000 }
+        },
+        {
+          "label": "the smallest loaf (150 g) and one loaf",
+          "in": { "loaves": 1, "loafWeight": 150 },
+          "out": { "flour": 78, "water": 53, "salt": 1.7, "starter": 17, "totalDough": 150 }
+        },
+        {
+          "label": "water, salt and starter at the edge of what is allowed",
+          "in": { "loaves": 6, "loafWeight": 900, "water": 50, "salt": 0, "starter": 50 },
+          "out": { "flour": 2700, "water": 900, "salt": 0, "starter": 1800, "totalDough": 5400 }
+        },
+        {
+          "label": "water at 100 and salt at 5",
+          "in": { "loaves": 2, "loafWeight": 400, "water": 100, "salt": 5, "starter": 10 },
+          "out": { "flour": 371, "water": 371, "salt": 19.5, "starter": 39, "totalDough": 800 }
+        }
+      ],
+      "refused": [
+        { "label": "no loaves", "in": { "loaves": 0, "loafWeight": 800 } },
+        { "label": "half a loaf", "in": { "loaves": 2.5, "loafWeight": 800 } },
+        { "label": "a loaf too heavy", "in": { "loaves": 2, "loafWeight": 1501 } },
+        { "label": "words for the weight", "in": { "loaves": 2, "loafWeight": "heavy" } },
+        { "label": "water over 100", "in": { "loaves": 2, "loafWeight": 800, "water": 101 } },
+        { "label": "water under 50", "in": { "loaves": 2, "loafWeight": 800, "water": 49 } },
+        { "label": "salt over 5", "in": { "loaves": 2, "loafWeight": 800, "salt": 6 } },
+        { "label": "starter over 50", "in": { "loaves": 2, "loafWeight": 800, "starter": 51 } },
+        { "label": "no weight given", "in": { "loaves": 2 } },
+        { "label": "no loaves given", "in": { "loafWeight": 800 } },
+        { "label": "a loaf lighter than the smallest", "in": { "loaves": 2, "loafWeight": 149 } },
+        { "label": "more loaves than the maker bakes", "in": { "loaves": 121, "loafWeight": 800 } }
+      ],
+      "said": ["the sums"]
+    }
+  ]
+}

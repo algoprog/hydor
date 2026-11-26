@@ -1,0 +1,3 @@
+I am a freelance translator, German and Croatian into English, and I share an account on this thing with my colleague Nadia because we split the cost, but we each keep our own clients and our own jobs and neither of us wants to see the other's. I have been tracking everything in my head and a notebook and it has stopped working.
+
+I want to keep my clients, with the country they are in and any notes. Then each job: which client it is for, what the job is called, how many words, what I am charging in euros, the day it is due, the day I delivered it once I have, and the file the client sent me. When I open it I want to see how much I have invoiced this month, meaning jobs I delivered this month, how many jobs are still open, and the average length of a job in words.

@@ -142,6 +142,7 @@ const DEVICE_SET: Record<string, string> = {
   enter: 'PUT /device { enter: "join"|"queue" }',
   suggestions: 'PUT /device { terminalSuggestions: true|false }',
   'word-suggestions': 'PUT /device { wordSuggestions: true|false }',
+  'technical-details': 'PUT /device { technicalDetails: true|false }',
   dictation: 'PUT /device { dictation: "browser"|"server" }',
   'speech-language': 'PUT /device { voiceLanguage: a tag such as "de-DE", or "" for the browser’s }',
   'read-aloud': 'PUT /device { readingVoice: one of its voices, or "" for the browser’s pick; readingSpeed: 0.5 to 2 }',
@@ -173,6 +174,8 @@ function deviceValue(r: Row, d?: DeviceReport): unknown {
       return s.terminalSuggestions;
     case 'word-suggestions':
       return s.wordSuggestions;
+    case 'technical-details':
+      return s.technicalDetails;
     case 'push':
       return d.notifications;
     case 'dictation':
@@ -203,6 +206,8 @@ export function deviceBody(r: Row, v: unknown): Record<string, unknown> | null {
       return { terminalSuggestions: yes(v) };
     case 'word-suggestions':
       return { wordSuggestions: yes(v) };
+    case 'technical-details':
+      return { technicalDetails: yes(v) };
     case 'language':
     case 'motion':
     case 'textSize':

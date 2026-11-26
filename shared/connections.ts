@@ -174,6 +174,8 @@ export interface SecretRequestView {
   have?: Record<string, string>;
   /** Some of the keys asked for may already be used in commands. */
   commandsOn?: boolean;
+  /** A card with tabs or steps (shared/keys.ts): GET /api/connections/requests/:id has it. */
+  card?: boolean;
 }
 
 /** A sign-in field's key: the request's name, then the field's ("password" in VOLTARO → VOLTARO_PASSWORD). */

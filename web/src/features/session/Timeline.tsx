@@ -7,6 +7,8 @@ import { copiesInConversation, onItsWay, sendingItems, sentShown, settlesAt, use
 import { basename, dirname, duration, prettyPath } from '../../lib/format';
 import { openFile } from '../../lib/nav';
 import { useApp, useSessions, useStops, useTimeline } from '../../lib/store';
+import { QuietWork } from '../webapps/simple/QuietWork';
+import { useQuietWork } from '../webapps/simple/quiet';
 import { stoppedTurn } from '../../lib/stopping';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { Button, cx, Throbber } from '../../components/ui';
@@ -884,6 +886,9 @@ const SegmentView = memo(function SegmentView({
     wasLive.current = !!live;
   }, [!!live]);
   const stats = useMemo(() => workStats(seg.work), [seg.work]);
+  // A web app's conversation with Technical details off: the work is one quiet line until asked for, and the files,
+  // commands and notices around it are left out.
+  const quiet = useQuietWork(sessionKey);
   // While the agent works, what it writes after its last step is mostly a note on what it does next: it shows in the
   // outline as the part under way, and takes the reply's place when the turn ends there, or as soon as it reads as a
   // reply (long, or in parts of its own).
@@ -942,8 +947,8 @@ const SegmentView = memo(function SegmentView({
     <section className={cx('tl-seg space-y-2', isNew && !seg.prompt && 'anim-in')}>
       {seg.prompt && seg.runEnded === undefined && <UserBubble item={seg.prompt} arrive={isNew && !seg.prompt.peer} sent={sent} />}
       {/* A subagent of the program's own that woke the agent shows as a reply; any other notice as a line. */}
-      {seg.notice?.subagent && <ProgramReplyRow ts={seg.notice.ts} reply={seg.notice.subagent} />}
-      {seg.notice && !seg.notice.subagent && (
+      {!quiet && seg.notice?.subagent && <ProgramReplyRow ts={seg.notice.ts} reply={seg.notice.subagent} />}
+      {!quiet && seg.notice && !seg.notice.subagent && (
         <div className="flex items-center gap-2 px-2 pt-2 text-[12.5px] text-fg-3">
           <Info size={13} className="shrink-0" />
           <span className="min-w-0 truncate">{seg.notice.text}</span>
@@ -962,13 +967,16 @@ const SegmentView = memo(function SegmentView({
           }
           // A subagent of the program's own that came back to the agent in the middle of its work.
           if (r.kind === 'reply') {
-            return (
+            return quiet ? null : (
               <div key={`reply:${r.id}`} className={cx(fresh(r.id) && 'anim-in')}>
                 <ProgramReplyRow ts={r.item.ts} reply={r.item.subagent} />
               </div>
             );
           }
           const isLast = k === lastRun;
+          if (quiet && !opened[r.id]) {
+            return <QuietWork key={`work:${works++}`} live={isLast && !!live && live.status !== 'waiting'} status={isLast ? status : undefined} empty={!r.items.length} onShow={() => toggle(r.id, true)} />;
+          }
           return (
             <WorkRun
               // By its place among the turn's stretches of work, not its first step: the agent at work, shown before a step
@@ -979,7 +987,7 @@ const SegmentView = memo(function SegmentView({
               live={isLast ? live : null}
               status={isLast ? status : undefined}
               took={spanOf(k)}
-              expanded={opened[r.id] ?? (!!live || stay)}
+              expanded={quiet || (opened[r.id] ?? (!!live || stay))}
               onToggle={toggle}
               sessionKey={sessionKey}
               agent={agent}
@@ -988,7 +996,7 @@ const SegmentView = memo(function SegmentView({
               className={cx(k === 0 && isNew && seg.prompt && 'anim-in [animation-delay:140ms]', k > 0 && fresh(r.id) && 'anim-in')}
               cost={
                 // Its time and cost: where the time went, the tokens by kind, what they cost.
-                isLast && tk && !live && seg.end ? <TurnCost sessionKey={sessionKey} agent={agent} turn={seg.end} work={seg.work} start={first} className="hidden shrink-0 sm:inline-flex" /> : null
+                !quiet && isLast && tk && !live && seg.end ? <TurnCost sessionKey={sessionKey} agent={agent} turn={seg.end} work={seg.work} start={first} className="hidden shrink-0 sm:inline-flex" /> : null
               }
             />
           );
@@ -1005,11 +1013,11 @@ const SegmentView = memo(function SegmentView({
           </div>
         )),
       ]}
-      {!live && docs && docs.length > 0 && <TurnDocs docs={docs} sessionKey={sessionKey} />}
+      {!quiet && !live && docs && docs.length > 0 && <TurnDocs docs={docs} sessionKey={sessionKey} />}
       {/* The subagents of the program's own this turn started: one group, like Hydor subagents have. */}
-      {subCalls.length > 0 && <ProgramCards items={subCalls} sessionKey={sessionKey} />}
+      {!quiet && subCalls.length > 0 && <ProgramCards items={subCalls} sessionKey={sessionKey} />}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} />}
-      {!live && stats.files.size > 0 && <TurnChanges files={[...stats.files.values()]} sessionKey={sessionKey} />}
+      {!quiet && !live && stats.files.size > 0 && <TurnChanges files={[...stats.files.values()]} sessionKey={sessionKey} />}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} after />}
     </section>
   );

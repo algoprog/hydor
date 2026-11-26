@@ -1,0 +1,3 @@
+I teach Year 4 at a primary school in Leeds, and I want a times tables race for my class to play on the classroom computers in the last ten minutes on a Friday. A child types their name, gets ten multiplication questions, answers them as fast as they can, and sees how many points they got. I would like the same ten questions every time so I can see which ones they trip up on.
+
+There should be a score board on the same page showing the five best scores so the class can see who is top, and a child's best score is the one that counts, not every try. A right answer is a point, and getting all ten right is worth extra, and so is being quick. Nobody has to log in, they only type their first name. It is called Times Tables Race.

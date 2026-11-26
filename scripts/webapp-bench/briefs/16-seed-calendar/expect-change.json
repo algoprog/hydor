@@ -1,0 +1,177 @@
+{
+  "id": "16-seed-calendar",
+  "group": "logic",
+  "product": "Totnes Seed Calendar",
+  "phrases": [["last frost", "frost"], ["tomato"], ["runner bean"], ["leek"], ["pumpkin"]],
+  "accounts": "none",
+  "kinds": [],
+  "rows": {},
+  "later": {},
+  "numbers": [],
+  "actions": [
+    {
+      "id": "plan",
+      "names": ["plan", "calendar", "jobs", "schedule", "make", "workout", "list", "seedcalendar", "tasks", "dates", "sowing", "timetable", "generate", "the list of jobs"],
+      "inputs": [
+        {
+          "id": "lastFrost",
+          "names": ["lastfrost", "lastfrostdate", "frost", "frostdate", "date", "dateoflastfrost", "lastfrostday"],
+          "kind": "day",
+          "required": true,
+          "said": ["the date of the last frost", "last frost"]
+        },
+        {
+          "id": "crops",
+          "names": ["crops", "crop", "plants", "chosen", "selected", "veg", "vegetables", "the crops"],
+          "kind": "list",
+          "required": true,
+          "said": ["the crops", "crops"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "tasks",
+          "names": ["jobs", "tasks", "list", "calendar", "schedule", "plan", "dates", "items", "timetable", "sowings", "entries", "the list of jobs"],
+          "kind": "rows",
+          "items": [
+            {
+              "id": "crop",
+              "names": ["crop", "plant", "name", "vegetable", "veg", "the crop"],
+              "kind": "text",
+              "said": ["the crop", "crop"]
+            },
+            {
+              "id": "date",
+              "names": ["date", "day", "on", "when", "the date"],
+              "kind": "day",
+              "said": ["the date", "date"]
+            }
+          ],
+          "said": ["the list of jobs", "jobs"]
+        }
+      ],
+      "cases": [
+        {
+          "label": "tomatoes and lettuce, a last frost on a Friday",
+          "in": { "lastFrost": "2027-04-23", "crops": ["Tomatoes", "Lettuce"] },
+          "out": {
+            "tasks": [
+              { "crop": "Tomatoes", "date": "2027-02-20" },
+              { "crop": "Lettuce", "date": "2027-03-20" },
+              { "crop": "Lettuce", "date": "2027-04-10" },
+              { "crop": "Tomatoes", "date": "2027-04-24" },
+              { "crop": "Lettuce", "date": "2027-05-01" },
+              { "crop": "Lettuce", "date": "2027-05-22" }
+            ]
+          }
+        },
+        {
+          "label": "a last frost on a Saturday: runner beans and carrots",
+          "in": { "lastFrost": "2027-05-01", "crops": ["Runner beans", "Carrots"] },
+          "out": {
+            "tasks": [
+              { "crop": "Carrots", "date": "2027-04-10" },
+              { "crop": "Runner beans", "date": "2027-05-15" },
+              { "crop": "Carrots", "date": "2027-05-22" }
+            ]
+          }
+        },
+        {
+          "label": "leeks and tomatoes, a last frost on a Sunday",
+          "in": { "lastFrost": "2027-03-14", "crops": ["Leeks", "Tomatoes"] },
+          "out": {
+            "tasks": [
+              { "crop": "Leeks", "date": "2027-01-02" },
+              { "crop": "Tomatoes", "date": "2027-01-16" },
+              { "crop": "Tomatoes", "date": "2027-03-20" },
+              { "crop": "Leeks", "date": "2027-04-10" }
+            ]
+          }
+        },
+        {
+          "label": "pumpkins",
+          "in": { "lastFrost": "2027-05-07", "crops": ["Pumpkins", "Leeks"] },
+          "out": {
+            "tasks": [
+              { "crop": "Leeks", "date": "2027-02-20" },
+              { "crop": "Pumpkins", "date": "2027-04-10" },
+              { "crop": "Pumpkins", "date": "2027-05-15" },
+              { "crop": "Leeks", "date": "2027-05-29" }
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "label": "lettuce is sown four times, three weeks apart, over the day the clocks go forward",
+          "in": { "lastFrost": "2027-04-25", "crops": ["Lettuce"] },
+          "out": {
+            "tasks": [
+              { "crop": "Lettuce", "date": "2027-03-27" },
+              { "crop": "Lettuce", "date": "2027-04-17" },
+              { "crop": "Lettuce", "date": "2027-05-08" },
+              { "crop": "Lettuce", "date": "2027-05-29" }
+            ]
+          }
+        },
+        {
+          "label": "carrots are sown twice, the clocks go back in the weeks after",
+          "in": { "lastFrost": "2027-10-05", "crops": ["Carrots"] },
+          "out": { "tasks": [{ "crop": "Carrots", "date": "2027-09-11" }, { "crop": "Carrots", "date": "2027-10-23" }] }
+        },
+        {
+          "label": "the jobs run over New Year and a leap day",
+          "in": { "lastFrost": "2028-03-02", "crops": ["Leeks", "Tomatoes", "Lettuce"] },
+          "out": {
+            "tasks": [
+              { "crop": "Leeks", "date": "2027-12-18" },
+              { "crop": "Tomatoes", "date": "2028-01-01" },
+              { "crop": "Lettuce", "date": "2028-01-29" },
+              { "crop": "Lettuce", "date": "2028-02-19" },
+              { "crop": "Tomatoes", "date": "2028-03-04" },
+              { "crop": "Lettuce", "date": "2028-03-11" },
+              { "crop": "Leeks", "date": "2028-03-25" },
+              { "crop": "Lettuce", "date": "2028-04-01" }
+            ]
+          }
+        },
+        {
+          "label": "all five crops, jobs from different crops on one Saturday are in alphabetical order",
+          "in": {
+            "lastFrost": "2027-04-17",
+            "crops": ["Leeks", "Runner beans", "Carrots", "Tomatoes", "Lettuce", "Pumpkins"]
+          },
+          "out": {
+            "tasks": [
+              { "crop": "Leeks", "date": "2027-02-06" },
+              { "crop": "Tomatoes", "date": "2027-02-20" },
+              { "crop": "Lettuce", "date": "2027-03-20" },
+              { "crop": "Carrots", "date": "2027-03-27" },
+              { "crop": "Pumpkins", "date": "2027-03-27" },
+              { "crop": "Lettuce", "date": "2027-04-10" },
+              { "crop": "Tomatoes", "date": "2027-04-24" },
+              { "crop": "Lettuce", "date": "2027-05-01" },
+              { "crop": "Pumpkins", "date": "2027-05-01" },
+              { "crop": "Runner beans", "date": "2027-05-01" },
+              { "crop": "Carrots", "date": "2027-05-08" },
+              { "crop": "Leeks", "date": "2027-05-15" },
+              { "crop": "Lettuce", "date": "2027-05-22" }
+            ]
+          }
+        }
+      ],
+      "refused": [
+        { "label": "a date that does not exist", "in": { "lastFrost": "2027-02-30", "crops": ["Tomatoes"] } },
+        { "label": "words for a date", "in": { "lastFrost": "next week", "crops": ["Tomatoes"] } },
+        { "label": "no crops", "in": { "lastFrost": "2027-04-23", "crops": [] } },
+        {
+          "label": "a crop that is not one of the five",
+          "in": { "lastFrost": "2027-04-23", "crops": ["Tomatoes", "Bananas"] }
+        },
+        { "label": "no date", "in": { "crops": ["Leeks"] } },
+        { "label": "no crops given at all", "in": { "lastFrost": "2027-04-23" } }
+      ],
+      "said": ["the list of jobs"]
+    }
+  ]
+}

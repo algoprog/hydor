@@ -1,0 +1,193 @@
+{
+  "id": "08-choir-rota",
+  "group": "accounts",
+  "product": "Ashby Village Choir",
+  "phrases": [
+    ["Singers", "Members", "Choir members"],
+    ["Rehearsals", "Practices", "Sessions"],
+    ["Jobs", "Rota", "Duties", "Tasks"]
+  ],
+  "accounts": "any",
+  "access": "team",
+  "kinds": [
+    {
+      "id": "singers",
+      "names": ["singers", "singer", "members", "member", "choir", "choirmembers", "people", "voices", "choristers"],
+      "fields": [
+        {
+          "id": "name",
+          "names": ["name", "fullname", "singer", "title", "who"],
+          "kind": "text",
+          "required": true,
+          "said": ["name"]
+        },
+        {
+          "id": "voice",
+          "names": ["voice", "voicepart", "part", "voicetype", "section", "range", "sings", "which voice they sing"],
+          "kind": "choice",
+          "required": true,
+          "choices": ["soprano", "alto", "tenor", "bass", "not sure yet"],
+          "said": ["voice", "which voice they sing"]
+        },
+        {
+          "id": "phone",
+          "names": ["phone", "phonenumber", "mobile", "tel", "telephone", "contact"],
+          "kind": "text",
+          "required": false,
+          "said": ["phone number"]
+        },
+        {
+          "id": "joined",
+          "names": ["joined", "joinedon", "joineddate", "since", "dayjoined", "datejoined", "startdate", "started", "startedon", "memberssince", "joindate", "the day they joined"],
+          "kind": "day",
+          "required": false,
+          "mayHave": true,
+          "said": ["the day they joined"]
+        },
+        {
+          "id": "notes",
+          "names": ["notes", "note", "comments", "details", "remarks"],
+          "kind": "long",
+          "required": false,
+          "mayHave": true,
+          "said": ["notes"]
+        }
+      ],
+      "ops": ["change"],
+      "said": ["singers"]
+    },
+    {
+      "id": "rehearsals",
+      "names": ["rehearsals", "rehearsal", "practices", "practice", "sessions", "session", "evenings", "meetings"],
+      "fields": [
+        {
+          "id": "date",
+          "names": ["date", "day", "on", "rehearsaldate", "rehearsalon", "when", "heldon", "dateof", "the date"],
+          "kind": "day",
+          "required": true,
+          "said": ["the date"]
+        },
+        {
+          "id": "place",
+          "names": ["place", "where", "venue", "location", "hall", "room"],
+          "kind": "text",
+          "required": true,
+          "said": ["where"]
+        },
+        {
+          "id": "attended",
+          "names": ["attended", "attendance", "howmany", "came", "turnout", "turnedup", "present", "numbercame", "peoplecame", "numberattended", "count", "headcount", "singerscame", "peoplepresent"],
+          "kind": "integer",
+          "required": false,
+          "said": ["how many people came", "how many people turned up"]
+        },
+        {
+          "id": "ledBy",
+          "names": ["ledby", "leader", "conductor", "led", "directedby", "ledbysinger", "lead", "musicaldirector", "md", "who led it"],
+          "kind": "ref",
+          "required": false,
+          "to": "singers",
+          "mayHave": true,
+          "said": ["who led it"]
+        },
+        {
+          "id": "notes",
+          "names": ["notes", "note", "comments", "details", "remarks"],
+          "kind": "long",
+          "required": false,
+          "mayHave": true,
+          "said": ["notes"]
+        }
+      ],
+      "ops": ["change"],
+      "said": ["rehearsals"]
+    },
+    {
+      "id": "duties",
+      "names": ["jobs", "job", "duties", "duty", "rota", "rotas", "tasks", "task", "assignments", "assignment", "roles", "chores", "rotaentries", "rotaitems", "the rota"],
+      "fields": [
+        {
+          "id": "rehearsal",
+          "names": ["rehearsal", "rehearsalid", "practice", "session", "forrehearsal", "event", "whichrehearsal"],
+          "kind": "ref",
+          "required": true,
+          "to": "rehearsals",
+          "said": ["which rehearsal"]
+        },
+        {
+          "id": "singer",
+          "names": ["singer", "singerid", "who", "person", "member", "assignedto", "assignee", "volunteer", "givento", "doneby", "owner", "responsible", "choirmember", "which singer"],
+          "kind": "ref",
+          "required": true,
+          "to": "singers",
+          "said": ["which singer"]
+        },
+        {
+          "id": "job",
+          "names": ["job", "duty", "task", "what", "role", "jobtype", "chore", "jobname", "type", "kind", "what job"],
+          "kind": "choice",
+          "required": true,
+          "choices": ["unlock the hall", "make the tea", "bring cake", "put out chairs"],
+          "said": ["what job"]
+        },
+        {
+          "id": "done",
+          "names": ["done", "isdone", "completed", "complete", "finished", "donejob", "tickedoff", "donealready"],
+          "kind": "yesno",
+          "required": false,
+          "said": ["done"]
+        }
+      ],
+      "ops": ["change"],
+      "said": ["jobs", "the rota"]
+    }
+  ],
+  "rows": {
+    "singers": [
+      { "name": "Ana Ferris", "voice": "soprano", "phone": "07700 900111" },
+      { "name": "Ben Okoye", "voice": "tenor", "joined": "$lastMonth:4" },
+      { "name": "Cath Doyle", "voice": "alto", "notes": "Prefers to sit near the piano." },
+      { "name": "Dev Rao", "voice": "bass" },
+      { "name": "Eve Marsh", "voice": "not sure yet" }
+    ],
+    "rehearsals": [
+      { "date": "$lastMonth:6", "place": "Village hall", "attended": 14, "ledBy": "@singers.2" },
+      { "date": "$lastMonth:13", "place": "Village hall", "attended": 18 },
+      { "date": "$lastMonth:20", "place": "St Mary's church", "attended": 17, "notes": "Hall was double-booked." }
+    ],
+    "duties": [
+      { "rehearsal": "@rehearsals.0", "singer": "@singers.0", "job": "unlock the hall", "done": true },
+      { "rehearsal": "@rehearsals.0", "singer": "@singers.1", "job": "make the tea", "done": false },
+      { "rehearsal": "@rehearsals.1", "singer": "@singers.2", "job": "bring cake", "done": false },
+      { "rehearsal": "@rehearsals.1", "singer": "@singers.3", "job": "put out chairs", "done": true },
+      { "rehearsal": "@rehearsals.2", "singer": "@singers.4", "job": "make the tea", "done": false }
+    ]
+  },
+  "later": {
+    "rehearsals": [
+      { "date": "$thisMonth:3", "place": "Village hall", "attended": 30 },
+      { "date": "$thisMonth:10", "place": "Village hall", "attended": 25 }
+    ],
+    "duties": [
+      { "rehearsal": "@rehearsals.3", "singer": "@singers.0", "job": "bring cake", "done": false },
+      { "rehearsal": "@rehearsals.4", "singer": "@singers.1", "job": "unlock the hall", "done": false },
+      { "rehearsal": "@rehearsals.4", "singer": "@singers.3", "job": "make the tea", "done": false }
+    ]
+  },
+  "numbers": [
+    {
+      "id": "notDone",
+      "of": "duties",
+      "agg": "count",
+      "where": [{ "field": "done", "eq": false }],
+      "say": "jobs not done yet"
+    },
+    {
+      "id": "average",
+      "of": "rehearsals",
+      "agg": "avg",
+      "field": "attended",
+      "say": "average number who came to a rehearsal"
+    }
+  ]
+}

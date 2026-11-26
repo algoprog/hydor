@@ -30,6 +30,7 @@ import { Group, Row, Select, Stack } from './kit';
 
 export function GeneralSettings() {
   const termSuggest = useUI((s) => s.termSuggest);
+  const technical = useUI((s) => s.technicalDetails);
   const [follow, setFollow] = useState<FollowUp>(followUpPref);
   return (
     <Stack>
@@ -71,6 +72,14 @@ export function GeneralSettings() {
           hint="Grey text after the cursor with the likeliest rest of the command"
           info="→ takes the suggestion. Ctrl+Space lists more either way."
           control={<Switch on={termSuggest} label="Terminal suggestions" onChange={(v) => useUI.getState().set({ termSuggest: v })} />}
+        />
+      </Group>
+      <Group title="Web apps">
+        <Row
+          label="Technical details"
+          hint="Show files, commands and logs when you make and run web apps"
+          info="Off: plain words, one step at a time. Your agent speaks the same way."
+          control={<Switch on={technical} label="Technical details" onChange={(v) => useUI.getState().set({ technicalDetails: v })} />}
         />
       </Group>
       <Group title="Startup and updates">

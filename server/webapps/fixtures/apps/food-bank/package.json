@@ -1,0 +1,12 @@
+{
+  "name": "eastgate-food-bank",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stock and deliveries for the Eastgate Food Bank",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/app.test.js"
+  }
+}

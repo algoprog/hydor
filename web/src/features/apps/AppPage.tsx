@@ -17,7 +17,7 @@ import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { EffortPicker, ModelPicker, ModePicker, modelLabel, tierMeans, useCatalog, useTierPick } from '../../components/AgentPickers';
-import { Button, cx, Empty, IconButton, inputCls, MenuItem, Popover, Section, SheetsOnPhone, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, Empty, IconButton, inputCls, MenuItem, Popover, Section, SheetsOnPhone, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
 import { AgentsCard, AppAbout } from './About';
@@ -29,6 +29,8 @@ import { AppForm, FoldedLine, formErrors, initialValues, type FormFiles, type Fo
 import { statusBadge } from './Gallery';
 import { FlowList } from './FlowStrip';
 import { PinMenuItem } from './Pinned';
+import { StartSheet } from '../webapps/StartSheet';
+import { openWebApp, webAppPath } from '../webapps/api';
 import { DownloadDialog, EnvLine } from './Install';
 import { AppScreen } from './Screen';
 import { AppView } from './View';
@@ -799,6 +801,7 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
   const [d, setD] = useState<AppDetail | null>(null);
   const [err, setErr] = useState('');
   const [menu, setMenu] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [saving, setSaving] = useState(false);
   const more = useRef<HTMLButtonElement>(null);
   const [ask, confirmNode] = useConfirm();
@@ -814,6 +817,16 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
   }, [d?.env?.state]);
   const template = id.startsWith('tpl:');
   const recipe = d?.app ?? d?.template;
+  // "Give it an app of its own": a ready-made app becomes the person's own first (a copy of its recipe), as the web app links to it.
+  const ownedId = async (): Promise<string | null> => {
+    if (!template) return d?.app?.id ?? id;
+    try {
+      return (await post<{ app: { id: string } }>('/api/apps', { recipe, template: id.slice(4) })).app.id;
+    } catch (e) {
+      toastError(e);
+      return null;
+    }
+  };
   // A ready-made app comes installed; one you uninstalled shows what it is, to install it again.
   const installed = !template || d?.installed !== false;
   const setTab = (t: Tab) => go(`${appPath(id)}${t === 'run' ? '' : `?tab=${t}`}`, true);
@@ -904,6 +917,9 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                       Make it mine
                     </MenuItem>
                   )}
+                  <MenuItem icon={<AppWindow size={15} />} onClick={() => (setMenu(false), setJoining(true))}>
+                    Give it an app of its own
+                  </MenuItem>
                   <MenuItem icon={<Trash2 size={15} />} danger onClick={uninstall}>
                     Uninstall
                   </MenuItem>
@@ -914,6 +930,11 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
             <>
               {ownPage && updatable(recipe) && <UpdateButton id={id} own={own} home={home} />}
               {ownPage && updatable(recipe) && home && <HomeSettingsButton id={id} recipe={recipe} template={false} home={home} onSaved={setHome} keys={d?.secrets} onKeys={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />}
+              {d?.app?.webapp && (
+                <Button size="sm" variant="primary" icon={<AppWindow size={14} />} onClick={() => void openWebApp(d.app!.webapp!.id)}>
+                  Open the app
+                </Button>
+              )}
               <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`${appPath(id)}/edit`)}>
                 Edit
               </Button>
@@ -959,6 +980,15 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                 >
                   {d?.app?.screens?.main ? 'Edit the screen' : 'Give it a screen'}
                 </MenuItem>
+                {d?.app?.webapp ? (
+                  <MenuItem icon={<AppWindow size={15} />} onClick={() => (setMenu(false), go(webAppPath(d.app!.webapp!.id, 'flows')))}>
+                    Its flows in the app
+                  </MenuItem>
+                ) : (
+                  <MenuItem icon={<AppWindow size={15} />} onClick={() => (setMenu(false), setJoining(true))}>
+                    Give it an app of its own
+                  </MenuItem>
+                )}
                 <MenuItem
                   icon={<Download size={15} />}
                   onClick={() => {
@@ -1003,6 +1033,20 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                 <AppKeysCard appId={d.app.id} keys={keysFor(d.secrets)} own onSaved={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />
               </div>
             )}
+            {d?.app?.webapp && tab === 'run' && !again && (
+              <div className="mx-auto max-w-[920px] px-4 pt-4 sm:px-6" data-own-pages>
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-fg-3">
+                  <Badge tone="info">Its own pages</Badge>
+                  <span translate="no" className="text-fg-2">
+                    {d.app.webapp.name}
+                  </span>
+                  <span aria-hidden>·</span>
+                  <button type="button" className="text-fg-2 underline-offset-2 hover:text-fg hover:underline" onClick={() => go(webAppPath(d.app!.webapp!.id, 'flows'))}>
+                    Its flows
+                  </button>
+                </p>
+              </div>
+            )}
             {d?.app && d.env && tab === 'run' && (d.env.state !== 'none' && d.env.state !== 'ready' ? true : d.env.missing.length > 0) && (
               <div className="mx-auto max-w-[760px] px-5 pt-5 sm:px-7">
                 <EnvLine appId={d.app.id} env={d.env} onChange={load} />
@@ -1026,6 +1070,7 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
           </>
         )}
       </div>
+      {recipe && joining && !d?.app?.webapp && <StartSheet kind={null} agent={{ name: recipe.name }} before={ownedId} onClose={() => setJoining(false)} />}
       {confirmNode}
     </div>
   );

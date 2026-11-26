@@ -4,7 +4,7 @@
 // name to the app. The tool call itself is a line among the agent's steps. The run's own reply stays on its page: the
 // session's agent says what came of it, above the card (a run that ends after the call stopped waiting moves its
 // card under the reply to that news, and the news itself shows no bubble: Timeline.tsx).
-import { ArrowUpRight } from 'lucide-react';
+import { AppWindow, ArrowUpRight } from 'lucide-react';
 import type { SessionNote } from '@shared/features';
 import type { ToolInfo } from '@shared/types';
 import { inputsLine } from '@shared/apps';
@@ -16,6 +16,7 @@ import { appPath, runPath, useRunDetail } from './api';
 import { AppIcon } from './AppIcon';
 import { RunBody } from './Result';
 import { AnswerCard, viewCan } from './RunPage';
+import { openWebApp } from '../webapps/api';
 import { AppView } from './View';
 
 /** What the card knows before the run loads: the run, its app, and the app's face. */
@@ -49,6 +50,11 @@ export function AppRunNote({ note }: { note: SessionNote; sessionKey: string }) 
           </span>
         )}
         {!asked && <span className="flex-1" />}
+        {d?.openApp && (
+          <Button size="sm" variant="ghost" icon={<AppWindow size={14} />} onClick={() => void openWebApp(d.openApp!.id, d.openApp!.path)} className="shrink-0" data-open-app={d.openApp.row ? 'row' : 'home'}>
+            Open the app
+          </Button>
+        )}
         <Button size="sm" variant="ghost" icon={<ArrowUpRight size={14} />} onClick={() => go(runPath(data.run))} className="shrink-0">
           Open
         </Button>

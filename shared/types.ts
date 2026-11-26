@@ -5,6 +5,7 @@ import type { GoalStatus } from './goals.ts';
 import type { QuickAnswer } from './inbox.ts';
 import type { AppTheme } from './themes.ts';
 import type { SignatureCard } from './signatures.ts';
+import type { WebAppChoose, WebKinds } from './webapps.ts';
 
 /** Claude Code, Codex, or an agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode…). */
 export type Agent = 'claude' | 'codex' | 'acp';
@@ -73,6 +74,8 @@ export interface ApprovalRequest {
   detail?: string;
   /** The tool_use / item this approval belongs to, when known. */
   itemId?: string;
+  /** The agent's own words on what the request is for (a command's description, Codex's reason): a plain view shows them, with the request behind a button. */
+  say?: string;
   kind: 'tool' | 'command' | 'file' | 'permissions' | 'question' | 'plan' | 'other';
   options: ApprovalOption[];
   questions?: Question[];
@@ -110,6 +113,22 @@ export interface ApprovalRequest {
    * with the saved one's id alone), or where an agent would place one, to allow or deny.
    */
   signature?: SignatureCard;
+  /**
+   * Real options for the maker of a web app to pick from (the webapp_choose tool): designs to compare, or one of a few.
+   * Answered with "accept" and form.answer, the answer as JSON (ChooseAnswer in shared/webapps.ts).
+   */
+  choose?: WebAppChoose;
+  /**
+   * The kinds of web app to pick from (the webapp_kinds tool): the same cards as the Apps page's "What do you want to make?". Answered
+   * with "accept" and form.kind: the idea's id, or "other".
+   */
+  kinds?: WebKinds & { suggest?: string[] };
+  /**
+   * What a change would be given, as labels and values (a function's inputs, read from its input schema), with the input as it was sent
+   * (`raw`) for whoever wants to read that form.
+   */
+  facts?: { label: string; value: string; long?: boolean }[];
+  raw?: string;
   /**
    * The question a new session in a project with no wiki memory asks first (build it, then start the agent), and, once
    * answered, the build's progress: answered by its own options (build, start, never, now, stop, retry).

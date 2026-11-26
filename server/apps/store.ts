@@ -2,7 +2,7 @@
 // or an app changed mid-run still checks the answer it started with), the steps of runs with steps,
 // API keys (hashed) and runs over the rows of a CSV. What apps keep for themselves is in data.ts.
 import crypto from 'node:crypto';
-import type { AppBatch, AppDef, AppRecipe, AppRun, PublicSettings, RunMiss, RunSource, RunStatus, StepStatus } from '../../shared/apps.ts';
+import type { AppBatch, AppDef, AppRecipe, AppRun, PublicSettings, RunMiss, RunPerson, RunSource, RunStatus, StepStatus } from '../../shared/apps.ts';
 import type { CheckResult } from '../../shared/app-manifest.ts';
 import { tierLabel } from '../../shared/tiers.ts';
 import { cleanPublic, cleanRecipe, DEFAULT_PUBLIC, isActive, RESERVED_SLUGS, slugify } from '../../shared/apps.ts';
@@ -112,6 +112,13 @@ export function ensureTables(db: DB) {
   if (!cols.has('lang')) db.exec('alter table app_runs add column lang text');
   // A run with steps at work: the answer fields its steps have given so far, as JSON (none once it ends).
   if (!cols.has('partial')) db.exec('alter table app_runs add column partial text');
+  // Who a run acts for, when the web app that started it with its key said so: as JSON, and the id alone to find a person's runs by.
+  if (!cols.has('person')) db.exec('alter table app_runs add column person text');
+  if (!cols.has('person_id')) db.exec('alter table app_runs add column person_id text');
+  // The caller's own short reference for a run an app's key started, and the index to list a reference's runs by.
+  if (!cols.has('ref')) db.exec('alter table app_runs add column ref text');
+  db.exec('create index if not exists app_runs_ref on app_runs (app_id, ref, created_at desc)');
+  db.exec('create index if not exists app_runs_person on app_runs (app_id, person_id, created_at desc)');
 }
 
 // ---- apps --------------------------------------------------------------------------------------------
@@ -136,6 +143,7 @@ function toApp(r: AppRow): AppDef {
     template: d.template || undefined,
     ...(typeof d.folder === 'string' && d.folder ? { folder: d.folder } : {}),
     ...(d.fromFile === true ? { fromFile: true } : {}),
+    ...(d.webapp && typeof d.webapp.id === 'string' && typeof d.webapp.name === 'string' ? { webapp: { id: d.webapp.id, name: d.webapp.name } } : {}),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -170,7 +178,7 @@ export function coreOf(r: AppRecipe): string {
   return JSON.stringify(core);
 }
 
-export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: AppRecipe; mcp?: boolean; agents?: boolean; public?: Partial<PublicSettings>; template?: string; by?: VersionBy; why?: string; folder?: string | null; fromFile?: boolean }): AppDef {
+export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: AppRecipe; mcp?: boolean; agents?: boolean; public?: Partial<PublicSettings>; template?: string; by?: VersionBy; why?: string; folder?: string | null; fromFile?: boolean; webapp?: { id: string; name: string } | null }): AppDef {
   const now = Date.now();
   const prev = input.id ? getApp(db, input.id) : null;
   const id = prev?.id ?? newId(6);
@@ -182,6 +190,8 @@ export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: App
     public: cleanPublic(input.public ?? {}, prev?.public ?? DEFAULT_PUBLIC),
     template: input.template ?? prev?.template,
     folder: input.folder === null ? undefined : (input.folder ?? prev?.folder),
+    // The web app it is the flows half of: kept through every other save, changed only by linking and unlinking.
+    webapp: input.webapp === null ? undefined : (input.webapp ?? prev?.webapp),
     ...(input.fromFile || prev?.fromFile ? { fromFile: true } : {}),
   };
   if (prev) db.prepare('update apps set slug = ?, data = ?, updated_at = ? where id = ?').run(slug, JSON.stringify(data), now, id);
@@ -313,6 +323,8 @@ interface RunRow {
   misses: string | null;
   lang: string | null;
   partial: string | null;
+  person: string | null;
+  ref: string | null;
   created_at: number;
   started_at: number | null;
   ended_at: number | null;
@@ -321,6 +333,8 @@ interface RunRow {
 /** A run as the server keeps it: the public view plus what only the server needs. */
 export interface RunRecord extends AppRun {
   recipe: AppRecipe;
+  /** The caller's own short reference (an app's key started it with one). */
+  ref?: string;
   visitor?: string;
   ip?: string;
   nudged: boolean;
@@ -371,6 +385,8 @@ function toRun(r: RunRow): RunRecord {
     ...(r.asked_by ? { askedBy: r.asked_by, told: !!r.told } : {}),
     ...(r.misses ? { misses: parse<RunMiss[]>(r.misses, []) } : {}),
     ...(r.lang ? { lang: r.lang } : {}),
+    ...(r.person !== null ? personOf(r.person) : {}),
+    ...(r.ref ? { ref: r.ref } : {}),
     // What its steps have given so far, only while it works.
     ...(r.partial && isActive(r.status as RunStatus) ? { partial: parse<Record<string, unknown>>(r.partial, {}) } : {}),
     createdAt: r.created_at,
@@ -379,21 +395,28 @@ function toRun(r: RunRow): RunRecord {
   };
 }
 
+const personOf = (text: string): { person?: RunPerson | null } => {
+  // "null" is kept on purpose: the run acts for nobody.
+  if (text === 'null') return { person: null };
+  const p = parse<Partial<RunPerson> | null>(text, null);
+  return p && typeof p.id === 'string' && typeof p.name === 'string' && typeof p.role === 'string' ? { person: p as RunPerson } : {};
+};
+
 /** What the pages see of a run (no recipe, no visitor). */
 export function runView(r: RunRecord): AppRun {
   const { recipe: _r, visitor: _v, ip: _i, nudged: _n, askedBy: _a, told: _t, ...view } = r;
   return view;
 }
 
-export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string; askedBy?: string; lang?: string }): RunRecord {
+export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string; askedBy?: string; lang?: string; person?: RunPerson | null; ref?: string }): RunRecord {
   const id = newId(8);
   // The version it runs, when it runs the template as saved (a try of changes not saved yet runs none).
   const last = r.source === 'step' ? null : latestVersion(db, r.app);
   const version = last && last.core === coreOf(r.recipe) ? last.n : null;
   db.prepare(
-    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, version, asked_by, lang, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, version, r.askedBy ?? null, r.lang ?? null, Date.now());
+    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, version, asked_by, lang, person, person_id, ref, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, version, r.askedBy ?? null, r.lang ?? null, r.person === undefined ? null : JSON.stringify(r.person), r.person?.id ?? null, r.ref ?? null, Date.now());
   return getRun(db, id)!;
 }
 
@@ -472,7 +495,7 @@ export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: 
  * Runs, newest first (a CSV's rows in order). The runs of a run's agent steps are part of that run, so
  * they are left out unless `steps` asks for them.
  */
-export function listRuns(db: DB, o: { app?: string; batch?: string; visitor?: string; status?: RunStatus[]; limit?: number; before?: number; steps?: boolean; parent?: string; source?: RunSource }): RunRecord[] {
+export function listRuns(db: DB, o: { app?: string; batch?: string; visitor?: string; person?: string; ref?: string; status?: RunStatus[]; limit?: number; before?: number; steps?: boolean; parent?: string; source?: RunSource }): RunRecord[] {
   const where: string[] = [];
   const vals: unknown[] = [];
   // A template's runs are its tasks: not its steps' runs, nor its conversations (unless those are asked for).
@@ -482,6 +505,8 @@ export function listRuns(db: DB, o: { app?: string; batch?: string; visitor?: st
   if (o.app) (where.push('app_id = ?'), vals.push(o.app));
   if (o.batch) (where.push('batch_id = ?'), vals.push(o.batch));
   if (o.visitor) (where.push('visitor = ?'), vals.push(o.visitor));
+  if (o.person) (where.push('person_id = ?'), vals.push(o.person));
+  if (o.ref) (where.push('ref = ?'), vals.push(o.ref));
   if (o.status?.length) (where.push(`status in (${o.status.map(() => '?').join(', ')})`), vals.push(...o.status));
   if (o.before) (where.push('created_at < ?'), vals.push(o.before));
   const order = o.batch ? 'row_no asc' : 'created_at desc';
@@ -624,6 +649,9 @@ const hashOf = (t: string) => crypto.createHash('sha256').update(t).digest('hex'
 
 /** App keys start with this, so the server can tell them from other tokens. */
 export const KEY_PREFIX = 'napp_';
+/** What Hydor puts after a web app's key for the launched version of that app (server/webapps/sides.ts): without it, it is the same key and opens the same things. */
+export const LAUNCHED_MARK = /~live\.[A-Za-z0-9_-]{43}$/;
+export const plainKey = (key: string) => key.replace(LAUNCHED_MARK, '');
 
 /** A new key for an app: its value is returned once; only its hash is kept. */
 export function createKey(db: DB, app: string, name: string): { id: string; key: string } {
@@ -650,7 +678,7 @@ export function revokeKey(db: DB, app: string, id: string): boolean {
 /** The app a key opens, or null; notes its use (at most once a minute). */
 export function appOfKey(db: DB, key: string): { app: string; id: string } | null {
   if (!key.startsWith(KEY_PREFIX)) return null;
-  const r = db.prepare('select id, app_id, last_used from app_keys where hash = ?').get(hashOf(key)) as { id: string; app_id: string; last_used: number | null } | undefined;
+  const r = db.prepare('select id, app_id, last_used from app_keys where hash = ?').get(hashOf(plainKey(key))) as { id: string; app_id: string; last_used: number | null } | undefined;
   if (!r) return null;
   if (!r.last_used || Date.now() - r.last_used > 60_000) db.prepare('update app_keys set last_used = ? where id = ?').run(Date.now(), r.id);
   return { app: r.app_id, id: r.id };

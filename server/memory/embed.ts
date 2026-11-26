@@ -271,27 +271,101 @@ function ask(w: Worker, texts: string[], kind: Kind, timeoutMs: number): Promise
   });
 }
 
+/** Requests of Hydor's own (memory, the search box, knowledge, pages) that are asking the model now: another program's wait for none. */
+let ownBusy = 0;
+
 /**
  * Vectors for texts, or null when search by meaning cannot answer now: it is off, not set up, or (unless
  * `wait`) not running. With `wait` the worker is started when memory allows, which on a CPU takes seconds.
+ * This is Hydor's own work: it is counted while it runs, so what a web app asks for (embedForApp) steps aside for it.
  */
 export async function embed(db: DB, texts: string[], kind: Kind, o: { wait?: boolean; timeoutMs?: number } = {}): Promise<Float32Array[] | null> {
   if (!texts.length) return [];
-  if (stub) return stub(texts, kind);
-  if (!meaningOn(db)) return null;
-  const w = worker?.ready ? worker : o.wait ? await ensureWorker(db) : null;
-  if (!w) {
-    // Not running: it starts now for what comes next (when memory allows), without keeping this one waiting.
-    if (!o.wait) void ensureWorker(db);
-    return null;
-  }
+  ownBusy++;
   try {
-    const out: Float32Array[] = [];
-    for (let i = 0; i < texts.length; i += 64) out.push(...(await ask(w, texts.slice(i, i + 64), kind, o.timeoutMs ?? 60_000)));
-    return out;
-  } catch {
-    return null;
+    if (stub) return await stub(texts, kind);
+    if (!meaningOn(db)) return null;
+    const w = worker?.ready ? worker : o.wait ? await ensureWorker(db) : null;
+    if (!w) {
+      // Not running: it starts now for what comes next (when memory allows), without keeping this one waiting.
+      if (!o.wait) void ensureWorker(db);
+      return null;
+    }
+    try {
+      const out: Float32Array[] = [];
+      for (let i = 0; i < texts.length; i += 64) out.push(...(await ask(w, texts.slice(i, i + 64), kind, o.timeoutMs ?? 60_000)));
+      return out;
+    } catch {
+      return null;
+    }
+  } finally {
+    ownBusy--;
   }
+}
+
+/**
+ * What a web app's search gets from the model (the route POST /api/apps/:slug/embed): vectors, or why there are none now.
+ * `off` and `not-set-up` do not pass by themselves (the person turns it on, or it sets itself up: never because an app asked); the rest are for a while.
+ */
+export type AppVectors = { ok: true; vectors: Float32Array[] } | { ok: false; why: 'off' | 'not-set-up' | 'failed' | 'memory' | 'starting' | 'busy'; detail?: string };
+
+/** Texts an app's request puts to the model at once, and the longest a request waits for Hydor's own work to be done. The model takes its requests in turn, so Hydor's own waits for one such piece at most. */
+export const APP_EMBED = { piece: 4, yieldMs: 10_000 };
+/** One app's piece at a time, across all apps. */
+let appTurn: Promise<void> = Promise.resolve();
+/** How many pieces of apps went (for tests and for what the page shows), and how often an app stepped aside. */
+export const appEmbedStats = { pieces: 0, steppedAside: 0 };
+
+const nap = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Vectors for a web app. It uses the model Hydor's own search uses (the same worker, on the CPU) and never sets it up or downloads it. Hydor's own work goes first:
+ * the texts go to the model a few at a time, one app's piece at a time in all, and before each piece it waits while any request of Hydor's own is being answered (so
+ * Hydor's own never waits for more than one small piece, however much an app asks); an app that has waited longer than APP_EMBED.yieldMs is told `busy` and tries again.
+ */
+export async function embedForApp(db: DB, texts: string[], kind: Kind, o: { signal?: AbortSignal } = {}): Promise<AppVectors> {
+  if (!stub) {
+    if (!meaningOn(db)) return { ok: false, why: 'off', detail: 'Search by meaning is turned off in this Hydor (Settings → Memory).' };
+    if (!worker?.ready) {
+      if (!envReady()) return { ok: false, why: 'not-set-up', detail: 'Search by meaning is not set up in this Hydor (its model is not here).' };
+      if (status === 'failed') return { ok: false, why: 'failed', detail: detail ?? 'The model stopped.' };
+    }
+  }
+  const out: Float32Array[] = [];
+  const until = Date.now() + APP_EMBED.yieldMs;
+  for (let i = 0; i < texts.length; i += APP_EMBED.piece) {
+    const mine = texts.slice(i, i + APP_EMBED.piece);
+    // Wait for our turn among the apps, then for Hydor's own work to be done.
+    const before = appTurn;
+    let release!: () => void;
+    appTurn = new Promise<void>((r) => (release = r));
+    try {
+      await before;
+      let yielded = false;
+      while (ownBusy > 0) {
+        if (Date.now() > until || o.signal?.aborted) return { ok: false, why: 'busy', detail: 'Hydor is busy with its own search, so this one waits a little.' };
+        yielded = true;
+        await nap(20);
+      }
+      if (yielded) appEmbedStats.steppedAside++;
+      let got: Float32Array[] | null;
+      if (stub) got = await stub(mine, kind);
+      else {
+        const w = worker?.ready ? worker : await ensureWorker(db);
+        if (!w) return short ? { ok: false, why: 'memory', detail: `Too little memory is free to load the model (${(short.free / 1024).toFixed(1)} GB of ${(short.need / 1024).toFixed(1)} GB).` } : { ok: false, why: status === 'failed' ? 'failed' : 'starting', detail };
+        try {
+          got = await ask(w, mine, kind, 60_000);
+        } catch (e) {
+          return { ok: false, why: 'failed', detail: (e as Error).message };
+        }
+      }
+      appEmbedStats.pieces++;
+      out.push(...got);
+    } finally {
+      release();
+    }
+  }
+  return { ok: true, vectors: out };
 }
 
 /** One query's vector, or null (see embed). */

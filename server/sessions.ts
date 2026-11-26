@@ -16,7 +16,7 @@ import { HttpError } from './auth.ts';
 import { config, paths } from './config.ts';
 import type { DB } from './db.ts';
 import { kvGet, kvSet } from './db.ts';
-import { answersText, dropForm, standingForm, standingForms } from './openForms.ts';
+import { answersText, dropForm, recordStandingAnswer, standingForm, standingForms } from './openForms.ts';
 import { formContent } from '../shared/forms.ts';
 import { ACCOUNT_AGENT_NAMES, acpAccountAgent, accountAgentOf, isAcpAccountAgent } from '../shared/account-agents.ts';
 import { agentBaseEnv } from './env.ts';
@@ -3476,7 +3476,8 @@ export class SessionManager extends EventEmitter {
         const [field, why] = Object.entries(r.errors)[0] ?? [];
         if (field) throw new HttpError(400, `${f.card.form?.fields.find((x) => x.id === field)?.label ?? field}: ${why}`);
         // Sent first: should the message not get through, the form stays, to send again.
-        await this.send(key, answersText(f, r.content), [], []);
+        const note = await recordStandingAnswer(f, r.content);
+        await this.send(key, answersText(f, r.content, note), [], []);
         dropForm(this.db, approvalId);
         this.formsChanged(key);
       } else {

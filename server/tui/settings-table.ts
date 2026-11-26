@@ -87,7 +87,7 @@ export interface Row {
   /** A command that has this option's list or button (kind command). */
   command?: string;
   /** A device setting's key; `terminal` ones are the chat's own. */
-  device?: { key: 'theme' | 'language' | 'motion' | 'textSize' | 'sound' | 'push' | 'signout' | 'dictation' | 'speech-language' | 'read-aloud' | 'enter' | 'suggestions' | 'word-suggestions'; terminal?: boolean };
+  device?: { key: 'theme' | 'language' | 'motion' | 'textSize' | 'sound' | 'push' | 'signout' | 'dictation' | 'speech-language' | 'read-aloud' | 'enter' | 'suggestions' | 'word-suggestions' | 'technical-details'; terminal?: boolean };
   /** What an action's yes and no read as, when it has a state to show (a permission: allowed or not). */
   states?: [string, string];
   /** What the terminal cannot do here, or what to know. */
@@ -134,6 +134,7 @@ row('general', 'Terminal suggestions', 'device', {
   device: { key: 'suggestions', terminal: true },
   note: 'Here it is the terminal chat’s grey suggestions from your earlier messages; the app keeps its own for its terminals in each browser.',
 });
+row('general', 'Technical details', 'device', { device: { key: 'technical-details' }, note: 'Each browser keeps its own: whether web apps show files, commands and logs beside the plain words.' });
 row('general', 'Resume after usage limits', 'switch', { read: rd('/api/app-settings', 'autoResume'), write: put('/api/app-settings', (v) => ({ autoResume: v })) });
 row('general', 'Delete inactive sessions', 'choice', {
   choices: [

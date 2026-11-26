@@ -1,0 +1,12 @@
+// Small conveniences only: everything works without this file.
+for (const button of document.querySelectorAll('[data-copy]')) {
+  if (!navigator.clipboard) continue;
+  button.hidden = false;
+  button.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(button.dataset.copy);
+    button.textContent = 'Copied';
+  });
+}
+for (const input of document.querySelectorAll('[data-select]')) {
+  input.addEventListener('focus', () => input.select());
+}

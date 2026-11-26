@@ -71,7 +71,7 @@ cd "$root"
 tar -cf - \
   package.json package-lock.json CHANGELOG.md LICENSE NOTICE \
   dist/server dist/web \
-  server/find/shipped-vectors.json server/memory/embed_worker.py server/images/picture_worker.py server/documents/pdf/fonts \
+  server/find/shipped-vectors.json server/webapps/services.json server/memory/embed_worker.py server/images/picture_worker.py server/documents/pdf/fonts \
   server/computer/x11-helper.py server/computer/windows-helper.cs \
   scripts/agent-tools/bin scripts/agent-tools/lib \
   web/src/i18n docs/guide catalog skills plugins |

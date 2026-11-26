@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "start": {
+    "command": "node --disable-warning=ExperimentalWarning server.js",
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "judgeEnv": { "ALLOW_SIGN_UP": "1" },
+    "ready": "/sign-in",
+    "browserFolders": ["public"]
+  },
+  "accounts": {
+    "signUp": { "method": "POST", "path": "/api/sign-up", "send": "json", "body": { "name": "{name}", "email": "{email}", "password": "{password}" } },
+    "signIn": { "method": "POST", "path": "/api/sign-in", "send": "json", "body": { "email": "{email}", "password": "{password}" } },
+    "session": "cookie"
+  },
+  "home": "/",
+  "things": {
+    "stock": {
+      "list": { "path": "/api/stock", "rows": "rows" },
+      "add": { "path": "/api/stock", "method": "POST", "send": "json" },
+      "one": { "path": "/api/stock/{id}", "read": "GET", "change": "PATCH", "remove": "DELETE" },
+      "idKey": "id",
+      "fields": {
+        "what it is": "name",
+        "what sort of thing it is": "category",
+        "how many": "quantity",
+        "best-before date": "bestBefore",
+        "photo": "photo",
+        "notes": "notes"
+      }
+    },
+    "deliveries": {
+      "list": { "path": "/api/deliveries", "rows": "rows" },
+      "add": { "path": "/api/deliveries", "method": "POST", "send": "json" },
+      "one": { "path": "/api/deliveries/{id}", "read": "GET", "change": "PATCH", "remove": "DELETE" },
+      "idKey": "id",
+      "fields": {
+        "which stock item came": "stockId",
+        "who it came from": "from",
+        "day it arrived": "arrived",
+        "kilos": "kilos",
+        "put away": "putAway"
+      }
+    }
+  }
+}

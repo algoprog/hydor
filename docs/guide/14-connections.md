@@ -255,7 +255,7 @@ Click the pencil (**Hosts, note and how it is sent**), change the hosts, whether
 
 ### Delete a key
 
-Click the bin (**Delete**) and confirm. Agents can no longer use the key, and its value is gone for good.
+Click the bin (**Delete**) and confirm. Agents can no longer use the key, and its value is gone for good. The question first names the apps that use it, and the web apps that keep a value of their own under that name (theirs stays).
 
 ### What agents can and cannot do with a key
 
@@ -290,6 +290,20 @@ To sign in to a site or a service, an agent asks for everything at once: **The a
 3. Click **Save to the vault**.
 
 Each secret goes to the vault as a key of its own, named after the sign-in (a Voltaro password becomes VOLTARO_PASSWORD). A field marked **The agent sees this one** is a detail that isn't secret, like a server's address: the agent gets what you type there, and it isn't kept in the vault. A field the vault already has says so: leave it empty to keep what is saved. Once saved, the card lists the keys, and the agent can sign in with them in its browser, on those hosts only, without seeing them.
+
+### Several keys on one card, with how to get them
+
+When a task needs more than one key, or the agent can tell you how to get one, it puts them on one card: a tab for each (on a phone, a row that opens). Each says who gives the key and why it is needed, lists **How to get it** as short numbered steps, links to the provider's page (it opens in a new tab), and has its fields.
+
+1. Follow the steps and paste each value into its field. It is hidden as you type; the eye shows it. The line under a field says what a right value looks like, and warns when what you pasted plainly is not it (it never stops you).
+2. Click **Save** on that tab, or **Skip for now** where it is offered.
+3. Go on to the next. The marks on the tabs say what is saved, skipped or still to do, and the corner counts them.
+
+- A key the vault already has is never shown: choose **Use the one saved on** (the date) or **Replace**.
+- The agent hears once every needed key is saved, or when you press **Close without the rest**: for each one saved, skipped or left, and nothing of its value. An optional one you add afterwards, it hears of too.
+- For an app that runs inside Hydor, payments take a test key only (it starts sk_test_): a live key is refused there.
+- For a web app, the card warns of a paste that is plainly something else (a publishable key where the secret one goes).
+- A field marked **The agent sees this one** is told to the agent as typed, as on a sign-in's card.
 
 ## Commands that use a key
 
@@ -410,3 +424,4 @@ Agents can do these for you, with your OK on a card. They never type a key's val
 - "Show me the most installed Claude Code plugins, then install the one I pick."
 - "Sign in to my Voltaro account and download this year's bills into this folder." (The first time, it asks for the sign-in on a card.)
 - "Push this branch to GitHub with the token in the vault."
+- "Ask me for the keys my shop needs, all on one card, and tell me how to get each."

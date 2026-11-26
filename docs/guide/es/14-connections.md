@@ -255,7 +255,7 @@ Haz clic en el lápiz (**Hosts, nota y cómo se envía**), cambia los hosts, si 
 
 ### Eliminar una clave
 
-Haz clic en la papelera (**Eliminar**) y confirma. Los agentes ya no pueden usar la clave, y su valor desaparece para siempre.
+Haz clic en la papelera (**Eliminar**) y confirma. Los agentes ya no pueden usar la clave, y su valor desaparece para siempre. La pregunta nombra antes las apps que la usan y las apps web que tienen un valor propio con ese nombre (el suyo se queda).
 
 ### Qué pueden y qué no pueden hacer los agentes con una clave
 
@@ -290,6 +290,20 @@ Para iniciar sesión en un sitio o un servicio, un agente pide todo de una vez: 
 3. Haz clic en **Guardar en la bóveda**.
 
 Cada secreto va a la bóveda como una clave propia, con el nombre del inicio de sesión (una contraseña de Voltaro pasa a ser VOLTARO_PASSWORD). Un campo marcado con **El agente ve este** es un dato que no es secreto, como la dirección de un servidor: el agente recibe lo que escribas ahí, y no se guarda en la bóveda. Un campo que la bóveda ya tiene lo indica: déjalo vacío para conservar lo guardado. Una vez guardado, la tarjeta enumera las claves, y el agente puede iniciar sesión con ellas en su navegador, solo en esos hosts, sin verlas.
+
+### Varias claves en una sola tarjeta, con cómo conseguirlas
+
+Cuando una tarea necesita más de una clave, o el agente puede explicarte cómo conseguir una, las pone en una sola tarjeta: una pestaña para cada una (en el teléfono, una fila que se abre). Cada una dice quién da la clave y para qué hace falta, enumera en **How to get it** unos pasos cortos, enlaza la página del proveedor (se abre en una pestaña nueva) y tiene sus campos.
+
+1. Sigue los pasos y pega cada valor en su campo. Se oculta mientras escribes; el ojo lo muestra. La línea bajo un campo dice cómo es un valor correcto, y avisa cuando lo que has pegado claramente no lo es (nunca te lo impide).
+2. Haz clic en **Guardar** en esa pestaña, o en **Omitir por ahora** donde se ofrezca.
+3. Sigue con la siguiente. Las marcas de las pestañas dicen qué está guardado, omitido o pendiente, y la esquina lleva la cuenta.
+
+- Una clave que la bóveda ya tiene nunca se muestra: elige **Use the one saved on** (con la fecha) o **Reemplazar**.
+- El agente se entera cuando están guardadas todas las necesarias, o cuando pulsas **Close without the rest**: de cada una, guardada, omitida o pendiente, y nada de su valor. También se entera de una opcional que añadas después.
+- En una app que corre dentro de Hydor, los pagos solo admiten una clave de prueba (empieza por sk_test_): una clave real se rechaza allí.
+- Para una app web, la tarjeta avisa de algo pegado que es claramente otra cosa (una clave publicable donde va la secreta).
+- Un campo marcado **El agente ve este** llega al agente tal como lo escribes, como en la tarjeta de un inicio de sesión.
 
 ## Comandos que usan una clave
 
@@ -410,3 +424,4 @@ Los agentes pueden hacer esto por ti, con tu visto bueno en una tarjeta. Nunca e
 - “Muéstrame los plugins de Claude Code más instalados y luego instala el que yo elija.”
 - “Inicia sesión en mi cuenta de Voltaro y descarga las facturas de este año en esta carpeta.” (La primera vez, pide el inicio de sesión en una tarjeta.)
 - “Sube esta rama a GitHub con el token de la bóveda.”
+- “Pídeme las claves que necesita mi tienda, todas en una tarjeta, y dime cómo conseguir cada una.”

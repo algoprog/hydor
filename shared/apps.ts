@@ -236,8 +236,19 @@ export interface AppDef extends AppRecipe {
   template?: string;
   /** Its folder of files, kept in step with it (made in its Edit, or with the command line). */
   folder?: string;
+  /** The web app this is the flows half of (server/webapps/flows.ts), by id and name; set and cleared only by linking and unlinking. */
+  webapp?: { id: string; name: string };
   createdAt: number;
   updatedAt: number;
+}
+
+/** Who a run acts for, as the web app that started it vouches for them (it is not checked against anything of Hydor's). */
+export interface RunPerson {
+  id: string;
+  name: string;
+  role: 'owner' | 'admin' | 'member' | 'guest';
+  email?: string;
+  teamId?: string;
 }
 
 /**
@@ -283,6 +294,8 @@ export interface AppRun {
   misses?: RunMiss[];
   /** The language it writes in, a tag ("el"): what started it said so, else About you's (none kept: English). */
   lang?: string;
+  /** Who it acts for, as the web app that started it with its own key proved with the signed token of the person at its screen; null: it acts for nobody (a job of that web app). */
+  person?: RunPerson | null;
   /** While a run with steps works: the answer fields its steps have given so far (each one that fits); gone once it ends. */
   partial?: Record<string, unknown>;
   createdAt: number;
@@ -467,7 +480,7 @@ export const APP_COLORS: Record<string, string> = {
 };
 
 /** Addresses the app's own routes use, which no app may take as its name. */
-export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data', 'connected', 'media', 'assets', 'pins']);
+export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data', 'connected', 'make', 'media', 'assets', 'pins']);
 
 // ---- names -----------------------------------------------------------------------------------------
 
@@ -1047,7 +1060,7 @@ export function cleanRecipe(raw: any): AppRecipe {
     prompt: typeof r.prompt === 'string' ? r.prompt.replace(/\r\n/g, '\n').trim().slice(0, 30_000) : '',
     fields,
     answer,
-    tools: Array.isArray(r.tools) ? [...new Set<string>(r.tools.map((t: unknown) => str(t, 80)).filter(Boolean))].slice(0, 80) : null,
+    tools: Array.isArray(r.tools) ? [...new Set<string>(r.tools.map((t: unknown) => str(t, 80)).filter(Boolean))].slice(0, 200) : null,
     limits: { runsPerDay: posNum(r.limits?.runsPerDay, 100_000) && Math.round(posNum(r.limits?.runsPerDay, 100_000)!), capUsd: posNum(r.limits?.capUsd, 10_000) },
     ...(flow ? { flow } : {}),
     ...(data ? { data } : {}),

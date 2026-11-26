@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "hydor.json",
+  "description": "What Hydor needs to know to run a web app: how to build and start it, what it reads from its environment, who signs people in, the keys it needs, the services it calls and where its database is.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["start", "env", "ready", "signIn"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "$ref": "#/$defs/line", "maxLength": 80 },
+    "build": { "$ref": "#/$defs/line", "maxLength": 1000, "description": "Run in the app's folder before it starts (optional)." },
+    "start": { "$ref": "#/$defs/line", "maxLength": 500, "description": "The one command that starts it in production." },
+    "dev": { "$ref": "#/$defs/line", "maxLength": 500, "description": "The command for the version being changed (optional)." },
+    "env": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["port", "data"],
+      "properties": {
+        "port": { "$ref": "#/$defs/variable" },
+        "data": { "$ref": "#/$defs/variable" },
+        "url": { "$ref": "#/$defs/variable" },
+        "secret": { "$ref": "#/$defs/variable" },
+        "host": { "$ref": "#/$defs/variable", "description": "The address it listens on (HOST when left out)." }
+      }
+    },
+    "ready": { "$ref": "#/$defs/path" },
+    "signIn": { "enum": ["hydor", "own"] },
+    "private": { "$ref": "#/$defs/path" },
+    "keys": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "from", "why"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+          "from": { "$ref": "#/$defs/line", "maxLength": 60 },
+          "why": { "$ref": "#/$defs/line", "maxLength": 600 },
+          "how": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 300 } },
+          "url": { "type": "string", "pattern": "^https://\\S+$", "maxLength": 300 },
+          "label": { "$ref": "#/$defs/line", "maxLength": 60 },
+          "optional": { "type": "boolean" },
+          "group": {
+            "type": "object",
+            "required": ["id"],
+            "properties": { "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,40}$" }, "title": { "type": "string" } }
+          },
+          "looks": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "starts": { "type": "array", "minItems": 1, "maxItems": 6, "items": { "type": "string", "minLength": 1 } },
+              "prefix": { "type": "array", "items": { "type": "string" } },
+              "pattern": { "type": "string", "maxLength": 200 },
+              "say": { "type": "string" },
+              "not": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "required": ["say"],
+                  "properties": { "starts": { "type": "string" }, "pattern": { "type": "string", "maxLength": 200 }, "say": { "type": "string", "minLength": 1 }, "when": { "type": "string" } },
+                  "anyOf": [{ "required": ["starts"] }, { "required": ["pattern"] }]
+                }
+              }
+            }
+          }
+        },
+        "if": { "not": { "properties": { "from": { "const": "made" } } } },
+        "then": { "required": ["how"] }
+      }
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ai": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tiers"],
+          "properties": {
+            "tiers": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["quick", "standard", "best"] } },
+            "usdPerDay": { "type": "number", "minimum": 0, "maximum": 10000 },
+            "try": { "$ref": "#/$defs/try" }
+          }
+        },
+        "embed": { "$ref": "#/$defs/service" },
+        "mail": { "$ref": "#/$defs/service" }
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "sqlite"],
+      "properties": {
+        "file": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$" },
+        "sqlite": { "type": "boolean" }
+      },
+      "if": { "properties": { "sqlite": { "const": true } } },
+      "then": { "properties": { "file": { "pattern": "\\.([dD][bB]|[sS][qQ][lL][iI][tT][eE]3?)$" } } }
+    },
+    "accounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signUp", "signIn"],
+      "properties": { "signUp": { "$ref": "#/$defs/account" }, "signIn": { "$ref": "#/$defs/account" } }
+    },
+    "smoke": {
+      "description": "One command, or one request, that tries the app after a launch (optional).",
+      "anyOf": [{ "$ref": "#/$defs/line", "maxLength": 500 }, { "$ref": "#/$defs/try" }]
+    }
+  },
+  "if": { "required": ["signIn"], "properties": { "signIn": { "const": "hydor" } } },
+  "then": { "properties": { "env": { "required": ["port", "data", "secret"] } }, "not": { "required": ["accounts"] } },
+  "else": { "not": { "required": ["private"] } },
+  "$defs": {
+    "line": { "type": "string", "minLength": 1, "pattern": "^[^\\u0000-\\u001f\\u007f]*$" },
+    "variable": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]{0,63}$" },
+    "path": { "type": "string", "pattern": "^/($|[^/\\s\\\\#][^\\s\\\\#]*$)", "maxLength": 200 },
+    "try": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "path"],
+      "properties": { "method": { "enum": ["GET", "POST"] }, "path": { "$ref": "#/$defs/path" }, "body": true }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "body"],
+      "properties": {
+        "method": { "enum": ["POST", "PUT"] },
+        "path": { "$ref": "#/$defs/path" },
+        "send": { "enum": ["json", "form"] },
+        "body": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean"] } }
+      }
+    },
+    "service": {
+      "anyOf": [{ "type": "boolean" }, { "type": "object", "additionalProperties": false, "properties": { "try": { "$ref": "#/$defs/try" } } }]
+    }
+  }
+}

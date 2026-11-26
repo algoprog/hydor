@@ -14,8 +14,9 @@
 // their marketplace and the keys in the vault.
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { ArrowRight, ArrowUpDown, ChevronDown, ChevronRight, Download, FilePlus2, FileUp, Globe, History, KeyRound, LayoutDashboard, LayoutGrid, MessagesSquare, MoreHorizontal, Pin, Plug, Plus, Puzzle, Search, Sparkles, TextCursorInput, User, X } from 'lucide-react';
+import { AppWindow, ArrowRight, ArrowUpDown, ChevronDown, ChevronRight, Download, FilePlus2, FileUp, Globe, History, KeyRound, LayoutDashboard, LayoutGrid, MessagesSquare, MoreHorizontal, Pin, Plug, Plus, Puzzle, Search, Sparkles, TextCursorInput, User, X } from 'lucide-react';
 import type { AppDef, AppRun } from '@shared/apps';
+import type { WebApp } from '@shared/webapps';
 import { APP_COLORS, inputsLine, isActive, madeForSessions, RECENT_APPS, USED_SOURCES } from '@shared/apps';
 import { pagesFor } from '@shared/app-ui';
 import { tr } from '../../i18n/runtime';
@@ -23,7 +24,7 @@ import { LOCALE } from '../../i18n/locale';
 import { api } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { toastError } from '../../lib/store';
+import { toastError, useUI } from '../../lib/store';
 import { Button, cx, Empty, IconButton, MenuItem, Popover, Tabs, Throbber, useMediaQuery } from '../../components/ui';
 import { ColumnScroll } from '../layout/ColumnScroll';
 import { NavButton, PageHeader } from '../layout/PageHeader';
@@ -42,11 +43,14 @@ import { gotPins, usePins } from './pins';
 import { isNew, RecentlyUsed, StartWith } from './Recent';
 import { statusBadge } from './status';
 import { useStartBuilder } from './startBuilder';
+import { AddWebApp } from '../webapps/AddWebApp';
+import { webAppPath, useWebApps } from '../webapps/api';
+import { WebAppCard, ownWords } from '../webapps/Card';
 
 export { statusBadge };
 
 /** New app: describe it, start from scratch, or install one from a file; one menu. */
-function NewAppMenu() {
+function NewAppMenu({ onAddWeb, onChoose }: { onAddWeb?: () => void; onChoose?: () => void }) {
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   return (
@@ -55,13 +59,23 @@ function NewAppMenu() {
         New app
         <ChevronDown size={14} className="-mr-1 opacity-70" />
       </Button>
-      <Popover anchor={btn} open={open} onClose={() => setOpen(false)} align="end" width={250}>
+      <Popover anchor={btn} open={open} onClose={() => setOpen(false)} align="end" width={290}>
+        {onChoose && (
+          <MenuItem icon={<LayoutGrid size={15} />} onClick={() => (setOpen(false), onChoose())}>
+            Choose what to make
+          </MenuItem>
+        )}
         <MenuItem icon={<Sparkles size={15} />} onClick={() => (setOpen(false), go('/?assistant=app-builder'))}>
           Describe it to an agent
         </MenuItem>
         <MenuItem icon={<FilePlus2 size={15} />} onClick={() => (setOpen(false), go('/apps/new'))}>
           Start from scratch
         </MenuItem>
+        {onAddWeb && (
+          <MenuItem icon={<AppWindow size={15} />} onClick={() => (setOpen(false), onAddWeb())}>
+            Add a web app from a folder
+          </MenuItem>
+        )}
         <InstallFromFile
           trigger={(pick) => (
             <MenuItem icon={<FileUp size={15} />} onClick={() => (setOpen(false), pick())}>
@@ -193,11 +207,11 @@ const GRID = `${COLS} sm:gap-3 max-sm:divide-y max-sm:divide-line max-sm:overflo
 
 /** Your own app, made here: it opens the builder (which also takes a description or a file). After your apps, a card
  *  with an app card's face (a plus on an accent tile, the name, a line); with none yet, one row across the page. */
-function NewTile({ row }: { row?: boolean }) {
+function NewTile({ row, to = '/apps/new' }: { row?: boolean; to?: string }) {
   return (
     <button
       type="button"
-      onClick={() => go('/apps/new')}
+      onClick={() => go(to)}
       data-tip="make-app"
       className={cx(
         'group flex w-full gap-3 rounded-2xl border border-line text-left transition-colors hover:border-line-2 hover:bg-bg-1',
@@ -209,7 +223,7 @@ function NewTile({ row }: { row?: boolean }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-semibold tracking-tight">Make an app</span>
-        <span className="mt-0.5 block text-[13px] leading-snug text-pretty text-fg-3">Describe it to an agent, start from scratch, or install a file</span>
+        <span className="mt-0.5 block text-[13px] leading-snug text-pretty text-fg-3">{to === '/apps/make' ? tr('Pick a kind of web app, or make a small tool') : 'Describe it to an agent, start from scratch, or install a file'}</span>
       </span>
       {row && <ChevronRight size={16} className="shrink-0 text-fg-3 transition-colors group-hover:text-accent" />}
     </button>
@@ -336,7 +350,7 @@ function SortMenu({ value, onChange, toolbar }: { value: Sort; onChange: (s: Sor
 // ---- the places in the column --------------------------------------------------------------------------------------
 
 /** Where the page is: the whole gallery, one part of it, one kind of app (`kind:Research`), or Connected apps. */
-type Place = 'all' | 'pinned' | 'recent' | 'own' | 'connected' | `kind:${string}`;
+type Place = 'all' | 'pinned' | 'recent' | 'own' | 'web' | 'connected' | `kind:${string}`;
 
 const kindOfPlace = (p: Place) => (p.startsWith('kind:') ? p.slice(5) : null);
 
@@ -348,19 +362,20 @@ function addressOf(p: Place): string {
   return kind !== null ? `/apps?kind=${encodeURIComponent(kind)}` : `/apps?place=${p}`;
 }
 
-const PLACE_TITLES: Record<string, string> = { all: 'All apps', pinned: 'Pinned', recent: 'Recently used', own: 'Your own apps', connected: 'Connected apps' };
+const PLACE_TITLES: Record<string, string> = { all: 'All apps', pinned: 'Pinned', recent: 'Recently used', own: 'Your own apps', web: 'Web apps', connected: 'Connected apps' };
 
 /**
  * The list in the Apps page's column, as the places of the other pages: All apps; the parts of it that have something (Pinned,
  * Recently used) and Your own apps; the kinds of apps, each with its count; and, after a divider, Connected apps.
  */
-function Places({ place, onPlace, counts, kinds, connected }: { place: Place; onPlace: (p: Place) => void; counts: { all: number; pinned: number; recent: number; own: number }; kinds: [string, number][]; connected?: number }) {
+function Places({ place, onPlace, counts, kinds, connected }: { place: Place; onPlace: (p: Place) => void; counts: { all: number; pinned: number; recent: number; own: number; web: number }; kinds: [string, number][]; connected?: number }) {
   return (
     <nav aria-label="Places in Apps" className="space-y-0.5">
       <PlaceRow on={place === 'all'} icon={<LayoutGrid size={15} className="text-fg-3" />} label="All apps" count={counts.all} onClick={() => onPlace('all')} />
       {(counts.pinned > 0 || place === 'pinned') && <PlaceRow on={place === 'pinned'} icon={<Pin size={15} className="text-fg-3" />} label="Pinned" count={counts.pinned} onClick={() => onPlace('pinned')} />}
       {(counts.recent > 0 || place === 'recent') && <PlaceRow on={place === 'recent'} icon={<History size={15} className="text-fg-3" />} label="Recently used" count={counts.recent} onClick={() => onPlace('recent')} />}
       <PlaceRow on={place === 'own'} icon={<User size={15} className="text-fg-3" />} label="Your own apps" count={counts.own} onClick={() => onPlace('own')} />
+      <PlaceRow on={place === 'web'} icon={<AppWindow size={15} className="text-fg-3" />} label="Web apps" count={counts.web} onClick={() => onPlace('web')} />
       {kinds.length > 1 && (
         <>
           <PlacesLabel>Kinds</PlacesLabel>
@@ -376,12 +391,64 @@ function Places({ place, onPlace, counts, kinds, connected }: { place: Place; on
   );
 }
 
+/** The Web apps place: their cards; or one calm sentence and the way to add one; or why there are none to show. */
+function WebPlace({ web, apps, onAdd }: { web: ReturnType<typeof useWebApps>; apps: WebApp[]; onAdd: () => void }) {
+  // Adding one from a folder, and why they are off, are for those who asked for technical details.
+  const technical = useUI((s) => s.technicalDetails);
+  if (web.off)
+    return (
+      <div className="rounded-2xl border border-dashed border-line-2 px-5 py-2">
+        <Empty icon={<AppWindow size={20} />} title="Web apps are turned off on this computer">
+          <span className="block">{technical ? 'Set APPS_PORT to a port number, or take it out, and restart Hydor to turn them on.' : 'Whoever looks after this Hydor can turn them on.'}</span>
+        </Empty>
+      </div>
+    );
+  if (web.error)
+    return (
+      <p translate="no" role="alert" className="rounded-2xl border border-err/35 bg-err/5 px-4 py-3 text-[13.5px] text-fg-2">
+        {web.error}
+      </p>
+    );
+  if (!web.list)
+    return (
+      <div className="flex justify-center py-16 text-fg-3">
+        <Throbber size={24} />
+      </div>
+    );
+  if (!apps.length)
+    return (
+      <div className="rounded-2xl border border-dashed border-line-2 px-5 py-2">
+        <Empty icon={<AppWindow size={20} />} title="No web apps yet">
+          <span className="mt-1 inline-flex">
+            {technical ? (
+              <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={onAdd}>
+                Add a web app from a folder
+              </Button>
+            ) : (
+              <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => go('/apps/make')}>
+                Make one
+              </Button>
+            )}
+          </span>
+        </Empty>
+      </div>
+    );
+  return (
+    <div className={GRID}>
+      {apps.map((w) => (
+        <WebAppCard key={w.id} a={w} />
+      ))}
+    </div>
+  );
+}
+
 // ---- the page ----------------------------------------------------------------------------------------------------
 
 /** Where the guide says what apps are. */
 const GUIDE = '/guide/apps#what-an-app-is';
 
 export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) {
+  const technical = useUI((x) => x.technicalDetails);
   const [g, setG] = useState<Gallery | null>(null);
   const [find, setFind] = useState('');
   const startBuilder = useStartBuilder();
@@ -390,6 +457,8 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
   const [blocksOpen, setBlocksOpen] = useState(false);
   const [runsOpen, setRunsOpen] = useState(false);
   const [adding, setAdding] = useState<ReadyApp | null>(null);
+  const web = useWebApps();
+  const [addingWeb, setAddingWeb] = useState(false);
   const [sort, setSortState] = useState<Sort>(() => {
     try {
       const s = localStorage.getItem(SORT_KEY);
@@ -424,7 +493,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
   const connTab = search.get('tab');
   // The place is in the address; narrower, only the kinds are places (the chips), the rest of the gallery is one page.
   const asked = search.get('kind') !== null ? (`kind:${search.get('kind')}` as Place) : search.get('place');
-  const place: Place = tab === 'connected' ? 'connected' : asked?.startsWith('kind:') ? (asked as Place) : wide && (asked === 'pinned' || asked === 'recent' || asked === 'own') ? asked : 'all';
+  const place: Place = tab === 'connected' ? 'connected' : asked?.startsWith('kind:') ? (asked as Place) : asked === 'web' || (wide && (asked === 'pinned' || asked === 'recent' || asked === 'own')) ? (asked as Place) : 'all';
   const cat = kindOfPlace(place) ?? 'All';
   const toPlace = (p: Place) => {
     // On a computer a new place starts with an empty find box (it finds across the place's own apps); the chips keep the words.
@@ -473,12 +542,16 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
   const blocks = useMemo(() => (g?.templates ?? []).filter((t) => t.block), [g]);
   const own = useMemo(() => (g?.apps ?? []).filter((a) => !a.block), [g]);
   const ownBlocks = useMemo(() => (g?.apps ?? []).filter((a) => a.block), [g]);
-  // The kinds of apps there are, the ready-made ones' first, in their order, each with how many apps it has.
+  // Web apps sit with your own apps (a small mark tells them apart) and have a place of their own.
+  const webApps = web.list?.apps ?? [];
+  const webInOwn = cat === 'All' ? webApps : [];
+  // The kinds of apps there are, the ready-made ones' first, in their order, each with how many apps it has. One rule for every number of apps on this page:
+  // web apps are apps, so "All" (here and in the column) counts them with the ready-made and your own; a kind counts only the apps of that kind, and the "Agent apps" tab only those.
   const kinds = useMemo(() => {
     const n = new Map<string, number>();
     for (const a of [...ready, ...own]) n.set(a.category ?? 'Other', (n.get(a.category ?? 'Other') ?? 0) + 1);
-    return [['All', ready.length + own.length] as [string, number], ...n.entries()];
-  }, [own, ready]);
+    return [['All', ready.length + own.length + webApps.length] as [string, number], ...n.entries()];
+  }, [own, ready, webApps.length]);
   const ofKind = (a: { category?: string }) => cat === 'All' || (a.category ?? 'Other') === cat;
   const words = useMemo(() => findWords(find), [find]);
   const finding = words.length > 0;
@@ -486,8 +559,9 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
   // yours a little ahead, those uninstalled and blocks a little behind.
   const found = useMemo(() => {
     if (!finding) return [];
-    const all: { key: string; a: CardApp; ready: boolean; weight: number }[] = [
+    const all: { key: string; a: CardApp; ready: boolean; weight: number; web?: WebApp }[] = [
       ...own.map((a) => ({ key: a.id, a, ready: false, weight: 1.15 })),
+      ...webApps.map((w) => ({ key: `web:${w.id}`, a: { name: w.name, category: 'Web apps', description: ownWords(w) } as CardApp, ready: false, weight: 1.15, web: w })),
       ...ready.map((t) => ({ key: `tpl:${t.id}`, a: t, ready: true, weight: 1 })),
       ...ownBlocks.map((a) => ({ key: a.id, a, ready: false, weight: 0.8 })),
       ...blocks.map((t) => ({ key: `tpl:${t.id}`, a: t, ready: true, weight: 0.8 })),
@@ -499,7 +573,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
       .filter((x) => x.fit > 0)
       .sort((a, b) => b.fit - a.fit || a.a.name.localeCompare(b.a.name));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finding, words, own, ready, ownBlocks, blocks, removed, cat]);
+  }, [finding, words, own, webApps, ready, ownBlocks, blocks, removed, cat]);
   const ownShown = useMemo(() => sorted(own.filter(ofKind), sort), [own, cat, sort]);
   const readyShown = ready.filter(ofKind);
   // All of them: the ready-made apps under their kinds.
@@ -516,7 +590,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
   // Enter opens the best fit; Escape empties the box.
   const keys = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
-    if (e.key === 'Enter' && found[0]) go(appPath(found[0].key));
+    if (e.key === 'Enter' && found[0]) go(found[0].web ? webAppPath(found[0].web.id) : appPath(found[0].key));
     if (e.key === 'Escape' && find) (e.preventDefault(), setFind(''));
   };
 
@@ -525,12 +599,13 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
       title="Apps"
       tip={tab === 'connected' ? 'connections' : 'apps'}
       sub={<span className="max-sm:hidden">{tab === 'connected' ? 'Services every agent can use, connected once, and the keys they use' : 'Small tools that find things out and show them clearly: open one here, or ask in any chat'}</span>}
-      actions={tab === 'agent' ? <NewAppMenu /> : undefined}
+      actions={tab === 'agent' ? <NewAppMenu onAddWeb={web.off || !technical ? undefined : () => setAddingWeb(true)} onChoose={web.off ? undefined : () => go('/apps/make')} /> : undefined}
     >
       <Tabs
         value={tab}
         onChange={(t) => go(t === 'agent' ? '/apps' : '/apps/connected')}
         options={[
+          // The agent apps only: web apps are listed under this tab too, but are not what its name counts.
           { value: 'agent', label: 'Agent apps', count: g ? own.length + ready.length : undefined },
           { value: 'connected', label: 'Connected apps', count: connections?.length || undefined },
         ]}
@@ -539,10 +614,10 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
   );
   // The column (a computer): the places, with New app in the row of the logo. Counts need the gallery; until it is there, none show.
   const column = wide && (
-    <SideColumn label="Apps" tip={tab === 'connected' ? 'connections' : 'apps'} actions={<NewAppMenu />}>
+    <SideColumn label="Apps" tip={tab === 'connected' ? 'connections' : 'apps'} actions={<NewAppMenu onAddWeb={web.off || !technical ? undefined : () => setAddingWeb(true)} onChoose={web.off ? undefined : () => go('/apps/make')} />}>
       <h1 className="sr-only">Apps</h1>
       <ColumnScroll className="px-3 pt-1 pb-4">
-        <Places place={place} onPlace={toPlace} counts={{ all: g ? own.length + ready.length : 0, pinned: pinned.length, recent: used.length || runs.length, own: own.length }} kinds={kinds.slice(1)} connected={connections?.length} />
+        <Places place={place} onPlace={toPlace} counts={{ all: g ? own.length + ready.length + webApps.length : 0, pinned: pinned.length, recent: used.length || runs.length, own: own.length + webApps.length, web: webApps.length }} kinds={kinds.slice(1)} connected={connections?.length} />
       </ColumnScroll>
     </SideColumn>
   );
@@ -555,6 +630,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
       </div>
       {adding && <InstallReadyDialog t={adding} open onClose={() => setAdding(null)} />}
       <InstallFromFile ref={installer} trigger={() => null} />
+      <AddWebApp open={addingWeb} onClose={() => setAddingWeb(false)} onAdded={(a) => go(webAppPath(a.id))} />
     </div>
   );
   // The row at the top of the page, as on the other pages: the place's name at the left, the find box at the right (its size and look the same), and what the place has beside it (a sort, the latest runs).
@@ -599,8 +675,8 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
   // One part of the gallery alone (a computer's Pinned, Recently used, Your own apps); the places All apps and the kinds show it all, as the page did.
   const single = wide && (place === 'pinned' || place === 'recent' || place === 'own');
   // Ready-made apps to install and the building blocks come with the whole page, not with a kind.
-  const whole = !wide || place === 'all';
-  const nothing = !!g && (finding ? !found.length : !single && !ownShown.length && !readyShown.length);
+  const whole = (!wide || place === 'all') && place !== 'web';
+  const nothing = !!g && (finding ? !found.length : !single && place !== 'web' && !ownShown.length && !webInOwn.length && !readyShown.length);
   const latest = (inToolbar?: boolean) =>
     used.length > 0 && runs.length > 0 ? (
       inToolbar ? (
@@ -628,22 +704,31 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
     </>
   );
   // Pinned tiles come with the whole page (and, on a computer, not while finding); Pinned shows them alone.
-  const pinnedShown = pinned.length > 0 && (!wide || (place === 'all' && !finding));
+  const pinnedShown = pinned.length > 0 && place !== 'web' && (!wide || (place === 'all' && !finding));
   const pinHint = 'Pin the ones you use most from their ⋯ menu to keep them at the top';
-  const ownGrid = ownShown.length > 0 ? (
+  const ownGrid = ownShown.length + webInOwn.length > 0 ? (
     <div className={cx(COLS, 'gap-3')}>
       <div className={cx(GRID, 'sm:contents')}>
         {ownShown.map((a) => (
           <YourApp key={a.id} a={a} />
         ))}
+        {webInOwn.map((w) => (
+          <WebAppCard key={`web:${w.id}`} a={w} />
+        ))}
       </div>
-      {cat === 'All' && <NewTile />}
+      {cat === 'All' && <NewTile to={web.off ? undefined : '/apps/make'} />}
     </div>
   ) : (
-    <NewTile row />
+    <NewTile row to={web.off ? undefined : '/apps/make'} />
   );
   // What the toolbar has beside the find box: Your own apps' sort, Recently used's latest runs.
-  const controls = single && place === 'own' && own.length >= SORT_FROM ? <SortMenu value={sort} onChange={setSort} toolbar /> : single && place === 'recent' ? latest(true) : undefined;
+  // Add, where the page has apps to put it beside: with none, the page's own button is the one way to it.
+  const controls = place === 'web' && !web.off && webApps.length > 0 && technical ? (
+    <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={() => setAddingWeb(true)}>
+      <span className="max-sm:hidden">Add a web app</span>
+      <span className="sm:hidden">Add</span>
+    </Button>
+  ) : single && place === 'own' && own.length >= SORT_FROM ? <SortMenu value={sort} onChange={setSort} toolbar /> : single && place === 'recent' ? latest(true) : undefined;
   return frame(
     <>
       <div className="relative min-h-0 flex-1 overflow-y-auto" {...drop}>
@@ -665,20 +750,24 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
             {/* As on the other pages: the title at the left, the find box at the right of its row (it stays at the top while the
                 page scrolls). On a computer the kinds are the column's; narrower, they are chips under it. */}
             <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 bg-bg px-4 py-2 sm:-mx-6 sm:px-6">{toolbar(true, controls)}</div>
-            {!wide && kinds.length > 2 && (
+            {!wide && (kinds.length > 2 || webApps.length > 0) && (
               <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden">
-                {kinds.map(([k, n]) => (
-                  <button
-                    key={k}
-                    type="button"
-                    aria-pressed={cat === k}
-                    onClick={() => toPlace(k === 'All' ? 'all' : `kind:${k}`)}
-                    className={cx('flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors', cat === k ? 'bg-bg-3 font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}
-                  >
-                    {k}
-                    <span className="tnum text-[11.5px] text-fg-3">{n}</span>
-                  </button>
-                ))}
+                {/* After All, so it shows without scrolling the row; the kinds follow. */}
+                {[...kinds.slice(0, 1), ...(webApps.length > 0 ? ([['Web apps', webApps.length, 'web']] as [string, number, string][]) : []), ...kinds.slice(1)].map(([k, n, to]) => {
+                  const on = to === 'web' ? place === 'web' : place !== 'web' && cat === k;
+                  return (
+                    <button
+                      key={to ?? k}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toPlace(to === 'web' ? 'web' : k === 'All' ? 'all' : `kind:${k}`)}
+                      className={cx('flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors', on ? 'bg-bg-3 font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}
+                    >
+                      {k}
+                      <span className="tnum text-[11.5px] text-fg-3">{n}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
             {pinnedShown && (
@@ -693,11 +782,11 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
               {finding ? (
                 found.length > 0 && (
                   <div className={GRID}>
-                    {found.map((x, i) => (
-                      <YourApp key={x.key} a={x.a} ready={x.ready} first={i === 0} />
-                    ))}
+                    {found.map((x, i) => (x.web ? <WebAppCard key={x.key} a={x.web} first={i === 0} /> : <YourApp key={x.key} a={x.a} ready={x.ready} first={i === 0} />))}
                   </div>
                 )
+              ) : place === 'web' ? (
+                <WebPlace web={web} apps={webApps} onAdd={() => setAddingWeb(true)} />
               ) : place === 'pinned' && single ? (
                 pinned.length > 0 ? (
                   <div>
@@ -739,7 +828,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
                   )}
 
                   {(ownShown.length > 0 || cat === 'All') && (
-                    <Part title="Your own apps" sub={ownShown.length ? tr(`${ownShown.length}`) : undefined} action={own.length >= SORT_FROM ? <SortMenu value={sort} onChange={setSort} /> : undefined}>
+                    <Part title="Your own apps" sub={ownShown.length + webInOwn.length ? tr(`${ownShown.length + webInOwn.length}`) : undefined} action={own.length >= SORT_FROM ? <SortMenu value={sort} onChange={setSort} /> : undefined}>
                       {ownGrid}
                     </Part>
                   )}

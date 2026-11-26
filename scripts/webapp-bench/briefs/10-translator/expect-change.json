@@ -1,0 +1,212 @@
+{
+  "id": "10-translator",
+  "group": "accounts",
+  "product": "Kovač Translations",
+  "phrases": [["Clients", "Customers"], ["Jobs", "Projects", "Translations"]],
+  "accounts": "any",
+  "access": "own",
+  "kinds": [
+    {
+      "id": "clients",
+      "names": ["clients", "client", "customers", "customer", "agencies", "agency", "contacts", "publishers"],
+      "fields": [
+        {
+          "id": "name",
+          "names": ["name", "clientname", "title", "client", "company", "agency"],
+          "kind": "text",
+          "required": true,
+          "said": ["name"]
+        },
+        {
+          "id": "country",
+          "names": ["country", "countryname", "location", "basedin", "nation", "where"],
+          "kind": "text",
+          "required": false,
+          "said": ["country"]
+        },
+        {
+          "id": "notes",
+          "names": ["notes", "note", "comments", "details", "remarks"],
+          "kind": "long",
+          "required": false,
+          "said": ["notes"]
+        }
+      ],
+      "ops": ["change"],
+      "said": ["clients"]
+    },
+    {
+      "id": "jobs",
+      "names": ["jobs", "job", "projects", "project", "assignments", "assignment", "orders", "order", "commissions", "tasks", "translations"],
+      "fields": [
+        {
+          "id": "client",
+          "names": ["client", "clientid", "customer", "forclient", "agency", "whichclient"],
+          "kind": "ref",
+          "required": true,
+          "to": "clients",
+          "said": ["which client"]
+        },
+        {
+          "id": "title",
+          "names": ["title", "name", "jobname", "jobtitle", "description", "project", "job", "projectname", "what the job is called"],
+          "kind": "text",
+          "required": true,
+          "said": ["what the job is called"]
+        },
+        {
+          "id": "words",
+          "names": ["words", "wordcount", "wordcnt", "length", "numberofwords", "nwords", "size", "wordtotal", "count", "how many words"],
+          "kind": "integer",
+          "required": true,
+          "said": ["words", "how many words"]
+        },
+        {
+          "id": "fee",
+          "names": ["fee", "price", "charge", "amount", "rate", "total", "invoice", "invoiced", "pay", "payment", "cost", "value", "feeeur", "invoiceamount", "euros", "fee in euros", "what I am charging in euros"],
+          "kind": "money",
+          "required": true,
+          "currency": "EUR",
+          "said": ["fee in euros", "what I am charging in euros"]
+        },
+        {
+          "id": "due",
+          "names": ["due", "dueon", "duedate", "deadline", "dueday", "duedateon", "dueby", "the day it is due"],
+          "kind": "day",
+          "required": true,
+          "said": ["the day it is due"]
+        },
+        {
+          "id": "deliveredOn",
+          "names": ["deliveredon", "delivered", "delivereddate", "deliverydate", "deliveryday", "dateofdelivery", "deliveredat", "dayddelivered", "daydelivered", "deliveredday", "datedelivered", "doneon", "finishedon", "completedon", "completed", "sentOn", "sent", "senton"],
+          "kind": "day",
+          "required": false,
+          "said": ["the day I delivered it"]
+        },
+        {
+          "id": "source",
+          "names": ["source", "sourcefile", "file", "attachment", "document", "originalfile", "clientfile", "original", "sourcedocument", "files", "upload", "the file the client sent"],
+          "kind": "file",
+          "required": false,
+          "file": "any",
+          "said": ["the file the client sent", "the file the client sent me"]
+        },
+        {
+          "id": "pair",
+          "names": ["pair", "languagepair", "languages", "language", "direction", "from", "translation", "lang"],
+          "kind": "choice",
+          "required": true,
+          "choices": ["German to English", "Croatian to English"],
+          "said": ["which language pair the job is in"]
+        }
+      ],
+      "ops": ["change"],
+      "said": ["jobs"]
+    }
+  ],
+  "rows": {
+    "clients": [
+      { "name": "Verlag Nord", "country": "Germany", "notes": "Pays within 30 days.\nPrefers PDF." },
+      { "name": "Marché Bleu", "country": "France" }
+    ],
+    "jobs": [
+      {
+        "client": "@clients.0",
+        "title": "Annual report",
+        "words": 4200,
+        "fee": 840,
+        "due": "$thisMonth:20",
+        "deliveredOn": "$thisMonth:8",
+        "pair": "German to English"
+      },
+      {
+        "client": "@clients.1",
+        "title": "Menu card",
+        "words": 600,
+        "fee": 120,
+        "due": "$thisMonth:25",
+        "pair": "Croatian to English"
+      },
+      {
+        "client": "@clients.0",
+        "title": "Safety manual",
+        "words": 9100,
+        "fee": 1365.5,
+        "due": "$lastMonth:15",
+        "deliveredOn": "$lastMonth:14",
+        "pair": "German to English"
+      },
+      {
+        "client": "@clients.1",
+        "title": "Catalogue",
+        "words": 2300,
+        "fee": 460,
+        "due": "$thisMonth:28",
+        "deliveredOn": "$thisMonth:18",
+        "pair": "Croatian to English"
+      }
+    ]
+  },
+  "later": {
+    "jobs": [
+      {
+        "client": "@clients.0",
+        "title": "Press release",
+        "words": 800,
+        "fee": 150,
+        "due": "$thisMonth:27",
+        "deliveredOn": "$thisMonth:21",
+        "pair": "German to English"
+      },
+      {
+        "client": "@clients.1",
+        "title": "Website",
+        "words": 3000,
+        "fee": 600,
+        "due": "$thisMonth:28",
+        "pair": "Croatian to English"
+      },
+      {
+        "client": "@clients.1",
+        "title": "Leaflet",
+        "words": 1000,
+        "fee": 90,
+        "due": "$thisMonth:28",
+        "pair": "German to English"
+      }
+    ]
+  },
+  "theirs": {
+    "clients": [{ "name": "Other Agency", "country": "Austria" }],
+    "jobs": [
+      {
+        "client": "@clients.0",
+        "title": "Their job",
+        "words": 99999,
+        "fee": 777,
+        "due": "$thisMonth:27",
+        "deliveredOn": "$thisMonth:9",
+        "pair": "German to English"
+      }
+    ]
+  },
+  "numbers": [
+    {
+      "id": "invoiced",
+      "of": "jobs",
+      "agg": "sum",
+      "field": "fee",
+      "where": [{ "field": "deliveredOn", "thisMonth": true }],
+      "say": "invoiced this month",
+      "show": "money"
+    },
+    {
+      "id": "open",
+      "of": "jobs",
+      "agg": "count",
+      "where": [{ "field": "deliveredOn", "empty": true }],
+      "say": "jobs still open"
+    },
+    { "id": "average", "of": "jobs", "agg": "avg", "field": "words", "say": "average words per job" }
+  ]
+}

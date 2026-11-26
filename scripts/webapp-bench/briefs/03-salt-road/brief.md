@@ -1,0 +1,3 @@
+I have finished my first novel, The Salt Road. It is a family story set on the Norfolk coast in the 1950s, and a small press called Larkspur Books is bringing it out in April. I would like a simple page where readers can leave their email so I can tell them the day it is out. Just their email, I do not want to ask them anything else, people give up on forms.
+
+I would also like a second page about the book and about me, where someone can read the first lines and see who I am. I teach geography and I write in the evenings, so I want it to feel quiet and a bit windswept, deep blue-green like the sea in winter. Only I will look at who signed up.

@@ -1,0 +1,3 @@
+I run a small pottery studio in Hatch End, and we have a big electric kiln that sits empty half the week. I want to open it up to other potters, people who make pots at home but have nowhere to fire them, so they can book a shelf in one of our firings. It is not ready yet, I am still sorting out the insurance, so for now I just want a page where people can put their name down for when it opens.
+
+The page should say what it is and roughly how it works: we fire about every second Thursday, a shelf costs £18, and there is room for twelve shelves each time. I would like it to feel like our studio, earthy and warm, terracotta sort of colours. I will be the only one who looks at the list of names, nobody else.

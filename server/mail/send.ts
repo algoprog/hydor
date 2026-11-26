@@ -30,6 +30,10 @@ export interface OutgoingMail {
   inReplyTo?: string;
   references?: string[];
   replyTo?: string;
+  /** The name beside the account's address, instead of the account's own (a web app's mail carries the app's). The address is always the account's. */
+  fromName?: string;
+  /** Where a mail sent to many alike is unsubscribed from, an https: or mailto: address the caller has checked: List-Unsubscribe (and, for https, List-Unsubscribe-Post). */
+  listUnsubscribe?: string;
 }
 
 export interface SentInfo {
@@ -72,7 +76,13 @@ function splitAddresses(s: string): string[] {
   return out;
 }
 
-const fromOf = (a: MailAccount) => (a.name ? { name: a.name, address: a.address } : a.address);
+const fromOf = (a: MailAccount, name = a.name) => (name ? { name, address: a.address } : a.address);
+
+/** The headers a mail sent to many alike carries (RFC 2369, and RFC 8058's one click for an https address), given as they are. */
+const unsubscribeHeaders = (u: string) => ({
+  'List-Unsubscribe': { prepared: true, value: `<${u}>` },
+  ...(u.startsWith('https:') ? { 'List-Unsubscribe-Post': { prepared: true, value: 'List-Unsubscribe=One-Click' } } : {}),
+});
 
 function smtpOptions(a: MailAccount, pass: string) {
   return {
@@ -112,7 +122,8 @@ function composeOptions(a: MailAccount, m: OutgoingMail, messageId: string, date
   if (size > MAX_ATTACHMENTS_BYTES) throw new MailError(`The attachments come to ${Math.round(size / 1024 / 1024)} MB: most mail servers take at most 25 MB. Send fewer, or share a link instead.`);
   if (to.length + cc.length + bcc.length > MAX_RECIPIENTS) throw new MailError(`At most ${MAX_RECIPIENTS} recipients in one email`);
   return {
-    from: fromOf(a),
+    from: fromOf(a, m.fromName ?? a.name),
+    ...(m.listUnsubscribe ? { headers: unsubscribeHeaders(m.listUnsubscribe) } : {}),
     ...(to.length ? { to } : {}),
     ...(cc.length ? { cc } : {}),
     ...(bcc.length ? { bcc } : {}),
@@ -148,8 +159,9 @@ const newMessageId = (a: MailAccount) => `<${crypto.randomUUID()}@${domainOf(a.a
  *
  * `account` is the account's address (or id or name); undefined sends from the first one. Throws a MailError in plain
  * words (no account, a refused recipient, a wrong password). It sends at once: check with the person first.
+ * `keepCopy: false` keeps no copy in Sent (a provider that keeps one by itself still does).
  */
-export async function sendMail(account: string | undefined, mail: OutgoingMail, o: { db?: DB } = {}): Promise<SentInfo> {
+export async function sendMail(account: string | undefined, mail: OutgoingMail, o: { db?: DB; keepCopy?: boolean } = {}): Promise<SentInfo> {
   const db = o.db ?? mailDb();
   const a = findAccount(db, account);
   const to = [...addressList(mail.to, 'to'), ...addressList(mail.cc, 'cc'), ...addressList(mail.bcc, 'bcc')];
@@ -162,15 +174,19 @@ export async function sendMail(account: string | undefined, mail: OutgoingMail, 
   try {
     info = await t.sendMail(opts);
   } catch (e) {
-    const err = e as { code?: string; response?: string; rejected?: unknown[] };
-    if (err.code === 'EENVELOPE') throw new MailError(`The mail server refused the recipients${err.rejected?.length ? ` ${err.rejected.map(String).join(', ')}` : ''}: ${String(err.response ?? '').slice(0, 200)}`);
-    throw explain(e, a.smtp, 'smtp', a.provider);
+    const err = e as { code?: string; response?: string; responseCode?: number; command?: string; rejected?: unknown[] };
+    const out =
+      err.code === 'EENVELOPE'
+        ? new MailError(`The mail server refused the recipients${err.rejected?.length ? ` ${err.rejected.map(String).join(', ')}` : ''}: ${String(err.response ?? '').slice(0, 200)}`)
+        : explain(e, a.smtp, 'smtp', a.provider);
+    out.smtp = { code: String(err.code ?? ''), status: Number(err.responseCode) || 0, command: String(err.command ?? ''), said: String(err.response ?? '').slice(0, 300) };
+    throw out;
   } finally {
     t.close();
   }
   const out: SentInfo = { messageId, accepted: info.accepted.map(String), rejected: info.rejected.map(String) };
   // Gmail keeps what goes through its SMTP server in Sent by itself; elsewhere a copy is added, as mail programs do.
-  if (!providerById(a.provider)?.savesSent) {
+  if (o.keepCopy !== false && !providerById(a.provider)?.savesSent) {
     try {
       const raw = await buildRaw(a, mail, { messageId, date });
       out.savedTo = await withImap(db, a, async (c) => {

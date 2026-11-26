@@ -14,7 +14,7 @@ import { AppIcon, authLabel, serverLine, useConn } from './store';
 /** Where a sign-in started in this tab goes on, after the browser comes back (phones). */
 export const FLOW_KEY = 'naget-connections-flow';
 
-export function SecretInput({ value, onChange, placeholder, autoFocus, onEnter }: { value: string; onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean; onEnter?: () => void }) {
+export function SecretInput({ value, onChange, placeholder, autoFocus, onEnter, label, describedBy, invalid }: { value: string; onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean; onEnter?: () => void; label?: string; describedBy?: string; invalid?: boolean }) {
   const [show, setShow] = useState(false);
   return (
     <div className="relative">
@@ -25,12 +25,15 @@ export function SecretInput({ value, onChange, placeholder, autoFocus, onEnter }
         onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
         placeholder={placeholder}
         autoFocus={autoFocus}
+        aria-label={label}
+        aria-describedby={describedBy}
+        aria-invalid={invalid || undefined}
         autoComplete="off"
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
         data-1p-ignore
-        className={cx(inputCls, 'pr-10 font-mono text-[16px] sm:text-[13.5px]')}
+        className={cx(inputCls, 'pr-10 font-mono text-[16px] sm:text-[13.5px]', invalid && 'border-err/70 focus:border-err focus:ring-err/15')}
       />
       <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? 'Hide' : 'Show'} className="absolute top-1/2 right-1.5 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-fg-3 hover:bg-bg-2 hover:text-fg">
         {show ? <EyeOff size={15} /> : <Eye size={15} />}

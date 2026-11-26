@@ -1,0 +1,9 @@
+{
+  "name": "dough-sums",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dough Sums: sourdough weights worked out the baker's way",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node --test" },
+  "engines": { "node": ">=18.2" }
+}

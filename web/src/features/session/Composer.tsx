@@ -26,6 +26,7 @@ import { ContextBreakdown, contextLines, contextRows, SessionMeters } from './Se
 import { stopWords, taskKindOf } from '../../lib/work';
 import { stopEverything } from './WorkRow';
 import { WorkTray } from './WorkTray';
+import { useQuietWork } from '../webapps/simple/quiet';
 import { useComposerMenu } from '../../components/ComposerMenu';
 import { QueueList } from './QueueList';
 import { GoalDock } from '../goal/GoalDock';
@@ -167,6 +168,7 @@ function WorkRing() {
  */
 export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const key = s.key;
+  const quiet = useQuietWork(s.key);
   const lv = useLive((x) => x.byKey[key]);
   const live = lv?.live ?? s.live ?? null;
   const running = !!live && live.status !== 'exited';
@@ -505,7 +507,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
         {/* Its key is its own: the tray below is keyed by the session too, and two siblings with one key leave a stale copy of the
             first behind at every render (React finds only one of them again), which stacked goal bars above the message box. */}
         <GoalDock key={`goal:${s.key}`} s={s} className="mb-2" />
-        <WorkTray key={key} s={s} />
+        {/* A web app's conversation with Technical details off keeps its commands and helpers out of sight. */}
+        {!quiet && <WorkTray key={key} s={s} />}
         <QueueList s={s} />
         {move && (
           <div className="anim-pop mb-2 flex items-center gap-2 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2 text-[12.5px]">

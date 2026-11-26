@@ -1,0 +1,10 @@
+{
+  "name": "Market Day Sums",
+  "start": "node server.js",
+  "env": {
+    "port": "PORT",
+    "data": "DATA_DIR"
+  },
+  "ready": "/",
+  "signIn": "own"
+}

@@ -56,6 +56,8 @@ import { antigravityFlows } from './agents/antigravity.ts';
 import { acpControl, dropAcpControls, type AcpAccountAgent, type AcpAccountControl } from './agents/acp-accounts.ts';
 import { ACCOUNT_AGENT_NAMES, acpAccountAgent, isAcpAccountAgent } from '../shared/account-agents.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
+import { buildCsp } from './csp.ts';
+import { webappsOptionsFromEnv } from './webapps/index.ts';
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import { moveFileComments } from './pages/filecomments.ts';
@@ -79,7 +81,7 @@ import * as terms from './terminals.ts';
 import { FEATURES } from './features/index.ts';
 import { suggestService } from './suggest/index.ts';
 import { shareRoutes } from './share-target.ts';
-import { eventSent, featureContext, featureDeps, inboxItems, registerFeatures, startFeatures } from './features/registry.ts';
+import { eventSent, featureContext, featureDeps, inboxItems, registerFeatures, startFeatures, stopFeatures } from './features/registry.ts';
 import { registerAway } from './away/index.ts';
 import { arenaOf } from '../shared/arena.ts';
 import { startMatch } from './arena/index.ts';
@@ -220,8 +222,9 @@ app.addHook('onRequest', async (req, reply) => {
   if (!other && isInternal(req)) return;
   // Another Hydor using this machine, with an access token: not a browser, so no origin to check.
   const token = other ? null : bearerOf(req.headers.authorization);
-  // An app's API key (server/apps) opens only its run endpoints (start one, ask about one), which check the key themselves.
-  const appRun = (req.method === 'POST' && /^\/api\/apps\/[^/]+\/run$/.test(url)) || (req.method === 'GET' && /^\/api\/apps\/[^/]+\/run\/[^/]+$/.test(url));
+  // An app's API key (server/apps) opens only its run endpoints (start one, ask about one) and, for a web app, the embed route (its search), the ai route (its model) and the mail route (its mail), which check the key themselves.
+  const appRun =
+    (req.method === 'POST' && /^\/api\/apps\/[^/]+\/run(\/[^/]+\/(answer|stop))?$/.test(url)) || (req.method === 'GET' && /^\/api\/apps\/[^/]+\/run(\/[^/]+(\/events)?)?$/.test(url)) || (req.method === 'POST' && /^\/api\/apps\/[^/]+\/(embed|ai|mail)$/.test(url));
   if (!other && appRun && /^Bearer\s+napp_\S+$/i.test(String(req.headers.authorization ?? ''))) return;
   if (token) return accessOk(db, token) ? undefined : reply.code(401).send({ error: 'That access token is not valid here' });
   if (req.method !== 'GET' && req.method !== 'HEAD' && !originOk(req)) {
@@ -2038,24 +2041,7 @@ app.register(async (scope) => {
 
 // ---- static web app ------------------------------------------------------------------------
 
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  // The preview port (server/preview.ts): the Preview page checks the browser can reach it.
-  `connect-src 'self' ws: wss:${PREVIEW_PORT ? ` http://*:${PREVIEW_PORT} https://*:${PREVIEW_PORT}` : ''}${PREVIEW_ORIGIN ? ` ${PREVIEW_ORIGIN}` : ''}`,
-  "media-src 'self' blob:",
-  // The preview port too: the Preview page shows a dev server inside it.
-  // …and the players of YouTube (its no-cookie address) and Vimeo, for videos in apps' answers and views.
-  `frame-src 'self' blob: https://www.youtube-nocookie.com https://player.vimeo.com${PREVIEW_PORT ? ` http://*:${PREVIEW_PORT} https://*:${PREVIEW_PORT}` : ''}${PREVIEW_ORIGIN ? ` ${PREVIEW_ORIGIN}` : ''}`,
-  "worker-src 'self' blob:",
-  "object-src 'none'",
-  "base-uri 'none'",
-  "form-action 'self'",
-  "frame-ancestors 'self'",
-].join('; ');
+const CSP = buildCsp({ previewPort: PREVIEW_PORT, previewOrigin: PREVIEW_ORIGIN, apps: webappsOptionsFromEnv() });
 
 // ---- dev-server previews (server/preview.ts) -------------------------------------------------------
 
@@ -2368,8 +2354,11 @@ const shutdown = async () => {
   codex.shutdown();
   // Word suggestions' programs (the worker, llama-server, a run of personalising) end with the server.
   suggestService()?.stop();
+  // The capabilities end what they keep running (web apps' servers); it goes on while the sockets close.
+  const stopping = stopFeatures();
   for (const ws of app.websocketServer?.clients ?? []) ws.terminate();
   await app.close().catch(() => {});
+  await stopping;
   process.exit(0);
 };
 process.on('SIGTERM', shutdown);

@@ -73,6 +73,7 @@ const SEALED: { table: string; id: string; col: string; aad: (id: string) => str
   { table: 'conn_secrets', id: 'name', col: 'value', aad: (n) => `secret:${n}` },
   { table: 'conn_apps', id: 'id', col: 'cred', aad: (n) => `app:${n}` },
   { table: 'conn_clients', id: 'k', col: 'client', aad: (n) => `client:${n}` },
+  { table: 'conn_app_keys', id: 'k', col: 'value', aad: (n) => `appkey:${n}` },
 ];
 
 /** A sealed column of another store's (the saved signatures'), sealed again with the rest when the key is replaced. */
@@ -123,14 +124,22 @@ export function vaultTables(db: DB) {
   );
   create table if not exists conn_requests (
     id text primary key, key text not null, name text not null, why text not null, domains text not null default '[]',
-    state text not null, created_at integer not null, done_at integer, fields text, commands integer not null default 0
+    state text not null, created_at integer not null, done_at integer, fields text, commands integer not null default 0,
+    items text, answers text, scope text, title text
   );
-  create index if not exists conn_requests_key on conn_requests (key, name, created_at);`);
+  create index if not exists conn_requests_key on conn_requests (key, name, created_at);
+  create table if not exists conn_app_keys (
+    k text primary key, app text not null, env text not null, name text not null, value text not null,
+    made integer not null default 0, created_at integer not null, updated_at integer not null
+  );
+  create index if not exists conn_app_keys_app on conn_app_keys (app, env);`);
   // Vaults from before sign-ins and commands.
   const has = (t: string, col: string) => (db.prepare(`pragma table_info(${t})`).all() as { name: string }[]).some((c) => c.name === col);
   if (!has('conn_secrets', 'commands')) db.exec('alter table conn_secrets add column commands integer not null default 0');
   if (!has('conn_requests', 'fields')) db.exec('alter table conn_requests add column fields text');
   if (!has('conn_requests', 'commands')) db.exec('alter table conn_requests add column commands integer not null default 0');
+  // A card with tabs (cards.ts): what it asks and what became of each item, never a value.
+  for (const col of ['items', 'answers', 'scope', 'title']) if (!has('conn_requests', col)) db.exec(`alter table conn_requests add column ${col} text`);
 }
 
 /** What a page may see of a value: its first characters when long enough to say what kind it is, and its last four. */
@@ -273,6 +282,77 @@ export function deleteSecret(db: DB, name: string) {
 
 export const touchSecret = (db: DB, name: string) => db.prepare('update conn_secrets set used_at = ? where name = ?').run(Date.now(), name);
 
+// ---- a web app's own keys -------------------------------------------------------------------------------
+// One value per app and per place it runs (inside this Hydor, a server's environment): the same name may have a test
+// value in one place and a live one in another, and another app has its own. Agents never use them by name; the app is
+// given them when it runs (server/webapps/app-keys.ts). Sealed and masked as every other value here.
+
+export interface AppKeyRow {
+  app: string;
+  env: string;
+  name: string;
+  /** Made by Hydor for the app (a signing secret): never asked for. */
+  made: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+const appKeyId = (app: string, env: string, name: string) => `${app}/${env}/${name}`;
+interface AppKeyDbRow {
+  app: string;
+  env: string;
+  name: string;
+  value: string;
+  made: number;
+  created_at: number;
+  updated_at: number;
+}
+const appKeyView = (r: AppKeyDbRow): AppKeyRow => ({ app: r.app, env: r.env, name: r.name, made: !!r.made, createdAt: r.created_at, updatedAt: r.updated_at });
+
+export function appKey(db: DB, app: string, env: string, name: string): AppKeyRow | null {
+  const r = db.prepare('select * from conn_app_keys where k = ?').get(appKeyId(app, env, name)) as AppKeyDbRow | undefined;
+  return r ? appKeyView(r) : null;
+}
+
+/** For the server's own use only: the value an app is given in one place. */
+export function readAppKey(db: DB, app: string, env: string, name: string): string | null {
+  const r = db.prepare('select * from conn_app_keys where k = ?').get(appKeyId(app, env, name)) as AppKeyDbRow | undefined;
+  return r ? unseal(r.value, `appkey:${appKeyId(app, env, name)}`) : null;
+}
+
+/** An app's keys (all places), or every app's. */
+export function listAppKeys(db: DB, app?: string): AppKeyRow[] {
+  const rows = (app === undefined ? db.prepare('select * from conn_app_keys order by app, env, name').all() : db.prepare('select * from conn_app_keys where app = ? order by env, name').all(app)) as AppKeyDbRow[];
+  return rows.map(appKeyView);
+}
+
+export function saveAppKey(db: DB, app: string, env: string, name: string, raw: string, o: { made?: boolean } = {}) {
+  if (!SECRET_NAME.test(name)) throw new HttpError(400, 'Name it with capitals, digits and underscores, like GITHUB_TOKEN');
+  const value = String(raw ?? '').trim();
+  if (!value) throw new HttpError(400, 'Enter the value');
+  if (value.length > 16_000) throw new HttpError(400, 'That is too long for a key');
+  if (/[\r\n]/.test(value) && !/^-----BEGIN /.test(value)) throw new HttpError(400, 'A key is one line');
+  const k = appKeyId(app, env, name);
+  const now = Date.now();
+  db.prepare(
+    `insert into conn_app_keys (k, app, env, name, value, made, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)
+     on conflict(k) do update set value = excluded.value, made = excluded.made, updated_at = excluded.updated_at`,
+  ).run(k, app, env, name, seal(value, `appkey:${k}`), o.made ? 1 : 0, now, now);
+  invalidateMask();
+}
+
+export function deleteAppKey(db: DB, app: string, env: string, name: string) {
+  db.prepare('delete from conn_app_keys where k = ?').run(appKeyId(app, env, name));
+  invalidateMask();
+}
+
+/** Every key of an app, gone with it. */
+export function deleteAppKeys(db: DB, app: string): number {
+  const n = db.prepare('delete from conn_app_keys where app = ?').run(app).changes;
+  invalidateMask();
+  return n;
+}
+
 // ---- an agent asking for a key ------------------------------------------------------------------------
 
 interface RequestRow {
@@ -286,6 +366,7 @@ interface RequestRow {
   done_at: number | null;
   fields: string | null;
   commands: number;
+  items: string | null;
 }
 
 const parseFields = (s: string | null): SecretField[] => {
@@ -321,12 +402,13 @@ function requestView(db: DB, r: RequestRow): SecretRequestView {
     ...(r.done_at ? { doneAt: r.done_at } : {}),
     exists: !!s,
     ...(s ? { hint: s.hint } : {}),
+    ...(r.items ? { card: true } : {}),
   };
 }
 
-export function addRequest(db: DB, r: { key: string; name: string; why: string; domains: string[]; fields?: SecretField[]; commands?: boolean }): SecretRequestView {
+export function addRequest(db: DB, r: { key: string; name: string; why: string; domains: string[]; fields?: SecretField[]; commands?: boolean; items?: string; answers?: string; scope?: string; title?: string }): SecretRequestView {
   const id = `sr_${crypto.randomBytes(9).toString('base64url')}`;
-  db.prepare('insert into conn_requests (id, key, name, why, domains, state, created_at, fields, commands) values (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+  db.prepare('insert into conn_requests (id, key, name, why, domains, state, created_at, fields, commands, items, answers, scope, title) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
     id,
     r.key,
     r.name,
@@ -336,6 +418,10 @@ export function addRequest(db: DB, r: { key: string; name: string; why: string; 
     Date.now(),
     r.fields?.length ? JSON.stringify(r.fields) : null,
     r.commands ? 1 : 0,
+    r.items ?? null,
+    r.answers ?? null,
+    r.scope ?? null,
+    r.title ?? null,
   );
   return requestView(db, db.prepare('select * from conn_requests where id = ?').get(id) as RequestRow);
 }
@@ -347,7 +433,7 @@ export function getRequest(db: DB, id: string): SecretRequestView | null {
 
 /** The latest request for `name` in a session (a card finds its own this way). */
 export function latestRequest(db: DB, key: string, name: string): SecretRequestView | null {
-  const r = db.prepare('select * from conn_requests where key = ? and name = ? order by created_at desc limit 1').get(key, name) as RequestRow | undefined;
+  const r = db.prepare('select * from conn_requests where key = ? and name = ? order by created_at desc, rowid desc limit 1').get(key, name) as RequestRow | undefined;
   return r ? requestView(db, r) : null;
 }
 
@@ -396,6 +482,15 @@ function maskList(): { find: string; put: string }[] {
   for (const r of db.prepare('select name, value from conn_secrets').all() as { name: string; value: string }[]) {
     try {
       add(unseal(r.value, `secret:${r.name}`), `[secret ${r.name}]`);
+    } catch {}
+  }
+  let own: { k: string; name: string; value: string }[] = [];
+  try {
+    own = db.prepare('select k, name, value from conn_app_keys').all() as { k: string; name: string; value: string }[];
+  } catch {}
+  for (const r of own) {
+    try {
+      add(unseal(r.value, `appkey:${r.k}`), `[secret ${r.name}]`);
     } catch {}
   }
   let apps: { id: string; cred: string }[] = [];

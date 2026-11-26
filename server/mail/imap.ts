@@ -7,8 +7,22 @@ import type { DB } from '../db.ts';
 import { passwordOf, type MailAccount } from './accounts.ts';
 import { providerById } from './providers.ts';
 
+/** What a mail server answered when it would not take a mail, for a caller that has to tell one kind of failure from another (a web app's mail: server/webapps/mail.ts). */
+export interface SmtpFailure {
+  /** The library's own code (EAUTH, EENVELOPE, ECONNECTION…). */
+  code: string;
+  /** The server's reply code (550, 451…), or 0 when it never answered. */
+  status: number;
+  /** The step it was at (MAIL FROM, RCPT TO, DATA…). */
+  command: string;
+  /** The server's words, which may repeat an address: never to be logged. */
+  said: string;
+}
+
 /** A failure to show as it is: already in plain words. */
 export class MailError extends Error {
+  /** Set by sendMail when the sending failed. */
+  smtp?: SmtpFailure;
   constructor(
     message: string,
     /** The server did not take the user name and password. */

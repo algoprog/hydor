@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "build": "npm install --omit=dev --no-audit --no-fund",
+  "start": {
+    "command": "node --disable-warning=ExperimentalWarning server.js",
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "env": { "APP_URL": "{origin}" },
+    "ready": "/",
+    "secrets": [],
+    "browserFolders": ["public"]
+  },
+  "accounts": {
+    "signUp": { "method": "POST", "path": "/api/sign-up", "send": "json", "body": { "name": "{name}", "email": "{email}", "password": "{password}" } },
+    "signIn": { "method": "POST", "path": "/api/sign-in", "send": "json", "body": { "email": "{email}", "password": "{password}" } },
+    "session": "cookie"
+  },
+  "home": "/home",
+  "teams": {
+    "create": { "path": "/api/crews", "body": { "name": "{name}" }, "id": "id" },
+    "invite": { "path": "/api/invitations", "body": { "crew": "{team}", "email": "{email}", "role": "{role}" }, "link": "link" },
+    "accept": { "method": "POST", "path": "/api/invitations/{token}/accept" },
+    "remove": { "path": "/api/crews/remove", "body": { "crew": "{team}", "email": "{email}" } },
+    "roles": { "lead": "lead", "member": "member" }
+  },
+  "things": {
+    "customers": {
+      "list": { "path": "/api/customers", "rows": "rows" },
+      "add": { "path": "/api/customers", "method": "POST", "send": "json" },
+      "one": { "path": "/api/customers/{id}", "read": "GET", "change": "PATCH", "remove": "DELETE" },
+      "idKey": "id",
+      "teamKey": "crew",
+      "fields": { "name": "name", "address": "address" }
+    },
+    "jobs": {
+      "list": { "path": "/api/jobs", "rows": "rows" },
+      "add": { "path": "/api/jobs", "method": "POST", "send": "json" },
+      "one": { "path": "/api/jobs/{id}", "read": "GET", "change": "PATCH", "remove": "DELETE" },
+      "idKey": "id",
+      "teamKey": "crew",
+      "fields": { "title": "title", "the day it is for": "day", "done": "done" }
+    },
+    "notes": {
+      "list": { "path": "/api/notes", "rows": "rows" },
+      "add": { "path": "/api/notes", "method": "POST", "send": "json" },
+      "one": { "path": "/api/notes/{id}", "read": "GET", "change": "PATCH", "remove": "DELETE" },
+      "idKey": "id",
+      "teamKey": "crew",
+      "fields": { "title": "title", "note": "note" }
+    }
+  }
+}

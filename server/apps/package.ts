@@ -98,7 +98,7 @@ function modelNeeds(r: AppRecipe): ModelNeed[] {
 /** What travels of a recipe: everything but its folder and what is this computer's own; its models said portably. */
 function travelling(a: AppRecipe): Record<string, unknown> {
   // What is kept beside its recipe here (its address, who may run it, where it came from) stays here.
-  const { id: _i, slug: _s, mcp: _m, agents: _a, fromFile: _f, public: _p, template: _t, createdAt: _c, updatedAt: _u, cwd: _w, ...recipe } = a as AppDef;
+  const { id: _i, slug: _s, mcp: _m, agents: _a, fromFile: _f, webapp: _wa, public: _p, template: _t, createdAt: _c, updatedAt: _u, cwd: _w, ...recipe } = a as AppDef;
   const models = modelNeeds(a);
   return { ...recipe, ...(models.length ? { requires: { ...(recipe.requires ?? {}), models } } : {}) } as unknown as Record<string, unknown>;
 }

@@ -17,6 +17,7 @@ import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES
 import { api, enc, post, put } from '../../lib/api';
 import { composeInsert, useFeatureEvent } from '../../lib/featureEvents';
 import { go } from '../../lib/nav';
+import { webAppPath } from '../webapps/api';
 import { toast, toastError, useApp } from '../../lib/store';
 import { EffortPicker, ModelPicker, ModePicker } from '../../components/AgentPickers';
 import { FolderChip } from '../../components/FolderPicker';
@@ -1204,6 +1205,35 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
                 {tools && !tools.length && <div className="text-[12.5px] text-fg-3">No tools to pick from.</div>}
               </div>
             )}
+            {/* The functions of the web app this is the flows half of (`fn:<name>`, and `fn:<name>!` when it may change things without asking): read only here; the web app's Flows tab changes them. */}
+            {(() => {
+              const fns = (recipe.tools ?? []).filter((t) => t.startsWith('fn:'));
+              if (!fns.length) return null;
+              return (
+                <div className="mt-3 rounded-xl border border-line bg-bg-1 p-3" data-builder="app-functions">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[13px] font-semibold">The web app’s own functions</span>
+                    <span className="flex-1" />
+                    {saved?.webapp && (
+                      <button type="button" className="text-[12.5px] text-accent underline-offset-2 hover:underline" onClick={() => go(webAppPath(saved.webapp!.id, 'flows'))}>
+                        Change them in its Flows tab
+                      </button>
+                    )}
+                  </div>
+                  <ul className="mt-1.5 space-y-0.5">
+                    {fns.map((t) => (
+                      <li key={t} className="flex flex-wrap items-baseline gap-2 text-[12.5px]">
+                        <span translate="no" className="font-mono">
+                          {t.replace(/^fn:/, '').replace(/!$/, '')}
+                        </span>
+                        <span className="text-fg-3">{t.endsWith('!') ? tr('may change things without asking') : t === 'fn:*' ? tr('every function that only reads') : tr('allowed; one that changes things asks first')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-[12px] text-fg-3">Read only here: they belong to the web app, and its owner allows them there.</p>
+                </div>
+              );
+            })()}
           </Fold>
 
           <Fold icon={<Gauge size={16} />} title="Limits" summary={limitsLine} sub="So that it cannot run or spend more than you mean it to.">

@@ -32,6 +32,7 @@ const YOUR_TOOLS = 'Use your own tools for that (files, commands, git): they ask
 const CAP = 'This changes a spending cap: how much may be spent before the work stops.';
 const PERMISSIONS = 'This changes what the agent may do without asking you.';
 const TOOL_STATES = 'This changes which of a connected account’s tools agents may use, and which wait for your OK in the Outbox first.';
+const APP_MAIL = 'This lets a web app send mail from your account, in your name, to addresses the app chooses (or changes which account, how many a day, or whether it sends while it is being made, so that trying it out mails real people). A link in its mail opens only for someone who has opened the app from Hydor.';
 
 /** The first rule that matches decides. */
 const RULES: Rule[] = [
@@ -65,6 +66,8 @@ const RULES: Rule[] = [
   ['W', /^\/api\/(skillpack\/proposals|automations\/proposals|sites\/requests|connections\/requests)\//, 'refuse', 'Only the user decides on these cards.'],
   ['W', /^\/api\/(access-tokens|mcp\/tokens)$/, 'refuse', 'Tokens are made by the user in Settings, so their value never passes through an agent. Tell them where: Settings → App → Machines (access from other machines) or Connect other agents.'],
   ['POST', /^\/api\/apps\/[^/]+\/keys$/, 'refuse', 'An app’s API keys are made by the user, on its Share tab.'],
+  // A web app's own mail goes through this route with its key: an agent never sends with it.
+  ['*', /^\/api\/apps\/[^/]+\/mail$/, 'refuse', 'That route is for a web app’s own server, with its key. To send mail for the user, use your email tools (send_email, of the Email connection), which ask them as their settings say.'],
   ['POST|PATCH', /^\/api\/connections\/secrets/, 'refuse', 'A key’s value never passes through an agent: ask for it with request_secret, and the user enters it in a card.'],
   ['POST|PATCH', /^\/api\/mail\/accounts(\/[^/]+)?$/, 'refuse', 'A mail account’s app password never passes through an agent: the user connects their mail in Apps → Connected apps → Email (/apps/connected?tab=market).'],
   // A signature is the user's own: agents list them by name, and place one with place_signature, which the user allows on a card.
@@ -82,6 +85,21 @@ const RULES: Rule[] = [
   ['PUT', /^\/api\/memory\/bring-in\/file$/, 'refuse', 'An export comes from the user’s own browser: they add it with Bring in… in Settings → Memory.'],
   ['W', /^\/api\/me\/language$/, 'refuse', 'The language is set on each device: PUT /device with { language }.'],
   // About you is the person's own record: an agent may change it only with their OK each time, Full access too.
+  // Web apps: launching, a host's fingerprint, restoring and going back are outward-facing or hard to undo: a card each time (the webapp_* tools ask with their own, saying more).
+  ['POST', /^\/api\/webapps\/[^/]+\/keys\/card$/, 'refuse', 'Use webapp_keys with ask: true: it puts the card up in your own session. The user fills it in; you never see a value.'],
+  ['GET', /^\/api\/webapps\/[^/]+\/server-text$/, 'refuse', 'The text for a new server holds the private half of its identity: only the person copies it, from the app’s Put it online page.'],
+  ['POST', /^\/api\/webapps\/[^/]+\/server-connect$/, 'refuse', 'Only the person connects the server they created, on the app’s Put it online page. For a server added by hand use webapp_host.'],
+  ['POST', /^\/api\/webapps\/hosts\/[^/]+\/accept$/, 'refuse', 'Only the person compares a server’s fingerprint with their provider’s and accepts it: use webapp_host accept, which asks them on a card that says where to compare it.'],
+  ['POST', /^\/api\/webapps\/[^/]+\/functions\/[^/]+\/call$/, 'refuse', 'Use webapp_call_function: a function that changes what the app keeps asks the person on a card the first time, which this route would skip.'],
+  ['POST', /^\/api\/webapps\/[^/]+\/services\/[^/]+$/, 'refuse', 'Which service an app uses is the person’s choice: use webapp_services, which puts the card up (or takes the one they named).'],
+  ['PUT', /^\/api\/webapps\/[^/]+\/functions\/sessions$/, 'ask', 'This offers functions of a web app to agents in your sessions: they act as you, with what you may do in that app.'],
+  ['POST', /^\/api\/webapps\/[^/]+\/launch\/answer$/, 'refuse', 'Only the person lets a failed line of the check through: webapp_launch asks them on a card.'],
+  ['POST', /^\/api\/webapps\/[^/]+\/launch\/(hydor|server|back)$/, 'ask', 'This launches the app, or goes back to an earlier launch: what is used changes.'],
+  ['POST', /^\/api\/webapps\/[^/]+\/launch\/takedown$/, 'ask', 'This stops the app on its server: nobody is answered at its address any more.'],
+  ['DELETE', /^\/api\/webapps\/hosts\/[^/]+$/, 'ask', 'This forgets the server, the key Hydor made for it and what it deployed there.'],
+  ['POST', /^\/api\/webapps\/[^/]+\/run\/[^/]+\/backups\/[^/]+\/restore$/, 'ask', 'This stops the app and replaces what it keeps with a backup: whatever was written since is lost.'],
+  ['POST', /^\/api\/webapps\/hosts\/[^/]+\/check$/, 'ask', 'This may install Docker and a firewall on the server (with prepare).'],
+  ['POST', /^\/api\/webapps\/scratch$/, 'ask', 'This makes a folder, a project and a new web app in it.'],
   ['W', /^\/api\/apps\/me$/, 'ask', 'About you is your own record, which apps read instead of asking (Settings → Apps → About you): this changes it.'],
   ['W', /^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|away\/here|voice\/(transcribe|command|cancel))$/, 'refuse', 'That is for the app’s pages themselves.'],
   // A slideshow's narration sounds and its phone remote are the editor's and the slideshow's own.
@@ -108,6 +126,8 @@ const RULES: Rule[] = [
   ['POST', /^\/api\/pages\/(tex\/(reference|compile)|docs\/print)$/, 'free'],
   // Ask every time: risky, costly or hard to undo.
   ['DELETE', /^\/api\/lean$/, 'refuse', 'Only the user removes Lean: Settings → General → Lean (proof checker).'],
+  ['DELETE', /^\/api\/webapps\/[^/]+\/keys\//, 'refuse', 'Only the user removes a web app’s key, on its Keys tab.'],
+  ['DELETE', /^\/api\/webapps\/[^/]+$/, 'always', 'This forgets the web app, and removes its own keys (those saved for it, for each place) from the vault.'],
   ['DELETE', /./, 'always'],
   ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|stop-all|interrupt|cancel)(\/|$)/, 'always'],
   ['W', /^\/api\/setup\//, 'always', 'This changes what Claude Code or Codex load in every session; an MCP server runs a program on this computer.'],
@@ -163,6 +183,9 @@ function askedFor(path: string, body: Json): { level: Level; why: string } | nul
   if (s?.[1] === '/extra' && body.capUsd !== undefined) return { level: 'ask', why: CAP };
   // A connected account's tools On, Ask first or Off: the user's say over what goes out without their OK.
   if (/^\/api\/connections\/[^/]+$/.test(path) && !/^\/api\/connections\/(catalog|secrets|requests|session|flows)$/.test(path) && body.tools !== undefined) return { level: 'ask', why: TOOL_STATES };
+  // A web app's mail goes out in the user's name: allowing it, and which account and how many, is theirs to say, on a card, every time.
+  const settings = body.settings as Json | undefined;
+  if (/^\/api\/webapps\/[^/]+$/.test(path) && settings && typeof settings === 'object' && settings.mail !== undefined) return { level: 'ask', why: APP_MAIL };
   return null;
 }
 
@@ -594,7 +617,7 @@ export const forgetAllowed = () => allowed.clear();
  * Full access asks nothing but `ask`; otherwise a card, which for `confirm` the user may allow for the rest of the
  * session (the same allowance as app_api's). Null when it may go ahead; else why not, for the agent.
  */
-export async function confirmChange(ctx: RunCtx, c: { title: string; detail: string; level: 'confirm' | 'always' | 'ask'; danger?: boolean; label?: string }): Promise<string | null> {
+export async function confirmChange(ctx: RunCtx, c: { title: string; detail: string; level: 'confirm' | 'always' | 'ask'; danger?: boolean; label?: string; facts?: ApprovalRequest['facts']; raw?: string }): Promise<string | null> {
   const mode = modeOf(ctx);
   if (mode === 'read-only') return 'This session only reads (Plan mode, or read-only): tell the user what you would change instead.';
   if (c.level === 'confirm' ? mode === 'full' || allowed.has(ctx.key) : c.level === 'always' && mode === 'full') return null;
@@ -606,6 +629,7 @@ export async function confirmChange(ctx: RunCtx, c: { title: string; detail: str
     title: c.title.replace(/\s+/g, ' ').trim().slice(0, 120),
     detail: c.detail.slice(0, 6000),
     prose: true,
+    ...(c.facts?.length ? { facts: c.facts.slice(0, 14), ...(c.raw ? { raw: c.raw.slice(0, 3000) } : {}) } : {}),
     options: [
       { id: 'accept', label: c.label ?? (c.danger ? 'Delete' : 'Allow'), style: c.danger ? 'danger' : 'primary' },
       ...(c.level === 'confirm' ? [{ id: 'always', label: 'Allow for this session' }] : []),

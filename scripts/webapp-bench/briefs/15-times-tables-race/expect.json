@@ -1,0 +1,195 @@
+{
+  "id": "15-times-tables-race",
+  "group": "logic",
+  "product": "Times Tables Race",
+  "phrases": [
+    ["6 × 7", "6 x 7", "6×7", "6 times 7", "6 * 7"],
+    ["12 × 12", "12 x 12", "12×12", "12 times 12", "12 * 12"],
+    ["score board", "re:score ?board|leader ?board|high ?scores?|best scores|top (scores|five|5)|hall of fame"]
+  ],
+  "accounts": "none",
+  "kinds": [
+    {
+      "id": "board",
+      "names": ["board", "scoreboard", "scores", "leaderboard", "top", "topfive", "highscores", "bestscores", "leaders", "players", "ranking", "table"],
+      "readOnly": true,
+      "fields": [
+        {
+          "id": "name",
+          "names": ["name", "player", "child", "pupil", "who", "the name"],
+          "kind": "text",
+          "required": true,
+          "said": ["the name", "name"]
+        },
+        {
+          "id": "points",
+          "names": ["points", "score", "total", "pts", "the points"],
+          "kind": "integer",
+          "required": true,
+          "said": ["the points", "points"]
+        },
+        {
+          "id": "seconds",
+          "names": ["seconds", "time", "secs", "timetaken", "duration"],
+          "kind": "number",
+          "required": true,
+          "said": ["the seconds", "seconds"]
+        }
+      ],
+      "said": ["score board"]
+    }
+  ],
+  "rows": {},
+  "later": {},
+  "numbers": [],
+  "actions": [
+    {
+      "id": "play",
+      "names": ["play", "race", "score", "submit", "answer", "answers", "finish", "game", "result", "check", "mark", "go", "turn", "try", "times tables race"],
+      "inputs": [
+        {
+          "id": "name",
+          "names": ["name", "player", "child", "firstname", "pupil", "who", "playername", "their name"],
+          "kind": "text",
+          "required": true,
+          "said": ["their name", "name"]
+        },
+        {
+          "id": "answers",
+          "names": ["answers", "answer", "theiranswers", "replies", "responses", "guesses", "results"],
+          "kind": "list",
+          "required": true,
+          "said": ["their ten answers", "answers"]
+        },
+        {
+          "id": "seconds",
+          "names": ["seconds", "time", "timetaken", "howlong", "secs", "duration", "elapsed", "timeseconds", "timeinseconds"],
+          "kind": "number",
+          "required": true,
+          "said": ["how many seconds they took", "seconds"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "right",
+          "names": ["right", "correct", "howmanyright", "numberright", "rightanswers", "correctanswers", "numbercorrect", "how many they got right"],
+          "kind": "number",
+          "tol": 0,
+          "said": ["how many they got right", "right"]
+        },
+        {
+          "id": "points",
+          "names": ["points", "score", "total", "totalpoints", "finalscore", "their points"],
+          "kind": "number",
+          "tol": 0,
+          "said": ["their points", "points"]
+        }
+      ],
+      "cases": [
+        {
+          "label": "all ten right in 70 seconds: ten points, 3 for all ten, 2 for quick",
+          "in": { "name": "Case One", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": 70 },
+          "out": { "right": 10, "points": 15 }
+        },
+        {
+          "label": "nine right in 80 seconds",
+          "in": { "name": "Case Two", "answers": [42, 72, 0, 48, 54, 88, 36, 45, 56, 144], "seconds": 80 },
+          "out": { "right": 9, "points": 11 }
+        },
+        {
+          "label": "nine right in 100 seconds: no bonus",
+          "in": { "name": "Case Three", "answers": [42, 72, 0, 48, 54, 88, 36, 45, 56, 144], "seconds": 100 },
+          "out": { "right": 9, "points": 9 }
+        }
+      ],
+      "edges": [
+        {
+          "label": "eight right in 55 seconds",
+          "in": { "name": "Edge One", "answers": [42, 72, 0, 48, 54, 0, 36, 45, 56, 144], "seconds": 55 },
+          "out": { "right": 8, "points": 10 }
+        },
+        {
+          "label": "eight right in exactly the limit: not under it, no bonus",
+          "in": { "name": "Edge Two", "answers": [42, 72, 0, 48, 54, 0, 36, 45, 56, 144], "seconds": 90 },
+          "out": { "right": 8, "points": 8 }
+        },
+        {
+          "label": "seven right and very quick: not enough for the quick bonus",
+          "in": { "name": "Edge Three", "answers": [42, 72, 49, 48, 54, 88, 36, null, null, null], "seconds": 20 },
+          "out": { "right": 7, "points": 7 }
+        },
+        {
+          "label": "all ten right, a second inside the limit: bonuses add up",
+          "in": { "name": "Edge Four", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": 89.5 },
+          "out": { "right": 10, "points": 15 }
+        },
+        {
+          "label": "all ten right at the limit: 3 for all ten, none for quick",
+          "in": { "name": "Edge Five", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": 90 },
+          "out": { "right": 10, "points": 13 }
+        },
+        {
+          "label": "nothing answered",
+          "in": { "name": "Edge Six", "answers": [null, null, null, null, null, null, null, null, null, null], "seconds": 5 },
+          "out": { "right": 0, "points": 0 }
+        }
+      ],
+      "refused": [
+        {
+          "label": "no name",
+          "in": { "name": "", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": 50 }
+        },
+        {
+          "label": "a name of 21 letters",
+          "in": { "name": "Abcdefghijklmnopqrstu", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": 50 }
+        },
+        {
+          "label": "nine answers",
+          "in": { "name": "Zed", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56], "seconds": 50 }
+        },
+        {
+          "label": "eleven answers",
+          "in": { "name": "Zed", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144, 1], "seconds": 50 }
+        },
+        {
+          "label": "a word for an answer",
+          "in": { "name": "Zed", "answers": [42, 72, 49, 48, "lots", 88, 36, 45, 56, 144], "seconds": 50 }
+        },
+        {
+          "label": "minus seconds",
+          "in": { "name": "Zed", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": -1 }
+        },
+        {
+          "label": "words for the seconds",
+          "in": { "name": "Zed", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": "quick" }
+        },
+        { "label": "no seconds", "in": { "name": "Zed", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144] } }
+      ],
+      "said": ["race", "times tables race"]
+    }
+  ],
+  "board": {
+    "action": "play",
+    "kind": "board",
+    "size": 5,
+    "plays": [
+      { "name": "Amy", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": 70 },
+      { "name": "ben", "answers": [42, 72, 0, 48, 54, 88, 36, 45, 56, 144], "seconds": 100 },
+      { "name": "Cleo", "answers": [42, 72, 0, 48, 54, 88, 36, 45, 56, 144], "seconds": 80 },
+      { "name": "Dev", "answers": [42, 72, 0, 48, 54, 88, 36, 45, 56, 144], "seconds": 100 },
+      { "name": "Eli", "answers": [42, 72, 0, 48, 54, 88, 36, 45, 56, 144], "seconds": 95 },
+      { "name": "amy", "answers": [42, 72, 49, 48, 54, 88, 36, null, null, null], "seconds": 30 },
+      { "name": "AMY ", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": 100 },
+      { "name": "Fay", "answers": [42, 72, 49, 48, 54, 0, 0, 0, 0, 0], "seconds": 60 },
+      { "name": "Gus", "answers": [42, 72, 49, null, null, null, null, null, null, null], "seconds": 50 },
+      { "name": "dev", "answers": [42, 72, 49, 48, 54, 88, 36, 45, 56, 144], "seconds": 120 }
+    ],
+    "expect": [
+      { "name": "Amy", "points": 15, "seconds": 70 },
+      { "name": "Dev", "points": 13, "seconds": 120 },
+      { "name": "Cleo", "points": 11, "seconds": 80 },
+      { "name": "Eli", "points": 9, "seconds": 95 },
+      { "name": "ben", "points": 9, "seconds": 100 }
+    ]
+  }
+}

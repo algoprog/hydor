@@ -97,6 +97,8 @@ async function startServer() {
     // as a new install has them, set up at first use: then no message box may get the focus.
     HYDOR_SUGGEST: process.env.HYDOR_SUGGEST_PYTHON ? 'on' : 'off',
     ...Object.fromEntries(Object.entries(process.env).filter(([k]) => /^HYDOR_SUGGEST(_|$)/.test(k))),
+    // Web apps: the apps' own server listens on its default port (8792, the real app's perhaps) unless APPS_PORT says another; 0 turns them off. The idle time passes on too.
+    ...Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(APPS_(PORT|ORIGIN|DOMAIN|IDLE_MINUTES))$/.test(k))),
   };
   const log = fs.openSync(path.join(demo, 'server.log'), 'a');
   server = spawn(process.execPath, [path.join(o.root, 'dist/server/index.js')], { cwd: home, env, stdio: ['ignore', log, log] });

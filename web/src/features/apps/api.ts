@@ -99,6 +99,8 @@ export interface RunDetail {
   question?: { step: string; question: string; fields?: AppField[]; since: number };
   /** What its view keeps for it: ticks, values its events kept. */
   view?: Record<string, unknown>;
+  /** Where its web app shows this run: the row it was kept as, else the app's home (an app with pages of its own). */
+  openApp?: { id: string; name: string; path: string; row: boolean };
 }
 
 export interface BatchDetail {

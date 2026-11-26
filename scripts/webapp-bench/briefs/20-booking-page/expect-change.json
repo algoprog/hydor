@@ -1,0 +1,220 @@
+{
+  "id": "20-booking-page",
+  "group": "larger",
+  "product": "Ash Physiotherapy",
+  "phrases": [
+    ["45 minutes", "three quarters of an hour", "forty-five minutes", "re:45[ -]min|forty[ -]five[ -]min|three[ -]quarters?( of)? an hour|3/4"],
+    ["physio", "physiotherapy"]
+  ],
+  "accounts": "owner-only",
+  "access": "owner",
+  "kinds": [
+    {
+      "id": "hours",
+      "names": ["hours", "hour", "openinghours", "workinghours", "weeklyhours", "availability", "weekdays", "schedule", "timetable", "my hours"],
+      "publicRead": true,
+      "ops": [],
+      "fields": [
+        {
+          "id": "weekday",
+          "names": ["weekday", "day", "dayofweek", "dayoftheweek", "on"],
+          "kind": "text",
+          "open": true,
+          "required": true,
+          "choices": ["monday"],
+          "said": ["weekday"]
+        },
+        {
+          "id": "start",
+          "names": ["start", "from", "starts", "starttime", "opens", "begin", "open", "a start"],
+          "kind": "text",
+          "open": true,
+          "required": true,
+          "said": ["a start", "start"]
+        },
+        {
+          "id": "end",
+          "names": ["end", "to", "ends", "endtime", "closes", "finish", "until", "close", "an end"],
+          "kind": "text",
+          "open": true,
+          "required": true,
+          "said": ["an end", "end"]
+        }
+      ],
+      "said": ["hours", "my hours"]
+    },
+    {
+      "id": "daysoff",
+      "names": ["daysoff", "dayoff", "holidays", "holiday", "closeddays", "closed", "timeoff", "unavailable", "blocked"],
+      "publicRead": true,
+      "fields": [
+        {
+          "id": "date",
+          "names": ["date", "day", "dayoff", "on", "a day"],
+          "kind": "day",
+          "required": true,
+          "said": ["a day", "day"]
+        }
+      ],
+      "said": ["days off", "day off"]
+    },
+    {
+      "id": "bookings",
+      "names": ["bookings", "booking", "appointments", "appointment", "reservations", "visits"],
+      "readOnly": true,
+      "ops": ["remove"],
+      "fields": [
+        {
+          "id": "name",
+          "names": ["name", "yourname", "fullname", "patient", "visitor", "client"],
+          "kind": "text",
+          "required": true,
+          "said": ["name", "the visitor's name"]
+        },
+        {
+          "id": "email",
+          "names": ["email", "emailaddress", "mail"],
+          "kind": "text",
+          "email": true,
+          "required": true,
+          "said": ["email"]
+        },
+        {
+          "id": "date",
+          "names": ["date", "day", "when", "appointmentdate", "the day"],
+          "kind": "text",
+          "mayHave": true,
+          "said": ["the day"]
+        },
+        {
+          "id": "time",
+          "names": ["time", "slot", "at", "starttime", "the time"],
+          "kind": "text",
+          "mayHave": true,
+          "said": ["the time"]
+        }
+      ],
+      "said": ["bookings", "the bookings"]
+    }
+  ],
+  "rows": {
+    "hours": [
+      { "weekday": "monday", "start": "09:00", "end": "12:00" },
+      { "weekday": "wednesday", "start": "10:00", "end": "11:00" }
+    ],
+    "daysoff": [{ "date": "2031-07-21" }]
+  },
+  "later": {},
+  "numbers": [],
+  "actions": [
+    {
+      "id": "book",
+      "names": ["book", "booking", "bookings", "reserve", "appointment", "appointments", "make", "schedule"],
+      "inputs": [
+        {
+          "id": "date",
+          "names": ["date", "day", "when", "appointmentdate", "bookingdate", "forday", "the day"],
+          "kind": "day",
+          "required": true,
+          "said": ["the day", "day"]
+        },
+        {
+          "id": "time",
+          "names": ["time", "slot", "at", "starttime", "hour", "appointmenttime", "bookingtime", "start", "the time"],
+          "kind": "text",
+          "required": true,
+          "said": ["the time", "time"]
+        },
+        {
+          "id": "name",
+          "names": ["name", "yourname", "fullname", "patient", "visitor", "client"],
+          "kind": "text",
+          "required": true,
+          "said": ["the visitor's name", "name"]
+        },
+        {
+          "id": "email",
+          "names": ["email", "emailaddress", "mail", "youremail"],
+          "kind": "text",
+          "required": true,
+          "said": ["email"]
+        }
+      ],
+      "outputs": [],
+      "cases": [
+        {
+          "label": "1: 2031-07-14 at 09:00",
+          "in": { "date": "2031-07-14", "time": "09:00", "name": "Guest 1", "email": "guest1@judge.test" }
+        },
+        {
+          "label": "2: 2031-01-13 at 10:00",
+          "in": { "date": "2031-01-13", "time": "10:00", "name": "Guest 2", "email": "guest2@judge.test" }
+        },
+        {
+          "label": "3: 2031-07-16 at 10:00",
+          "in": { "date": "2031-07-16", "time": "10:00", "name": "Guest 3", "email": "guest3@judge.test" }
+        }
+      ],
+      "edges": [
+        {
+          "label": "4: 2031-07-14 at 11:15",
+          "in": { "date": "2031-07-14", "time": "11:15", "name": "Guest 4", "email": "guest4@judge.test" }
+        },
+        {
+          "label": "5: 2031-01-13 at 11:15",
+          "in": { "date": "2031-01-13", "time": "11:15", "name": "Guest 5", "email": "guest5@judge.test" }
+        },
+        {
+          "label": "6: 2031-07-16 at 10:00",
+          "in": { "date": "2031-07-16", "time": "10:00", "name": "Guest 6", "email": "guest6@judge.test" }
+        }
+      ],
+      "refused": [
+        {
+          "label": "a time that is not the start of a slot",
+          "in": { "date": "2031-07-14", "time": "09:15", "name": "Guest A", "email": "a@judge.test" }
+        },
+        {
+          "label": "a time after the hours",
+          "in": { "date": "2031-07-14", "time": "13:00", "name": "Guest B", "email": "b@judge.test" }
+        },
+        {
+          "label": "a day with no hours",
+          "in": { "date": "2031-07-20", "time": "10:00", "name": "Guest C", "email": "c@judge.test" }
+        },
+        {
+          "label": "an email that is not an address",
+          "in": { "date": "2031-07-14", "time": "09:00", "name": "Guest D", "email": "not-an-email" }
+        },
+        { "label": "no name", "in": { "date": "2031-07-14", "time": "09:00", "name": "", "email": "e@judge.test" } },
+        {
+          "label": "words for the day",
+          "in": { "date": "next monday", "time": "09:00", "name": "Guest F", "email": "f@judge.test" }
+        }
+      ],
+      "said": ["a booking", "booking"]
+    }
+  ],
+  "booking": {
+    "hours": "hours",
+    "daysOff": "daysoff",
+    "bookings": "bookings",
+    "action": "book",
+    "zone": "Europe/London",
+    "slotMinutes": 45,
+    "days": {
+      "summer": "2031-07-14",
+      "winter": "2031-01-13",
+      "wednesday": "2031-07-16",
+      "sunday": "2031-07-20",
+      "off": "2031-07-21"
+    },
+    "slots": {
+      "summer": ["09:00", "09:45", "10:30", "11:15"],
+      "winter": ["09:00", "09:45", "10:30", "11:15"],
+      "wednesday": ["10:00"],
+      "sunday": [],
+      "off": []
+    }
+  }
+}

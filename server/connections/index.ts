@@ -3,7 +3,8 @@
 //
 //   Apps → Connected apps    the marketplace, the connected services (test, on or off, disconnect), the keys
 //   every agent              gets each connected app as an MCP server (relay.ts: no key in its settings),
-//                            and request_secret, http_request and list_connections (tools.ts)
+//                            and request_secret, http_request and list_connections (tools.ts); several keys at once,
+//                            each with how to get it, on one card (cards.ts)
 //   /connections/callback    where a browser sign-in comes back to, at the app's own address (a phone too)
 import path from 'node:path';
 import { cleanDomains, CONNECTION_CATEGORIES, SECRET_NAME, secretName, type CatalogApp } from '../../shared/connections.ts';
@@ -31,6 +32,7 @@ import {
   toolOn,
   type Conn,
 } from './apps.ts';
+import { answerItem, cardMessage, cardTitles, cardView, closeCard, skipItem, usesOf, type Told } from './cards.ts';
 import { catalog, catalogApp } from './catalog.ts';
 import { connectPlain, finishOAuth, flowResult, startOAuth, testConnection } from './connect.ts';
 import { revoke } from './oauth.ts';
@@ -82,7 +84,7 @@ function instructions(d: Deps, apps: Conn[]): string {
 
 /** How to use the vault and its tools: a guide, given while one of them is offered. */
 const VAULT_GUIDE =
-  'Keys and sign-ins: when a task needs one, use what is set up already (list_connections shows the vault and the connected accounts; a program on this computer may be signed in already). If it is not there, call request_secret (name, why, domains; fields for a sign-in in several parts; commands: true for use in commands): the user fills in a card, the values go to the vault, and a message tells you when they are saved. You never see them: use them by name, in http_request (auth: NAME, or {{NAME}} in the address, headers or body), in browser_act (a type step with "secret": NAME, to sign in on a site) and in run_with_secrets ($NAME in a command).';
+  'Keys and sign-ins: when a task needs one, use what is set up already (list_connections shows the vault and the connected accounts; a program on this computer may be signed in already). If it is not there, call request_secret (name, why, domains; fields for a sign-in in several parts; items for several at once; how and url for how to get it; commands: true for use in commands): the user fills in a card, the values go to the vault, and a message tells you when they are saved. You never see them: use them by name, in http_request (auth: NAME, or {{NAME}} in the address, headers or body), in browser_act (a type step with "secret": NAME, to sign in on a site) and in run_with_secrets ($NAME in a command).';
 
 /** The address the person reaches this app at, from the page that asked (sign-ins come back there). */
 function originOf(d: Deps, h: Record<string, unknown>): string {
@@ -247,6 +249,11 @@ function routes(d: Deps) {
     changed('secrets');
     return { secret: s };
   });
+  // Who names it (web apps, apps): the person hears it before removing it. Names only.
+  app.get('/api/connections/secrets/:name/uses', async (req) => {
+    const name = secretName(String((req.params as { name: string }).name));
+    return { uses: SECRET_NAME.test(name) ? usesOf(name) : [] };
+  });
   app.delete('/api/connections/secrets/:name', async (req) => {
     deleteSecret(db, (req.params as { name: string }).name);
     changed('secrets');
@@ -259,9 +266,44 @@ function routes(d: Deps) {
     const name = secretName(String(q.name ?? ''));
     return { request: q.key && SECRET_NAME.test(name) ? latestRequest(db, String(q.key), name) : null, secret: SECRET_NAME.test(name) ? secretView(db, name) : null };
   });
+  // ---- a card with tabs or steps (cards.ts) ----
+  /** The pages showing the card's session hear it changed (a web app's own page hears the broadcast). */
+  const cardChanged = (key: string) => {
+    changed('secrets');
+    d.toSubscribers(key, { t: 'feature', id: 'connections', key, data: { changed: 'request' } });
+  };
+  /** The session hears per item saved, skipped or left: never a value. A card on a web app's page has no session. */
+  const tell = async (key: string, id: string, why: Exclude<Told, null> | 'closed') => {
+    if (key.startsWith('webapp:')) return;
+    await d.sessions
+      .deliverOrQueue(key, cardMessage(db, id, why, howToUse), { person: true })
+      .catch((e) => console.warn(`[connections] could not tell ${key} about its keys card: ${(e as Error).message}`));
+  };
+  const cardOr404 = (id: string) => {
+    const c = cardView(db, id);
+    if (!c) throw new HttpError(404, 'That request is gone');
+    return c;
+  };
+  app.get('/api/connections/requests/:id', async (req) => ({ card: cardOr404((req.params as { id: string }).id) }));
+  app.post('/api/connections/requests/:id/items/:item', async (req) => {
+    const p = req.params as { id: string; item: string };
+    const b = (req.body ?? {}) as { values?: Record<string, unknown>; use?: boolean; reuse?: string; domains?: unknown; commands?: unknown };
+    const r = answerItem(db, p.id, p.item, b);
+    cardChanged(r.view.key);
+    if (r.told) await tell(r.view.key, p.id, r.told);
+    return { card: r.view };
+  });
+  app.post('/api/connections/requests/:id/items/:item/skip', async (req) => {
+    const p = req.params as { id: string; item: string };
+    const r = skipItem(db, p.id, p.item);
+    cardChanged(r.view.key);
+    if (r.told) await tell(r.view.key, p.id, r.told);
+    return { card: r.view };
+  });
   app.post('/api/connections/requests/:id', async (req) => {
     const r = getRequest(db, (req.params as { id: string }).id);
     if (!r) throw new HttpError(404, 'That request is gone');
+    if (r.card) throw new HttpError(400, 'This card is answered item by item');
     // The OpenRouter key a tool asked for (openrouter-key.ts): it goes to Settings → Models, not the vault.
     if (r.name === OPENROUTER_REQUEST) {
       const value = String((req.body as { value?: unknown } | undefined)?.value ?? '').trim();
@@ -329,6 +371,12 @@ function routes(d: Deps) {
   app.post('/api/connections/requests/:id/dismiss', async (req) => {
     const r = getRequest(db, (req.params as { id: string }).id);
     if (!r) throw new HttpError(404, 'That request is gone');
+    if (r.card) {
+      const c = closeCard(db, r.id);
+      cardChanged(r.key);
+      if (c.told) await tell(r.key, r.id, 'closed');
+      return { request: getRequest(db, r.id), card: c.view };
+    }
     settleRequests(db, r.key, r.name, 'dismissed');
     d.toSubscribers(r.key, { t: 'feature', id: 'connections', key: r.key, data: { changed: 'request' } });
     // A tool waiting for the OpenRouter key hears it was skipped and says so itself.
@@ -379,7 +427,8 @@ export const connections: Feature = {
   inbox: (d) =>
     pendingRequests(d.db).flatMap((r) => {
       const s = d.sessions.summary(r.key);
-      const title = r.fields?.length ? `Asks for a sign-in: ${r.name}` : `Asks for a key: ${r.name}`;
+      const asked = r.card ? cardTitles(d.db, r.id) : [];
+      const title = r.card ? `Asks for ${asked.length > 1 ? 'keys' : 'a key'}: ${listNames(asked)}` : r.fields?.length ? `Asks for a sign-in: ${r.name}` : `Asks for a key: ${r.name}`;
       return s ? [{ id: `key:${r.id}`, kind: 'key' as const, title, detail: r.why, key: r.key, session: s.title, agent: s.agent, at: r.createdAt, path: `/s/${encodeURIComponent(r.key)}` }] : [];
     }),
   start(d) {

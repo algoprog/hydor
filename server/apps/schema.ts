@@ -59,7 +59,7 @@ export function appSchema(): Record<string, unknown> {
       tier: { enum: ['quick', 'standard', 'best', 'max'], description: 'agent: the tier its agent thinks with (Settings → Models → Tiers) instead of a model by name: "quick", "standard", "best" or "max". It follows the table as models change and works whichever program runs it. Pick the lowest that does the job well: quick for short clear jobs (a summary, formatting, a look-up), standard for most, best for research and hard reasoning, max rarely. A model by name wins over it (unset: the app’s tier, unless the step names a model)' },
       tools: { type: ['array', 'null'], items: { type: 'string' } },
       capUsd: { type: 'number', description: 'agent: most it may spend, in US dollars' },
-      tool: { enum: STEP_TOOLS, description: 'tool: which of the app’s own tools' },
+      tool: { anyOf: [{ enum: STEP_TOOLS }, { type: 'string', pattern: '^fn:[a-z][a-z0-9_]{1,63}$' }], description: 'tool: which of the app’s own tools, or fn:<name>, one of the functions of the web app this app is the flows half of (its tools must allow it: fn:<name> or fn:*)' },
       with: values('tool, app, code: its inputs, each a value or text with {{values}}; data: the record, or what to change'),
       cache: { type: ['boolean', 'number'], description: 'tool: how long the answer of a look-up (read_page, web_search, http_request GET) is kept for the same call: false never, else seconds (unset: 5 minutes, a day for places and encyclopedias)' },
       rule: str('decide: a rule'),

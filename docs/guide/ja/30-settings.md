@@ -22,6 +22,7 @@
 - [**文字サイズ**](/settings?s=general&find=Text%20size)：この端末でのメッセージ、ヘルプページ、入力ボックスの文字の大きさ：標準、大、特大。
 - [**エージェントの作業中に送信**](/settings?s=general&find=Sending%20while%20an%20agent%20works)：Enterで実行中のターンに加わるか、終わるまで待ちます。
 - [**ターミナルのサジェスト**](/settings?s=general&find=Terminal%20suggestions)：ターミナルでカーソルの後ろに表示されるグレーの入力候補。
+- [**技術的な詳細**](/settings?s=general&find=Technical%20details)：Webアプリをわかりやすい言葉で表示するか、ファイル、コマンド、ログも表示するか。
 - [**使用量の上限後に再開**](/settings?s=general&find=Resume%20after%20usage%20limits)：プランの上限がリセットされた1分後にセッションを続行します。
 - [**非アクティブなセッションを削除**](/settings?s=general&find=Delete%20inactive%20sessions)：1年間、または選んだ期間、誰も使っていないセッションを削除します。それまではすべての会話が保持されます。
 - [**セッションごとに制限**](/settings?s=general&find=Limit%20each%20session)：1つのセッションのプログラムが使えるメモリとプロセッサの上限。

@@ -778,6 +778,152 @@ agents that speak ACP and take MCP servers.
   endpoint; Settings → Images, video and audio → Captions for what you keep). A kept picture, video or sound shows in its project's Files
   as a tile (with a video's length and a sound's play button), and the app finds, plays, downloads and edits them; **Start a session with it** opens
   a new session with one in the message box, and agents can work from them.
+- **Web apps without code**: web apps are shown in plain words unless **Technical details** is on (Settings →
+  General, or an app's More menu; each browser keeps its own, and the agent speaks the same way). Starting is one box
+  with three sentences to tap and ideas under it. In the conversation five steps show where it is (Describe it, Pick a
+  look, It gets built, Try it, Put it online), the agent's work folds into one line (**Show the work**), and every card,
+  those for a server and for backups too, is in plain words with **You decide** where there is a choice. An app's page
+  shows only what you act on: its state in a line, what needs you, the app, Try it (three to five things the agent
+  writes, each **Works** or **Something is wrong**, with pointing at the part; folded to the count once all work), one
+  box to say what should be different, Put it online or Share it, Undo the last change, the checks (run by themselves
+  after each change) with **Fix them**, and More (What it keeps, Backups, Keys and services, Checks, Earlier versions).
+  **Put it online** is one screen per step: only here, or on a server you rent. For a new rented server Hydor makes the
+  server's identity beforehand and gives one text to paste as you create it (cloud-init user data: DigitalOcean's
+  **Startup scripts**): you paste the address and Hydor connects only to a machine that shows and proves that identity,
+  nothing to compare, nothing to prepare. Over that first connection the server makes itself a new identity, and only that one
+  is recorded, so the text the provider keeps cannot pose as it. Apps on a server cannot reach the provider's metadata
+  address. In a web app's conversation a permission card says in one sentence what for, with the command behind **Show
+  the command** (answers that go on counting are offered once it is shown). **I already have a server** is the
+  other way (paste a key, compare the code, set it up). Then a web address (your own, a new one, or a test address from
+  sslip.io), the keys and four steps of progress. The weekly check says what needs you in one sentence that opens the
+  app's page. With Technical details on, everything described below, and the folder in Files, the editor and a
+  terminal, the code as an archive, hydor.json to edit, the names each place is started with, the servers' keys and each
+  step's diff.
+- **Web apps**: whole apps with pages and data of their own, written from scratch by an agent in whatever stack suits
+  each, to a short contract, and kept running on this computer (Apps → Web apps). Each is a folder; Hydor builds it,
+  starts it when someone opens it, stops it after 15 minutes with nobody, restarts it when it falls, signs you in to it
+  when the app asks for that (inside Hydor you are the only person signed in to an app), and shows it at an address of
+  its own that cannot reach Hydor's pages. Through a tunnel that gives Hydor one hostname only, apps have no address of
+  their own, which the app says (links and cookies inside an app may not work; `APPS_DOMAIN` gives them one). An app is a
+  project, with the web developer agent.
+  **Why from scratch**: Hydor had a framework of its own for these apps and measured it (26 November 2026): six apps
+  built both ways, and a change made to two of them. Every build passed every check, and building on the framework cost
+  two to three times as much in model use every time (medians, with the framework against without: a one-list page \$2.67
+  and \$1.29, a small tool \$1.35 and \$0.45, an app with a few parts \$1.86 and \$0.96, one with many \$3.14 and \$1.38,
+  a later change \$1.13 and \$0.60) and about two to three times as long. So there is no framework: what Hydor keeps is the
+  guidance for building, checking, launching and running an app.
+  **What do you want to make?** (New app → **Choose what to make**, `/apps/make`) is the one front door for a new app:
+  ideas to start from, as cards, each with a drawing of its first screen, a sentence on who it is for and what such an app
+  usually needs (a landing page with a waitlist, an internal tool, a SaaS, an app with agents at work, a content site, an
+  AI app, a portfolio, a directory, a shop, booking, courses, a marketplace, a community, a real-time app), **Something
+  else**, and the small tool an agent runs with no pages of its own under them (**Describe it to an agent**, **Start from
+  scratch**, **Install from a file**). They are ideas, not templates: every one can be started. Choosing one opens a short
+  sheet (the app's name and what it is for) whose **Start** makes the app (a folder, a git repository, a project and its
+  card) and opens the App builder's conversation in that folder, already knowing the idea and your words. An agent asked
+  for an app without a kind can put the same ideas in the conversation (`webapp_kinds`). Route: `GET /api/webapps/kinds`.
+  **The stages.** Someone who does not program describes an app to the **App builder**, which says whether it is a small
+  tool an agent runs or a web app (people sign in, come back, keep things in it) and, for a web app, answers with a sketch
+  (who uses it and what they do, what it keeps and who may see it, where it runs, what it assumed, three questions at most
+  to tap; nothing is built until **Build it**). It then takes them through Brief, Design, Build, Check, Launch and Run with
+  the `web-app-builder` skill, putting real options on cards (`webapp_choose`). **Design** is two or three directions, each
+  a small page of the app's own first screen that the agent writes; Hydor takes their pictures, on a computer and on a
+  phone, dark and light, and the card shows them side by side: pick one and say what to take from another. A card you
+  answer after the agent stopped waiting is recorded as you answer it, and the agent's next message says so. The app runs
+  beside the conversation (**Preview** as a phone or a computer, which reloads when a build ends and is there again after a
+  reload of the page; **Point** lets you tap a part of it, and a short reference to it goes into the message box). The
+  app's page is the map: **Overview** shows the stages with where it stands, what was decided, the one next step (a button
+  that asks the agent in the app's project) and **What changed**; then **Preview**, **Flows** (an app with an agent app),
+  **Data** (a SQLite database it names, read only), **Checks**, **Keys**, **Launch** and **Run**. Each app's folder is a
+  git repository of its own: each accepted change is a step with words about what changed for you, and **Back to before
+  this** returns the files to before a step (the later steps stay in the list) and builds again.
+  **The contract**: one file at the app's root, `hydor.json` (how to build it and the one command that starts it, the
+  variables it reads its port, data folder, address, listening address and secret from, a ready address, who signs people
+  in (Hydor's signed header or its own accounts), the keys it needs with how to get each, which of the models, search
+  vectors and mail it calls, and its database file; optionally a development command, a smoke test (one request or one
+  command) a launch tries it with, and for its own accounts how to sign up and sign in a test person). Add an app that is
+  already there from its folder (**New app** → **Add a web app from a folder**). A **check** tries each thing the file
+  claims on a copy, the app in the sandbox, with made-up keys and stand-ins (**Checks** tab, `webapp_contract_check`, and
+  before every launch), including that it listens only where it is told; the same check of the file is one script with
+  nothing beyond Node that a builder runs in the app's folder
+  (`skills/web-app-builder/references/hydor-check.mjs`, made by `npm run webapps:checker`). The builders' page is
+  `references/hydor-contract.md` of the same skill. While the checked copy runs, Hydor also looks at its **pages** in a
+  browser, posting their forms (nothing there is real): phone layout (sideways scrolling, small text, small taps, covered
+  things), reading (contrast, titles, descriptions, language, headings, labels, names, the keyboard), weight and other
+  sites, safety (keys in a page or file, forms another site can post, the sign-in cookie's flags, headers, development
+  parts) and broken things (server errors, links, console errors, pictures). Signed-in pages are seen with Hydor's header
+  or a test person; otherwise the tab says they were not looked at, and it ends with what no script can judge. The
+  **Checks** tab shows failed lines first, then each group; the agent gets the pages in at most a dozen lines. Before a
+  launch, every failed line of the file stops it, and of the pages only a key in a page, a form another site can post to,
+  an unprotected sign-in cookie and a server error; each can be let through on a card. The agent also tries the app by
+  hand, at a phone's width.
+  **Builds run in a sandbox**: the Build button, a launch's installs and builds, and the check's build read and write only
+  the app's folder and a home of the build's own, and reach only the package registry the folder needs (npm, PyPI, Go,
+  crates.io, RubyGems, or the one `npm_config_registry` or `PIP_INDEX_URL` names): the build has a network of its own with
+  loopback only, and a proxy of Hydor's passes on nothing else, saying in the build's output what was refused. Where
+  bubblewrap cannot cut the network the build may use it, and where there is no sandbox the build runs with the owner's
+  own access; the line under Build says which before you build. A build that was refused a download says where it tried
+  to go, on the app's page and in its log, with what to do. The folder's `.git` is read and never written there.
+  **Launch and Run** (the app's **Launch** tab, and **Run** once something is launched). **Inside this Hydor** is one job
+  with named steps shown as they end: the commit, the app's build, the check (a failed line stops it; a card lets you let
+  one through, which is written down), a data folder of its own and a backup of what the version before wrote, the start,
+  its ready address, a look. After the first launch the app has two sides at once: **the launched version** (the launched
+  commit, in a folder of its own, at `<slug>.localhost`, with its own data) and **the one being changed** (Preview, its own
+  data, at `<slug>--preview.localhost`): editing never changes what people use until **Launch again**. **Back to the launch
+  before** starts the one before on the data as it is; a failed launch puts it back by itself. **Launch history** lists
+  each launch (when, who, the commit, the lines let through, how long). **A server of your own** (not for an app with
+  Hydor's sign-in, and the card says why): add it as `user@address`, put the key Hydor makes for it on it (never your
+  `~/.ssh`), accept the machine's fingerprint yourself, check it and **Prepare** it (Docker and a firewall, after a card).
+  A launch sends the saved commit over SSH after the check, builds it on the server (the app's own Dockerfile, or one
+  written for Node, Python or Go), serves it over https by Caddy, gives it its keys for that place and no other, backs up
+  the data, switches, looks at it (and runs its smoke test) and reads a backup back, in fourteen steps shown as they end; a
+  failure after the switch puts the version before back by itself, data too when the new one changed it. **Back to the
+  launch before** and **Take it off the server** are on the same tab; Hydor remembers each deployment (place, host, name,
+  address, commit) and writes nothing into the app. **Run** shows, for each place, whether it is up (since when, last
+  launch, last backup and its age, disk, errors and requests, a server's services), its log (a server's app, Caddy or
+  backup lines) as rows (time, level, what, status, how long; errors first on request; the raw line on request; never
+  a secret), **Restart**, backups (SQLite's online backup of the file the app names, otherwise stopped, copied and started,
+  and said; the rest of the data folder and a manifest of the rows of each table, read back before one counts; **Back up
+  now**, a daily time and days kept, **Put this one back**, **Download**) and the weekly check, which tells you only when
+  something needs you. Agents get `webapp_host`, `webapp_new`, `webapp_get`, `webapp_run`, `webapp_look` (a picture of a page),
+  `webapp_choose`, `webapp_kinds`, `webapp_steps`, `webapp_contract_check`, `webapp_places`, `webapp_launch`,
+  `webapp_status` and `webapp_backup`; those that change something ask you on a card first.
+  **Keys**: a web app's are its own, never usable by agents; inside Hydor and each place on a server have values of their
+  own. It names them in `hydor.json`; the keys card asks for them
+  with each provider's steps and page, what a right value looks like and a warning for a paste that is plainly something
+  else; a value of the same name elsewhere is offered, never taken, and only where a test and a live key cannot differ; a
+  payments key inside Hydor must be a test key; keys marked as made (a signing secret) Hydor makes. Preview gets the same
+  keys as the launched version and restarts to pick up a new one. The **Keys** tab lists each with who gives it and where
+  it stands, **How to get it**, **Add**, **Replace** and **Remove**; forgetting an app removes its keys after naming them.
+  **Services** (a web app's Overview, or `webapp_services`): a catalog of outside services for a database, mail, a place to
+  run, web search, files and backups, a model, payments, sign-in with another account, texts, visits, errors, uptime, a
+  domain, bot checks and maps: one where one is better overall, at most three otherwise with one recommended, each with
+  the sentence it is chosen by, what a small app pays and the day that was read (older than ninety days: **Check the
+  current price**, never a figure), its catch, where it does not fit and why others are left out. A need with one service
+  is not a question; a need an app can do without says so first. Choosing gives the agent the lines for `hydor.json` and
+  puts up the keys card with that service's steps; the choice stays with the app, with **Change**.
+  The card that asks before a web app's function changes something (in a run and in a session) shows what it would be
+  given as labels and values read from the function's input schema, long text folded, the input as it was sent on request.
+  **An agent app with pages of its own**: a web app can be linked to an agent app (Hydor's agents do the work), kept as
+  files in the web app's own `flows` folder. The web app is started with the address of Hydor, of that agent app and a key
+  of its own (never in its folder), and its pages start the agent app's runs, follow them (steps as they go, or a stream of
+  events), answer what a run asks a person and stop them, through the agent apps' API for programs with a key; a run can
+  act for the person at the web app's screen, which Hydor checks from the signed header it put on that request, so the web
+  app cannot claim anyone else; a run may carry a reference of the app's own (`ref`), and the app's flows, with their forms
+  and answers, can be read by key (`GET /api/apps/<address>/flows`). The web app's own **functions** (`functions.json` at
+  its root) can be tools for its agents: the maker allows them one by one in the agent app's tools (`fn:<name>`; a new link
+  allows none), each call is made as the person the run acts for with a header Hydor signs, so the app's own access rules
+  decide what it may touch, the app is started with the run and held awake until it ends, a run for nobody gets none, and
+  every call is a step of the run's page. **Give it an app of its own**, on an agent app (**More** (⋯), ready-made apps
+  too), opens a sheet (a name, what it is for) whose **Start** makes the web app and starts the App builder with a brief
+  saying which agent app it is, its questions and answer fields, and that the pages start and follow runs through these
+  routes. The web app's **Flows** tab shows its flows in plain words, the recent runs and who they acted for, the functions
+  its agents may use (off until the owner allows each; one that changes things asks the person on a card the first time in
+  a run, unless allowed without asking), what the runs spent today against the cap, and **Unlink**; **Add agents' work** on
+  its Overview links a starting recipe or an agent app from the other side. A session's card for such an app gains **Open
+  the app**, and agents get `webapp_add_work` and `webapp_functions` for the same.
+  **The models of a web app**: a web app whose `hydor.json` lists `ai` carries no key inside Hydor: it asks `POST /api/apps/:slug/ai` with the key Hydor made for it, for a tier (Quick, Standard, Best) that its file lists, and Hydor answers with the owner's own models: the tier is the model Settings → Models → Tiers names for Custom (else the helper model, else Automatic, which cannot call tools). Nothing is used until the owner allows it on the card **What it may use** on the app's Overview ("It would use your models (Standard), up to $1 a day"); it has a switch for each tier, the most a day (the one cap its agent app's runs are held to as well), what it spent today and for how many people, and when the cap is reached the app tells the person and when it lifts. Answers are a stream of text pieces (server-sent events) or one JSON, with an answer to fit a schema when asked, and tool calls the model asks for passed back to the app (Hydor never calls the app); the person is proven by the header Hydor signed and counted for them; what is kept is counts, never a word. A model that costs no money here counts as nothing against the cap, so a day's ceiling of tokens stops it too.
+  **A web app's mail**: a web app whose `hydor.json` lists `mail` carries no mail account inside Hydor, where only the owner is signed in and it has no sign-up, password or invitation mail of its own (only an app launched to a server of its own mails those); what it sends beyond accounts (a form's notice and reply, a welcome or a reminder, a newsletter) goes through `POST /api/apps/:slug/mail`, from a mail account connected in Apps → Connected apps → Email. Nothing is sent until the owner allows it on the card **Mail it may send** on the app's Overview, where they pick the account and the most a day (100 to start, UTC) and can turn it off; the card warns that a link in such a mail opens only for someone who opened the app from Hydor, and, with no `APPS_DOMAIN`, only on this computer; only the launched version sends (Hydor marks its key), while mail from the version being made (Preview, an app not launched yet) is kept in the app unless the second switch, **Also send while it is being made**, off by default, says otherwise, each side with its own idempotency keys and counts; each person is sent a mail of their own, with limits a minute and on sizes, header injection refused, and a repeat with the same Idempotency-Key within a day sending nothing. A slow or busy mail server is answered "queued" and tried again. The card and the app's JSON show today's count and the last requests; Hydor keeps when, how many people, the subject's length and the outcome, never an address or the text. Agents cannot send through that route, and allowing an app asks on a card every time. Without an account, or before the owner allows it, the app keeps its mail and says it was not delivered.
+  **Functions in sessions**: each function also has a second switch on the Flows tab, **In sessions**; agents in a session then find the functions offered, by app, with `webapp_list_functions` and call one with `webapp_call_function`, as the person the session belongs to, with the header Hydor signs as for a run; one that changes things asks on a card the first time in a session unless it was offered without asking, Plan mode refuses it, and the call shows as a step of the conversation. The app is called at the version people use (the launched one when it is launched inside Hydor, else the version being made). **Search by meaning in a web app**: a web app whose `hydor.json` lists `embed` asks Hydor for its vectors (`POST /api/apps/<address>/embed`, with a key that opens only that) and Hydor makes them with the model memory and the search box use, on the processor, without ever downloading it for an app; when search by meaning is off or the model is not set up the app searches by words and says so. Hydor's own work goes first (an app's texts go to the model four at a time, one such piece at a time in all, each only while Hydor is not answering its own search), and each app has limits (64 texts a call, 30 calls a minute, 20,000 texts a day, counted on its page).
 - **Connected apps**: on the Apps page, the last place in its column after your agent apps (Apps → Connected apps, which was Settings →
   Connections), a marketplace of services (Notion, Linear, GitHub, Google, Stripe and more), signed
   in once for every agent and app; anyone can add one with a pull request to `catalog/`. **Email** connects any
@@ -791,7 +937,11 @@ agents that speak ACP and take MCP servers.
   passwords for them. Keys and sign-ins live in an
   encrypted vault: when a task needs one that isn't there, the agent asks with a card (one key, or a sign-in's
   fields), and uses it by name without ever seeing it, in API calls and site sign-ins on the hosts you allow, and
-  in commands on this computer that you allow (what they print comes back masked). When an app needs something from
+  in commands on this computer that you allow (what they print comes back masked). Several keys come on **one card**,
+  a tab each (rows on a phone), with who gives each, how to get it in short steps, a link to the provider's page, a
+  quiet warning when a paste plainly is not it, **Skip for now** where it may be, and a saved one offered as it is or
+  replaced, never shown; the agent hears once every needed one is saved, per key saved, skipped or left. Removing a key
+  names the apps that use it, and web apps that keep their own value under that name. When an app needs something from
   you partway through (a date, a choice, a page to approve on), its form shows as a card in the session,
   whichever agent is working; Codex's own servers ask the same way. Each of an account's tools is On, Ask first or
   Off: a call to a tool on Ask first is never made straight away, but held in the Outbox for your OK, whichever

@@ -488,6 +488,8 @@ interface UIState {
   termSuggest: boolean;
   /** Grey word suggestions while typing, in this browser (Settings → Capabilities → Word suggestions). */
   wordSuggestions: boolean;
+  /** Web apps show files, commands and logs beside the plain words (Settings → General → Apps). */
+  technicalDetails: boolean;
   /** The Files page's left pane: the tree or search in files. */
   side: SideView;
   /** Desktop sidebar shown. */
@@ -555,6 +557,7 @@ export const useUI = create<UIState>((set, get) => ({
   lightTheme: 'naget-light',
   termSuggest: true,
   wordSuggestions: true,
+  technicalDetails: false,
   side: 'files',
   sideOpen: true,
   drawerOpen: false,

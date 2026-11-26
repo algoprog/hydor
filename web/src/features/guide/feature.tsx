@@ -87,6 +87,7 @@ onFeatureEvent('guide', (e) => {
   }
   if (d.terminalSuggestions !== undefined) ui.set({ termSuggest: d.terminalSuggestions });
   if (d.wordSuggestions !== undefined) ui.set({ wordSuggestions: d.wordSuggestions });
+  if (d.technicalDetails !== undefined) ui.set({ technicalDetails: d.technicalDetails });
   if (d.sidebar !== undefined) ui.set({ sideOpen: d.sidebar });
   if (d.groupSessions !== undefined) ui.set({ groupByFolder: d.groupSessions });
   // Voice: the language spoken, how dictation listens, the voice and speed replies are read in.

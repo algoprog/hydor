@@ -9,6 +9,7 @@ import { limitsText, useSessionResources } from '../system/sessionUse';
 import { useSearch } from 'wouter';
 import { go, openFile, openSession, sessionPath } from '../../lib/nav';
 import { stopSession, toastError, useApp, useLive, useSessions, useTimeline, useUI, type DetailsTab } from '../../lib/store';
+import { useQuietWork } from '../webapps/simple/quiet';
 import { live as socket } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { modelLabel, useCatalog } from '../../components/AgentPickers';
@@ -113,6 +114,7 @@ function Header({ s, detailsOpen, onDetails, onFork, conversation }: { s: Sessio
   // A program's own subagent (one of Claude Code's or Codex's) is read-only: it is not resumed or renamed here, and only
   // Claude Code's stops from here, while it works, as a task of its lead.
   const program = !!s.subagentOf;
+  const quiet = useQuietWork(s.key);
   let action: ReactNode = null;
   if (program) {
     action = <ProgramStop s={s} />;
@@ -176,12 +178,12 @@ function Header({ s, detailsOpen, onDetails, onFork, conversation }: { s: Sessio
           </div>
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
             <StatusPill s={s} end={end} />
-            {s.cwd && (
+            {!quiet && s.cwd && (
               <button className="min-w-0 truncate hover:text-fg" onClick={() => (useUI.getState().set({ explorerRoot: s.cwd! }), go('/files'))} title={s.cwd}>
                 {tildify(s.cwd, home)}
               </button>
             )}
-            {!mobile && s.gitBranch && s.gitBranch !== 'HEAD' && (
+            {!quiet && !mobile && s.gitBranch && s.gitBranch !== 'HEAD' && (
               <span className="flex shrink-0 items-center gap-1">
                 · <GitBranch size={12} /> <span translate="no">{s.gitBranch}</span>
               </span>
@@ -207,7 +209,7 @@ function Header({ s, detailsOpen, onDetails, onFork, conversation }: { s: Sessio
           title="Changes, commands and session info"
           icon={<PanelRight size={16} />}
         >
-          {!mobile && (st.linesAdded || st.linesRemoved ? <DiffStat added={st.linesAdded} removed={st.linesRemoved} compact className="text-[12px]" /> : <span>Details</span>)}
+          {!mobile && (!quiet && (st.linesAdded || st.linesRemoved) ? <DiffStat added={st.linesAdded} removed={st.linesRemoved} compact className="text-[12px]" /> : <span>Details</span>)}
         </Button>
         {/* Nothing in the menu applies to a program's own subagent: it cannot be run, forked, moved, handed off or deleted. */}
         {!program && (

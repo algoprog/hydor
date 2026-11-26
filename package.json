@@ -53,6 +53,7 @@
     "i18n:audit": "node scripts/i18n-audit.mjs",
     "find:vectors": "OUTDIR=dist/dev node scripts/build-server.mjs scripts/find-vectors.ts && DATA_DIR=/tmp/hydor-find-vectors node dist/dev/find-vectors.js",
     "guide:settings": "node scripts/guide-settings.mjs",
+    "webapps:checker": "node scripts/webapps-checker.mjs",
     "start": "node dist/server/index.js",
     "set-password": "node dist/server/cli.js set-password"
   },

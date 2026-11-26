@@ -97,6 +97,9 @@ export interface ToolStep extends StepCommon {
   cache?: false | number;
 }
 
+/** A tool step may also name one of the functions of the web app its app is the flows half of: `fn:<name>` (server/apps/appfns.ts). */
+export const FN_STEP_TOOL = /^fn:[a-z][a-z0-9_]{1,63}$/;
+
 /** The longest a tool step may keep an answer (cache), in seconds: a week. */
 export const MOST_CACHE_SECONDS = 7 * 24 * 3600;
 
@@ -1656,7 +1659,7 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
           checkRefs(where, s.instructions, seen, names, siblings);
           break;
         case 'tool':
-          if (s.tool && !STEP_TOOLS.includes(s.tool)) note(errors, `${where}: ${s.tool} cannot run as a step on its own; use it in an Ask an agent step (on their own: ${STEP_TOOLS.join(', ')})`);
+          if (s.tool && !STEP_TOOLS.includes(s.tool) && !FN_STEP_TOOL.test(s.tool)) note(errors, `${where}: ${s.tool} cannot run as a step on its own; use it in an Ask an agent step (on their own: ${STEP_TOOLS.join(', ')})`);
           checkRefs(where, s.with, seen, names, siblings);
           break;
         case 'app':

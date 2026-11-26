@@ -1,15 +1,18 @@
 // The card an agent's request_secret shows in the conversation: the person pastes a key, or fills in a
 // sign-in of several fields, and it goes straight to the vault (never into the conversation); details the
-// agent marked as not secret go to it as typed. The agent hears that the keys are there.
+// agent marked as not secret go to it as typed. The agent hears that the keys are there. A call with several
+// items, or with how to get one, shows the card with tabs and steps instead (KeysCard.tsx).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { CircleCheck, KeyRound, LockKeyhole } from 'lucide-react';
-import { cleanDomains, secretName, type SecretField, type SecretRequestView, type SecretView } from '@shared/connections';
+import { cleanDomains, type SecretField, type SecretRequestView, type SecretView } from '@shared/connections';
+import { requestName } from '@shared/keys';
 import type { ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { toastError } from '../../lib/store';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { Button, cx, inputCls, Switch, Throbber } from '../../components/ui';
 import { SecretInput } from './ConnectDialog';
+import { KeysCard } from './KeysCard';
 import { OpenRouterKeyCard, OPENROUTER_REQUEST } from './OpenRouterKeyCard';
 
 function FieldInput({ f, value, onChange, saved, onEnter }: { f: SecretField; value: string; onChange: (v: string) => void; saved?: string; onEnter: () => void }) {
@@ -33,8 +36,8 @@ function FieldInput({ f, value, onChange, saved, onEnter }: { f: SecretField; va
 }
 
 export function SecretCard({ item, sessionKey }: { item: ToolItem; sessionKey: string }) {
-  const input = (item.tool.input ?? {}) as { name?: string; why?: string; domains?: unknown };
-  const name = secretName(String(input.name ?? ''));
+  const input = (item.tool.input ?? {}) as { name?: string; why?: string; domains?: unknown; items?: unknown };
+  const name = requestName(input);
   const [data, setData] = useState<{ request: SecretRequestView | null; secret: SecretView | null } | null>(null);
   const [value, setValue] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -65,7 +68,7 @@ export function SecretCard({ item, sessionKey }: { item: ToolItem; sessionKey: s
   if (!data || (!r && (item.tool.status === 'running' || item.tool.status === 'pending')))
     return shell(
       <div className="flex items-center gap-2 text-[13px] text-fg-3">
-        <Throbber /> Asking for {name}…
+        <Throbber /> {Array.isArray(input.items) ? 'Asking for keys…' : <span>Asking for {name}…</span>}
       </div>,
       'muted',
     );
@@ -83,6 +86,7 @@ export function SecretCard({ item, sessionKey }: { item: ToolItem; sessionKey: s
         )
       : null;
 
+  if (r.card) return <KeysCard key={r.id} id={r.id} />;
   const fields = r.fields ?? [];
   const signIn = fields.length > 0;
   // A saved key the agent wants for commands: its value may stay as it is.

@@ -18,6 +18,12 @@ import { Elapsed } from './items';
 import { allAnswered, answerOf, QuestionForm, type Picks } from './QuestionForm';
 import { tr } from '../../i18n/runtime';
 import { MemoryBuildCard } from './MemoryBuildCard';
+import { ChooseCard } from '../webapps/ChooseCard';
+import { KindsCard } from '../webapps/KindsCard';
+import { ApprovalFacts } from './ApprovalFacts';
+import { useQuietWork } from '../webapps/simple/quiet';
+import { plainAsk, showsRawWork } from '../webapps/simple/plainAsk';
+import { PlainAskView } from '../webapps/simple/PlainAskView';
 
 function FileDetail({ detail }: { detail: string }) {
   // "path\n@@ … diff" blocks, possibly several, possibly led by a reason line.
@@ -50,6 +56,8 @@ const SignatureApproval = lazy(() => import('../signatures/Cards').then((m) => (
 export function ApprovalCard(props: { a: ApprovalRequest; sessionKey: string; agent: Agent; id?: string; base?: string; onDone?: () => void }) {
   // Whether to build the project's memory first, and the build while the agent's first message waits for it.
   if (props.a.memory) return <MemoryBuildCard a={props.a} sessionKey={props.sessionKey} id={props.id} base={props.base} onDone={props.onDone} />;
+  if (props.a.kinds) return <KindsCard a={props.a} sessionKey={props.sessionKey} id={props.id} base={props.base} onDone={props.onDone} />;
+  if (props.a.choose) return <ChooseCard a={props.a} sessionKey={props.sessionKey} id={props.id} base={props.base} onDone={props.onDone} />;
   if (props.a.signature)
     return (
       <Suspense fallback={null}>
@@ -147,10 +155,34 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
     }
   };
 
+  // A web app's conversation with Technical details off: a command or a change is asked about in one plain sentence.
+  const quiet = useQuietWork(sessionKey);
+  const plain = quiet && showsRawWork(a) ? plainAsk(a) : null;
+  const [shown, setShown] = useState(false);
   const question = a.kind === 'question';
   const answeredAll = !question || allAnswered(a.questions ?? [], picks);
   // Declining a question or a form needs no word to the agent first.
   const plainDecline = question || !!a.form || !!app?.approve;
+
+  // The command, change or input itself: shown on the card, or behind the plain card's button.
+  const raw = (
+    <>
+      {a.detail && a.kind === 'command' && <CodeBlock code={a.detail} lang="bash" maxHeight={260} className="!my-0" />}
+      {a.detail && a.kind === 'file' && <FileDetail detail={a.detail} />}
+      {a.detail && a.kind === 'plan' && (
+        <div className="max-h-[420px] overflow-auto rounded-lg border border-line px-3 py-2">
+          <Markdown text={a.detail} />
+        </div>
+      )}
+      {/* The app's own cards (a change an agent asks to make, its form) say what they do in plain words. */}
+      {a.detail && a.prose && <Markdown text={a.detail} className="!text-[13.5px] !leading-relaxed" />}
+      {a.facts && a.facts.length > 0 && <ApprovalFacts facts={a.facts} raw={a.raw} />}
+      {a.detail && a.form && !a.prose && <div className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{a.detail}</div>}
+      {a.detail && !a.form && !a.prose && (a.kind === 'tool' || a.kind === 'permissions' || a.kind === 'other') && (
+        <pre className="term-out max-h-64 overflow-auto rounded-lg border border-line px-3 py-2">{a.detail}</pre>
+      )}
+    </>
+  );
 
   return (
     <div id={id} className="anim-pop my-2 overflow-hidden rounded-xl border border-warn/45 bg-panel shadow-[0_0_0_3px_color-mix(in_srgb,var(--warn)_10%,transparent)]">
@@ -165,7 +197,7 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
           <ShieldAlert size={15} className="shrink-0 text-warn" />
         )}
         <div className="min-w-0 flex-1 truncate text-[13px] font-medium" translate={app && !app.id.startsWith('tpl:') ? 'no' : undefined}>
-          {a.title}
+          {plain ? 'The agent asks first' : a.title}
         </div>
         <span className="shrink-0 text-[11px] text-fg-3">
           waiting <Elapsed since={a.createdAt} />
@@ -214,18 +246,13 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
             About this app
           </button>
         )}
-        {a.detail && a.kind === 'command' && <CodeBlock code={a.detail} lang="bash" maxHeight={260} className="!my-0" />}
-        {a.detail && a.kind === 'file' && <FileDetail detail={a.detail} />}
-        {a.detail && a.kind === 'plan' && (
-          <div className="max-h-[420px] overflow-auto rounded-lg border border-line px-3 py-2">
-            <Markdown text={a.detail} />
-          </div>
-        )}
-        {/* The app's own cards (a change an agent asks to make, its form) say what they do in plain words. */}
-        {a.detail && a.prose && <Markdown text={a.detail} className="!text-[13.5px] !leading-relaxed" />}
-        {a.detail && a.form && !a.prose && <div className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{a.detail}</div>}
-        {a.detail && !a.form && !a.prose && (a.kind === 'tool' || a.kind === 'permissions' || a.kind === 'other') && (
-          <pre className="term-out max-h-64 overflow-auto rounded-lg border border-line px-3 py-2">{a.detail}</pre>
+        {plain ? (
+          <PlainAskView ask={plain} open={shown} onToggle={() => setShown((x) => !x)}>
+            <p translate="no" className="text-[12.5px] text-fg-3">{a.title}</p>
+            {raw}
+          </PlainAskView>
+        ) : (
+          raw
         )}
         {link && (
           <a href={link} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-1.5 text-[13px] text-accent hover:underline">
@@ -268,12 +295,12 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
           />
         )}
         <div className="flex flex-wrap items-center gap-2">
-          {a.options.map((o) => {
+          {a.options.filter((o) => !plain || shown || !plain.standing(o)).map((o) => {
             const deny = o.id === 'deny' || o.id === 'decline';
             if (deny && !denyOpen && !plainDecline) {
               return (
                 <Button key={o.id} size="sm" variant="ghost" disabled={busy} onClick={() => setDenyOpen(true)}>
-                  {o.label}…
+                  {plain ? plain.label(o) : o.label}…
                 </Button>
               );
             }
@@ -285,7 +312,7 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
                 disabled={busy || (o.id === 'answer' && !answeredAll)}
                 onClick={() => respond(o.id)}
               >
-                {app && o.id === 'accept' ? 'Run it' : app && o.id === 'always' ? 'Always run it' : app && o.id === 'decline' ? (app.approve ? 'Don’t run' : 'Not now') : o.label}
+                {app && o.id === 'accept' ? 'Run it' : app && o.id === 'always' ? 'Always run it' : app && o.id === 'decline' ? (app.approve ? 'Don’t run' : 'Not now') : plain ? plain.label(o) : o.label}
               </Button>
             );
           })}

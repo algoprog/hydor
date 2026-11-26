@@ -300,13 +300,23 @@ export function listDevServers(): Promise<DevServer[]> {
   );
 }
 
+/** The window a picture of a page is taken in, for each device. */
+const VIEWPORTS = {
+  phone: { width: 390, height: 844, scale: 2, mobile: true },
+  tablet: { width: 820, height: 1180, scale: 1, mobile: true },
+  desktop: { width: 1280, height: 800, scale: 1, mobile: false },
+} as const;
+
+/** A picture of a page at an address on this computer, as a browser here sees it: freshly opened, at a device's size (the colour scheme the page is told the device prefers when named). */
+export async function pageShot(url: string, device: 'desktop' | 'tablet' | 'phone', o: { colorScheme?: 'light' | 'dark'; settleMs?: number } = {}): Promise<Awaited<ReturnType<typeof capture>>> {
+  return capture({ url, ...VIEWPORTS[device], format: 'png', settleMs: o.settleMs ?? 900, ...(o.colorScheme ? { colorScheme: o.colorScheme } : {}) });
+}
+
 /** A picture of a dev server's page, as a browser here sees it: as it is in its live preview when that is open, else freshly opened. */
 export async function devServerShot(port: number, at: string, device: 'desktop' | 'tablet' | 'phone', live = false): Promise<Buffer> {
   const t = live ? browserOf(previewKey(port))?.active : undefined;
   if (t && !t.closed) return Buffer.from(await t.screenshot({ format: 'png' }), 'base64');
-  const vp = device === 'phone' ? { width: 390, height: 844, scale: 2, mobile: true } : device === 'tablet' ? { width: 820, height: 1180, scale: 1, mobile: true } : { width: 1280, height: 800, scale: 1, mobile: false };
-  const shot = await capture({ url: `http://localhost:${port}${safePath(at)}`, ...vp, format: 'png', settleMs: 900 });
-  return shot.data;
+  return (await pageShot(`http://localhost:${port}${safePath(at)}`, device)).data;
 }
 
 const within = (v: unknown, lo: number, hi: number, d: number) => {

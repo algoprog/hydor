@@ -1,0 +1,3 @@
+My partner and I grow vegetables on four acres outside Ludlow and so far we have only sold them from the farm gate. This year we want to start a weekly veg box, delivered on Wednesdays, mostly to cafés and a few shops, and to households if there is room. We do not start until March, so what I need now is a sign-up page to find out who is interested and how many boxes they would want. The small box will be £14 and the large one £22.
+
+I do not really have a colour in mind, something fresh and natural, not boring. Jo, my partner, needs to log in and look at the list too, and so will the two people who do the packing, and I would rather they could just sign themselves up than have me set each of them up.

@@ -1,0 +1,9 @@
+{
+  "name": "hatch-end-kiln-share-no-email",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A waiting list page for a kiln share, written by hand: the reference the judge's self-test uses.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "better-sqlite3": "13.0.3" }
+}

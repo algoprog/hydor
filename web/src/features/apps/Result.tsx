@@ -101,7 +101,24 @@ export function MediaList({ items, assets }: { items: MediaItem[]; assets?: Reco
   );
 }
 
-function Value({ v, type }: { v: unknown; type?: string }) {
+/** A long text cut after `limit` characters, with a button that shows all of it (and cuts it again). */
+function Folded({ text, limit }: { text: string; limit: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="whitespace-pre-wrap">
+      {open ? text : `${text.slice(0, limit).trimEnd()}…`}{' '}
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="text-[12px] whitespace-nowrap text-accent hover:underline">
+        {open ? 'Show less' : 'Show more'}
+      </button>
+    </span>
+  );
+}
+
+/** A day, with or without its time, as databases and agents write one: never broken at its dashes. */
+const WRITTEN_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/** `fold`: a text longer than this many characters is folded (a table of data that can hold anything). */
+function Value({ v, type, fold }: { v: unknown; type?: string; fold?: number }) {
   if (v === null || v === undefined || v === '') return <span className="text-fg-3">—</span>;
   if (type === 'image' && typeof v === 'string') {
     if (!ownFile(v)) return /^https?:\/\//.test(v) ? <a href={v} target="_blank" rel="noopener noreferrer" className="break-all text-accent hover:underline">{nameOfUrl(v)}</a> : <span className="text-fg-3">—</span>;
@@ -129,7 +146,8 @@ function Value({ v, type }: { v: unknown; type?: string }) {
     return <span>{d.toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>;
   }
   if (typeof v === 'number') return <span className="tnum">{v.toLocaleString()}</span>;
-  return <span className="whitespace-pre-wrap">{cellText(v)}</span>;
+  if (fold && typeof v === 'string' && v.length > fold) return <Folded text={v} limit={fold} />;
+  return <span className={typeof v === 'string' && WRITTEN_DATE.test(v) ? 'whitespace-nowrap' : 'whitespace-pre-wrap'}>{cellText(v)}</span>;
 }
 
 function copyText(text: string) {
@@ -205,7 +223,7 @@ function useWidth(): [(el: HTMLDivElement | null) => void, number] {
  * A table too wide for a phone, as a card a row: the first column (and the dates right after it) names
  * the row ("Day 1 · Fri, Mar 26, 2027"), short values sit beside their label, long text under it.
  */
-function RowCards({ cols, rows }: { cols: AnswerColumn[]; rows: Row[] }) {
+function RowCards({ cols, rows, fold }: { cols: AnswerColumn[]; rows: Row[]; fold?: number }) {
   let n = 1;
   while (n < cols.length && cols[n].type === 'date') n++;
   const [head, dates, rest] = [cols[0], cols.slice(1, n), cols.slice(n)];
@@ -216,13 +234,13 @@ function RowCards({ cols, rows }: { cols: AnswerColumn[]; rows: Row[] }) {
         <div key={i} className="py-3.5 first:pt-1.5 last:pb-0.5">
           <div className="text-[14.5px] leading-snug font-semibold">
             {(head.type === 'number' || head.type === 'yesno') && `${head.label} `}
-            <Value v={r[head.id]} type={head.type} />
+            <Value v={r[head.id]} type={head.type} fold={fold} />
             {dates.map(
               (c) =>
                 !blank(r[c.id]) && (
                   <span key={c.id} className="font-normal text-fg-2">
                     {' · '}
-                    <Value v={r[c.id]} type={c.type} />
+                    <Value v={r[c.id]} type={c.type} fold={fold} />
                   </span>
                 ),
             )}
@@ -233,14 +251,14 @@ function RowCards({ cols, rows }: { cols: AnswerColumn[]; rows: Row[] }) {
                 <div key={c.id} className="flex gap-3">
                   <dt className="w-24 shrink-0 pt-px text-[12.5px] text-fg-3">{c.label}</dt>
                   <dd className="min-w-0 flex-1 text-[14px] leading-snug">
-                    <Value v={r[c.id]} type={c.type} />
+                    <Value v={r[c.id]} type={c.type} fold={fold} />
                   </dd>
                 </div>
               ) : (
                 <div key={c.id}>
                   <dt className="text-[12.5px] text-fg-3">{c.label}</dt>
                   <dd className="mt-0.5 text-[14px] leading-relaxed">
-                    <Value v={r[c.id]} type={c.type} />
+                    <Value v={r[c.id]} type={c.type} fold={fold} />
                   </dd>
                 </div>
               ),
@@ -252,7 +270,7 @@ function RowCards({ cols, rows }: { cols: AnswerColumn[]; rows: Row[] }) {
   );
 }
 
-export function ResultTable({ f, rows }: { f: AnswerField; rows: Row[] }) {
+export function ResultTable({ f, rows, fold }: { f: AnswerField; rows: Row[]; fold?: number }) {
   const [ref, width] = useWidth();
   const cols: AnswerColumn[] = f.columns?.length ? f.columns : Object.keys(rows[0] ?? {}).map((id) => ({ id, label: humanize(id), type: 'text' as const }));
   if (!rows.length) return <div className="text-[13px] text-fg-3">Nothing here.</div>;
@@ -261,7 +279,7 @@ export function ResultTable({ f, rows }: { f: AnswerField; rows: Row[] }) {
   return (
     <div ref={ref} className="-mx-1 overflow-x-auto px-1 pb-1">
       {cards ? (
-        <RowCards cols={cols} rows={rows} />
+        <RowCards cols={cols} rows={rows} fold={fold} />
       ) : (
         <table className="w-full border-separate border-spacing-0 text-[13px]">
           <thead>
@@ -278,7 +296,7 @@ export function ResultTable({ f, rows }: { f: AnswerField; rows: Row[] }) {
               <tr key={i} className="align-top">
                 {cols.map((c) => (
                   <td key={c.id} className={cx('border-b border-line px-2.5 py-2 leading-snug first:pl-0', c.type === 'number' && 'text-right', (c.type === 'number' || c.type === 'date') && 'whitespace-nowrap')}>
-                    <Value v={r[c.id]} type={c.type} />
+                    <Value v={r[c.id]} type={c.type} fold={fold} />
                   </td>
                 ))}
               </tr>

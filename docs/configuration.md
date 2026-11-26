@@ -9,6 +9,9 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` (`0.0.0.0` in Docker) | Address to listen on |
 | `PORT` | `8790` | Port to listen on |
+| `APPS_PORT` | `8792` | Port of the server your web apps are opened at (`0` turns web apps off) |
+| `APPS_DOMAIN` | none | A domain whose subdomains lead to that server: each web app then has `<name>.<domain>` as its address, which is also where the links it mails point. Without it they point at `<name>.localhost`, which only this computer knows. Either way an app opens only for someone who opened it from Hydor |
+| `APPS_ORIGIN` | none | The address browsers reach that server at, when it is not this computer on `APPS_PORT` (a reverse proxy, a tunnel) |
 | `DATA_DIR` | `~/.hydor` (`~/.web-agent` where an older install made it) | The app's own data (see below) |
 | `DEFAULT_CWD` | your home folder (`/workspace` in Docker) | Folder new sessions and terminals start in |
 | `ALLOWED_ORIGINS` | none | Extra addresses the app is opened at, comma-separated, when a proxy changes the `Host` header. The first is also the address the links the app hands out start with (chat apps' Open in Hydor, links agents give to sessions and pages); without one, they use the Tailscale address while Settings → App → Use on your phone serves the app, else `http://127.0.0.1:<PORT>`. That Tailscale address needs nothing here: the app keeps it beside these |

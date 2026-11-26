@@ -15,10 +15,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
-import { answerSchema, APP_COLORS, APP_ICONS, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, questionLine, toCsv } from '../../shared/apps.ts';
+import { answerSchema, APP_COLORS, APP_ICONS, checkAnswer, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, questionLine, toCsv } from '../../shared/apps.ts';
 import { cardFieldProblems } from '../../shared/app-cards.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_ONLY_TOOLS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
+import { keyUses } from '../connections/cards.ts';
 import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
 import { ASSET_NAME, MEDIA_LIMITS, type AppAsset } from '../../shared/app-media.ts';
 import { secretsLine } from '../../shared/app-secrets.ts';
@@ -35,15 +36,17 @@ import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import type { AppRunEnd } from '../scheduler.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { noteUserMessage } from '../updates.ts';
-import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
+import { checkDaily } from './api.ts';
+import { answerRun } from './keyrun.ts';
+import { keyRoutes, signedInPerson } from './keyroutes.ts';
 import { batchCsv, MAX_ROWS, startBatch, startBatches, stopBatch } from './batch.ts';
 import { addRecord, clearData, collectionsOf, dataOp, embedSoon, ensureDataTables, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { ensureEnv, envLine, envOf, envVars } from './env.ts';
-import { answerAsk, askOf, dataChanged, flowRunner, goOn, stepsOf } from './flow.ts';
+import { isFunctionTool, openAppOf, runFunctions } from './appfns.ts';
+import { askOf, dataChanged, flowRunner, goOn, stepsOf } from './flow.ts';
 import { installPackage, MAX_PACKAGE, packageJson, packageOf, previewOf, readPackage, zipPackage, type Catalog } from './package.ts';
 import { changeScreen, makeScreen, removeScreen, removeScreens, screenHtml, screensOf } from './screens.ts';
 import { draftFromSession } from './draft.ts';
-import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { PUBLIC_RUN_ENV } from './publicRun.ts';
 import { adviceOf } from './advice.ts';
@@ -51,7 +54,6 @@ import { defaultFolder, folderOf, folderSaved, initFolders, linkFolder, unlinkFo
 import { appSchema } from './schema.ts';
 import { appChanged, askRun, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, runFolder, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, whyNoAsks, WORK_DIR } from './runs.ts';
 import {
-  appOfKey,
   createKey,
   dayStart,
   deleteApp,
@@ -64,7 +66,6 @@ import {
   getRun,
   getVersion,
   getView,
-  KEY_PREFIX,
   lastExampleRuns,
   listApps,
   listBatches,
@@ -94,7 +95,6 @@ import { dropDaily, homeOf, saveHome } from './home.ts';
 import { pinsOf, recentApps, setPins, suggestedApps, unpin, useCounts } from './pins.ts';
 import { WORK_LOG } from './worklog.ts';
 
-const keyLimiter = new Limiter();
 /** The largest request that installs an app: its file, as base64. */
 const INSTALL_BODY = Math.ceil(MAX_PACKAGE * 1.37) + (1 << 20);
 
@@ -152,7 +152,7 @@ function customModels(): { id: string; label: string; provider: string }[] {
  * What is wrong with a recipe as sent (errors: it cannot be saved or run) and what may surprise
  * (warnings): its task or steps, its flow's values and rules, what it keeps, the templates it calls.
  */
-function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: string[]; warnings: string[] } {
+export function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: string[]; warnings: string[] } {
   const src = raw && typeof raw === 'object' ? raw : {};
   const recipe = cleanRecipe(src);
   const errors = [...cardFieldProblems(src.answer), ...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanSecrets(src.secrets).errors, ...cleanExamples(src.examples).errors, ...cleanUi(src.ui).errors];
@@ -230,6 +230,8 @@ function inputsOf(schema: Record<string, unknown>): { name: string; type?: strin
 }
 
 function routes(d: Deps) {
+  // Whoever removes a key of the vault hears which apps need it.
+  keyUses.set('apps', (name) => listApps(d.db).filter((a) => a.secrets?.some((s) => s.name === name)).map((a) => ({ kind: 'app' as const, id: a.id, name: a.name })));
   const { app, db, sessions } = d;
   // The models apps need from a provider are read from (and added to) Settings → Models.
   setModelsHere(d.models ?? null);
@@ -509,6 +511,7 @@ function routes(d: Deps) {
   app.delete('/api/apps/:id', async (req) => {
     const a = getApp(db, P(req).id);
     if (!a) throw new HttpError(404, 'No such app');
+    if (a.webapp) throw new HttpError(409, `It is the flows half of the web app “${a.webapp.name}”: unlink it there first (DELETE /api/webapps/${a.webapp.id}/flows).`);
     for (const r of listRuns(db, { app: a.id, status: ['queued', 'starting', 'running', 'waiting'], steps: true })) await stopRun(r.id);
     removeScreens(db, a);
     unwatch(a.id);
@@ -661,6 +664,8 @@ function routes(d: Deps) {
       flow: typeof b.flow === 'string' && b.flow && b.flow !== 'run' ? b.flow : undefined,
       // The language the page is in, which the run writes in.
       lang: typeof b.lang === 'string' ? b.lang : undefined,
+      // The flows half of a web app: the person signed in to Hydor is who it acts for, as a proven person is recorded (not for a test of a recipe on screen, which acts for nobody).
+      ...(a && b.source !== 'test' && signedInPerson(a) ? { person: signedInPerson(a)! } : {}),
       // A try in the graph: steps it pauses before, and steps frozen at what they gave in an earlier try of the same template.
       ...(b.source === 'test' ? triedIn(db, b, a?.id ?? (template ? `tpl:${template.id}` : 'test')) : {}),
     });
@@ -727,6 +732,8 @@ function routes(d: Deps) {
       // What its view keeps for it (ticks, values its events kept).
       ...(ui ? { view: getView(db, `run:${r.id}`) } : {}),
       slug: a?.slug ?? null,
+      // The app's own pages, when the app has them: where this run is shown in them (docs/guide/90-api.md).
+      ...((x) => (x ? { openApp: x } : {}))(openAppOf(r)),
       ...(r.source === 'public' ? { asks: [] } : await followUpsOf(r)),
       ...(isFlowRun(r) ? { steps: stepsOf(r.id, { values: true }) } : {}),
       // An Ask a person step waiting for the answer, which the page asks for.
@@ -822,17 +829,7 @@ function routes(d: Deps) {
   app.post('/api/apps/runs/:runId/answer', async (req) => {
     const r = getRun(db, P(req).runId);
     if (!r) throw new HttpError(404, 'No such run');
-    const q = r.status === 'waiting' && isFlowRun(r) ? askOf(r) : null;
-    const b = (req.body ?? {}) as { step?: unknown; yes?: unknown; values?: unknown };
-    if (!q || (typeof b.step === 'string' && b.step !== q.step)) throw new HttpError(409, 'It does not wait for an answer now');
-    let values: Record<string, unknown>;
-    if (q.fields) {
-      const { values: v, errors } = checkInputs(q.fields, b.values && typeof b.values === 'object' ? (b.values as Record<string, unknown>) : {});
-      if (errors.length) throw new HttpError(400, `Check the answer: ${errors.join('; ')}`);
-      values = v;
-    } else if (typeof b.yes === 'boolean') values = { yes: b.yes };
-    else throw new HttpError(400, 'Answer yes or no (yes: true or false)');
-    if (!answerAsk(r.id, q.step, values)) throw new HttpError(409, 'It is not ready for the answer yet: try again in a moment');
+    answerRun(r, (req.body ?? {}) as { step?: unknown; yes?: unknown; values?: unknown });
     return { ok: true };
   });
 
@@ -872,6 +869,7 @@ function routes(d: Deps) {
       ...(old.flow ? { flow: old.flow } : {}),
       // In the language it wrote in.
       ...(old.lang ? { lang: old.lang } : {}),
+      ...(a && !test && signedInPerson(a) ? { person: signedInPerson(a)! } : {}),
       reuse: { run: old.id, steps: flow.steps.slice(0, k).map((s) => s.id) },
     });
     return { run: runView(r) };
@@ -1061,49 +1059,20 @@ function routes(d: Deps) {
     return { ok: true };
   });
 
-  // ---- programs: an app's API key, or the sign-in ----
+  // ---- programs: an app's API key, or the sign-in (keyroutes.ts) ----
 
-  /** The app a call may run: an app key opens its own app only (server/index.ts lets these through to here). */
-  const callable = (req: FastifyRequest): { a: AppDef; key?: string } => {
-    const a = getApp(db, P(req).slug);
-    const bearer = /^Bearer\s+(\S+)$/i.exec(String(req.headers.authorization ?? ''))?.[1];
-    if (bearer?.startsWith(KEY_PREFIX)) {
-      const k = appOfKey(db, bearer);
-      if (!k || !a || k.app !== a.id) throw new HttpError(401, 'That key does not open this app');
-      if (!keyLimiter.take(k.id, 30, 60_000)) throw new HttpError(429, 'Too many calls with this key: at most 30 a minute');
-      return { a, key: k.id };
-    }
-    // Anything else here passed the sign-in (or a machine's access token) on the way in.
-    if (!a) throw new HttpError(404, 'No such app');
-    return { a };
-  };
-
-  app.post('/api/apps/:slug/run', { bodyLimit: 40 * 1024 * 1024 }, async (req) => {
-    const { a } = callable(req);
-    const b = (req.body ?? {}) as Record<string, any>;
-    // The form's values under "inputs", or at the top level beside "wait".
-    const { wait, files, inputs, flow, ...rest } = b;
-    checkDaily(db, a);
-    const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'api', inputs: inputs && typeof inputs === 'object' ? inputs : rest, files: files && typeof files === 'object' ? files : undefined, flow: typeof flow === 'string' && flow && flow !== 'run' ? flow : undefined });
-    const done = await waitFor(r.id, waitSeconds(wait, 0, 900) * 1000);
-    const now = done ?? r;
-    return apiAnswer(now, link, isFlowRun(now) ? stepsOf(now.id) : undefined);
-  });
-
-  app.get('/api/apps/:slug/run/:runId', async (req) => {
-    const { a } = callable(req);
-    const r = getRun(db, P(req).runId);
-    if (!r || r.app !== a.id) throw new HttpError(404, 'No such run of this app');
-    const done = await waitFor(r.id, waitSeconds((req.query as Record<string, string>).wait, 0, 900) * 1000);
-    const now = done ?? r;
-    return apiAnswer(now, link, isFlowRun(now) ? stepsOf(now.id) : undefined);
-  });
+  keyRoutes(d, link);
 
   publicRoutes(d);
   // A session ended or gone takes its runs with it.
   sessions.on('sessions', (_up: unknown, removed: string[]) => {
     for (const key of removed ?? []) for (const r of listRuns(db, { status: ['starting', 'running', 'waiting'], limit: 500, steps: true })) if (r.key === key) finish(r.id, 'failed', 'The session was removed');
   });
+}
+
+/** The run a tool step of a flow calls tools for (its context is `flow-<run id>`, server/apps/flow.ts), or none. */
+function runOfStep(ctx: Pick<RunCtx, 'runId' | 'deps'>): RunRecord | null {
+  return ctx.runId.startsWith('flow-') ? getRun(ctx.deps.db, ctx.runId.slice(5)) : null;
 }
 
 // ---- the answer fields, on each app run's own MCP server ----
@@ -1281,14 +1250,22 @@ export const apps: Feature = {
       return q ? [{ id: `app-ask:${r.id}:${q.step}`, kind: q.fields ? ('form' as const) : ('question' as const), title: questionLine(q.question), detail: r.appName, at: q.since, path: `/apps/runs/${encodeURIComponent(r.id)}` }] : [];
     }),
   tools(ctx) {
+    // The functions of the web app this app is the flows half of, for the run's agents and tool steps (appfns.ts): only a run, and a tool step of one.
+    const fnRun = runOfCtx(ctx)?.run ?? (ctx.step ? runOfStep(ctx) : null);
+    const fns = fnRun && !fnRun.visitor && fnRun.source !== 'public' ? (runFunctions()?.tools(ctx, fnRun) ?? []) : [];
     // A template's run gets what it hands in with and what it keeps; any other session what templates are built with.
-    if (runOfCtx(ctx)) return [submitTool(ctx), dataTool(ctx), flowTool(ctx)].filter((t): t is RunTool => !!t);
+    if (runOfCtx(ctx)) return [submitTool(ctx), dataTool(ctx), flowTool(ctx), ...fns].filter((t): t is RunTool => !!t);
     // Any other session: what apps are built with, and the user's apps to run for them; a step also what the user did (work_log).
-    return [...builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare }), findAppsTool(ctx), useAppTool(ctx), ctx.step ? WORK_LOG : null].filter((t): t is RunTool => !!t);
+    return [...builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare }), findAppsTool(ctx), useAppTool(ctx), ctx.step ? WORK_LOG : null, ...fns].filter((t): t is RunTool => !!t);
   },
   /** An app's run gets the tools its app allows; a public run only the answer and, if allowed, the web. */
   allowTool(name, ctx) {
     const hit = runOfCtx(ctx);
+    // An app's function: only where the run's allow-list names it (never a public run, never a session that is no run's).
+    if (isFunctionTool(name)) {
+      const run = hit?.run ?? (ctx.step ? runOfStep(ctx) : null);
+      return !!run && !hit?.mark.public && run.source !== 'public' && (runFunctions()?.allows(name, run) ?? false);
+    }
     if (!hit) return true;
     if (name === 'submit_result' || name === 'app_data') return true;
     if (name === 'app_run') return hit.run.source === 'chat';

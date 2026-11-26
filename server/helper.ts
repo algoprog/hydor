@@ -4,7 +4,7 @@
 // through its CLI (else Codex), like the app's other one-off questions (server/oneshot.ts).
 import fs from 'node:fs';
 import { isSubscription, modelSource, type AgentModel } from '../shared/types.ts';
-import { chat, type ChatMessage, type Part } from './agent/llm.ts';
+import { chat, ToolsUnsupported, type ChatMessage, type Part, type Reply, type ToolSchema } from './agent/llm.ts';
 import { HttpError } from './auth.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { AGENT_FILE } from './models/config.ts';
@@ -155,6 +155,14 @@ function fallbackModels(db: DB, q: HelperAsk): AgentModel[] {
   return [...named, ...rest].slice(0, 2);
 }
 
+/** What a reply cost, in US dollars: 0 on a model of this computer or a plan, else what the server said or the model's price; undefined when no price is known. */
+function replyCost(db: DB, m: AgentModel, usage: NonNullable<Reply['usage']>): number | undefined {
+  const cached = usage.cached ?? 0;
+  const tokens = { tokensIn: Math.max(0, usage.prompt - cached), tokensCached: cached, tokensOut: usage.completion };
+  const usd = m.provider === 'ollama' || m.provider === 'vllm' || isSubscription(m.provider) ? 0 : (usage.cost ?? costOf(db, m.id, tokens) ?? costOf(db, m.model, tokens));
+  return typeof usd === 'number' && Number.isFinite(usd) ? usd : undefined;
+}
+
 /** One of Custom's models answers: its text, and what it cost told to `onCost`. */
 async function askModel(db: DB, q: HelperAsk, model: AgentModel, timeout: number): Promise<string> {
   let m = model;
@@ -167,12 +175,61 @@ async function askModel(db: DB, q: HelperAsk, model: AgentModel, timeout: number
   const signal = q.signal ? AbortSignal.any([AbortSignal.timeout(timeout), q.signal]) : AbortSignal.timeout(timeout);
   const r = await chat(m, { messages, signal, onText: () => {}, onReasoning: () => {}, maxTokens: q.maxTokens });
   if (q.onCost && r.usage) {
-    const cached = r.usage.cached ?? 0;
-    const tokens = { tokensIn: Math.max(0, r.usage.prompt - cached), tokensCached: cached, tokensOut: r.usage.completion };
-    const usd = m.provider === 'ollama' || m.provider === 'vllm' || isSubscription(m.provider) ? 0 : (r.usage.cost ?? costOf(db, m.id, tokens) ?? costOf(db, m.model, tokens));
-    if (typeof usd === 'number' && Number.isFinite(usd)) q.onCost(usd);
+    const usd = replyCost(db, m, r.usage);
+    if (usd !== undefined) q.onCost(usd);
   }
   return r.text;
+}
+
+/** A model of Custom's by its id, or null (no such model). */
+export const customModel = (id: string): AgentModel | null => customModels().find((m) => m.id === id) ?? null;
+
+/** A conversation with one of Custom's models: tool calls, a streamed answer and what it cost (what the helper's one-question call cannot do). */
+export interface HelperChat {
+  /** Custom's model id. */
+  model: string;
+  messages: ChatMessage[];
+  /** Tools the model may ask for: it only asks, the caller runs them (a model whose tools are not native is refused). */
+  tools?: ToolSchema[];
+  maxTokens?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  /** Called with each piece of the answer as it is written. */
+  onText?: (piece: string) => void;
+}
+
+export interface HelperChatDone {
+  text: string;
+  calls: { id: string; name: string; arguments: string }[];
+  /** The server's reason for stopping ("stop", "length", "tool_calls", "content_filter"…), when it said. */
+  finish?: string;
+  usage: { inputTokens: number; outputTokens: number; usd?: number };
+  /** The model's name for the log. */
+  name: string;
+}
+
+/**
+ * A turn with one of Custom's models, outside any session, with the same start, accounting and prices as the helper's
+ * one-question call (`askModel`): the web apps' AI route's way to the owner's models. Nothing of the app is reachable
+ * from it: no tools of the app's own, no memory, no files; only the tools the caller passes, which it runs itself.
+ */
+export async function helperChat(db: DB, q: HelperChat): Promise<HelperChatDone> {
+  const model = customModel(q.model);
+  if (!model) throw new HttpError(400, 'The model is gone: pick another in Settings → Models');
+  if (q.tools?.length && model.tools !== 'native') throw new ToolsUnsupported(`${model.label} does not take tool calls`);
+  let m = model;
+  if (m.start && manager) m = await manager.ensure(m.id);
+  const timeout = q.timeoutMs ?? 120_000;
+  const signal = q.signal ? AbortSignal.any([AbortSignal.timeout(timeout), q.signal]) : AbortSignal.timeout(timeout);
+  const r = await chat(m, { messages: q.messages, tools: q.tools, signal, onText: q.onText ?? (() => {}), onReasoning: () => {}, maxTokens: q.maxTokens });
+  const usd = r.usage ? replyCost(db, m, r.usage) : undefined;
+  return {
+    text: r.text,
+    calls: r.calls,
+    finish: r.finish,
+    usage: { inputTokens: r.usage?.prompt ?? 0, outputTokens: r.usage?.completion ?? 0, ...(usd !== undefined ? { usd } : {}) },
+    name: m.label,
+  };
 }
 
 /**

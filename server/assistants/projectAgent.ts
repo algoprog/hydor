@@ -66,6 +66,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
       '- Use the framework, components and styles already there; keep pages fast, accessible and right on phones as well as computers.',
       '- Run its development server and look at what you changed in a browser, with screenshots before and after a change people will see.',
       '- Run its tests, type checks and linters before you say it is done.',
+      '- When the folder is a web app of Hydor’s (it has a hydor.json, or webapp_get knows it), follow the web-app-builder skill: Hydor runs, checks and launches it.',
       '- End with what changed, how to see it, and anything left open.',
     ].join('\n'),
     tier: 'standard',
@@ -280,6 +281,7 @@ export function scanFolder(dir: string): Scan {
       const ext = e.name.includes('.') ? e.name.split('.').pop()!.toLowerCase() : '';
       const kind = EXT[ext];
       if (kind) s.counts[kind] = (s.counts[kind] ?? 0) + 1;
+      if (depth === 0 && e.name === 'hydor.json') s.webDeps = true;
       if (depth === 0 && MARKERS.includes(e.name)) s.markers.push(e.name);
       if (/^train.*\.py$/i.test(e.name) || kind === 'weights') s.mlFiles = true;
       if (depth === 0 && !s.readme && /^(readme|agents|claude)(\.md|\.markdown|\.txt|\.rst)?$/i.test(e.name)) s.readme = read(p).trim();

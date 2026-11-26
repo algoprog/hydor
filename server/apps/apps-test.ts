@@ -564,6 +564,7 @@ test('keys: shown once, kept as a hash, open their own app only, revoked at once
   const ok = await http.inject({ method: 'POST', url: `/api/apps/${a.slug}/run`, headers: { authorization: `Bearer ${key}` }, payload: { city: 'Oslo', wait: 0 } });
   assert.equal(ok.statusCode, 200, ok.body);
   assert.equal(ok.json().status, 'starting');
+  assert.equal(ok.json().state, 'waiting', 'the kit’s word for it, beside Hydor’s own');
   const other = await http.inject({ method: 'POST', url: `/api/apps/${b.slug}/run`, headers: { authorization: `Bearer ${key}` }, payload: { city: 'Oslo' } });
   assert.equal(other.statusCode, 401);
   const poll = await http.inject({ method: 'GET', url: `/api/apps/${a.slug}/run/${ok.json().run}`, headers: { authorization: `Bearer ${key}` } });

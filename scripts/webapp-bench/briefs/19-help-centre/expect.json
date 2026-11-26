@@ -1,0 +1,394 @@
+{
+  "id": "19-help-centre",
+  "group": "larger",
+  "product": "Fenwick Help",
+  "phrases": [
+    ["help centre", "help center", "Fenwick Help"],
+    ["Heating"],
+    ["Hot water"],
+    ["Payments"],
+    ["Appointments"],
+    ["Safety"]
+  ],
+  "accounts": "owner-only",
+  "access": "owner",
+  "kinds": [
+    {
+      "id": "articles",
+      "names": ["articles", "article", "help", "helparticles", "posts", "pages", "faqs", "entries"],
+      "publicRead": true,
+      "ops": ["change"],
+      "fields": [
+        {
+          "id": "title",
+          "names": ["title", "name", "heading", "headline"],
+          "kind": "text",
+          "required": true,
+          "said": ["title"]
+        },
+        {
+          "id": "text",
+          "names": ["text", "body", "content", "article", "answer", "details"],
+          "kind": "long",
+          "required": true,
+          "said": ["text"]
+        },
+        {
+          "id": "category",
+          "names": ["category", "group", "section", "topic", "categories", "kind"],
+          "kind": "choice",
+          "required": true,
+          "choices": ["Heating", "Hot water", "Payments", "Appointments", "Safety"],
+          "said": ["group"]
+        },
+        {
+          "id": "status",
+          "names": ["status", "state", "published", "draft", "visibility"],
+          "kind": "choice",
+          "required": false,
+          "choices": ["draft", "published"],
+          "said": ["status"]
+        },
+        {
+          "id": "slug",
+          "names": ["slug", "address", "url", "path", "permalink", "link"],
+          "kind": "text",
+          "readOnly": true,
+          "said": ["address", "the address"]
+        }
+      ],
+      "said": ["articles", "an article"]
+    }
+  ],
+  "rows": {
+    "articles": [
+      {
+        "title": "Why your radiator stops working",
+        "text": "Start by looking at the radiator. Check the pressure and the cold before you call us, and write down what you see. Our engineer will ask about the radiator first. Reference heating0.",
+        "category": "Heating",
+        "status": "published"
+      },
+      {
+        "title": "How we check the thermostat",
+        "text": "Start by looking at the thermostat. Check the clock and the pressure before you call us, and write down what you see. Our engineer will ask about the thermostat first. Reference heating1.",
+        "category": "Heating",
+        "status": "published"
+      },
+      {
+        "title": "When the boiler pressure needs an engineer",
+        "text": "Start by looking at the boiler pressure. Check the pressure and the filter before you call us, and write down what you see. Our engineer will ask about the boiler pressure first. Reference heating2.",
+        "category": "Heating",
+        "status": "published"
+      },
+      {
+        "title": "What to do when the timer is noisy",
+        "text": "Start by looking at the timer. Check the clock and the clock before you call us, and write down what you see. Our engineer will ask about the timer first. Reference heating3.",
+        "category": "Heating",
+        "status": "published"
+      },
+      {
+        "title": "Looking after the zone valve",
+        "text": "Start by looking at the zone valve. Check the pressure and the cold before you call us, and write down what you see. Our engineer will ask about the zone valve first. Reference heating4.",
+        "category": "Heating",
+        "status": "published"
+      },
+      {
+        "title": "Why your circulation pump stops working",
+        "text": "Start by looking at the circulation pump. Check the clock and the pressure before you call us, and write down what you see. Our engineer will ask about the circulation pump first. Reference heating5.",
+        "category": "Heating",
+        "status": "draft"
+      },
+      {
+        "title": "How we check the bleed key",
+        "text": "Start by looking at the bleed key. Check the pressure and the filter before you call us, and write down what you see. Our engineer will ask about the bleed key first. Reference heating6.",
+        "category": "Heating",
+        "status": "published"
+      },
+      {
+        "title": "When the magnetic filter needs an engineer",
+        "text": "Start by looking at the magnetic filter. Check the clock and the clock before you call us, and write down what you see. Our engineer will ask about the magnetic filter first. Reference heating7.",
+        "category": "Heating",
+        "status": "published"
+      },
+      {
+        "title": "What to do when the flue is noisy",
+        "text": "Start by looking at the flue. Check the pressure and the cold before you call us, and write down what you see. Our engineer will ask about the flue first. Reference heating8.",
+        "category": "Heating",
+        "status": "published"
+      },
+      {
+        "title": "Looking after the expansion vessel",
+        "text": "Start by looking at the expansion vessel. Check the clock and the pressure before you call us, and write down what you see. Our engineer will ask about the expansion vessel first. Reference heating9.",
+        "category": "Heating",
+        "status": "published"
+      },
+      {
+        "title": "Why your cylinder stops working",
+        "text": "Start by looking at the cylinder. Check the filter and the clock before you call us, and write down what you see. Our engineer will ask about the cylinder first. Reference hotwater0.",
+        "category": "Hot water",
+        "status": "published"
+      },
+      {
+        "title": "How we check the immersion heater",
+        "text": "Start by looking at the immersion heater. Check the cold and the cold before you call us, and write down what you see. Our engineer will ask about the immersion heater first. Reference hotwater1.",
+        "category": "Hot water",
+        "status": "draft"
+      },
+      {
+        "title": "When the mixer shower needs an engineer",
+        "text": "Start by looking at the mixer shower. Check the filter and the pressure before you call us, and write down what you see. Our engineer will ask about the mixer shower first. Reference hotwater2.",
+        "category": "Hot water",
+        "status": "published"
+      },
+      {
+        "title": "What to do when the tap flow is noisy",
+        "text": "Start by looking at the tap flow. Check the cold and the filter before you call us, and write down what you see. Our engineer will ask about the tap flow first. Reference hotwater3.",
+        "category": "Hot water",
+        "status": "published"
+      },
+      {
+        "title": "Looking after the limescale",
+        "text": "Start by looking at the limescale. Check the filter and the clock before you call us, and write down what you see. Our engineer will ask about the limescale first. Reference hotwater4.",
+        "category": "Hot water",
+        "status": "published"
+      },
+      {
+        "title": "Why your hot water store stops working",
+        "text": "Start by looking at the hot water store. Check the cold and the cold before you call us, and write down what you see. Our engineer will ask about the hot water store first. Reference hotwater5.",
+        "category": "Hot water",
+        "status": "published"
+      },
+      {
+        "title": "How we check the pressure reducing valve",
+        "text": "Start by looking at the pressure reducing valve. Check the filter and the pressure before you call us, and write down what you see. Our engineer will ask about the pressure reducing valve first. Reference hotwater6.",
+        "category": "Hot water",
+        "status": "published"
+      },
+      {
+        "title": "When the tank thermostat needs an engineer",
+        "text": "Start by looking at the tank thermostat. Check the cold and the filter before you call us, and write down what you see. Our engineer will ask about the tank thermostat first. Reference hotwater7.",
+        "category": "Hot water",
+        "status": "draft"
+      },
+      {
+        "title": "What to do when the cold feed is noisy",
+        "text": "Start by looking at the cold feed. Check the filter and the clock before you call us, and write down what you see. Our engineer will ask about the cold feed first. Reference hotwater8.",
+        "category": "Hot water",
+        "status": "published"
+      },
+      {
+        "title": "Looking after the pipe lagging",
+        "text": "Start by looking at the pipe lagging. Check the cold and the cold before you call us, and write down what you see. Our engineer will ask about the pipe lagging first. Reference hotwater9.",
+        "category": "Hot water",
+        "status": "published"
+      },
+      {
+        "title": "Why your annual service invoice stops working",
+        "text": "Start by looking at the annual service invoice. Check the clock and the filter before you call us, and write down what you see. Our engineer will ask about the annual service invoice first. Reference payments0.",
+        "category": "Payments",
+        "status": "published"
+      },
+      {
+        "title": "How we check the direct debit",
+        "text": "Start by looking at the direct debit. Check the pressure and the clock before you call us, and write down what you see. Our engineer will ask about the direct debit first. Reference payments1.",
+        "category": "Payments",
+        "status": "published"
+      },
+      {
+        "title": "When the card payment needs an engineer",
+        "text": "Start by looking at the card payment. Check the clock and the cold before you call us, and write down what you see. Our engineer will ask about the card payment first. Reference payments2.",
+        "category": "Payments",
+        "status": "published"
+      },
+      {
+        "title": "What to do when the service plan is noisy",
+        "text": "Start by looking at the service plan. Check the pressure and the pressure before you call us, and write down what you see. Our engineer will ask about the service plan first. Reference payments3.",
+        "category": "Payments",
+        "status": "draft"
+      },
+      {
+        "title": "Looking after the payment reminder",
+        "text": "Start by looking at the payment reminder. Check the clock and the filter before you call us, and write down what you see. Our engineer will ask about the payment reminder first. Reference payments4.",
+        "category": "Payments",
+        "status": "published"
+      },
+      {
+        "title": "Why your refund stops working",
+        "text": "Start by looking at the refund. Check the pressure and the clock before you call us, and write down what you see. Our engineer will ask about the refund first. Reference payments5.",
+        "category": "Payments",
+        "status": "published"
+      },
+      {
+        "title": "How we check the receipt",
+        "text": "Start by looking at the receipt. Check the clock and the cold before you call us, and write down what you see. Our engineer will ask about the receipt first. Reference payments6.",
+        "category": "Payments",
+        "status": "published"
+      },
+      {
+        "title": "When the late fee needs an engineer",
+        "text": "Start by looking at the late fee. Check the pressure and the pressure before you call us, and write down what you see. Our engineer will ask about the late fee first. Reference payments7.",
+        "category": "Payments",
+        "status": "published"
+      },
+      {
+        "title": "What to do when the quote is noisy",
+        "text": "Start by looking at the quote. Check the clock and the filter before you call us, and write down what you see. Our engineer will ask about the quote first. Reference payments8.",
+        "category": "Payments",
+        "status": "published"
+      },
+      {
+        "title": "Looking after the deposit",
+        "text": "Start by looking at the deposit. Check the pressure and the clock before you call us, and write down what you see. Our engineer will ask about the deposit first. Reference payments9.",
+        "category": "Payments",
+        "status": "draft"
+      },
+      {
+        "title": "Why your first visit stops working",
+        "text": "Start by looking at the first visit. Check the cold and the pressure before you call us, and write down what you see. Our engineer will ask about the first visit first. Reference appointments0.",
+        "category": "Appointments",
+        "status": "published"
+      },
+      {
+        "title": "How we check the rebooking",
+        "text": "Start by looking at the rebooking. Check the filter and the filter before you call us, and write down what you see. Our engineer will ask about the rebooking first. Reference appointments1.",
+        "category": "Appointments",
+        "status": "published"
+      },
+      {
+        "title": "When the missed visit needs an engineer",
+        "text": "Start by looking at the missed visit. Check the cold and the clock before you call us, and write down what you see. Our engineer will ask about the missed visit first. Reference appointments2.",
+        "category": "Appointments",
+        "status": "published"
+      },
+      {
+        "title": "What to do when the access to the boiler is noisy",
+        "text": "Start by looking at the access to the boiler. Check the filter and the cold before you call us, and write down what you see. Our engineer will ask about the access to the boiler first. Reference appointments3.",
+        "category": "Appointments",
+        "status": "published"
+      },
+      {
+        "title": "Looking after the visit window",
+        "text": "Start by looking at the visit window. Check the cold and the pressure before you call us, and write down what you see. Our engineer will ask about the visit window first. Reference appointments4.",
+        "category": "Appointments",
+        "status": "published"
+      },
+      {
+        "title": "Why your parking stops working",
+        "text": "Start by looking at the parking. Check the filter and the filter before you call us, and write down what you see. Our engineer will ask about the parking first. Reference appointments5.",
+        "category": "Appointments",
+        "status": "draft"
+      },
+      {
+        "title": "How we check the engineer arrival",
+        "text": "Start by looking at the engineer arrival. Check the cold and the clock before you call us, and write down what you see. Our engineer will ask about the engineer arrival first. Reference appointments6.",
+        "category": "Appointments",
+        "status": "published"
+      },
+      {
+        "title": "When the evening visit needs an engineer",
+        "text": "Start by looking at the evening visit. Check the filter and the cold before you call us, and write down what you see. Our engineer will ask about the evening visit first. Reference appointments7.",
+        "category": "Appointments",
+        "status": "published"
+      },
+      {
+        "title": "What to do when the emergency call out is noisy",
+        "text": "Start by looking at the emergency call out. Check the cold and the pressure before you call us, and write down what you see. Our engineer will ask about the emergency call out first. Reference appointments8.",
+        "category": "Appointments",
+        "status": "published"
+      },
+      {
+        "title": "Looking after the visit reminder",
+        "text": "Start by looking at the visit reminder. Check the filter and the filter before you call us, and write down what you see. Our engineer will ask about the visit reminder first. Reference appointments9.",
+        "category": "Appointments",
+        "status": "published"
+      },
+      {
+        "title": "Why your carbon monoxide alarm stops working",
+        "text": "Start by looking at the carbon monoxide alarm. Check the pressure and the cold before you call us, and write down what you see. Our engineer will ask about the carbon monoxide alarm first. Reference safety0.",
+        "category": "Safety",
+        "status": "published"
+      },
+      {
+        "title": "How we check the gas smell",
+        "text": "Start by looking at the gas smell. Check the clock and the pressure before you call us, and write down what you see. Our engineer will ask about the gas smell first. Reference safety1.",
+        "category": "Safety",
+        "status": "draft"
+      },
+      {
+        "title": "When the flue check needs an engineer",
+        "text": "Start by looking at the flue check. Check the pressure and the filter before you call us, and write down what you see. Our engineer will ask about the flue check first. Reference safety2.",
+        "category": "Safety",
+        "status": "published"
+      },
+      {
+        "title": "What to do when the ventilation is noisy",
+        "text": "Start by looking at the ventilation. Check the clock and the clock before you call us, and write down what you see. Our engineer will ask about the ventilation first. Reference safety3.",
+        "category": "Safety",
+        "status": "published"
+      },
+      {
+        "title": "Looking after the pilot light",
+        "text": "Start by looking at the pilot light. Check the pressure and the cold before you call us, and write down what you see. Our engineer will ask about the pilot light first. Reference safety4.",
+        "category": "Safety",
+        "status": "published"
+      },
+      {
+        "title": "Why your safe room temperature stops working",
+        "text": "Start by looking at the safe room temperature. Check the clock and the pressure before you call us, and write down what you see. Our engineer will ask about the safe room temperature first. Reference safety5.",
+        "category": "Safety",
+        "status": "published"
+      },
+      {
+        "title": "How we check the frozen condensate pipe",
+        "text": "Start by looking at the frozen condensate pipe. Check the pressure and the filter before you call us, and write down what you see. Our engineer will ask about the frozen condensate pipe first. Reference safety6.",
+        "category": "Safety",
+        "status": "published"
+      },
+      {
+        "title": "When the meter cupboard needs an engineer",
+        "text": "Start by looking at the meter cupboard. Check the clock and the clock before you call us, and write down what you see. Our engineer will ask about the meter cupboard first. Reference safety7.",
+        "category": "Safety",
+        "status": "draft"
+      },
+      {
+        "title": "What to do when the gas safe card is noisy",
+        "text": "Start by looking at the gas safe card. Check the pressure and the cold before you call us, and write down what you see. Our engineer will ask about the gas safe card first. Reference safety8.",
+        "category": "Safety",
+        "status": "published"
+      },
+      {
+        "title": "Looking after the landlord certificate",
+        "text": "Start by looking at the landlord certificate. Check the clock and the pressure before you call us, and write down what you see. Our engineer will ask about the landlord certificate first. Reference safety9.",
+        "category": "Safety",
+        "status": "published"
+      }
+    ]
+  },
+  "later": {},
+  "numbers": [],
+  "kb": {
+    "kind": "articles",
+    "searches": [
+      { "q": "thermostat", "expect": ["How we check the thermostat"] },
+      { "q": "flue", "expect": ["What to do when the flue is noisy", "When the flue check needs an engineer"] },
+      { "q": "FLUE", "expect": ["What to do when the flue is noisy", "When the flue check needs an engineer"] },
+      {
+        "q": "clock",
+        "expect": ["How we check the direct debit", "How we check the engineer arrival", "How we check the receipt", "How we check the thermostat", "Looking after the expansion vessel", "Looking after the landlord certificate", "Looking after the limescale", "Looking after the payment reminder", "What to do when the cold feed is noisy", "What to do when the quote is noisy", "What to do when the timer is noisy", "What to do when the ventilation is noisy", "When the card payment needs an engineer", "When the magnetic filter needs an engineer", "When the missed visit needs an engineer", "Why your annual service invoice stops working", "Why your cylinder stops working", "Why your refund stops working", "Why your safe room temperature stops working"]
+      },
+      { "q": "cold feed", "expect": ["What to do when the cold feed is noisy"] },
+      { "q": "heating0", "expect": ["Why your radiator stops working"] },
+      { "q": "heating5", "expect": [] },
+      { "q": "zzzz", "expect": [] }
+    ],
+    "categories": {
+      "Heating": ["How we check the bleed key", "How we check the thermostat", "Looking after the expansion vessel", "Looking after the zone valve", "What to do when the flue is noisy", "What to do when the timer is noisy", "When the boiler pressure needs an engineer", "When the magnetic filter needs an engineer", "Why your radiator stops working"],
+      "Hot water": ["How we check the pressure reducing valve", "Looking after the limescale", "Looking after the pipe lagging", "What to do when the cold feed is noisy", "What to do when the tap flow is noisy", "When the mixer shower needs an engineer", "Why your cylinder stops working", "Why your hot water store stops working"],
+      "Payments": ["How we check the direct debit", "How we check the receipt", "Looking after the payment reminder", "What to do when the quote is noisy", "When the card payment needs an engineer", "When the late fee needs an engineer", "Why your annual service invoice stops working", "Why your refund stops working"],
+      "Appointments": ["How we check the engineer arrival", "How we check the rebooking", "Looking after the visit reminder", "Looking after the visit window", "What to do when the access to the boiler is noisy", "What to do when the emergency call out is noisy", "When the evening visit needs an engineer", "When the missed visit needs an engineer", "Why your first visit stops working"],
+      "Safety": ["How we check the frozen condensate pipe", "Looking after the landlord certificate", "Looking after the pilot light", "What to do when the gas safe card is noisy", "What to do when the ventilation is noisy", "When the flue check needs an engineer", "Why your carbon monoxide alarm stops working", "Why your safe room temperature stops working"]
+    },
+    "draft": { "title": "Why your circulation pump stops working", "word": "heating5", "category": "Heating" },
+    "retitle": { "title": "Why your radiator stops working", "to": "Radiators that will not warm up", "word": "heating0" }
+  }
+}

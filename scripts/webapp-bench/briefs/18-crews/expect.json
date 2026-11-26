@@ -1,0 +1,101 @@
+{
+  "id": "18-crews",
+  "group": "larger",
+  "product": "Kestrel Crews",
+  "phrases": [["Customers", "Clients"], ["Jobs", "Work"], ["Notes", "Job notes"], ["crew", "team"]],
+  "accounts": "open",
+  "kinds": [
+    {
+      "id": "customers",
+      "names": ["customers", "customer", "clients", "client", "people"],
+      "ops": ["change"],
+      "fields": [
+        {
+          "id": "name",
+          "names": ["name", "customername", "fullname", "client"],
+          "kind": "text",
+          "required": true,
+          "said": ["name"]
+        },
+        {
+          "id": "address",
+          "names": ["address", "where", "location", "site", "place"],
+          "kind": "long",
+          "mayHave": true,
+          "said": ["address"]
+        }
+      ],
+      "said": ["customers"]
+    },
+    {
+      "id": "jobs",
+      "names": ["jobs", "job", "tasks", "task", "work", "visits"],
+      "ops": ["change"],
+      "fields": [
+        {
+          "id": "title",
+          "names": ["title", "name", "job", "jobname", "description", "what"],
+          "kind": "text",
+          "required": true,
+          "said": ["title"]
+        },
+        {
+          "id": "day",
+          "names": ["day", "date", "dueon", "jobday", "forday", "when", "scheduled", "due", "the day it is for"],
+          "kind": "day",
+          "required": true,
+          "said": ["the day it is for"]
+        },
+        {
+          "id": "done",
+          "names": ["done", "isdone", "completed", "complete", "finished"],
+          "kind": "yesno",
+          "mayHave": true,
+          "said": ["done"]
+        }
+      ],
+      "said": ["jobs"]
+    },
+    {
+      "id": "notes",
+      "names": ["notes", "note", "jobnotes", "jobnote", "comments"],
+      "ops": ["change"],
+      "fields": [
+        {
+          "id": "title",
+          "names": ["title", "name", "heading", "subject", "a title"],
+          "kind": "text",
+          "required": true,
+          "said": ["a title", "title"]
+        },
+        {
+          "id": "text",
+          "names": ["text", "note", "body", "content", "details", "message", "the note"],
+          "kind": "long",
+          "mayHave": true,
+          "said": ["the note"]
+        }
+      ],
+      "said": ["notes", "job notes"]
+    }
+  ],
+  "rows": {
+    "customers": [
+      { "name": "Mrs Alderwood", "address": "4 Mill Lane\nPerth" },
+      { "name": "Perth Bowling Club" },
+      { "name": "Dunkeld Estates", "address": "The Lodge" }
+    ],
+    "jobs": [
+      { "title": "Cut the front hedge", "day": "2027-05-10", "done": false },
+      { "title": "Plant the beds", "day": "2027-05-12" },
+      { "title": "Clear the pond", "day": "2027-05-14", "done": true }
+    ],
+    "notes": [
+      { "title": "Gate code changed", "text": "Ask for the new code at the lodge." },
+      { "title": "Dog in the garden" }
+    ]
+  },
+  "later": {},
+  "numbers": [],
+  "teams": { "kinds": ["customers", "jobs", "notes"], "roles": { "lead": "lead", "member": "member" } }
+}

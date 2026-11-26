@@ -28,6 +28,19 @@ export function startFeatures() {
   }
 }
 
+/** The server is shutting down: each capability ends what it keeps running. */
+export async function stopFeatures() {
+  await Promise.all(
+    list.map(async (f) => {
+      try {
+        await f.stop?.(deps!);
+      } catch (e) {
+        warn(f, 'stop', e);
+      }
+    }),
+  );
+}
+
 export function featureDeps(): Deps {
   if (!deps) throw new Error('The app is still starting');
   return deps;

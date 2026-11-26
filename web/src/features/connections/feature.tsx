@@ -1,9 +1,11 @@
 // Connections: services signed in once for every agent, their marketplace, and the vault for keys. They are the
 // Connected apps part of the Apps page (/apps/connected, ConnectedApps.tsx); a session's menu turns them on or off
 // for it, and an agent asking for a key shows its card in the conversation.
+import { keysCardOf } from '@shared/keys';
 import type { ToolInfo } from '@shared/types';
 import { StepRow } from '../automations/StepRow';
 import type { WebFeature } from '../registry';
+import { KeysRow } from './KeysRow';
 import { SecretCard } from './SecretCard';
 import { SessionAppsDialog, SessionAppsItem } from './SessionApps';
 
@@ -20,6 +22,8 @@ export const connectionsFeature: WebFeature = {
     request_secret: { place: 'attention', Row: SecretCard },
     run_with_secrets: { Row: StepRow, step: (t: ToolInfo) => ({ category: 'command', verb: t.status === 'running' || t.status === 'pending' ? 'Running' : 'Ran', title: commandOf(t) }) },
   },
+  // A web app's keys card, put up by webapp_keys or before a launch.
+  matchTool: (t) => (/webapp_(keys|launch)$/.test(t.name) && keysCardOf(t.output) ? { place: 'attention', Row: KeysRow } : undefined),
   // A confidential session reaches no connected app.
   SessionMenu: (p) => (p.s.extra?.confidential ? null : <SessionAppsItem {...p} />),
   sessionMenuPart: 'settings',

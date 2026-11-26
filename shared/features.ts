@@ -4,6 +4,7 @@ import type { ArenaStart } from './arena.ts';
 import type { MakeExtra } from './content-asks.ts';
 import type { GoalSettings } from './goals.ts';
 import type { ResearchSettings } from './research.ts';
+import type { WebKindPick } from './webapps.ts';
 
 /** Settings a session keeps beyond its agent's own. Each capability reads and writes its own fields. */
 export interface SessionExtra {
@@ -45,6 +46,8 @@ export interface SessionExtra {
    * app's goal loop takes it from there (shared/goals.ts) with these settings. start is set until the loop has taken it.
    */
   goal?: Partial<GoalSettings> & { start?: boolean };
+  /** Web apps: the kind of app chosen on the Apps page's "What do you want to make?" (and the name and words typed there), told to the App builder as it starts. */
+  webKind?: WebKindPick;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }

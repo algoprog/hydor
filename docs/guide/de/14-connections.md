@@ -255,7 +255,7 @@ Klicke auf den runden Pfeil (**Neuer Wert**) neben dem Key, füge den neuen Wert
 
 ### Einen Key löschen
 
-Klicke auf den Papierkorb **Löschen** und bestätige. Der Wert wird endgültig entfernt und kann von Agenten nicht mehr verwendet werden.
+Klicke auf den Papierkorb **Löschen** und bestätige. Der Wert wird endgültig entfernt und kann von Agenten nicht mehr verwendet werden. Die Rückfrage nennt vorher die Apps, die ihn verwenden, und die Web-Apps, die unter diesem Namen einen eigenen Wert haben (der bleibt).
 
 ### Wie Agenten einen Key verwenden dürfen
 
@@ -290,6 +290,20 @@ Bei Webseiten- oder Dienstanmeldungen fragt **Der Agent bittet um Anmeldedaten**
 3. Klicke auf **Im Tresor speichern**.
 
 Jedes Geheimnis kommt als eigener Key in den Tresor, benannt nach der Anmeldung (aus einem Voltaro-Passwort wird VOLTARO_PASSWORD). Ein Feld mit der Markierung **Diese Angabe ist für den Agenten sichtbar** ist eine Angabe, die nicht geheim ist, etwa die Adresse eines Servers: Der Agent bekommt, was du dort eintippst, und es wird nicht im Tresor aufbewahrt. Ein Feld, das der Tresor schon hat, sagt das: Lass es leer, um zu behalten, was gespeichert ist. Nach dem Speichern listet die Karte die Keys auf, und der Agent kann sich damit in seinem Browser anmelden, nur auf diesen Hosts und ohne sie zu sehen.
+
+### Mehrere Keys auf einer Karte, mit Anleitung
+
+Braucht eine Aufgabe mehr als einen Key, oder kann der Agent sagen, wie du einen bekommst, legt er alles auf eine Karte: für jeden einen Tab (auf dem Telefon eine Zeile zum Aufklappen). Jeder sagt, wer den Key ausgibt und wofür er gebraucht wird, führt unter **How to get it** kurze nummerierte Schritte auf, verlinkt die Seite des Anbieters (sie öffnet in einem neuen Tab) und hat seine Felder.
+
+1. Folge den Schritten und füge jeden Wert in sein Feld ein. Er ist beim Tippen verdeckt; das Auge zeigt ihn. Die Zeile unter einem Feld sagt, wie ein richtiger Wert aussieht, und warnt, wenn das Eingefügte offensichtlich keiner ist (sie hält dich nie auf).
+2. Klicke auf diesem Tab auf **Speichern**, oder auf **Vorerst überspringen**, wo es angeboten wird.
+3. Weiter zum nächsten. Die Zeichen an den Tabs sagen, was gespeichert, übersprungen oder noch offen ist, und in der Ecke steht, wie viele.
+
+- Ein Key, den der Tresor schon hat, wird nie angezeigt: Wähle **Use the one saved on** (mit dem Datum) oder **Ersetzen**.
+- Der Agent erfährt davon, sobald jeder nötige Key gespeichert ist, oder wenn du auf **Close without the rest** klickst: für jeden gespeichert, übersprungen oder offen, und nichts vom Wert. Auch einen optionalen, den du danach ergänzt, erfährt er.
+- Für eine App, die in Hydor läuft, nehmen Zahlungen nur einen Test-Key (er beginnt mit sk_test_): Ein Live-Key wird dort abgelehnt.
+- Bei einer Web-App warnt die Karte vor einem Einfügen, das klar etwas anderes ist (ein veröffentlichbarer Key, wo der geheime hingehört).
+- Ein Feld mit der Markierung **Diese Angabe ist für den Agenten sichtbar** bekommt der Agent so, wie du es eintippst, wie auf der Karte einer Anmeldung.
 
 ## Befehle mit Keys
 
@@ -410,3 +424,4 @@ Diese Aktionen können Agenten mit deiner Kartenfreigabe übernehmen. Key-Werte 
 - „Zeige die am häufigsten installierten Claude-Code-Plugins und installiere anschließend meine Auswahl.“
 - „Melde dich bei Voltaro an und lade die Rechnungen dieses Jahres in diesen Ordner.“ Beim ersten Mal erscheint eine Anmeldekarte.
 - „Pushe diesen Branch mit dem Token aus dem Tresor zu GitHub.“
+- „Frag mich nach den Keys, die mein Shop braucht, alle auf einer Karte, und sag mir, wie ich jeden bekomme.“

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "start": {
+    "command": "node server.js",
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "env": { "SESSION_SECRET": "{secret}" },
+    "secrets": ["SESSION_SECRET"],
+    "browserFolders": ["public"]
+  },
+  "accounts": {
+    "signUp": { "path": "/api/sign-up", "body": { "name": "{name}", "email": "{email}", "password": "{password}" } },
+    "signIn": { "path": "/api/sign-in", "body": { "email": "{email}", "password": "{password}" } }
+  },
+  "things": {
+    "articles": {
+      "list": { "path": "/api/articles", "rows": "rows" },
+      "add": { "path": "/api/articles" },
+      "one": { "path": "/api/articles/{id}", "read": "GET", "change": "PATCH", "remove": "DELETE" },
+      "fields": { "title": "title", "text": "text", "group": "category", "status": "status", "address": "slug" }
+    }
+  },
+  "site": { "article": "/help/{slug}", "search": "/search?q={q}", "category": "/help/category/{category}" }
+}

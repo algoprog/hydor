@@ -56,6 +56,7 @@ async function report(): Promise<DeviceReport> {
     enter,
     terminalSuggestions: ui.termSuggest,
     wordSuggestions: ui.wordSuggestions,
+    technicalDetails: ui.technicalDetails,
     sidebar: ui.sideOpen,
     groupSessions: ui.groupByFolder,
     voiceLanguage: v.lang,
@@ -80,7 +81,7 @@ export function deviceChanged() {
   }, 400);
 }
 
-const WATCHED = ['theme', 'darkTheme', 'lightTheme', 'motion', 'textSize', 'convZoom', 'termSuggest', 'wordSuggestions', 'sideOpen', 'groupByFolder'] as const;
+const WATCHED = ['theme', 'darkTheme', 'lightTheme', 'motion', 'textSize', 'convZoom', 'termSuggest', 'wordSuggestions', 'technicalDetails', 'sideOpen', 'groupByFolder'] as const;
 
 /** Starts telling: now, and whenever one of these settings changes. */
 export function startDeviceReports() {

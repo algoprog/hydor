@@ -1,0 +1,9 @@
+{
+  "name": "quayside-rowing-club",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A rowing club's members, notices and monthly fees, written by hand: a reference the judge's self-test uses.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "better-sqlite3": "13.0.3" }
+}

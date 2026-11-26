@@ -1,0 +1,6 @@
+body { font-family: Georgia, serif; background: #fbf3ea; color: #3b2314; margin: 0; }
+main { max-width: 38rem; margin: 0 auto; padding: 2rem 1rem; }
+h1 { color: #b45309; }
+label { display: block; margin-top: 1rem; }
+input, textarea { width: 100%; padding: 0.5rem; font: inherit; box-sizing: border-box; }
+button { margin-top: 1rem; padding: 0.6rem 1.2rem; background: #b45309; color: white; border: 0; font: inherit; }

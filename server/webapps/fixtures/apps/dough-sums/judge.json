@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "start": {
+    "command": "node server.js",
+    "port": "PORT",
+    "data": "DATA_DIR",
+    "ready": "/"
+  },
+  "home": "/",
+  "actions": {
+    "work out": {
+      "path": "/api/work-out",
+      "method": "POST",
+      "send": "json",
+      "input": {
+        "loaves": "loaves",
+        "loaf weight": "loafWeight",
+        "water": "water",
+        "salt": "salt",
+        "starter": "starter"
+      },
+      "output": {
+        "flour": "flour",
+        "water": "water",
+        "salt": "salt",
+        "starter": "starter",
+        "total dough": "totalDough"
+      }
+    }
+  }
+}

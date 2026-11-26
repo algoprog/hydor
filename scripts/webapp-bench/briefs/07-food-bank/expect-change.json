@@ -1,0 +1,167 @@
+{
+  "id": "07-food-bank",
+  "group": "accounts",
+  "product": "Eastgate Food Bank",
+  "phrases": [["Stock", "Store", "Inventory", "Items"], ["Deliveries", "Delivery", "Donations", "Intake", "Arrivals"]],
+  "accounts": "any",
+  "access": "team",
+  "kinds": [
+    {
+      "id": "stock",
+      "names": ["stock", "stocks", "stock items", "stock item", "items", "item", "inventory", "store", "products", "goods", "things", "storeroom", "the things in the store"],
+      "fields": [
+        {
+          "id": "name",
+          "names": ["name", "title", "item", "product", "what", "label", "what it is"],
+          "kind": "text",
+          "required": true,
+          "said": ["what it is"]
+        },
+        {
+          "id": "group",
+          "names": ["group", "category", "type", "kind", "sort", "class", "section", "stocktype", "itemtype", "sortof", "what sort of thing it is"],
+          "kind": "choice",
+          "required": true,
+          "choices": ["tinned", "fresh", "dry goods", "baby & household"],
+          "said": ["what sort of thing it is"]
+        },
+        {
+          "id": "quantity",
+          "names": ["quantity", "qty", "count", "howmany", "amount", "number", "stock", "onhand", "level", "units", "inhand"],
+          "kind": "integer",
+          "required": true,
+          "said": ["how many we have"]
+        },
+        {
+          "id": "bestBefore",
+          "names": ["bestbefore", "bestbeforedate", "bestbeforeon", "expiry", "expires", "expirydate", "expireson", "useby", "usebydate", "bbd", "bb"],
+          "kind": "day",
+          "required": false,
+          "said": ["best-before date"]
+        },
+        {
+          "id": "photo",
+          "names": ["photo", "picture", "image", "pic", "photograph", "photos"],
+          "kind": "file",
+          "required": false,
+          "file": "image",
+          "said": ["photo"]
+        },
+        {
+          "id": "notes",
+          "names": ["notes", "note", "comments", "comment", "details", "remarks"],
+          "kind": "long",
+          "required": false,
+          "said": ["notes"]
+        }
+      ],
+      "ops": ["change"],
+      "said": ["stock", "the things in the store"]
+    },
+    {
+      "id": "deliveries",
+      "names": ["deliveries", "delivery", "donations", "donation", "intake", "receipts", "arrivals", "incoming", "received", "consignments"],
+      "fields": [
+        {
+          "id": "item",
+          "names": ["item", "stock", "stockitem", "product", "what", "stockid", "goods", "thing", "what came"],
+          "kind": "ref",
+          "required": true,
+          "to": "stock",
+          "said": ["which stock item came", "what came"]
+        },
+        {
+          "id": "from",
+          "names": ["from", "source", "supplier", "donor", "donatedby", "receivedfrom", "camefrom", "origin", "sender", "fromwho", "deliveredby", "provider"],
+          "kind": "text",
+          "required": true,
+          "said": ["who it came from"]
+        },
+        {
+          "id": "received",
+          "names": ["received", "receivedon", "receivedat", "arrived", "arrivedon", "arrivedat", "date", "day", "deliveredon", "dateofdelivery", "receiveddate", "arrival", "arrivaldate", "deliverydate", "datereceived"],
+          "kind": "day",
+          "required": true,
+          "said": ["the day it arrived"]
+        },
+        {
+          "id": "kilos",
+          "names": ["kilos", "kilo", "kg", "kgs", "weight", "weightkg", "kilograms", "kilogram", "weightinkilos", "weightkilos", "totalkg", "how many kilos it weighed"],
+          "kind": "integer",
+          "required": true,
+          "said": ["kilos", "how many kilos it weighed"]
+        },
+        {
+          "id": "putAway",
+          "names": ["putaway", "putawayyet", "isputaway", "stored", "storedaway", "away", "done", "shelved", "unpacked", "packedaway", "putaway", "putinstore", "filed", "processed"],
+          "kind": "yesno",
+          "required": false,
+          "said": ["put away", "whether it has been put away"]
+        }
+      ],
+      "ops": ["change"],
+      "said": ["deliveries"]
+    }
+  ],
+  "rows": {
+    "stock": [
+      { "name": "Baked beans", "group": "tinned", "quantity": 4 },
+      {
+        "name": "Pasta",
+        "group": "dry goods",
+        "quantity": 36,
+        "bestBefore": "$thisMonth:20",
+        "notes": "Donated by the school harvest festival."
+      },
+      { "name": "Tomato soup", "group": "tinned", "quantity": 8 },
+      { "name": "Nappies size 3", "group": "baby & household", "quantity": 41 },
+      { "name": "Apples", "group": "fresh", "quantity": 17, "bestBefore": "$today+9" },
+      { "name": "Chicken soup", "group": "tinned", "quantity": 15 }
+    ],
+    "deliveries": [
+      { "item": "@stock.1", "from": "Tesco Community", "received": "$thisMonth:12", "kilos": 120, "putAway": true },
+      { "item": "@stock.3", "from": "Baby Basics", "received": "$thisMonth:13", "kilos": 45, "putAway": false },
+      { "item": "@stock.2", "from": "Harvest Church", "received": "$lastMonth:20", "kilos": 300, "putAway": true }
+    ]
+  },
+  "later": {
+    "stock": [
+      { "name": "Tuna", "group": "tinned", "quantity": 5 },
+      { "name": "Rice", "group": "dry goods", "quantity": 9 }
+    ],
+    "deliveries": [
+      { "item": "@stock.0", "from": "Co-op", "received": "$thisMonth:15", "kilos": 83, "putAway": false },
+      {
+        "item": "@stock.4",
+        "from": "Allotment society",
+        "received": "$thisMonth:16",
+        "kilos": 52,
+        "putAway": false
+      }
+    ]
+  },
+  "numbers": [
+    {
+      "id": "low",
+      "of": "stock",
+      "agg": "count",
+      "where": [{ "field": "quantity", "lt": 20 }],
+      "say": "things running low (fewer than 20 left)"
+    },
+    {
+      "id": "kilos",
+      "of": "deliveries",
+      "agg": "sum",
+      "field": "kilos",
+      "where": [{ "field": "received", "thisMonth": true }],
+      "say": "kilos taken in this month"
+    },
+    {
+      "id": "notPutAway",
+      "of": "deliveries",
+      "agg": "count",
+      "where": [{ "field": "putAway", "eq": false }],
+      "say": "deliveries not yet put away"
+    }
+  ]
+}

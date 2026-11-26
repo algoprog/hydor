@@ -1,0 +1,86 @@
+:root {
+  --bg: #121714; --panel: #1b221e; --line: #313b35; --text: #eef2ee; --muted: #a6b2a9;
+  --accent: #7fd69a; --accent-text: #08210f; --warn: #f2c14e; --bad: #ff8f85;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding: .8rem 1rem; border-bottom: 1px solid var(--line); }
+.brand { font-weight: 700; font-size: 1.1rem; color: var(--text); text-decoration: none; }
+nav { display: flex; gap: .25rem; }
+nav a { padding: .55rem .8rem; border-radius: .6rem; color: var(--muted); text-decoration: none; }
+nav a[aria-current] { background: var(--panel); color: var(--text); font-weight: 600; }
+main { max-width: 44rem; margin: 0 auto; padding: 1rem 1rem 3rem; }
+h1 { font-size: 1.5rem; margin: .4rem 0 1rem; }
+h2 { font-size: 1.15rem; margin: 1.6rem 0 .6rem; }
+.muted, .hint, small { color: var(--muted); }
+.hint { font-size: .85rem; font-weight: 400; }
+.notice, .error { padding: .75rem 1rem; border-radius: .6rem; border: 1px solid; }
+.notice { border-color: var(--accent); background: #16301f; }
+.error { border-color: var(--bad); background: #351b19; }
+
+input, select, textarea, button, .button { font: inherit; border-radius: .6rem; min-height: 2.9rem; }
+input, select, textarea { width: 100%; padding: .55rem .7rem; background: var(--bg); color: var(--text); border: 1px solid #55625a; }
+input[type=checkbox] { width: 1.5rem; height: 1.5rem; min-height: 0; accent-color: var(--accent); flex: none; }
+button, .button { display: inline-flex; align-items: center; justify-content: center; padding: .55rem 1rem; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; cursor: pointer; text-decoration: none; }
+button.second, .button.second { background: transparent; color: var(--accent); }
+button.bad { background: transparent; color: var(--bad); border-color: var(--bad); }
+button:disabled { opacity: .35; cursor: default; }
+:focus-visible { outline: 3px solid var(--warn); outline-offset: 2px; }
+
+label { display: block; font-weight: 600; margin-bottom: 1rem; }
+label input, label select, label textarea { display: block; margin-top: .3rem; font-weight: 400; }
+label.check { display: flex; align-items: center; gap: .6rem; }
+label.check input { margin: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: .8rem; padding: 1rem; margin: 0 0 1rem; }
+.panel h2 { margin-top: 0; }
+.panel > button { width: 100%; }
+.code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.4rem; letter-spacing: .12em; }
+summary { cursor: pointer; padding: .5rem 0; }
+.danger { margin-top: 1.5rem; }
+.danger summary { color: var(--bad); }
+
+.tiles { display: grid; gap: .7rem; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+.tile { display: block; padding: 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: .8rem; color: var(--text); text-decoration: none; }
+.tile strong { display: block; font-size: 2.6rem; line-height: 1.1; }
+.tile span { display: block; font-weight: 600; }
+.tile.warn { border-color: var(--warn); }
+.tile.warn strong { color: var(--warn); }
+.actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.actions .button { flex: 1 1 12rem; }
+.heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; }
+.heading h1 { margin: .4rem 0; }
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .8rem; }
+.filters input { grid-column: 1 / -1; }
+.filters button { grid-column: 1 / -1; }
+.switch { display: flex; flex-wrap: wrap; gap: .4rem; }
+.switch a { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: 2rem; text-decoration: none; }
+.switch a[aria-current] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+
+.cards { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: .6rem; }
+.card { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding: .8rem; background: var(--panel); border: 1px solid var(--line); border-radius: .8rem; scroll-margin-top: 1rem; }
+.what { flex: 1 1 10rem; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; }
+.title { font-weight: 700; font-size: 1.1rem; }
+.notes { white-space: pre-line; font-size: .92rem; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.thumb { width: 4.2rem; height: 4.2rem; border-radius: .6rem; object-fit: cover; display: block; }
+.thumb.none { display: grid; place-items: center; background: var(--line); color: var(--muted); font-size: 1.6rem; }
+.photo { max-width: 100%; max-height: 18rem; border-radius: .8rem; }
+.badge { font-size: .82rem; font-weight: 600; padding: .05rem .55rem; border-radius: 2rem; border: 1px solid; }
+.badge.warn { color: var(--warn); }
+.badge.bad { color: var(--bad); }
+.badge.ok { color: var(--accent); }
+.count { display: flex; align-items: center; gap: .5rem; margin-left: auto; text-align: center; }
+.count span { min-width: 3.5rem; }
+.count strong { display: block; font-size: 1.6rem; line-height: 1.1; }
+.step { width: 2.9rem; padding: 0; font-size: 1.4rem; background: transparent; color: var(--accent); }
+.delivery > form { margin-left: auto; }
+.person details form { margin: .4rem 0; }
+
+/* On a phone the menu sits at the bottom, under the thumb. */
+@media (max-width: 36rem) {
+  body.in nav { position: fixed; z-index: 2; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); padding: .35rem .5rem calc(.35rem + env(safe-area-inset-bottom)); }
+  body.in nav a { flex: 1; text-align: center; padding: .7rem .2rem; }
+  body.in nav a[aria-current] { background: var(--line); }
+  body.in main { padding-bottom: 6rem; }
+}

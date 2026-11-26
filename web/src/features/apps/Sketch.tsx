@@ -24,6 +24,8 @@ import { EstimateText } from './Estimate';
 import { ResultView } from './Result';
 import { ICON, KIND_COLOR } from './stepKinds';
 import { AppView } from './View';
+import { parseWebSketch } from '../webapps/chooseLogic';
+import { WebSketchCard } from '../webapps/WebSketch';
 
 interface SketchStep {
   title: string;
@@ -236,6 +238,8 @@ export function SketchRow({ item, sessionKey }: { item: ToolItem; sessionKey: st
       return null;
     }
   }, [t.output]);
+  // A web app's sketch has its own card (kind "web").
+  const web = useMemo(() => parseWebSketch(t.output), [t.output]);
   if (t.status === 'running' || t.status === 'pending')
     return (
       <div className="my-1.5 flex items-center gap-2 text-[13px] text-fg-2">
@@ -245,6 +249,7 @@ export function SketchRow({ item, sessionKey }: { item: ToolItem; sessionKey: st
         Sketching the app…
       </div>
     );
+  if (web) return <WebSketchCard out={web} sessionKey={sessionKey} answered={answered} />;
   if (!out)
     return (
       <div className="my-2 rounded-xl bg-bg-2 px-3 py-2 text-[12.5px] whitespace-pre-wrap text-fg-2" translate="no">

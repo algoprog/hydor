@@ -4,7 +4,9 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, KeyRound, LockKeyhole, Pencil, Plus, RotateCcw, SquareTerminal, Trash2 } from 'lucide-react';
 import { cleanDomains, secretName, type SecretView } from '@shared/connections';
-import { del, enc, patch, post } from '../../lib/api';
+import type { KeyUse } from '@shared/keys';
+import { tr } from '../../i18n/runtime';
+import { api, del, enc, patch, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { toast, toastError } from '../../lib/store';
 import { Button, cx, Dialog, Empty, IconButton, inputCls, Section, Switch, Throbber, useConfirm } from '../../components/ui';
@@ -156,7 +158,47 @@ export function Keys() {
   const [mode, setMode] = useState<Mode | null>(null);
   const [confirm, confirmNode] = useConfirm();
   const remove = async (s: SecretView) => {
-    if (!(await confirm({ title: `Delete ${s.name}?`, body: 'Agents can no longer use it, and its value is gone for good.', confirm: 'Delete', danger: true }))) return;
+    // Which apps need it, said before it goes (names only).
+    const uses = await api<{ uses: KeyUse[] }>(`/api/connections/secrets/${enc(s.name)}/uses`).then(
+      (r) => r.uses,
+      () => [] as KeyUse[],
+    );
+    // Apps that use this one, and web apps that keep a value of their own under its name (which stays).
+    const using = uses.filter((u) => !u.own);
+    const keeping = uses.filter((u) => u.own);
+    const list = (of: KeyUse[]) => (
+      <ul className="list-disc space-y-1 pl-5">
+        {of.map((u) => (
+          <li key={`${u.kind}:${u.id}`}>
+            <b translate="no">{u.name}</b>{' '}
+            <span className="text-fg-3">
+              {u.kind === 'webapp' ? tr('web app') : tr('app')}
+              {u.where?.length ? <span>: {u.where.map((w) => (w === 'hydor' ? tr('inside Hydor') : w)).join(', ')}</span> : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    );
+    const body = uses.length ? (
+      <div className="space-y-2 text-[13.5px] leading-snug" data-keys="uses">
+        <p>Agents can no longer use it, and its value is gone for good.</p>
+        {using.length > 0 && (
+          <>
+            <p>{using.length === 1 ? 'This app uses it, and goes without it from now on:' : 'These apps use it, and go without it from now on:'}</p>
+            {list(using)}
+          </>
+        )}
+        {keeping.length > 0 && (
+          <>
+            <p>{keeping.length === 1 ? 'This web app keeps its own value under this name, which stays:' : 'These web apps keep their own values under this name, which stay:'}</p>
+            {list(keeping)}
+          </>
+        )}
+      </div>
+    ) : (
+      'Agents can no longer use it, and its value is gone for good.'
+    );
+    if (!(await confirm({ title: `Delete ${s.name}?`, body, confirm: 'Delete', danger: true }))) return;
     await del(`/api/connections/secrets/${enc(s.name)}`).catch(toastError);
     await useConn.getState().load();
   };

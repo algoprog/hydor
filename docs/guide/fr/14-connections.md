@@ -255,7 +255,7 @@ Cliquez sur le crayon (**Hôtes, note et mode d’envoi**), modifiez les hôtes,
 
 ### Supprimer une clé
 
-Cliquez sur la corbeille (**Supprimer**) et confirmez. Les agents ne peuvent plus utiliser la clé, et sa valeur est définitivement perdue.
+Cliquez sur la corbeille (**Supprimer**) et confirmez. Les agents ne peuvent plus utiliser la clé, et sa valeur est définitivement perdue. La question nomme d’abord les apps qui l’utilisent, et les applis web qui ont leur propre valeur sous ce nom (la leur reste).
 
 ### Ce que les agents peuvent et ne peuvent pas faire avec une clé
 
@@ -290,6 +290,20 @@ Pour se connecter à un site ou à un service, un agent demande tout en une fois
 3. Cliquez sur **Enregistrer dans le coffre**.
 
 Chaque secret est enregistré dans le coffre comme une clé à part entière, nommée d’après la connexion (un mot de passe Voltaro devient VOLTARO_PASSWORD). Un champ marqué **L’agent voit celle-ci** est une information qui n’est pas secrète, comme l’adresse d’un serveur : l’agent reçoit ce que vous y saisissez, et cela n’est pas conservé dans le coffre. Un champ que le coffre contient déjà le signale : laissez-le vide pour conserver la valeur enregistrée. Une fois la connexion enregistrée, la carte liste les clés, et l’agent peut se connecter avec elles dans son navigateur, uniquement sur ces hôtes, sans les voir.
+
+### Plusieurs clés sur une seule carte, avec comment les obtenir
+
+Quand une tâche a besoin de plus d’une clé, ou que l’agent peut vous dire comment en obtenir une, il les met sur une seule carte : un onglet pour chacune (sur un téléphone, une ligne qui s’ouvre). Chacun dit qui donne la clé et pourquoi elle est nécessaire, liste sous **How to get it** de courtes étapes numérotées, renvoie à la page du fournisseur (elle s’ouvre dans un nouvel onglet) et a ses champs.
+
+1. Suivez les étapes et collez chaque valeur dans son champ. Elle est masquée pendant la saisie ; l’œil l’affiche. La ligne sous un champ dit à quoi ressemble une valeur correcte, et prévient quand ce que vous avez collé n’en est manifestement pas une (elle ne vous bloque jamais).
+2. Cliquez sur **Enregistrer** dans cet onglet, ou sur **Ignorer pour l’instant** quand c’est proposé.
+3. Passez au suivant. Les marques des onglets disent ce qui est enregistré, ignoré ou à faire, et le coin les compte.
+
+- Une clé que le coffre a déjà n’est jamais affichée : choisissez **Use the one saved on** (avec la date) ou **Remplacer**.
+- L’agent est informé dès que chaque clé nécessaire est enregistrée, ou quand vous appuyez sur **Close without the rest** : pour chacune, enregistrée, ignorée ou restante, et rien de sa valeur. Une clé facultative ajoutée ensuite lui est signalée aussi.
+- Pour une appli qui tourne dans Hydor, les paiements n’acceptent qu’une clé de test (elle commence par sk_test_) : une clé réelle y est refusée.
+- Pour une appli web, la carte signale un collage qui est manifestement autre chose (une clé publique là où va la secrète).
+- Un champ marqué **L’agent voit celle-ci** est transmis à l’agent tel que vous l’avez saisi, comme sur la carte d’une connexion.
 
 ## Commandes qui utilisent une clé
 
@@ -410,3 +424,4 @@ Les agents peuvent faire tout cela pour vous, avec votre accord sur une carte. I
 - « Montre-moi les plugins Claude Code les plus installés, puis installe celui que je choisis. »
 - « Connecte-toi à mon compte Voltaro et télécharge les factures de cette année dans ce dossier. » (La première fois, il demande la connexion sur une carte.)
 - « Envoie cette branche vers GitHub avec le jeton du coffre. »
+- « Demande-moi les clés dont ma boutique a besoin, toutes sur une carte, et dis-moi comment obtenir chacune. »
