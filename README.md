@@ -8,9 +8,10 @@
 <h3 align="center">The everything app for AI agents</h3>
 
 <p align="center">
-  <b>Claude Code, Codex and any model in one app, on the plans you already pay for.</b><br />
-  They share one memory, answer with charts, maps and apps, carry on with your other account when one hits its limit,
-  and ask for your OK on your phone.
+  <b>Give Claude Code, Codex or any model a goal, and come back to finished work.</b><br />
+  Hydor gives them a shared memory, a browser, subagents on cheaper models, and a schedule to run on. They answer with
+  charts, maps and apps, write documents, slides and spreadsheets you can edit in the app, and carry on with your other
+  account when one hits its limit. Your OK is a tap away on your phone.
 </p>
 
 <p align="center">
@@ -47,7 +48,8 @@ Six reasons to move your work here:
 
 1. **[Every agent, on the plans you already pay for.](docs/guide/16-agents-models.md)** Claude Code on your Claude plan
    and Codex on your ChatGPT plan: the official programs, with nothing more to pay. Gemini CLI, OpenCode, Grok Build
-   and more run beside them, and Hydor's own agent takes any model, local ones too.
+   and more run beside them, and Hydor's own agent takes any model: one in the cloud, or a local model that runs on
+   your own computer with Ollama, vLLM or llama.cpp, with the same memory, tools and subagents as the rest.
 2. **[A usage limit doesn't stop the work.](docs/guide/16-agents-models.md#use-all-your-accounts-switch-at-a-limit)**
    Sign in more than one Claude, ChatGPT or Grok account, a work and a personal one say. When one hits its limit, the
    session moves to another by itself, with its history, and carries on.
