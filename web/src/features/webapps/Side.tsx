@@ -13,6 +13,7 @@ import { busy, useLoaded, webAppPath } from './api';
 import { Preview } from './Preview';
 import { SideTry } from './simple/SideTry';
 import { shortState } from './simple/plain';
+import { useBeingMade } from './simple/sessions';
 import { latestWebApp, webAppOf, webSideTarget } from './side.ts';
 import { keysCardOf } from '@shared/keys';
 import { KeysCard } from '../connections/KeysCard';
@@ -104,6 +105,7 @@ export function WebSide({ s }: { s: SessionSummary }) {
   const width = useCanvas((x) => x.width);
   const app = useLoaded<{ app: WebAppDetail }>(id ? `/api/webapps/${enc(id)}` : null);
   const going = !!app.data && busy(app.data.app);
+  const making = useBeingMade(app.data?.app);
   // While it builds or starts, ask again until it is not.
   useEffect(() => {
     if (!going) return;
@@ -119,7 +121,7 @@ export function WebSide({ s }: { s: SessionSummary }) {
         <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
           {a?.name ?? ''}
         </span>
-        {a && <StatusLabel s={technical ? statusOf(a) : shortState(a)} />}
+        {a && <StatusLabel s={technical ? statusOf(a) : shortState(a, making)} />}
         <IconButton label="Open its page" size="sm" onClick={() => go(webAppPath(id))}>
           <ExternalLink size={14} />
         </IconButton>

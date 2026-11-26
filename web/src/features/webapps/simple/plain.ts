@@ -284,8 +284,10 @@ export function needsOf(f: NeedFacts): NeedFact[] {
 
 // ---- an app on the Apps page ----------------------------------------------------------------------------------------------------------
 
-/** An app's state in a word or two, for its card and the panel beside a conversation. */
-export function shortState(app: Pick<WebApp, 'shape' | 'build' | 'run' | 'mode'>): { tone: Tone; label: string } {
+/** An app's state in a word or two, for its card and the panel beside a conversation. `making`: its agent is at work on it. */
+export function shortState(app: Pick<WebApp, 'shape' | 'build' | 'run' | 'mode'>, making = false): { tone: Tone; label: string } {
+  // What does not run yet while its agent still works on it is unfinished, not broken.
+  if (making && (!app.shape.ok || app.build.state === 'failed' || app.run.state === 'crashed')) return { tone: 'busy', label: 'Being made' };
   if (!app.shape.ok) {
     if (/has no hydor\.json yet/i.test(app.shape.problem ?? '')) return { tone: 'idle', label: 'Being made' };
     return { tone: 'err', label: 'Needs fixing' };

@@ -145,8 +145,8 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const safeId = (id: string) => /^[A-Za-z0-9_-]{1,80}$/.test(id);
 
-/** Whether the ready address answers on the port with any 2xx or 3xx. */
-function healthy(port: number, path: string): Promise<boolean> {
+/** How the ready address answers on the port: its status (ready on any 2xx or 3xx), or 0 for no answer. */
+function healthy(port: number, path: string): Promise<number> {
   return new Promise((resolve) => {
     const req = http.get(
       {
@@ -158,12 +158,11 @@ function healthy(port: number, path: string): Promise<boolean> {
       },
       (r) => {
         r.resume();
-        const code = r.statusCode ?? 0;
-        resolve(code >= 200 && code < 400);
+        resolve(r.statusCode ?? 0);
       },
     );
     req.on("timeout", () => req.destroy());
-    req.on("error", () => resolve(false));
+    req.on("error", () => resolve(0));
   });
 }
 
@@ -437,9 +436,13 @@ export function createHost(options: HostOptions): Host {
     const deadline = Date.now() + limit;
     let ended = false;
     r.onExit.push(() => (ended = true));
+    // What its ready address last answered when not ready: a server that is up but has no page there yet (404 while an app is
+    // being made) is said as such, not as one that does not answer.
+    let answered = 0;
     for (;;) {
       if (ended || exited) break;
-      if (await healthy(port, readyAt)) {
+      const code = await healthy(port, readyAt);
+      if (code >= 200 && code < 400) {
         if (ended || exited) break;
         r.state = "running";
         r.since = Date.now();
@@ -447,6 +450,7 @@ export function createHost(options: HostOptions): Host {
         say(r, "--- ready");
         return port;
       }
+      if (code) answered = code;
       if (Date.now() > deadline) break;
       await sleep(120);
     }
@@ -457,7 +461,8 @@ export function createHost(options: HostOptions): Host {
       await r.stopping;
       r.stopping = null;
       // Its ending was on purpose, but the start failed: that is a fall.
-      fell(r, `did not answer ${c.shape.ready} within ${Math.round(limit / 1000)} s`);
+      const s = Math.round(limit / 1000);
+      fell(r, answered ? `${c.shape.ready} answered ${answered} for ${s} s, not a 2xx or 3xx` : `did not answer ${c.shape.ready} within ${s} s`);
       r.port = null;
     }
     r.port = null;

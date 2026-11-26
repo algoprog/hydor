@@ -5,7 +5,7 @@ import '../test-dom.test';
 import assert from 'node:assert/strict';
 import type { LaunchStep, WebAppLaunchView } from '@shared/webapps';
 import { back, cleanDomain, cleanServer, hostName, recordName, screenOf, stepAt, testAddress, type OnlineSaved } from './onlinePath';
-import { homeOf, launchGroups, stripOf } from './plain';
+import { homeOf, launchGroups, shortState, stripOf } from './plain';
 
 let passed = 0;
 const step = (name: string, fn: () => void) => {
@@ -112,6 +112,14 @@ step('an app on a server that does not answer is not said to be online', () => {
   const of = (down: boolean) => homeOf({ app: { shape: { ok: true } as never, build: { state: 'built', exists: true } as never, run: { state: 'stopped' } as never, mode: { launched: false, runsAs: 'built', servers: ['production'] }, stage: 'run', decisions: [] }, view: online, checks: null, checking: false, guide: null, steps: [], keys: [], session: { working: false, waiting: false }, fixAt: 0, now: 2, down }).state;
   assert.equal(of(false).text, 'Online at shelves.example.org');
   assert.deepEqual([of(true).tone, of(true).text], ['err', 'shelves.example.org is not answering right now.']);
+});
+
+step('an app that does not start while its agent still makes it is being made, not in need of fixing', () => {
+  const of = (run: string, making: boolean, shape: object = { ok: true }) => shortState({ shape, build: { state: 'none', exists: true }, run: { state: run }, mode: { launched: false, runsAs: 'built' } } as never, making);
+  assert.deepEqual(of('crashed', false), { tone: 'err', label: 'Needs fixing' });
+  assert.deepEqual(of('crashed', true), { tone: 'busy', label: 'Being made' });
+  assert.deepEqual(of('stopped', true, { ok: false, problem: 'hydor.json: "start" is missing' }), { tone: 'busy', label: 'Being made' });
+  assert.deepEqual(of('running', true), { tone: 'idle', label: 'Ready to try' }, 'one that runs says so, whoever is at work');
 });
 
 console.log(`\n${passed} checks passed`);

@@ -1336,7 +1336,8 @@ try {
         }),
         (e: Error) =>
           /silent app waiting/.test(e.message) &&
-          /did not answer \/api\/health within 2 s/.test(e.message),
+          // It is up but its ready address answers no page: said as such, not as one that does not answer.
+          /\/api\/health answered 500 for 2 s, not a 2xx or 3xx/.test(e.message),
       );
       assert.ok(Date.now() - t < 6000);
       const s = h.status("silent");

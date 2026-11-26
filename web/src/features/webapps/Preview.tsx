@@ -16,9 +16,14 @@ import { useAskAgent } from './ask';
 import { BuildWhere } from './BuildWhere';
 import { pointNote, readFrameMessage, type Pointed } from './point';
 import { readable, statusOf } from './status';
+import { useBeingMade } from './simple/sessions';
 
 type Size = 'phone' | 'computer';
-type Phase = { at: 'idle' } | { at: 'loading' } | { at: 'ready'; url: string } | { at: 'path' } | { at: 'refused' } | { at: 'nocookie' } | { at: 'error'; message: string };
+/** `waiting`: it did not start while its agent is still making it, and is tried again. */
+type Phase = { at: 'idle' } | { at: 'loading' } | { at: 'ready'; url: string } | { at: 'path' } | { at: 'refused' } | { at: 'nocookie' } | { at: 'error'; message: string } | { at: 'waiting'; message: string };
+
+/** While its agent makes it, how long after a start that failed it is tried again (Hydor spaces repeated starts out as well). */
+const AGAIN_MS = 8000;
 
 const SIZE_KEY = 'wa.webapps.preview';
 /** What the person chose here and keeps across a reload of the page: pointing on (by the key of the place it is shown in). */
@@ -75,25 +80,39 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
   /** How many pages the frame has finished loading since the address was asked for. */
   const loaded = useRef(0);
   const st = statusOf(app);
+  // Its agent is at work on it: a start that fails is "not finished yet", shown as such and tried again, not an error.
+  const making = useBeingMade(app);
+  const makingNow = useRef(making);
+  makingNow.current = making;
   // What it needs before it can be shown at all: its files read, a build, no build running.
   // An app being made runs its development server, so nothing has to be built before it shows.
   const blocker = !readable(app) ? 'file' : app.build.state === 'building' ? 'building' : !app.build.exists && app.mode?.runsAs !== 'dev' ? 'build' : null;
 
-  const load = useCallback((resume = false) => {
+  const load = useCallback((resume = false, quiet = false) => {
     const n = ++run.current;
     loaded.current = 0;
     setShown(false);
-    setPhase({ at: 'loading' });
+    // Tried again by itself while it is being made: it keeps saying so meanwhile.
+    if (!quiet) setPhase({ at: 'loading' });
     post<WebAppOpen>(`/api/webapps/${enc(app.id)}/open`, { frame: true, side: 'preview', ...(pointingNow.current ? { point: true } : {}), ...(resume ? { resume: true } : {}) }).then(
       (r) => {
         if (n !== run.current) return;
         setPhase(r.way === 'hostname' ? { at: 'ready', url: r.url } : { at: 'path' });
       },
       (e: unknown) => {
-        if (n === run.current) setPhase({ at: 'error', message: e instanceof ApiError || e instanceof Error ? e.message : 'It could not be opened.' });
+        if (n !== run.current) return;
+        const message = e instanceof ApiError || e instanceof Error ? e.message : 'It could not be opened.';
+        setPhase(makingNow.current ? { at: 'waiting', message } : { at: 'error', message });
       },
     );
   }, [app.id]);
+  // Being made: a start that failed is tried again now and then, and once more as soon as its agent stops. What fails after that is an error.
+  useEffect(() => {
+    if (phase.at !== 'waiting') return;
+    if (!making) return void load(false, true);
+    const t = setTimeout(() => load(false, true), AGAIN_MS);
+    return () => clearTimeout(t);
+  }, [phase, making, load]);
   // Shown as soon as it can be, and again when a build ends (even one that was too quick to be seen going).
   useEffect(() => {
     if (blocker) setPhase({ at: 'idle' });
@@ -161,12 +180,13 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
     } catch {}
   };
 
-  const message = (title: string, body?: string, action?: React.ReactNode) => (
+  const message = (title: string, body?: string, action?: React.ReactNode, busy?: boolean) => (
     <div className="grid h-full place-items-center px-6 py-10 text-center">
       <div className="max-w-[420px]">
+        {busy && <Throbber size={24} className="mx-auto mb-4 text-fg-3" />}
         <div className="text-[15px] font-medium">{title}</div>
         {body && (
-          <p translate={blocker === 'file' || phase.at === 'error' ? 'no' : undefined} className="mt-1.5 text-[13.5px] leading-relaxed text-fg-3">
+          <p translate={blocker === 'file' || phase.at === 'error' || (phase.at === 'waiting' && !simple) ? 'no' : undefined} className="mt-1.5 break-words text-[13.5px] leading-relaxed text-fg-3">
             {body}
           </p>
         )}
@@ -181,7 +201,10 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
   );
 
   let body: React.ReactNode;
-  if (simple && blocker === 'file') body = message(tr('Not ready to be shown yet'), tr('It shows here once it can run.'));
+  // Its agent is still making it: what does not run yet shows as being made (with why, in technical details), not as a fault.
+  if (!blocker && phase.at === 'waiting') body = message(tr('Being made'), simple ? tr('It shows here once it can run.') : phase.message, undefined, true);
+  else if (making && blocker === 'file') body = message(tr('Being made'), simple ? tr('It shows here once it can run.') : st.reason, undefined, true);
+  else if (simple && blocker === 'file') body = message(tr('Not ready to be shown yet'), tr('It shows here once it can run.'));
   else if (simple && blocker === 'building') body = message(tr('Being put together'), tr('It shows here in a moment.'));
   else if (simple && blocker === 'build')
     body = message(tr('Not ready to be shown yet'), tr('Put it together once to try it.'), (

@@ -9,6 +9,7 @@ import { AppIcon } from '../apps/AppIcon';
 import { openWebApp, webAppPath } from './api';
 import { StatusLabel } from './StatusLabel';
 import { reachWords, shortState } from './simple/plain';
+import { useBeingMade } from './simple/sessions';
 import { useUI } from '../../lib/store';
 import { readable, statusOf } from './status';
 
@@ -21,7 +22,8 @@ export function ownWords(a: WebApp): string {
 
 export function WebAppCard({ a, first }: { a: WebApp; first?: boolean }) {
   const technical = useUI((s) => s.technicalDetails);
-  const st = technical ? statusOf(a) : shortState(a);
+  const making = useBeingMade(a);
+  const st = technical ? statusOf(a) : shortState(a, making);
   const canOpen = readable(a) && (a.build.exists || a.mode?.runsAs === 'dev') && a.build.state !== 'building';
   return (
     <div

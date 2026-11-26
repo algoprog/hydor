@@ -24,6 +24,22 @@ export interface SessionFacts {
   latest: SessionSummary | null;
 }
 
+/**
+ * Its agent is at work on it: a turn, its subagents, or a question that waits for the person. While it is, an app that does not
+ * run yet is unfinished, not broken (the preview and its state say "Being made" rather than that it needs fixing).
+ */
+export function useBeingMade(app: App | null | undefined): boolean {
+  const byKey = useSessions((s) => s.byKey);
+  const id = app?.id;
+  const folder = app?.folder;
+  const project = app?.project;
+  return useMemo(() => {
+    if (!id) return false;
+    const f = factsOf(appSessions(Object.values(byKey), { id, folder: folder ?? '', project: project ?? undefined }));
+    return f.working || !!f.waiting;
+  }, [byKey, id, folder, project]);
+}
+
 export function factsOf(list: SessionSummary[]): SessionFacts {
   const waiting = list.find((s) => (s.live?.pendingApprovals ?? 0) > 0);
   return {
