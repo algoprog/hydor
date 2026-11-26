@@ -67,7 +67,6 @@ import {
   WEBAPP_STAGES,
   isWebAppStage,
 } from "../../shared/webapps.ts";
-import type { BrowserView } from "../../shared/browser.ts";
 import { HttpError } from "../auth.ts";
 import { APP_ROOT, config } from "../config.ts";
 import { createSpace, allSpaces } from "../spaces/index.ts";
@@ -163,8 +162,6 @@ export interface WebappsOptions {
   first?: Pick<FirstOptions, "scan" | "connect">;
   /** A picture of an address, as a browser here sees it (default: the one Preview uses for dev servers). */
   shot?: (url: string, o: { device: "phone" | "desktop"; scheme: "dark" | "light" }) => Promise<{ png: Buffer; width: number; height: number; url: string }>;
-  /** A page of an app at its own hostname (`at`), streaming from a browser here (default: the one Preview streams dev servers from). */
-  live?: (at: string, open: (path: string) => string, o: { path?: string; device: "phone" | "desktop"; w: unknown; h: unknown; scale?: unknown }) => Promise<{ key: string; view: BrowserView }>;
 }
 
 /** The idle time APPS_IDLE_MINUTES gives, in ms: a number above 0 (at most a week); anything else is the usual 15 minutes. */
@@ -232,35 +229,34 @@ async function defaultShot(url: string, o: { device: "phone" | "desktop"; scheme
   return { png: s.data, width: s.width, height: s.height, url: s.url };
 }
 
-/** Streams an app's page from the browser Preview streams dev servers from. */
-async function defaultLive(at: string, open: (path: string) => string, o: { path?: string; device: "phone" | "desktop"; w: unknown; h: unknown; scale?: unknown }) {
-  const { liveWebApp } = await import("../preview.ts");
-  return liveWebApp(at, open, o);
-}
-
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 /** Where the page that asked is: from the address it was loaded from (Origin), else the Host it reached this server by. */
-function pageAddress(req: FastifyRequest): { hostname: string; https: boolean } {
+function pageAddress(req: FastifyRequest): { hostname: string; https: boolean; origin: string } {
   const h = req.headers;
   let https = h["x-forwarded-proto"] === "https" || String(h["cf-visitor"] ?? "").includes("https");
   let hostname = "";
+  let at = "";
   const origin = typeof h.origin === "string" ? h.origin : "";
   try {
     if (origin && origin !== "null") {
       const u = new URL(origin);
       hostname = u.hostname;
+      at = u.host;
       https = https || u.protocol === "https:";
     }
   } catch {}
   if (!hostname) {
     try {
-      hostname = new URL(`http://${h["x-forwarded-host"] ?? h.host ?? "localhost"}`).hostname;
+      const u = new URL(`http://${h["x-forwarded-host"] ?? h.host ?? "localhost"}`);
+      hostname = u.hostname;
+      at = u.host;
     } catch {
-      hostname = "localhost";
+      hostname = at = "localhost";
     }
   }
-  return { hostname: hostname.toLowerCase(), https };
+  // The page's own origin: where Hydor's server is reached, and so where it carries the path way.
+  return { hostname: hostname.toLowerCase(), https, origin: `${https ? "https" : "http"}://${at.toLowerCase()}` };
 }
 
 export interface Webapps extends Feature {
@@ -941,16 +937,20 @@ export function createWebapps(o: WebappsOptions): Webapps {
       return readRows(dataOf(a, q.side), String((req.params as { table: string }).table), { ...q, file: databaseOf(a, q.side, q.file) });
     });
 
-    /** Which side is asked for: the launched version (what people use) or the one being changed (Preview). Left out: the launched version when there is one. */
-    const sideOf = (a: WebAppRow, asked: unknown): { side: "launched" | "preview"; target: HostedApp } => {
+    app.post("/api/webapps/:id/open", async (req) => {
+      enabled();
+      const a = own(req);
+      const b = B(req);
+      // `resume`: where the app's frame in Hydor's page was last, when the server knows (turning pointing on does not lose the place).
+      const to = cleanPath(b.resume === true && proxy?.lastPath(a.id) ? proxy.lastPath(a.id) : b.path);
+      // Which side: the launched version (what people use) or the one being changed (Preview). Left out: the launched version when there is one.
       const lv = launches!.live(a);
-      if (asked !== undefined && asked !== "launched" && asked !== "preview") throw new HttpError(400, "side is launched or preview.");
-      if (asked === "launched" && !lv) throw new HttpError(409, "This app has not been launched inside this Hydor: there is only the one being made.");
-      const side: "launched" | "preview" = (asked as "launched" | "preview" | undefined) ?? (lv ? "launched" : "preview");
-      return { side, target: side === "launched" ? hostedLive(a, lv!.dir) : hosted(a) };
-    };
-    /** That side started, to be opened (the pages that show where it stands hear when it was stopped), or why it cannot be. */
-    const bringUp = async (a: WebAppRow, side: "launched" | "preview", target: HostedApp) => {
+      if (b.side !== undefined && b.side !== "launched" && b.side !== "preview") throw new HttpError(400, "side is launched or preview.");
+      if (b.side === "launched" && !lv) throw new HttpError(409, "This app has not been launched inside this Hydor: there is only the one being made.");
+      const side: "launched" | "preview" = (b.side as "launched" | "preview" | undefined) ?? (lv ? "launched" : "preview");
+      if (side === "launched" && b.point === true) throw new HttpError(409, "This is the launched version: it shows what the people who use it see. Pointing is for the version being changed (Preview).");
+      const target: HostedApp = side === "launched" ? hostedLive(a, lv!.dir) : hosted(a);
+      const flags = b.point === true ? { point: true } : {};
       if (listenError)
         throw new HttpError(502, `The server for web apps is not running: ${listenError}`);
       if (builds!.state(built(a)).state === "building")
@@ -963,19 +963,8 @@ export function createWebapps(o: WebappsOptions): Webapps {
           throw new HttpError(502, `The launched version could not start. ${String((e as Error).message).split("\n")[0]}`);
         }
       } else await startApp(a);
+      // Opening starts it when it was stopped: the pages that show where it stands hear of that.
       if (was !== "running") changed();
-    };
-
-    app.post("/api/webapps/:id/open", async (req) => {
-      enabled();
-      const a = own(req);
-      const b = B(req);
-      // `resume`: where the app's frame in Hydor's page was last, when the server knows (turning pointing on does not lose the place).
-      const to = cleanPath(b.resume === true && proxy?.lastPath(a.id) ? proxy.lastPath(a.id) : b.path);
-      const { side, target } = sideOf(a, b.side);
-      if (side === "launched" && b.point === true) throw new HttpError(409, "This is the launched version: it shows what the people who use it see. Pointing is for the version being changed (Preview).");
-      const flags = b.point === true ? { point: true } : {};
-      await bringUp(a, side, target);
       const person = who();
       const page = pageAddress(req);
       // For Hydor's own page to show it in a frame (its Preview): the page's origin goes in the link, and the app lets that page frame it.
@@ -1006,33 +995,13 @@ export function createWebapps(o: WebappsOptions): Webapps {
           url: `${proto}://${target.slug}.${o.domain}${port}/__hydor/open?t=${encodeURIComponent(t)}&to=${encodeURIComponent(to)}`,
         };
       } else {
-        // One hostname only (a tunnel to this Hydor, an address on the network): the path with a token, the page in a sandbox.
-        const hostPart = page.hostname.includes(":") ? `[${page.hostname.replace(/^\[|\]$/g, "")}]` : page.hostname;
-        const base = o.origin || `${page.https ? "https" : "http"}://${hostPart}:${o.port}`;
-        out = { way: "path", url: `${base}/w/${webappSession(target.id, person, undefined, undefined, flags)}${to}` };
+        // One hostname only (a tunnel to this Hydor, an address on the network): the path with a token, the page in a sandbox, at
+        // Hydor's own address (its server carries the path way to the apps' server), or at APPS_ORIGIN when that is given. Shown in
+        // Hydor's page, the page's origin goes in it, and the app lets that page, and no other, frame it.
+        const base = o.origin || page.origin;
+        out = { way: "path", url: `${base}/w/${webappSession(target.id, person, undefined, frame, flags)}${to}` };
       }
       return out;
-    });
-
-    // Where the page cannot reach the app's own address (open gave the path way: Hydor reached through one hostname, a tunnel or a
-    // proxy), its Preview shows the app as the browser on this computer shows it, streaming, and the person drives it: there it is at
-    // its own hostname, `<slug>.localhost`, as when Hydor is opened on this computer, signed in as this person by a one-time link.
-    app.post("/api/webapps/:id/live", async (req) => {
-      enabled();
-      const a = own(req);
-      const b = B(req);
-      if (b.device !== undefined && b.device !== "phone" && b.device !== "desktop") throw new HttpError(400, "device is phone or desktop.");
-      const to = b.path === undefined ? undefined : cleanPath(b.path);
-      const { side, target } = sideOf(a, b.side);
-      await bringUp(a, side, target);
-      const at = `${target.slug}.localhost:${o.port}`;
-      const person = who();
-      const open = (p: string) => `http://${at}/__hydor/open?t=${encodeURIComponent(webappOpenToken(target.id, person))}&to=${encodeURIComponent(p)}`;
-      try {
-        return await (o.live ?? defaultLive)(at, open, { path: to, device: b.device === "phone" ? "phone" : "desktop", w: b.w, h: b.h, scale: b.scale });
-      } catch (e) {
-        throw new HttpError(502, `It could not be opened in the browser here: ${String((e as Error).message).split("\n")[0].slice(0, 300)}`);
-      }
     });
 
     // ---- a picture of a page ---------------------------------------------------------------------------------------------------

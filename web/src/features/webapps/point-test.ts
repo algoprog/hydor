@@ -9,6 +9,10 @@ const good = { hydor: 'hydor-webapp-point', path: '/customers?page=2', text: '  
 assert.deepEqual(readFrameMessage(good, 'http://shop.localhost:8792', url), { type: 'point', pointed: { path: '/customers?page=2', text: 'Add customer', kind: 'button', tag: 'button' } });
 // Another origin (another site's frame, a page of Hydor's own, an opaque origin) is not the app.
 for (const origin of ['http://evil.localhost:8792', 'http://localhost:8790', 'null', 'https://shop.localhost:8792', '']) assert.equal(readFrameMessage(good, origin, url), null, origin);
+// A frame on the path way (at Hydor's own address, sandboxed) speaks with an origin of no one, and with nothing else.
+const pathUrl = 'https://hydor.example.org/w/tok/';
+assert.equal(readFrameMessage(good, 'null', pathUrl, true)?.type, 'point');
+for (const origin of ['https://hydor.example.org', 'http://shop.localhost:8792', '']) assert.equal(readFrameMessage(good, origin, pathUrl, true), null, origin);
 // No frame address yet, or a broken one.
 assert.equal(readFrameMessage(good, 'http://shop.localhost:8792', ''), null);
 assert.equal(readFrameMessage(good, 'http://shop.localhost:8792', 'not a url'), null);

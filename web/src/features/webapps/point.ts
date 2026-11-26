@@ -25,7 +25,7 @@ const cleanPath = (v: unknown): string | null => (typeof v === 'string' && v.sta
 const words = (v: unknown): string => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) : '');
 
 /** What a message from the frame says, when it is one of the two pointing sends and comes from the origin of the frame's own address. */
-export function readFrameMessage(data: unknown, origin: string, frameUrl: string): FrameMessage | null {
+export function readFrameMessage(data: unknown, origin: string, frameUrl: string, sandboxed = false): FrameMessage | null {
   if (!frameUrl || !data || typeof data !== 'object') return null;
   let own: string;
   try {
@@ -33,7 +33,9 @@ export function readFrameMessage(data: unknown, origin: string, frameUrl: string
   } catch {
     return null;
   }
-  if (origin !== own || own === 'null') return null;
+  // A frame on the path way (at Hydor's own address, sandboxed) has an origin of no one: its messages say "null", and the caller has
+  // made sure they come from that frame's own window.
+  if (sandboxed ? origin !== 'null' : origin !== own || own === 'null') return null;
   const m = data as Record<string, unknown>;
   const path = cleanPath(m.path);
   if (!path) return null;

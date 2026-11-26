@@ -57,7 +57,8 @@ import { acpControl, dropAcpControls, type AcpAccountAgent, type AcpAccountContr
 import { ACCOUNT_AGENT_NAMES, acpAccountAgent, isAcpAccountAgent } from '../shared/account-agents.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { buildCsp } from './csp.ts';
-import { webappsOptionsFromEnv } from './webapps/index.ts';
+import { webapps, webappsOptionsFromEnv } from './webapps/index.ts';
+import { carryPathWay } from './webapps/proxy.ts';
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import { moveFileComments } from './pages/filecomments.ts';
@@ -146,6 +147,9 @@ const app = Fastify({
   // Projects' API was /api/spaces until 5 November 2026: pages open from before, agents' notes and other machines still call it.
   rewriteUrl: (req) => (req.url ?? '/').replace(/^\/api\/spaces(?=[/?]|$)/, '/api/projects'),
 });
+
+// Web apps at Hydor's own address, /w/<token>/… (server/webapps/proxy.ts): handed to the apps' server before anything here sees them.
+carryPathWay(app.server, () => webapps.parts().proxy);
 
 await app.register(cookie);
 await app.register(compress, { global: true, threshold: 2048, encodings: ['br', 'gzip'] });

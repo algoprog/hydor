@@ -832,7 +832,7 @@ agents that speak ACP and take MCP servers.
   starts it when someone opens it, stops it after 15 minutes with nobody, restarts it when it falls, signs you in to it
   when the app asks for that (inside Hydor you are the only person signed in to an app), and shows it at an address of
   its own that cannot reach Hydor's pages. Through a tunnel that gives Hydor one hostname only, apps have no address of
-  their own, which the app says (links and cookies inside an app may not work; `APPS_DOMAIN` gives them one); its Preview still shows the app there, streamed live from a browser on this computer. An app is a
+  their own, which the app says (links and cookies inside an app may not work; `APPS_DOMAIN` gives them one). An app is a
   project, with the web developer agent.
   **Why from scratch**: Hydor had a framework of its own for these apps and measured it (26 November 2026): six apps
   built both ways, and a change made to two of them. Every build passed every check, and building on the framework cost

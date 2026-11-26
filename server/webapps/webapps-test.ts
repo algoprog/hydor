@@ -19,7 +19,7 @@ import { kvSet, openDb, type DB } from "../db.ts";
 import { registerFeatures, startFeatures, stopFeatures } from "../features/registry.ts";
 import type { Deps } from "../features/types.ts";
 import { appAddressOf, createWebapps, IDLE_MS, idleMsFromEnv, type Webapps, type WebappsOptions } from "./index.ts";
-import { allowFrameBy, frameOrigin } from "./proxy.ts";
+import { allowFrameBy, carryPathWay, frameOrigin } from "./proxy.ts";
 import { processInfo } from "./sweep.ts";
 import { writeTestApp } from "./test-apps.ts";
 
@@ -72,6 +72,7 @@ http.createServer((req, res) => {
     const p = person(req.headers['x-hydor-person']);
     return p ? send(200, { id: p.id, name: p.name, role: p.role }) : send(401, { error: 'nobody' });
   }
+  if (req.url === '/headers') return send(200, { cookie: req.headers.cookie ?? null });
   if (req.url === '/framed') { res.writeHead(200, { 'content-type': 'text/plain', 'content-security-policy': "frame-ancestors 'self'; img-src 'self'", 'x-frame-options': 'DENY' }); return res.end('framed'); }
   send(404, { error: 'not here' });
 }).listen(Number(process.env.PORT), '127.0.0.1');
@@ -211,13 +212,6 @@ const alive = (pid: number | null) => {
   return !!i && i.cmdline !== "";
 };
 const bwrap = sandboxAvailable()?.kind === "bwrap";
-/** What the live Preview asked the browser here for (a stand-in for it: the real one streams from Chromium). */
-const livesAsked: { at: string; open: (path: string) => string; o: Parameters<NonNullable<WebappsOptions["live"]>>[2] }[] = [];
-const liveStandIn: NonNullable<WebappsOptions["live"]> = async (at, open, o) => {
-  livesAsked.push({ at, open, o });
-  if (o.w === 999) throw new Error("No Chromium is installed\nmore");
-  return { key: `preview:${at}`, view: { open: true } as never };
-};
 const open = (i: Instance, id: string, body: unknown = {}, headers: Record<string, string> = { origin: "http://localhost:8790" }) => i.call<WebAppOpen & { error: string }>("POST", `/api/webapps/${id}/open`, body, headers);
 const get = async (i: Instance, id: string) => (await i.call<{ app: WebAppDetail }>("GET", `/api/webapps/${id}`)).json.app;
 const built = (i: Instance, id: string, ms = 20_000) => until(`${id} to stop building`, async () => (await get(i, id)).build.state !== "building", ms);
@@ -271,7 +265,7 @@ try {
   });
 
   // ---- registering, building, running (fixture apps) ------------------------------------------------------------------
-  const main = await instance("main", { live: liveStandIn }, true);
+  const main = await instance("main", {}, true);
   instances.push(main);
   const dataRoot = path.join(main.dataDir, "webapps");
   assert.equal(await main.feature.ready, PORT);
@@ -511,18 +505,78 @@ try {
     const ob = new Browser(PORT);
     await ob.open(other.json.url, { follow: false });
     assert.equal((await ob.request(`club-notes.localhost:${PORT}`, "/framed")).headers["content-security-policy"], "frame-ancestors 'self' http://127.0.0.1:8790; img-src 'self'");
-    // The path way is not framed: its page runs in a sandbox, the same whatever is asked.
+    // The path way is framed too, by that page only, and its page stays in a sandbox with an origin of no one; one opened for a tab is no frame.
     const path = await framed({ origin: "https://hydor.example.org" }, { frame: true, path: "/framed" });
     assert.equal(path.json.way, "path");
     const pa = await new Browser(PORT).open(path.json.url);
-    assert.doesNotMatch(String(pa.headers["content-security-policy"]), /hydor\.example\.org/);
-    assert.match(String(pa.headers["content-security-policy"]), /sandbox/);
+    assert.equal(pa.status, 200, pa.text);
+    assert.equal(pa.headers["x-frame-options"], undefined);
+    const pcsp = [pa.headers["content-security-policy"]].flat().join(", ");
+    assert.match(pcsp, /frame-ancestors 'self' https:\/\/hydor\.example\.org; img-src 'self'/, "the app's own policy lets that page frame it");
+    assert.match(pcsp, /sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads; frame-ancestors https:\/\/hydor\.example\.org$/);
+    assert.doesNotMatch(pcsp, /allow-same-origin/);
+    const pathTab = await framed({ origin: "https://hydor.example.org" }, { path: "/framed" });
+    const tp2 = await new Browser(PORT).open(pathTab.json.url);
+    assert.doesNotMatch([tp2.headers["content-security-policy"]].flat().join(", "), /hydor\.example\.org/);
+    assert.equal(tp2.headers["x-frame-options"], "DENY");
+  });
+
+  await step("Hydor's own server carries the path way: /w/<token>/… (requests and sockets) goes to the apps' server before anything of its own, the rest stays its own", async () => {
+    const own: string[] = [];
+    const s = http.createServer((req, res) => {
+      own.push(req.url ?? "");
+      res.writeHead(200, { "content-type": "text/plain" }).end("hydor");
+    });
+    let upgraded = 0;
+    s.on("upgrade", (_req, socket) => {
+      upgraded++;
+      socket.destroy();
+    });
+    carryPathWay(s, () => main.feature.parts().proxy);
+    await new Promise<void>((resolve) => s.listen(0, "127.0.0.1", resolve));
+    const port = (s.address() as net.AddressInfo).port;
+    try {
+      const r = await open(main, ok.id, { path: "/whoami" }, { origin: "https://hydor.example.org" });
+      const u = new URL(r.json.url);
+      assert.equal(u.origin, "https://hydor.example.org", "at Hydor's own address");
+      const via = new Browser(port);
+      const page = await via.request("hydor.example.org", u.pathname + u.search);
+      assert.equal(page.status, 200, page.text);
+      assert.equal(page.json().name, "Dana");
+      assert.match(String(page.headers["content-security-policy"]), /sandbox/);
+      // Hydor's own cookies never reach the app, and the app's never reach the browser.
+      const echoed = await via.request("hydor.example.org", u.pathname.replace(/\/whoami$/, "/headers"), { headers: { cookie: "wa_session=secret; other=1" } });
+      assert.equal(echoed.status, 200, echoed.text);
+      assert.doesNotMatch(echoed.text, /secret/);
+      // Without a token, or with a bad one: the apps' server's own no.
+      assert.equal((await via.request("hydor.example.org", "/w/nonsense/whoami")).status, 403);
+      // Everything else is Hydor's own, sockets too.
+      assert.equal((await via.request("hydor.example.org", "/api/health")).text, "hydor");
+      assert.equal((await via.request("hydor.example.org", "/wonder")).text, "hydor");
+      assert.deepEqual(own, ["/api/health", "/wonder"]);
+      await new Promise<void>((resolve) => {
+        const q = http.request({ host: "127.0.0.1", port, path: "/ws", headers: { connection: "upgrade", upgrade: "websocket" } });
+        q.on("error", () => resolve());
+        q.on("close", () => resolve());
+        q.end();
+      });
+      assert.equal(upgraded, 1);
+      // With web apps off there is nothing to carry it to: it is Hydor's own.
+      const off = http.createServer((req, res) => res.writeHead(404).end(req.url));
+      carryPathWay(off, () => null);
+      await new Promise<void>((resolve) => off.listen(0, "127.0.0.1", resolve));
+      const offAt = await new Browser((off.address() as net.AddressInfo).port).request("hydor.example.org", u.pathname);
+      assert.equal(offAt.status, 404);
+      await new Promise<void>((resolve) => off.close(() => resolve()));
+    } finally {
+      await new Promise<void>((resolve) => s.close(() => resolve()));
+    }
   });
 
   await step("opening by path (an address that is not localhost, no domain): /w/<token>/…, a page in a sandbox, signed in as the same person", async () => {
     const r = await open(main, ok.id, { path: "/whoami?x=1" }, { origin: "http://192.168.1.20:8790" });
     assert.equal(r.json.way, "path");
-    assert.match(r.json.url, new RegExp(`^http://192\\.168\\.1\\.20:${PORT}/w/[^/]+/whoami\\?x=1$`));
+    assert.match(r.json.url, new RegExp(`^http://192\\.168\\.1\\.20:8790/w/[^/]+/whoami\\?x=1$`), "at Hydor's own address, which carries it");
     const b = new Browser(PORT);
     const page = await b.open(r.json.url);
     assert.equal(page.status, 200, page.text);
@@ -532,45 +586,14 @@ try {
     assert.equal(page.headers["set-cookie"], undefined);
     // https from a tunnel, and a Host header only; an IPv6 address.
     const h = await open(main, ok.id, {}, { origin: "https://hydor.example.org" });
-    assert.match(h.json.url, new RegExp(`^https://hydor\\.example\\.org:${PORT}/w/[^/]+/$`));
+    assert.match(h.json.url, /^https:\/\/hydor\.example\.org\/w\/[^/]+\/$/);
     const f = await open(main, ok.id, {}, { host: "hydor.lan:8790", "x-forwarded-proto": "https" });
-    assert.match(f.json.url, new RegExp(`^https://hydor\\.lan:${PORT}/w/[^/]+/$`));
+    assert.match(f.json.url, /^https:\/\/hydor\.lan:8790\/w\/[^/]+\/$/);
     const v6 = await open(main, ok.id, {}, { origin: "http://[fd00::1]:8790" });
-    assert.match(v6.json.url, new RegExp(`^http://\\[fd00::1\\]:${PORT}/w/[^/]+/$`));
+    assert.match(v6.json.url, /^http:\/\/\[fd00::1\]:8790\/w\/[^/]+\/$/);
     // No hostname way on a host with no app, and no port way: the plain host has nothing without a token.
     assert.equal((await new Browser(PORT).request(`192.168.1.20:${PORT}`, "/whoami")).status, 403);
     assert.equal((await new Browser(PORT).request(`localhost:${PORT}`, "/whoami")).status, 403);
-  });
-
-  await step("the live Preview (Hydor reached through one hostname): the app at its own hostname in the browser here, signed in by a link that works once, at the size asked", async () => {
-    livesAsked.length = 0;
-    const live = (body: unknown) => main.call<{ key: string; error: string }>("POST", `/api/webapps/${ok.id}/live`, body);
-    const r = await live({ side: "preview", device: "phone", w: 390, h: 700, scale: 2, path: "/whoami" });
-    assert.equal(r.status, 200, JSON.stringify(r.json));
-    assert.equal(r.json.key, `preview:club-notes.localhost:${PORT}`);
-    assert.equal(livesAsked.length, 1);
-    const [c] = livesAsked;
-    assert.equal(c.at, `club-notes.localhost:${PORT}`);
-    assert.deepEqual({ ...c.o }, { path: "/whoami", device: "phone", w: 390, h: 700, scale: 2 });
-    // Each link the browser here is sent to signs this person in, once.
-    const url = c.open("/whoami");
-    assert.match(url, new RegExp(`^http://club-notes\\.localhost:${PORT}/__hydor/open\\?t=[^&]+&to=%2Fwhoami$`));
-    const page = await new Browser(PORT).open(url);
-    assert.equal(page.status, 200, page.text);
-    assert.equal(page.json().name, "Dana");
-    assert.equal((await new Browser(PORT).open(url)).status, 403, "a used link is no link");
-    assert.notEqual(c.open("/"), c.open("/"), "a new link each time");
-    // No path: the page is left where it was; a computer's size when no device is named.
-    assert.equal((await live({ w: 1280, h: 800 })).status, 200);
-    assert.equal(livesAsked[1].o.path, undefined);
-    assert.equal(livesAsked[1].o.device, "desktop");
-    // What cannot be is refused before anything opens; a browser that cannot open it says why, in one line.
-    for (const body of [{ path: "notes" }, { device: "tablet" }, { side: "elsewhere" }]) assert.equal((await live(body)).status, 400, JSON.stringify(body));
-    assert.equal((await live({ side: "launched" })).status, 409, "not launched: there is only the one being made");
-    assert.equal(livesAsked.length, 2);
-    const no = await live({ w: 999 });
-    assert.equal(no.status, 502);
-    assert.equal(no.json.error, "It could not be opened in the browser here: No Chromium is installed");
   });
 
   await step("changing: a new name keeps the address, settings are kept and checked, a bad one is a sentence, an unknown app is 404", async () => {

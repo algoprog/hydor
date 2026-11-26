@@ -22,6 +22,11 @@ assert.deepEqual(latestWebApp([tool('1', 'webapp_check', `1 of 22 lines failed.\
 assert.deepEqual(latestWebApp([tool('1', 'webapp_run', `Built.\n[web app ${A}]`), tool('2', 'webapp_run', `The build failed.\n[web app ${B}]`, 'error')]), { item: '1', app: A });
 assert.equal(latestWebApp([tool('1', 'Bash', `echo [web app ${A}]`)]), null);
 assert.equal(latestWebApp([tool('1', 'find_apps', `[web app ${A}]`)]), null);
+// looking an app up or using it is no conversation about making it: nothing beside it, no steps; the call that made something stands
+for (const name of ['webapp_places', 'mcp__hydor__webapp_status', 'webapp_get', 'webapp_list_functions', 'webapp_call_function', 'webapp_backup'])
+  assert.equal(latestWebApp([tool('1', name, `Places for algoprog.\n[web app ${A}]`)]), null, name);
+assert.deepEqual(latestWebApp([tool('1', 'webapp_look', `A picture.\n[web app ${A}]`), tool('2', 'webapp_status', `Up.\n[web app ${B}]`)]), { item: '1', app: A });
+assert.deepEqual(latestWebApp([tool('1', 'webapp_contract_check', `All fine.\n[web app ${A}]`)]), { item: '1', app: A }, 'a name with an underscore is a web app call too');
 
 // opened by hand wins; else the record's app, unless that call's app was closed; a newer call is new again
 assert.equal(webSideTarget(B, { item: '3', app: A }, '3'), B);

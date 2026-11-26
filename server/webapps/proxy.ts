@@ -335,12 +335,13 @@ const NOT_FROM_HYDOR = "Open this app from Hydor.";
 export const FRAME_MESSAGE = "hydor-webapp-needs-open";
 const FRAME_SCRIPT = `try{parent.postMessage({hydor:${JSON.stringify(FRAME_MESSAGE)}},"*")}catch(e){}`;
 const FRAME_PAGE = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${NOT_FROM_HYDOR}</title><body style="font:15px system-ui,sans-serif;margin:2rem;color:#777"><p>${NOT_FROM_HYDOR}</p><script>${FRAME_SCRIPT}</script>`;
-const FRAME_CSP = `default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${crypto.createHash("sha256").update(FRAME_SCRIPT).digest("base64")}'`;
+// Both pages may be at an address of Hydor's own (the path way carried by Hydor's server): each has an origin of no one, as an app's has.
+const FRAME_CSP = `default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${crypto.createHash("sha256").update(FRAME_SCRIPT).digest("base64")}'; sandbox allow-scripts`;
 
 // A person who opens the app's address by itself (a bookmark, a link someone sent) is told in a page that fits a phone, not in a line of
 // plain text in the corner of an empty screen. Only a browser's own page load (Sec-Fetch-Dest: document) gets it; the rest get the plain words.
 const NAV_PAGE = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><title>${NOT_FROM_HYDOR}</title><body style="font:19px/1.5 system-ui,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;padding:2rem;text-align:center"><div><p style="margin:0 0 .5rem;font-size:22px">${NOT_FROM_HYDOR}</p><p style="margin:0;font-size:16px;opacity:.7">Find it on Hydor’s Apps page and tap Open.</p></div>`;
-const NAV_CSP = "default-src 'none'; style-src 'unsafe-inline'";
+const NAV_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 
 /** The answer for a request that has no way in: plain words, and for a frame (the browser says so) a page that tells the page around it. */
 const noWayIn = (req: http.IncomingMessage, res: http.ServerResponse, code: number, text: string) => {
@@ -387,9 +388,29 @@ interface Resolved {
   flags: ShowFlags;
 }
 
+/** Whether a request is on the path way (`/w/<token>/…`). */
+export const onPathWay = (url: string | undefined): boolean => typeof url === "string" && url.startsWith("/w/");
+
+/**
+ * Hydor's own server carries the path way to the apps' server: through a tunnel with one hostname, Hydor's own address is the only one
+ * a browser has, so an app is at `<Hydor's address>/w/<token>/…` (its Preview frames it there). Its requests and sockets are handed over
+ * as they come, before anything of Hydor's (its headers, its sign-in, its pages) sees them; the apps' server checks the token and keeps
+ * every page in a sandbox, with an origin of no one, so an app there can reach nothing of Hydor's. With web apps off, nothing is.
+ */
+export function carryPathWay(server: http.Server, proxy: () => AppsProxy | null): void {
+  const emit = server.emit.bind(server) as (event: string | symbol, ...args: unknown[]) => boolean;
+  server.emit = ((event: string | symbol, ...args: unknown[]) => {
+    if (event === "request" || event === "upgrade") {
+      const p = onPathWay((args[0] as http.IncomingMessage).url) ? proxy() : null;
+      if (p) return p.server.emit(event, ...args);
+    }
+    return emit(event, ...args);
+  }) as typeof server.emit;
+}
+
 export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
   const host = o.host;
-  /** Where each app's frame was last (only frames of Hydor's page are watched, only the hostname way). */
+  /** Where each app's frame was last (only frames of Hydor's page are watched). */
   const lastPaths = new Map<string, string>();
   const domain = (o.domain ?? "").toLowerCase().replace(/^\.+|\.+$/g, "");
 
@@ -435,7 +456,7 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
       if (!s) return { code: 403, text: NOT_FROM_HYDOR };
       if (!app) return { code: 404, text: "This app is not here any more." };
       const inner = (slash < 0 ? "/" : rest.slice(slash)) + url.search;
-      return { app, person: s.person, url: inner, prefix: `/w/${token}`, flags: s.flags };
+      return { app, person: s.person, url: inner, prefix: `/w/${token}`, ...(s.fa ? { frame: s.fa } : {}), flags: s.flags };
     }
     // 1. The session cookie, on the hostname of the app it is for. A host that names no app is no way in.
     if (!slug) return { code: 403, text: NOT_FROM_HYDOR };
@@ -621,13 +642,14 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
       return res.end();
     }
     host.touch(r.app.id);
-    if (r.frame && !r.prefix) {
+    if (r.frame) {
       const dest = String(req.headers["sec-fetch-dest"] ?? "");
       let seen: string | null = null;
+      // On the path way the page's own address is under its prefix, and a page in its sandbox names no referer: its loads are what counts.
       if (req.method === "GET" && (dest === "iframe" || dest === "document")) seen = r.url;
       // A request the page makes by itself (a fetch, a server function) carries the page's own address as its referer. A font or
       // an image asked for by a stylesheet carries the stylesheet's, so only these count, and never an address that is a file.
-      else if (typeof req.headers.referer === "string" && (dest === "empty" || dest === "")) {
+      else if (!r.prefix && typeof req.headers.referer === "string" && (dest === "empty" || dest === "")) {
         try {
           const u = new URL(req.headers.referer);
           if (u.host === String(req.headers.host ?? "") && !u.pathname.startsWith("/__hydor") && !STATIC_FILE.test(u.pathname)) seen = u.pathname + u.search;
@@ -672,10 +694,13 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
             }
             if (r.prefix) {
               Object.assign(headers, CORS);
-              const csp = a.headers["content-security-policy"];
+              // The app's own policy as it stands (opened for a frame, it lets Hydor's page frame it), and the sandbox beside it.
+              const csp = headers["content-security-policy"];
+              // Shown in Hydor's page: that page, and no other, may frame it.
+              const own = r.frame ? `${SANDBOX_POLICY}; frame-ancestors ${r.frame}` : SANDBOX_POLICY;
               headers["content-security-policy"] = csp
-                ? [...(Array.isArray(csp) ? csp : [csp]), SANDBOX_POLICY]
-                : SANDBOX_POLICY;
+                ? [...(Array.isArray(csp) ? csp : [csp]), own]
+                : own;
             }
             // An app built for a base names it in its pages, scripts and styles: it is put as it is here.
             const rewrite =
