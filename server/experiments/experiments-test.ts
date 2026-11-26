@@ -1752,6 +1752,15 @@ test('night hours: the night an hour is in, across midnight; the settings and wh
   assert.equal(nightAt(at(5, 0, 59), { nightFrom: '01:00', nightTo: '05:00' }), null);
   assert.equal(nightAt(at(5, 1), { nightFrom: '01:00', nightTo: '05:00' }), '2026-01-05', 'a night after midnight');
   assert.equal(nightAt(at(5, 3), { nightFrom: '03:00', nightTo: '03:00' }), null, 'no night');
+  // The hours are the person's, in their time zone: on a server whose clock is UTC, 04:30 UTC is 23:30 in New York.
+  const utc = (day: number, hour: number, min = 0) => Date.UTC(2026, 0, day, hour, min);
+  assert.equal(nightAt(utc(5, 4, 30), h, 'America/New_York'), '2026-01-04', '23:30 the evening before, there');
+  assert.equal(nightAt(utc(5, 23, 30), h, 'America/New_York'), null, '18:30 there: still day');
+  assert.equal(nightAt(utc(5, 11, 59), h, 'America/New_York'), '2026-01-04', '06:59 there');
+  assert.equal(nightAt(utc(5, 12), h, 'America/New_York'), null, '07:00 there: the night is over');
+  assert.equal(nightAt(utc(1, 3), h, 'Asia/Tokyo'), null, 'noon in Tokyo');
+  assert.equal(nightAt(utc(1, 15), h, 'Asia/Tokyo'), '2026-01-01', 'midnight in Tokyo, the 2nd there already: the night that began on the 1st');
+  assert.equal(nightAt(utc(5, 4, 30), h, 'Not/AZone'), nightAt(utc(5, 4, 30), h), 'a zone that is none: this computer’s clock');
 
   assert.equal(morningWords({ done: 5, failed: 1, stopped: 0, running: 0, waiting: 2 }), 'Last night: 5 runs done, 1 failed, 2 still wait for tonight');
   assert.equal(morningWords({ done: 1, failed: 0, stopped: 0, running: 1, waiting: 1 }), 'Last night: 1 run done, 1 still running, 1 still waits for tonight');

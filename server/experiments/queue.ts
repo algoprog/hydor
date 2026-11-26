@@ -25,7 +25,7 @@ import { stampRun } from './evaluations.ts';
 import { chooseGpus, gpuList, gpusVia, readGpus, type GpuReading } from './gpus.ts';
 import { aliveLocal, exitOf, files, startLocal, stopLocal, wrapperScript } from './local.ts';
 import { nanText, oomText, parseLine, readFrom, tailLines, Tracker } from './metrics.ts';
-import { clock, clockTime, endedAtNight, morningDue, NIGHT_AGAIN, NIGHT_BEHIND, NIGHT_CLUSTER, nightAt, nightWhy, watchNight } from './night.ts';
+import { clock, clockTime, endedAtNight, morningDue, NIGHT_AGAIN, NIGHT_BEHIND, NIGHT_CLUSTER, nightAt, nightWhy, nightZone, watchNight } from './night.ts';
 import { addEvent, eventsOf, eventsSince, getInfo, getRun, getSweep, insertRun, isScoringRun, listRuns, listSweeps, listTables, newId, offsetsOf, resetRun, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
 import { repairRecord, repairRecordSoon } from './repair.ts';
 import { remoteMachine, type RemoteRun } from './remote.ts';
@@ -376,7 +376,8 @@ async function pass() {
   if (!d) return;
   const active = listRuns(d.db, { status: ACTIVE, limit: 5000, oldest: true });
   const settings = settingsOf(d.db);
-  const night = nightAt(clock.now(), settings);
+  // The night's hours are the person's own (their browser's time zone), not a server's UTC.
+  const night = nightAt(clock.now(), settings, nightZone(d.db));
   watchNight(d, night, active, settings);
   if (!active.length && !busy.size && !morningDue(d.db)) return sleepLoop();
   for (const r of active) {

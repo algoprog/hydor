@@ -99,7 +99,7 @@ export async function patchOf(d: Deps, id: string): Promise<string | null> {
 /** The runs for the list: this computer's (and its copies of runs elsewhere), and with `everywhere` every connected machine's. */
 export async function runsList(d: Deps, q: RunQuery, everywhere: boolean): Promise<RunRecord[]> {
   const mine = listRuns(d.db, q);
-  // A night is this computer's (its own clock): another machine tells of its own.
+  // A night is this computer's (in the person's time zone as it knows it): another machine tells of its own.
   if (!everywhere || q.night) return mine;
   const params = new URLSearchParams();
   if (q.status?.length) params.set('status', q.status.join(','));

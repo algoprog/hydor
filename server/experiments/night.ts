@@ -1,4 +1,5 @@
-// Runs that wait for the night (a job's when: "night"): the night's hours on this computer's own clock, why such a run
+// Runs that wait for the night (a job's when: "night"): the night's hours in the person's own time zone (the one their
+// browser reported; this computer's when it has not said: a server's clock is often UTC), why such a run
 // waits, what happens when a night ends (runs still going are let finish, or marked to be stopped and put back to wait
 // for the next night) and the one notice in the morning. The queue (queue.ts) looks here on every pass.
 //
@@ -32,17 +33,32 @@ export function clockTime(v: unknown): string | null {
 const minutesOf = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
 const dateOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** The night `at` is in, by the date it began on; null by day, and always when there is no night (from equal to to). */
-export function nightAt(at: number, h: Hours): string | null {
+/** The wall clock at `at` in a time zone (this computer's own when none is given, or it is not one): minutes into the day, the date, and the date before. */
+function wall(at: number, tz?: string): { now: number; date: string; before: string } {
+  const d = new Date(at);
+  if (tz) {
+    try {
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d).map((x) => [x.type, x.value]));
+      const before = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) - 1)).toISOString().slice(0, 10);
+      return { now: Number(p.hour) * 60 + Number(p.minute), date: `${p.year}-${p.month}-${p.day}`, before };
+    } catch {}
+  }
+  return { now: d.getHours() * 60 + d.getMinutes(), date: dateOf(d), before: dateOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1)) };
+}
+
+/**
+ * The night `at` is in, by the date it began on; null by day, and always when there is no night (from equal to to).
+ * The hours are read in `tz`, the person's time zone: on a server whose clock is UTC, 23:00 is still their 23:00.
+ */
+export function nightAt(at: number, h: Hours, tz?: string): string | null {
   const from = minutesOf(h.nightFrom);
   const to = minutesOf(h.nightTo);
-  const d = new Date(at);
-  const now = d.getHours() * 60 + d.getMinutes();
+  const { now, date, before } = wall(at, tz);
   if (from === to) return null;
-  if (from < to) return now >= from && now < to ? dateOf(d) : null;
-  if (now >= from) return dateOf(d);
+  if (from < to) return now >= from && now < to ? date : null;
+  if (now >= from) return date;
   // The early hours belong to the night that began the evening before.
-  return now < to ? dateOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1)) : null;
+  return now < to ? before : null;
 }
 
 /** Why a night run waits by day: when it will start. */
@@ -57,6 +73,9 @@ export function tonightWords(h: Hours, machine?: string): string {
   if (h.nightFrom === h.nightTo) return 'It will wait until night hours are set (Experiments → Where runs go): there is no night now';
   return `It will start tonight, between ${h.nightFrom} and ${h.nightTo}`;
 }
+
+/** The time zone the night's hours are read in: the person's, as their browser reported it (the tests leave it unset: this computer's). */
+export const nightZone = (db: DB): string | undefined => kvGet(db, 'user.tz') || undefined;
 
 /** A night run in this computer's own queue (one sent to another machine is that machine's). */
 export const isNightHere = (r: Pick<RunRecord, 'when' | 'remote' | 'where'>) => r.when === 'night' && !r.remote && !/^[cm]:/.test(r.where ?? '');
