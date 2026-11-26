@@ -4,6 +4,16 @@
 found); the rest is not built. It follows [Apps: a plan for building apps on top of agents](apps-framework.md), which
 is built: agent apps stay as that plan made them.*
 
+## Where it stands (26 November 2026)
+
+What this plan became is on `main` as one commit ("Web apps: make an app that is a whole website…") and runs in the
+live app: the contract, apps opened inside Hydor, keys, the services catalog, launching to a server, the page checks,
+the simple view and the benchmark. It is not in a version yet (no release notes, not in the desktop apps). Not proven
+for real: a rented server's first start, a public certificate, real payment, mail and model keys, and macOS and
+Windows. Where Hydor itself is reached through a web address rather than on its own computer, apps open only once
+`APPS_DOMAIN` (and `APPS_ORIGIN`) say where their addresses lead; without them an app's address is
+`<name>.localhost`, which only that computer knows. The guide's pictures of Apps were not taken again.
+
 ## Decided on 26 November 2026: the kit is dropped
 
 The comparison in section 13 built six apps both ways and changed two afterwards. Every app passed every check,
