@@ -1011,6 +1011,31 @@ port, where its data lives, how to tell it is ready, how it learns who is signed
 scratch gets them too, and the kit becomes one way of meeting the contract. Until that is decided, no new kit
 blocks are started (commerce, community and live were next); work that helps either way goes on.
 
+### The contract (a draft, to be decided)
+
+One file at the root of an app, `hydor.json`, written by whoever builds it, in any stack. It says where things
+are; Hydor tests what it says before relying on it.
+
+| It says | So that Hydor can |
+|---|---|
+| How to build it (optional) and the one command that starts it in production | Build and run it, inside Hydor or on a server |
+| The names of the variables it reads its port, its data folder and its own address from | Give it a port, a folder of its own that is kept and backed up, and its address |
+| An address that answers once it is ready, and that it stops when asked | Wait for it, restart it, replace a version with the next |
+| Whether it takes who is signed in from Hydor (the signed header, checked with the app's secret) or signs people in itself | Let people of this Hydor use it without a second account |
+| The keys it needs, each with who gives it, why, and how to get it | Ask for them on the keys card and hand them over at start, never in the code |
+| Which of Hydor's services it calls with its own key: a model, vectors for search, mail | Ask the owner once for each, count and cap it |
+| Where its database file is, if it has one | Take a backup while it runs and read it back before the backup counts |
+| A container file, if it is to go to a server | Send, build, switch and roll back as a kit app does today |
+
+What an app gets for meeting it: Preview and a launched version inside Hydor with data of its own, the keys card,
+backups and the way back, the owner's models, search vectors and mail within caps, and launching to a server. What
+it does not get from the contract: the kit's blocks, its who-sees-what checks, and updates of shared parts, which
+stay the kit's. An app made with the kit meets the contract through a `hydor.json` the kit writes.
+
+A short page for builders (the header's format and how to check it in a few lines of any language, the three
+service requests, what a good ready address does) goes with it, with a checker a builder runs before handing over:
+it starts the app as the file says and tries each thing the file claims.
+
 ## 14. Not in this plan
 
 - Native phone apps, and a hosting service of ours.
