@@ -3,6 +3,58 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.117.0 · 26 November 2026
+
+Web apps you can put online, a Jobs section for long work, everything a project keeps as files in its folder, and
+research that goes on while you sleep: runs and searches that wait for the night, Lean verdicts pinned to what was
+agreed, and conjectures explored before anyone tries to prove them.
+
+- **Web apps**: ask for an app that is a whole website (customers and jobs, bookings, a members area, a shop) and
+  the App builder makes it with you in stages, with real choices on cards. You try it inside Hydor, then put it
+  online in Hydor itself or on a server of your own, with backups, going back to the launch before, and its status
+  and log. The keys it needs are asked for on one card. A portfolio starts as plain pages published at a link, with
+  no server, sign-in or key. While an agent is still making an app, its preview says **Being made** and tries again
+  by itself, and the preview shows the app itself where you reach Hydor through one address (a tunnel) too.
+- **Jobs**: a section of its own in the rail for the long work sessions run in the background: how long each has
+  run, about how long it has left, what waits for what and what finished, grouped by tags that agents pick and
+  filtered by project, with **Finished** by day and a **Failed** filter. Agents get a `job` command for anything
+  that takes more than about ten minutes. A session whose jobs still wait or run shows **Working**, not Ready, and
+  its "Finished" notice waits for them.
+- **A project's things are files in its folder**: documents, slides, spreadsheets, LaTeX, notebooks, diagrams,
+  pages, pictures, videos and sounds kept in a project each have a file of their own there (a .docx, a .pptx, an
+  .xlsx…), kept in step both ways: change the file outside Hydor and it comes back as a new version. When something
+  goes into a project you can pick a folder inside it.
+- **Runs that wait for the night**: in New run, set **Start** to **Tonight** for a run or a sweep that can wait, so
+  your GPUs stay yours by day. The hours are in **Where runs go** (**Night from** … **to**, 23:00 to 07:00 to start
+  with, in your own time zone), with what happens when the night ends. In the morning one notice says how the night
+  went.
+- **Evolve at night**: **Evolve…** has the same **Start** choice. With **Tonight** a search scores only in your
+  night hours, over as many nights as it needs, tries nothing new by day and counts only night time against its
+  hours; the morning's notice says how far it got ("The search … tried 37 more versions: its best is 0.4474, 0.0351
+  better than the start").
+- **Lean verdicts that say what was proved**: a verdict names the statement it checked, and can be pinned to the
+  statement you agreed: change the statement, or a definition it rests on, and the check fails instead of passing on
+  something else. Mathlib is set up and tried for real, proofs in a Lake project of your own are covered, and a
+  goal can use the check as its test (`leancheck`).
+- **Explore a conjecture**: the LaTeX editor's **Tools** gain **Explore a conjecture…**: an agent says it exactly,
+  hunts for a counterexample, works the small cases, looks the numbers up in the OEIS, and tells you whether it is
+  false, known or open before anyone spends a week on a proof. Several results at once are formalised as a board:
+  every statement agreed and pinned first, then proved from the leaves up.
+- **The map of a goal's attempts**: a goal's rounds can be seen as a **Map** of which attempt grew out of which,
+  with the best line marked.
+- **Results that say more**: a results table says better, worse or the same within the noise, and says so when the
+  seeds tell little; the message at the end of a run leads with the number that matters and how it stands to the
+  others; scripts and files that are not in git are kept with the run that used them; a finding can be about the
+  literature; and **Is this new?** ranks what it finds by how much it is cited and looks for the paper that started
+  the idea.
+- **Try it on my code**: Paper radar's cards, its saved list and Living related work have **Try it on my code**,
+  which opens a session with the request written for an agent to try the paper's idea in your repository.
+- **Word suggestions** show more of the right words: an answer that arrives while you are still typing shows what
+  is left of it, and how sure a suggestion must be is fitted to your own writing.
+- **Smaller things**: under a reply, the files it changed, its commit and its memory show as one row of small
+  chips; a project's **Memory** tab fits a phone (chips in one line that scrolls sideways); money in answer cards
+  shows as $, not \$; and while the app loads, a stream of bright water runs through the Ω.
+
 ## 0.116.0 · 26 November 2026
 
 Research you can trust when agents do it: one sealed way of keeping score, results tested before they count, proofs
