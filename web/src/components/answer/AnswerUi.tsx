@@ -20,6 +20,7 @@ import { CardFullScreen, CardMenu, picturable } from './CardTools';
 import type { PinCard } from './PinToBoard';
 import { AuiCtx, isObj, str, type AuiInfo, type Data } from './kit';
 import { DataView, dataText } from './DataView';
+import { unescapeMoney } from './money';
 import { FromLine, NotRead, Reading, useCardData } from './DataRef';
 import { UIS } from './registry';
 
@@ -49,11 +50,11 @@ export function readUi(code: string, done: boolean): { value: Data; bad?: boolea
   if (!text) return { value: {} };
   if (done)
     try {
-      const v = JSON.parse(text);
+      const v = unescapeMoney(JSON.parse(text));
       return { value: isObj(v) ? v : Array.isArray(v) ? { items: v } : {}, bad: !isObj(v) && !Array.isArray(v) };
     } catch {}
   const p = readPartial(text);
-  const raw = p.value;
+  const raw = unescapeMoney(p.value);
   const value: Data = isObj(raw) ? raw : Array.isArray(raw) ? { items: raw } : {};
   if (!done && p.inString && p.open?.length) dropOpenAddress(value, p.open);
   return { value, bad: done && (raw === undefined || !Object.keys(value).length) };
