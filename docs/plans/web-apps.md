@@ -45,7 +45,7 @@ is built: agent apps stay as that plan made them.*
 | Licence of the kit and what it puts in apps | MIT | Section 4. Hydor itself stays AGPL-3.0 |
 | Credentials | When an app needs a key (payments, a model, a mail service, a sign-in app), the agent shows how to get it and asks for it on a card that saves it in the vault; several at once as tabs, each with its own short steps | Section 7: one card for any session, fed for kit apps by what each block says about its keys |
 | Outside services | For each need (a database, mail, a place to run, web search, storage, a model, payments and so on) the kit supports the popular services that are affordable and easy; people pick by preference, at most three side by side with one recommended; where one is better overall, only that one is offered | Section 7: the services catalog and its choice card |
-| With the kit or without | The kit is used where it lowers the time and cost of building, and not where it adds to them: the guide recommends one way for each app from what was measured, and the person can choose the other. The kit's advantage is measured, not assumed | Section 7 (the choice, on the brief) and section 13 (the comparison) |
+| With the kit or without | The kit is used where it lowers the cost of building (model use in money; time comes second), and not where it adds to it: the guide recommends one way for each app from what was measured, and the person can choose the other. The kit's advantage is measured, not assumed | Section 7 (the choice, on the brief) and section 13 (the comparison) |
 | Where the kit lives | A public repository of its own, a copy inside each Hydor release | Section 4 |
 | Database and search | SQLite first, Postgres as a switch | Sections 3, 4 and 9 |
 | Vectors in a standalone app | A small model on the app's server by default, an API as an option | Section 6 |
@@ -531,7 +531,7 @@ by and a default marked, never more than three. The choice writes the driver int
 the keys card for that service. The catalog is revisited each release, since prices and free allowances change.
 
 **With the kit or without.** The guide says which way it will build an app and why: on the kit where that is
-faster and cheaper, from scratch in any stack where the kit would only add time and cost (a single page, a single
+cheaper, from scratch in any stack where the kit would only add cost (a single page, a single
 tool). The recommendation comes from the comparison in section 13 for that kind of app, or from a rule of thumb
 said to be one until that kind is measured; the maker can always choose the other way. From scratch is what Hydor already does for any coding task, with the brief known and
 Preview to look at it; it has no ready-made parts, no Features, Check, Launch and Run stages, no updates card, and
