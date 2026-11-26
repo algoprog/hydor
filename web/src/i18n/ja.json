@@ -25892,5 +25892,7 @@
   "That folder is outside the session’s project: make one inside “{0}”": "そのフォルダはセッションのプロジェクトの外にあります。「{0}」内に作成してください",
   "There is already a folder called “{0}” there": "そこにはすでに「{0}」というフォルダがあります",
   "folder: the folder’s id, or null for none": "folder: フォルダのID。なしの場合はnull",
-  "name: the name of the folder": "name: フォルダの名前"
+  "name: the name of the folder": "name: フォルダの名前",
+  "Could not show the screenshots: {0}": "スクリーンショットを表示できませんでした：{0}",
+  "In the dark and light themes too": "ダークテーマとライトテーマの両方でも"
 }

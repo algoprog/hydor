@@ -113,6 +113,8 @@ One bug per report, using `references/bug-report.md`:
   500", not "the backend is broken"); a suspected cause goes under Notes, marked as a guess.
 - **Evidence:** a screenshot (`browser_read` with `kind: "screenshot"`, or `ui_screenshot` with
   `phase: "check"`), the console error text, the failing request (method, address, status, response).
+  Screenshots taken with a script or another tool go to the user with `show_screenshots` (one card, by
+  screen), not as pictures in the reply.
 - **Severity:**
 
 | Severity | Meaning |

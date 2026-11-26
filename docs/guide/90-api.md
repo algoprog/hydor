@@ -1000,11 +1000,12 @@ UpdateState: `{ kind: 'git'|'app' — from git commit by commit, or the Mac app 
 
 ## Before and after screenshots
 
-Agents take them with their own ui_screenshot tool when they change how a web app looks (phase before, then after, with the same label); the user reviews each pair in the conversation. **Shot**: `{ id — 12 hex characters, key — the session's, label — which screen, phase: before|after|check, viewport: desktop|phone, url, title — the page's own, width, height — the picture's, in pixels, createdAt }`.
+Agents take them with their own ui_screenshot tool when they change how a web app looks (phase before, then after, with the same label), and show screenshots they already have as files with show_screenshots; the user reviews each screen in the conversation, one card for a reply's. **Shot**: `{ id — 12 hex characters, key — the session's, label — which screen (the same for its sizes and themes), phase: before|after|check, viewport: desktop|phone, url — the page's address, or file:// and the path for a picture shown from a file, title — the page's own (empty for a file), width, height — the picture's, in pixels, createdAt, theme?: dark|light — the colour scheme it shows, when known, section?: string — the heading its screen shows under, note?: string — the agent's line about the screen, source: capture|file — taken by the app's browser, or copied from a file the agent had }`.
 
 - `GET /api/shots?key=` — a session's screenshots, oldest first. Query: `key: string — the session's key`. Returns: `{ shots: [Shot] }`.
-- `GET /api/shots/:id/pair` — a screenshot and, for an after one, the before one it answers (the session's latest before with the same label and viewport, taken earlier). Returns: `{ shot: Shot, before: Shot | null }`; 404 when it is no longer kept.
-- `GET /api/shots/:id` — the picture itself (WebP). 404 when it is no longer kept (the pictures go with their session, and the oldest go past 500 MB in all).
+- `GET /api/shots/pairs?ids=a,b,c` — several screenshots at once, each with its before one as `GET /api/shots/:id/pair` has it. Query: `ids: string — up to 300 ids, comma-separated`. Returns: `{ pairs: [{ shot: Shot, before: Shot | null }] }`, in the order asked, with the ones that are no longer kept left out.
+- `GET /api/shots/:id/pair` — a screenshot and, for an after one, the before one it answers (the session's latest before with the same label, viewport, heading and theme, taken earlier). Returns: `{ shot: Shot, before: Shot | null }`; 404 when it is no longer kept.
+- `GET /api/shots/:id` — the picture itself, as the type it was given (WebP, PNG, JPEG or GIF). 404 when it is no longer kept (the pictures go with their session, and the oldest go past 500 MB in all).
 
 ## Experiments (System → Experiments)
 

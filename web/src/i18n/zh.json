@@ -27748,5 +27748,7 @@
   "That folder is outside the session’s project: make one inside “{0}”": "该文件夹不在会话所属的项目中：请在“{0}”里新建一个",
   "There is already a folder called “{0}” there": "那里已经有一个名为“{0}”的文件夹",
   "folder: the folder’s id, or null for none": "folder：文件夹的 id，没有则为 null",
-  "name: the name of the folder": "name：文件夹的名称"
+  "name: the name of the folder": "name：文件夹的名称",
+  "Could not show the screenshots: {0}": "无法显示截图：{0}",
+  "In the dark and light themes too": "深色和浅色主题下也一样"
 }

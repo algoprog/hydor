@@ -1741,7 +1741,8 @@ programs shows each program's version and what is out, with Check now, Update no
   timelines, mind maps, Gantt and pie charts…) drawn in the app's colours with their code, a full-screen view and an
   SVG to save, figures and small interactive tools (a chart, a calculator, a simulation with sliders) that run in
   place in a sealed-off frame as the reply comes, and pictures from the web (fetched by the app's own server, so the
-  sites never see your browser) or from this computer, opened large on a click. The user's guidelines can ask for
+  sites never see your browser) or from this computer, opened large on a click (several in a row show as a grid, each with its description, and the viewer
+  goes through all of a reply's pictures with arrows). The user's guidelines can ask for
   plain text instead.
 - Zoom in a conversation, apart from the rest of the app: Ctrl or ⌘ with + − 0 (the number pad too), Ctrl and the
   wheel or a trackpad pinch (Safari's pinch too), the − 125% + pill in the session's header (shown while it is not
@@ -1825,8 +1826,14 @@ programs shows each program's version and what is out, with Check now, Update no
   the light, to see what would not read well.
 - Before and after: when an agent changes how a web app looks, it shows screenshots of each screen it changed
   from before and after, on a computer's or a phone's screen, in the light or dark theme: a reply's screenshots as one card of small
-  pictures (a row of them, with Show all, when there are more), each opening a review (beside the conversation, or
-  over the app on a phone) with a slider or side by side, and arrows to the reply's other screens.
+  pictures, one per screen under headings the agent gives (a row of them, with Show all, when there are more; a
+  phone sign and a sun-and-moon sign mark the versions a screen has), each opening a review (beside the conversation, or
+  over the app on a phone) with a slider or side by side, computer and phone buttons, dark and light buttons, the
+  agent's note, Looks good and Change something, and arrows to the reply's other screens.
+- Screenshots an agent already has as files (taken with a script, in another browser, or given to it) it shows in the
+  same card with show_screenshots, instead of as pictures in its reply: no Chromium needed, and allowed in confidential
+  sessions. The pictures are copied into the app and kept with the session (they go when it is deleted, the oldest first
+  past 500 MB in all), so they stay after the agent cleans up its own files.
 - Every file a turn changed, with its diff, and the commits it made, each opening to its message and diff. Screenshots you attach show in the conversation and open full size.
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - A message you send shows in the conversation at once, with the agent at work under it (or in the queue, when

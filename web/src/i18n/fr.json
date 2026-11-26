@@ -25892,5 +25892,7 @@
   "That folder is outside the session’s project: make one inside “{0}”": "Ce dossier est en dehors du projet de la session : créez-en un dans « {0} »",
   "There is already a folder called “{0}” there": "Il y a déjà un dossier nommé « {0} » à cet endroit",
   "folder: the folder’s id, or null for none": "folder : l’id du dossier, ou null s’il n’y en a pas",
-  "name: the name of the folder": "name : le nom du dossier"
+  "name: the name of the folder": "name : le nom du dossier",
+  "Could not show the screenshots: {0}": "Impossible d’afficher les captures d’écran : {0}",
+  "In the dark and light themes too": "Dans les thèmes sombre et clair aussi"
 }

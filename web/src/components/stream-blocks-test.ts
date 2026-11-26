@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import { groupPictures } from './markdown-pictures';
 import { streamBlocks } from './stream-blocks';
 
 const cases: [string, string, string[]][] = [
@@ -19,6 +20,12 @@ const cases: [string, string, string[]][] = [
   ['code in a list item', '- step:\n\n  ```sh\n  ls\n\n  pwd\n  ```\n\nDone', ['- step:\n\n  ```sh\n  ls\n\n  pwd\n  ```\n', 'Done']],
   ['a longer fence holds a shorter one', '````md\n```js\nx\n```\n\nstill inside\n````\n\nout', ['````md\n```js\nx\n```\n\nstill inside\n````\n', 'out']],
   ['blank lines first and several between', '\n\na\n\n\n\nb', ['\n\na\n\n\n', 'b']],
+  ['a run of picture paragraphs stays one block', 'Shots:\n\n![a](/a.png)\n\n![b](/b.png "B")\n\n![c](/c.png)\n\nDone', ['Shots:\n', '![a](/a.png)\n\n![b](/b.png "B")\n\n![c](/c.png)\n', 'Done']],
+  ['a run still coming, its next picture not yet whole', '![a](/a.png)\n\n![b](/b.p', ['![a](/a.png)\n\n![b](/b.p']],
+  ['runs split by a line of words are two blocks', '![a](/a.png)\n\n![b](/b.png)\n\n**Next**\n\n![c](/c.png)\n\n![d](/d.png)', ['![a](/a.png)\n\n![b](/b.png)\n', '**Next**\n', '![c](/c.png)\n\n![d](/d.png)']],
+  ['linked pictures and several blank lines between', '[![a](/a.png)](https://x.example)\n\n\n\n![b](/b.png)\n\ntext', ['[![a](/a.png)](https://x.example)\n\n\n\n![b](/b.png)\n', 'text']],
+  ['a picture before words is cut as ever', '![a](/a.png)\n\nwords\n\n![b](/b.png)', ['![a](/a.png)\n', 'words\n', '![b](/b.png)']],
+  ['a picture among words is no run', 'See ![a](/a.png) here\n\n![b](/b.png)', ['See ![a](/a.png) here\n', '![b](/b.png)']],
 ];
 let n = 0;
 for (const [what, src, want] of cases) {
@@ -41,4 +48,11 @@ for (const r of replies) {
   assert.equal(streamBlocks(r).map(draw).join(''), draw(r));
   n++;
 }
+// A run of pictures drawn as blocks makes the grid it makes whole (React hoists an image's preload link: left out here).
+const drawPics = (text: string) =>
+  renderToStaticMarkup(createElement(ReactMarkdown, { remarkPlugins: [remarkGfm], rehypePlugins: [groupPictures] } as any, text)).replace(/<link [^>]*>/g, '').replace(/>\s+</g, '><');
+const pics = 'Look:\n\n![a](/a.png)\n\n![b](/b.png "B")\n\n![c](/c.png)\n\nEnd';
+assert.equal(streamBlocks(pics).map(drawPics).join(''), drawPics(pics));
+assert.equal((streamBlocks(pics).map(drawPics).join('').match(/class="md-pics"/g) ?? []).length, 1);
+n++;
 console.log(`${n} passed`);

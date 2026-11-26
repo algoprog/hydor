@@ -47,6 +47,8 @@ export const CONFIDENTIAL_TOOLS = new Set([
   // Files and documents, read here.
   'read_document',
   'present_files',
+  // Screenshots as files, copied into the data folder (no browser, nothing sent anywhere).
+  'show_screenshots',
   // Kept pages, on this computer.
   'show_html',
   'save_page',

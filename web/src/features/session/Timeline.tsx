@@ -235,6 +235,12 @@ function segment(items: TimelineItem[]): Segment[] {
   return out;
 }
 
+/** The group a call shows together with others in (a tool's `many`: its own name, or the name the view gives), if it does. */
+const manyOf = (it: ToolItem): string | undefined => {
+  const m = toolView(it.tool.name, it.tool)?.many;
+  return m ? (typeof m === 'string' ? m : it.tool.name) : undefined;
+};
+
 /**
  * The reply's items, with the later calls of a tool that shows them together (`many`) in its first one's `more`, and
  * the turn's other calls that made the same as one (`same`) in its `more`. `key` stays the same while a page is saved
@@ -244,12 +250,13 @@ function together(items: TimelineItem[], same: Segment['same']): { key: string; 
   const out: { key: string; item: TimelineItem; more?: ToolItem[] }[] = [];
   const first = new Map<string, { key: string; item: TimelineItem; more?: ToolItem[] }>();
   for (const it of items) {
-    const lead = it.kind === 'tool' && toolView(it.tool.name, it.tool)?.many ? first.get(it.tool.name) : undefined;
+    const group = it.kind === 'tool' ? manyOf(it) : undefined;
+    const lead = group ? first.get(group) : undefined;
     if (lead) (lead.more ??= []).push(it as ToolItem);
     else {
       const s = same.get(it.id);
       const e = { key: s?.first ?? it.id, item: it, ...(s ? { more: s.others } : {}) };
-      if (it.kind === 'tool' && toolView(it.tool.name, it.tool)?.many) first.set(it.tool.name, e);
+      if (group) first.set(group, e);
       out.push(e);
     }
   }

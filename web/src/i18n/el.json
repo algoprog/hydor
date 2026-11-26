@@ -27751,5 +27751,7 @@
   "That folder is outside the session’s project: make one inside “{0}”": "Αυτός ο φάκελος είναι εκτός του έργου της συνεδρίας: δημιουργήστε έναν μέσα στο «{0}»",
   "There is already a folder called “{0}” there": "Υπάρχει ήδη εκεί φάκελος με το όνομα «{0}»",
   "folder: the folder’s id, or null for none": "folder: το αναγνωριστικό του φακέλου ή null για κανέναν",
-  "name: the name of the folder": "name: το όνομα του φακέλου"
+  "name: the name of the folder": "name: το όνομα του φακέλου",
+  "Could not show the screenshots: {0}": "Δεν ήταν δυνατή η εμφάνιση των στιγμιότυπων οθόνης: {0}",
+  "In the dark and light themes too": "Και σε σκούρο και φωτεινό θέμα"
 }

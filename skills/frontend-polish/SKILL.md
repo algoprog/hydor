@@ -20,6 +20,8 @@ screenshots, not by reading CSS.
   `phase: "after"` with the same labels, so the user sees each pair side by side.
 - Without that tool: Playwright's `page.screenshot({ path, fullPage: true })` at 1280 and 390 wide, or the
   browser's device toolbar.
+  Pictures you take that way, or are given, go to the user with `show_screenshots` (one card, grouped by
+  screen, with a `before` path to pair them), not as pictures pasted into your reply.
 - Write down what looks off, concretely: "card titles wrap at 390px", "three different greys for
   secondary text", "buttons are 32, 36 and 40px tall". Specific problems, not "make it nicer".
 

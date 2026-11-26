@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { normalizeMath } from './markdown-math';
 import { streamBlocks } from './stream-blocks';
+import { groupPictures, replyPictureRefs } from './markdown-pictures';
 import { FileText, Maximize2 } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
 import { appPageLink, isAppPage } from '@shared/app-pages';
@@ -12,7 +13,7 @@ import type { CardSource } from '@shared/boards';
 import { CITE_RUN, citedReply, citeNumbers, type Cited } from '@shared/citations';
 import { codexCitations, FILE_CITATION } from '@shared/file-citations';
 import { CiteChip, SourcesRow } from './Citations';
-import { openLightbox } from './Lightbox';
+import { openLightbox, type LightboxImage } from './Lightbox';
 import { cx } from './ui';
 import { ZoomOverlay } from './ZoomPan';
 import { goApp, openFile } from '../lib/nav';
@@ -331,6 +332,8 @@ export interface MdInfo {
   offline?: boolean;
   /** Where the reply is, for an answer card pinned to a board from it: its session and place, or an app's or a task's run. */
   pinFrom?: CardSource;
+  /** A reply's whole text as given to the parser (`src` is just a block's while it streams), for the viewer's list of its pictures. */
+  whole?: { current: string };
 }
 export const MdCtx = createContext<MdInfo>({ src: '', streaming: false, rich: false });
 
@@ -413,12 +416,38 @@ export function replyPicture(src: string, cwd?: string): string | null {
   return mu(`/api/fs/raw?path=${encodeURIComponent(file)}`);
 }
 
-/** A picture in an agent's reply: fitted to the reply, opened large on a click, and a link when it cannot load. */
-function ReplyPicture({ src, alt, title }: { src?: string; alt?: string; title?: string }) {
-  const { cwd, offline } = useContext(MdCtx);
+/** Where a picture of a reply loads from; a confidential session's reply loads nothing from the web (null: a link). */
+const pictureUrl = (from: string, cwd?: string, offline?: boolean) => (offline && /^https?:\/\//i.test(from.trim()) ? null : replyPicture(from, cwd));
+
+/**
+ * The viewer for a picture of a reply: all of the reply's pictures, in order (read from its text), at the one clicked
+ * (the one of its address that comes as many times before it on the page); alone when it is not among them.
+ */
+function openReplyPicture(img: HTMLImageElement, md: MdInfo, one: LightboxImage) {
+  const list: LightboxImage[] = [];
+  for (const r of replyPictureRefs(md.whole?.current ?? md.src)) {
+    const src = pictureUrl(r.src, md.cwd, md.offline);
+    if (src) list.push({ src, name: r.title || r.alt || undefined, href: /^https?:\/\//i.test(r.src) ? r.src : undefined });
+  }
+  const root = img.closest('.md');
+  const same = root ? Array.from(root.querySelectorAll<HTMLImageElement>('img.md-pic')).filter((i) => i.getAttribute('src') === one.src) : [img];
+  const nth = Math.max(0, same.indexOf(img));
+  let at = -1;
+  for (let i = 0, seen = 0; i < list.length; i++) if (list[i].src === one.src && seen++ === nth) at = i;
+  if (at < 0) openLightbox([one]);
+  else openLightbox(list, at);
+}
+
+/**
+ * A picture in an agent's reply: fitted to the reply, opened large on a click (with the reply's other pictures to step
+ * through), and a link when it cannot load. In a grid of pictures (`data-grid`, groupPictures) its title or alt is its caption.
+ */
+function ReplyPicture({ src, alt, title, ...rest }: { src?: string; alt?: string; title?: string; [k: string]: any }) {
+  const md = useContext(MdCtx);
+  const { cwd, offline } = md;
+  const grid = !!rest['data-grid'];
   const from = String(src ?? '');
-  // A confidential session's reply loads nothing from the web: such a picture is a link you may open.
-  const url = useMemo(() => (offline && /^https?:\/\//i.test(from.trim()) ? null : replyPicture(from, cwd)), [from, cwd, offline]);
+  const url = useMemo(() => pictureUrl(from, cwd, offline), [from, cwd, offline]);
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
   if (!url || failed) {
@@ -426,6 +455,7 @@ function ReplyPicture({ src, alt, title }: { src?: string; alt?: string; title?:
     return <Link href={from}>{`${alt?.trim() || tr('Picture')} ↗`}</Link>;
   }
   const web = /^https?:\/\//i.test(from);
+  const caption = grid ? title || alt?.trim() : title;
   return (
     <span className="md-figure">
       <img
@@ -438,11 +468,11 @@ function ReplyPicture({ src, alt, title }: { src?: string; alt?: string; title?:
         onClick={(e) => {
           // A picture that is a link (to its source) follows the link.
           if ((e.currentTarget as HTMLElement).closest('a')) return;
-          openLightbox([{ src: url, name: title || alt || undefined, href: web ? from : undefined }]);
+          openReplyPicture(e.currentTarget, md, { src: url, name: title || alt || undefined, href: web ? from : undefined });
         }}
         className="md-pic"
       />
-      {title && <span className="md-caption">{title}</span>}
+      {caption && <span className="md-caption">{caption}</span>}
     </span>
   );
 }
@@ -800,7 +830,10 @@ export const Markdown = memo(function Markdown({
     return streaming ? holdOpenMaths(t) : t;
   }, [text, notebook, streaming]);
   useChemistry(src);
-  const base = useMemo<Omit<MdInfo, 'src'>>(() => ({ streaming: !!streaming, rich: !!rich, sessionKey, cwd, offline, pinFrom }), [streaming, rich, sessionKey, cwd, offline, pinFrom]);
+  // The whole text, for a picture's click to find the reply's others (a ref: a block's props do not change with each word).
+  const whole = useRef(src);
+  whole.current = src;
+  const base = useMemo<Omit<MdInfo, 'src'>>(() => ({ streaming: !!streaming, rich: !!rich, sessionKey, cwd, offline, pinFrom, whole }), [streaming, rich, sessionKey, cwd, offline, pinFrom]);
   const info = useMemo<MdInfo>(() => ({ ...base, src }), [base, src]);
   // While it comes, block by block (a document's headings are numbered across the whole of it: it is read whole).
   const blocks = useMemo(() => (streaming && !baseDir && !app ? streamBlocks(src) : null), [src, streaming, baseDir, app]);
@@ -832,12 +865,13 @@ export const Markdown = memo(function Markdown({
     const list = [...(breaks ? remarkBreaks : remarkPlugins), ...(rich ? [remarkFilePaths] : [])];
     return cites?.size ? [...list, [remarkCites, { known: new Set(cites.keys()) }]] : list;
   }, [breaks, cites, rich]);
+  // Pictures one after another are one grid, in an agent's reply (finished or streaming alike).
   const rehype = useMemo(
-    () => [...(rehypeExtra ?? []), ...(streaming ? rehypeStreaming : rehypePlugins), ...(baseDir || app ? [[rehypeHeadingIds, { ids: headingIds }]] : [])],
-    [rehypeExtra, streaming, baseDir, app, headingIds],
+    () => [...(rehypeExtra ?? []), ...(rich && !resolveImage ? [groupPictures] : []), ...(streaming ? rehypeStreaming : rehypePlugins), ...(baseDir || app ? [[rehypeHeadingIds, { ids: headingIds }]] : [])],
+    [rehypeExtra, rich, resolveImage, streaming, baseDir, app, headingIds],
   );
   // A finished block's words are all there: none arrives to fade in.
-  const rehypeWhole = useMemo(() => [...(rehypeExtra ?? []), ...rehypePlugins], [rehypeExtra]);
+  const rehypeWhole = useMemo(() => [...(rehypeExtra ?? []), ...(rich && !resolveImage ? [groupPictures] : []), ...rehypePlugins], [rehypeExtra, rich, resolveImage]);
   return (
     <MdCtx.Provider value={info}>
       <div className={cx('md', className)}>

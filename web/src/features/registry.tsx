@@ -53,8 +53,11 @@ export interface ToolView {
   place?: 'work' | 'answer' | 'attention';
   /** How its step reads on a line and counts in a folded group (as an MCP tool it would be "other"): web_search counts with web searches. */
   step?: (t: ToolInfo) => { category?: ToolCategory; verb?: string; title?: string };
-  /** Shown with the reply, its later calls in that reply come to the first as `more` and show with it, as one (screenshots). */
-  many?: boolean;
+  /**
+   * Shown with the reply, its later calls in that reply come to the first as `more` and show with it, as one (screenshots).
+   * A string names a group: the calls of every tool with that name show as one, even across tool names.
+   */
+  many?: boolean | string;
   /**
    * Shown with the reply, what a call makes again when called again (a saved page, by its id). Of a turn's calls
    * that make the same, the reply shows only the newest that did not fail (or was not declined or stopped), the others

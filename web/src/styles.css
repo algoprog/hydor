@@ -2113,6 +2113,51 @@ html:not([data-motion=off]) .update-words {
   line-height: 1.45;
   color: var(--fg-3);
 }
+/* Pictures one after another in an agent's reply (groupPictures): one grid, each in a 16:10 box cut from the top, its title or
+   alt under it. Two sit side by side, four two by two; more are three to a row, two when the reply is narrow (a column is at least 120px or
+   a third of the width, the 1px keeps three from rounding down to two). */
+.md .md-pics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(max(120px, calc((100% - 16px) / 3 - 1px)), 1fr));
+  gap: 12px 8px;
+  margin: 0.55em 0;
+}
+.md .md-pics[data-n='2'],
+.md .md-pics[data-n='4'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.md .md-pics > * {
+  min-width: 0;
+}
+.md .md-pics a:hover {
+  text-decoration: none;
+}
+.md .md-pics .md-figure {
+  display: block;
+  margin: 0;
+}
+.md .md-pics .md-figure + .md-figure {
+  margin-left: 0;
+}
+.md .md-pics .md-pic {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: none;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top center;
+}
+.md .md-pics .md-caption {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: calc(12px * var(--n-text-scale, 1));
+  line-height: 1.4;
+  color: var(--fg-3);
+}
 /* A diagram (```mermaid): drawn at its own size or smaller, never taller than most of a screen. Its labels keep the
    line height and wrapping Mermaid measured them with. */
 .md .mermaid-svg {

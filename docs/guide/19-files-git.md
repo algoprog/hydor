@@ -710,13 +710,18 @@ To have the page itself in your browser rather than streamed:
 
 When an agent changes how a web app looks or works (a site or an app with a dev server, or HTML files), it shows you screenshots to review: before its first change, a picture of each screen it will change, and when it is done, the same screens again. It starts the app's dev server first when it isn't running.
 
-- A **Before** card shows the screens as they were, in small pictures: the screenshots of one reply show together, in one card. In a **Before and after** card, a screen's pair is marked **Before → after**, its before and after split down the middle. A phone sign marks a screen the agent took on a phone's size too. When a reply has more screens than fit in a row, the card shows the first row with **Show all** under it (**Show fewer** folds them again).
-- Click a picture to review it: on a wide screen it opens beside the conversation, as pages do; in a narrower window or on a phone, over the app. The arrows at its top go to the reply's other screens.
-- A screen's before and after show one over the other: drag the slider (or press ← and →) to sweep between them, or pick **Side by side**. The computer and phone buttons switch between the two sizes when the agent took both. **See them large** opens the pictures over the app. **Looks good** and **Change something** put a line about the screen in the message box, for you to finish and send.
+An agent that has screenshots as files (it took them with a script, in another browser, or was given them) shows them the same way, in one card instead of pictures pasted into its reply. That needs no Chromium on this computer, and it works in a [confidential session](/guide/sessions#keep-a-session-confidential) too.
+
+- The screenshots of one reply show together, in one card of small pictures, one for each screen. The agent can group the screens under headings of its own ("Adding a server", "Settings"). A **Before** card shows the screens as they were; in a **Before and after** card, a screen's pair is marked **Before → after**, its before and after split down the middle.
+- A screen's other versions are part of its picture, not more pictures: a phone sign marks a screen the agent took at a phone's size too, and a sun-and-moon sign one it took in the dark and the light themes too (when only some screens have both). When a reply has more screens than fit in a row, the card shows the first row with **Show all** under it (**Show fewer** folds them again).
+- Click a picture to review it: on a wide screen it opens beside the conversation, as pages do; in a narrower window or on a phone, over the app. The arrows at its top go to the reply's other screens. If the agent wrote a note about the screen, it shows at the top.
+- The computer and phone buttons switch between the sizes, and the moon and sun buttons between the dark and light themes, when the agent took both. **See them large** opens the pictures over the app.
+- When the agent gave a before picture for a screen, its before and after show one over the other: drag the slider (or press ← and →) to sweep between them, or pick **Side by side**.
+- **Looks good** and **Change something** put a line about the screen in the message box, for you to finish and send.
 - On a wide screen, a screen's after opens beside the conversation by itself when it comes.
 - An after picture without a before one shows alone, with "No before picture to compare with"; the agent is told to take the before one first next time.
 
-You can also ask for a screenshot any time: "show me the settings page on a phone", or "in the dark theme" (a site that follows your computer's light or dark shows in the one you name, and in the light otherwise). A page an agent made for the conversation or kept in a project (a mock-up, a report) is pictured as the app shows it, in the dark theme unless the light one is asked for, so the agent sees what would not read well before you do. The pictures are taken on this computer by a Chromium ([Settings → Capabilities → Browser](/settings?s=browser)) and kept with their session: they go when the session is deleted, and the oldest go first past 500 MB in all.
+You can also ask for a screenshot any time: "show me the settings page on a phone", or "in the dark theme" (a site that follows your computer's light or dark shows in the one you name, and in the light otherwise). A page an agent made for the conversation or kept in a project (a mock-up, a report) is pictured as the app shows it, in the dark theme unless the light one is asked for, so the agent sees what would not read well before you do. The pictures the app takes of a web app are taken on this computer by a Chromium ([Settings → Capabilities → Browser](/settings?s=browser)); the ones an agent shows from files are copied into the app. Either way they are kept with their session, so they stay after the agent tidies up its own files: they go when the session is deleted, and the oldest go first past 500 MB in all.
 
 ## Watch this computer in Monitor
 
@@ -766,4 +771,5 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 - "Search went slow after v2.3 in ~/code/shop-api: find the commit that made it slow."
 - "Which dev servers are running on this computer right now?"
 - "Make the checkout page's button bigger, and show me before and after on a phone, in the dark theme."
+- "Run the Playwright tests that take screenshots of each page, then show me them under a heading for each part of the app, with the phone ones beside the computer ones."
 - "What's using the most memory on this computer?"
