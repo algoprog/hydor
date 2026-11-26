@@ -1036,6 +1036,32 @@ A short page for builders (the header's format and how to check it in a few line
 service requests, what a good ready address does) goes with it, with a checker a builder runs before handing over:
 it starts the app as the file says and tries each thing the file claims.
 
+### The services catalog: what is offered for each need (decided 26 November 2026)
+
+From providers' own pricing and documentation pages, read on 25 November 2026; a figure that could not be read
+there is not used. One service where one is better overall for a small app, at most three otherwise, the first
+being the default. The catalog is Hydor's, so it serves an app built either way: a choice card where there is a
+choice, then the keys card with that service's steps.
+
+| Need | Offered | Chosen by | Left out, and why |
+|---|---|---|---|
+| A database | None: SQLite on the app's own disk. Where there is no disk: Neon, Turso | Neon is plain Postgres, free with no card, and stops instead of billing at its limit; Turso keeps SQLite code as it is | Supabase (its free tier pauses a project after a week idle; the next step is 25 dollars a month) |
+| Sending mail | Resend, Brevo, Postmark; a mailbox the person has, for a few mails a day | Resend needs no approval and has 3,000 a month free; Brevo also does newsletters cheaply; Postmark for delivery that must not fail | Amazon SES (approval and signing too hard for this audience), SendGrid (no free plan any more) |
+| A place to run | Inside this Hydor; a rented server: DigitalOcean, Hetzner; a platform with a disk: Render | DigitalOcean is 12 dollars a month for 2 GB and easy to follow; Hetzner is about half that when its small plans can be ordered; Render needs no server at all, at 25 dollars | Vercel's free plan (no business use), Fly.io (a command-line tool and a card) |
+| Web search for an app's AI features | Tavily, Exa, Brave; or the model provider's own search where the person already has that key | Tavily has 1,000 searches a month free with no card; Exa is cheapest per search; Brave has its own index, needs a card and forbids keeping results | Google's and Bing's search APIs (closed or retired), SerpApi (three to five times the price) |
+| Files and backups off the server | Cloudflare R2, Backblaze B2, Hetzner object storage | R2 has 10 GB free and no charge for downloads; B2 is cheapest at 100 GB; Hetzner is one flat price in Germany or Finland | Amazon S3 (account setup and download fees), Wasabi (a 1 TB minimum) |
+| A model, with the person's own key | Anthropic, OpenAI, Google's Gemini | Priced alike for their small and middle models; Anthropic is the default the AI features are written and tested against; OpenAI starts on a 5 dollar prepaid balance; Gemini has a free tier with no card, whose content Google may use | OpenRouter as a card (a fee on every top-up and a catalogue too long; it stays possible as "another provider") |
+| Taking payments | Stripe, Polar, Paddle | Stripe is the only one that also allows physical goods, services, donations and club fees; Polar and Paddle handle sales tax for sellers of software and courses, at about 5% and 50 cents a sale | Lemon Squeezy (closing on 31 March 2027, by its own page) |
+| Sign-in with another account | Google, Microsoft, GitHub; a mailed link and passkeys need no service | Google needs no review for plain sign-in; Microsoft where people work in it; GitHub for developers' tools | Apple (99 dollars a year and a secret to renew twice a year), unless there is an iPhone app |
+| Text messages | Not offered unless asked; then Twilio | A code by text costs 5 to 16 cents and US senders wait days for registration; a code by mail has neither | |
+| Seeing use and errors | The app's own counts and its own log; if asked: Umami or Plausible, Sentry or Bugsink; UptimeRobot for "is it up" | No cookies and no outside service by default | PostHog (far more than a small app needs) |
+| A domain | Cloudflare Registrar, Porkbun | Both sell at about cost with no jump at renewal; Cloudflare's DNS can be set by an agent with one token | GoDaddy, Namecheap, Gandi (renewal prices) |
+| Keeping bots out of forms | Cloudflare Turnstile, ALTCHA | Turnstile is free with no cap; ALTCHA needs no outside account and sets no cookie | reCAPTCHA (a Google Cloud project and a hard cap) |
+| Maps | Geoapify; one map file served from the app's own storage | Geoapify has tiles and address lookup under one free key and allows business use | OpenStreetMap's own tiles for a busy site (its policy gives no guarantee) |
+
+One Cloudflare account covers storage, the domain, DNS and bot protection, which keeps sign-ups few. Open: whether
+Naget's own search is offered for web search, and as the default.
+
 ## 14. Not in this plan
 
 - Native phone apps, and a hosting service of ours.
