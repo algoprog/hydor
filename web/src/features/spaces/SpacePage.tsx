@@ -664,9 +664,10 @@ export function SpacePage({ id, tab: first, part: firstPart, share, dir, req, pa
           </div>
         </div>
       ) : tab === 'memory' ? (
-        // Its list and its reader scroll in their own boxes, so the window keeps its height.
+        // On a computer its list and its reader scroll in their own boxes, so the window keeps its height; on a phone the tab
+        // scrolls as a whole, edge to edge (it keeps its own margins, so its rows of chips can run to the screen's edges).
         <div className="min-h-0 flex-1 pb-[var(--safe-bottom)]">
-          <div className="h-full px-3 pt-4 pb-3 sm:px-6">
+          <div className="h-full sm:px-6 sm:pt-4 sm:pb-3">
             <ProjectMemory s={s} view={view} memory={memory} part={part} onPart={setPart} onTab={to} />
           </div>
         </div>

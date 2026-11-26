@@ -185,6 +185,8 @@ You can also drop files or a folder anywhere on the tab: they are added to the p
 - **Documents** shows the folders the project reads, each with a × that stops reading it (after asking; the folder itself is untouched), and **Add a folder**. In a group, "Also searched:" names its projects, whose documents the group searches too. When the project has more documents than its wiki reads, it says so: "Its wiki reads 100 of its 340 documents: the pinned, the most used and the newest. Agents search all of them." (see [When a project has too many documents](#when-a-project-has-too-many-documents)).
 - **Findings**, what the project tried and what came of it, has smaller chips by verdict: **Supported**, **Refuted**, **Unclear** and **Open** (see [Findings](/guide/memory#findings-what-was-tried-and-what-came-of-it)).
 
+On a phone the whole tab scrolls, so the list has the screen, and each row of chips is one line that scrolls sideways: an edge with more chips beyond it fades out. When you go back from what you opened, the list is where you left it.
+
 **The list.** Everything is in one list, newest first. The project's profile comes first, pinned ("Project profile · Every agent here reads it first"). A note shows its short title and a line such as "Note · you said so · used once · ends 26 Nov · 3 h ago"; a topic says "Topic · sums up 7 notes"; a wiki article, "Wiki · its area · when it changed"; a document, "Document · 12 passages · 2.1 MB · read yesterday" (in red, "could not be read"); a finding, its statement, its verdict, its age and, when the code under it has changed, "code changed since".
 
 **The pane.** Click a row and it opens on the right (on a phone it takes the list's place, with **‹ Memory** to go back):

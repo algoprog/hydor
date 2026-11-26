@@ -1,8 +1,10 @@
 // A project's Memory tab: everything its agents remember in one list (its notes, its wiki's articles, its own documents and its
 // findings, newest first), narrowed by chips, searched in one box, and read in the pane beside it (in the list's place on a phone). Add
 // puts in a note, files or a folder; ⋯ holds the wiki's jobs, the agents' prompts and the settings. Files dropped anywhere on the tab are
-// added to the project's documents. It fills the window's height; the list and the reader scroll on their own.
-import { useEffect, useMemo, useRef, useState } from 'react';
+// added to the project's documents. On a computer it fills the window's height and the list and the reader scroll on their own; on a
+// phone the whole tab scrolls (the search box and the chips go up with the list, so the list has the screen), its rows of chips are
+// one line each that scrolls sideways, and an open item takes the list's place (the list is where it was when you come back).
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpDown, Brain, Search, X } from 'lucide-react';
 import type { MemoryListEntry } from '@shared/memory';
 import { isUserProfile } from '@shared/memory';
@@ -29,20 +31,20 @@ import { docRow, FINDING_SUBS, groupOf, NOTE_SUBS, noteRow, notAFailure, ownBase
 import { AddFolder, AddMenu, MoreMenu, UpdatesDialog, useFilePicker } from './Menus';
 import { DocReader, MemoryIntro, NoteReader, WikiPane } from './Readers';
 import { FailedStrip, OfferStrip, WikiErrorStrip } from './Strips';
-import { Chip, KindIcon, Loading } from './ui';
+import { Chip, KindIcon, Loading, ScrollRow } from './ui';
 
 /** The list shows this many rows, and as many more each time Show more is pressed. */
 const PAGE = 100;
 const WEEK = 7 * 86400_000;
 
-/** One row of the list: its kind's icon, its title on one line, and what it is under it. A finding's statement may take two,
- * with its verdict, its age and whether the code under it changed. */
-function ListRow({ r, on, onClick }: { r: Row; on: boolean; onClick: () => void }) {
+/** One row of the list: its kind's icon, its title on one line (two on a phone, where the open item is not beside it), and what it is
+ * under it. A finding's statement may take two, with its verdict, its age and whether the code under it changed. */
+function ListRow({ r, on, wide, onClick }: { r: Row; on: boolean; wide: boolean; onClick: () => void }) {
   return (
     <button type="button" aria-current={on || undefined} onClick={onClick} className={cx('flex w-full min-w-0 items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', on ? 'bg-bg-2' : 'hover:bg-bg-1')}>
       <KindIcon kind={r.kind} />
       <span className="min-w-0 flex-1">
-        <span translate="no" className={cx('text-[13.5px] leading-snug font-medium', r.verdict ? 'line-clamp-2 break-words' : 'block truncate')}>
+        <span translate="no" className={cx('text-[13.5px] leading-snug font-medium', r.verdict || !wide ? 'line-clamp-2 break-words' : 'block truncate')}>
           {r.title}
         </span>
         {r.verdict ? (
@@ -64,7 +66,7 @@ function ListRow({ r, on, onClick }: { r: Row; on: boolean; onClick: () => void 
 /** What is in the list's place when it has no rows: a few words, and what to do. */
 function Blank({ icon, title, children, action }: { icon?: React.ReactNode; title: string; children?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center px-6 py-8 text-center">
+    <div className="flex h-full flex-1 flex-col items-center justify-center px-6 py-8 text-center">
       {icon && <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-[14px] bg-bg-2 text-fg-2">{icon}</span>}
       <div className="text-[14px] font-semibold">{title}</div>
       {children && <div className="mt-1 max-w-[380px] text-[13px] leading-relaxed text-fg-3">{children}</div>}
@@ -105,18 +107,19 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
   const { result, busy } = useMemorySearch(s.id, q);
   const searching = !!q.trim() && !!result;
 
-  // On a narrow screen the chips scroll sideways: the open one is brought into view (an address may open the last).
-  const chips = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const row = chips.current;
-    const on = row?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    if (row && on) row.scrollLeft = Math.max(0, on.offsetLeft + on.offsetWidth - row.offsetLeft - row.clientWidth + 4);
-  }, [part, s.id, notes]);
+
+  // On a phone the tab scrolls as a whole: where the list was when an item opened (in its place), to go back to when it closes.
+  const scroller = useRef<HTMLDivElement>(null);
+  const listTop = useRef(0);
+  useLayoutEffect(() => {
+    if (!wide && !sel && scroller.current) scroller.current.scrollTop = listTop.current;
+  }, [sel, wide]);
 
   // Another project, or another kind of chip, starts afresh.
   useEffect(() => {
     setSel(null);
     setQ('');
+    listTop.current = 0;
   }, [s.id]);
   useEffect(() => setSub(null), [part, s.id]);
   useEffect(() => setLimitRows(PAGE), [part, sub, q, sort, s.id]);
@@ -212,7 +215,10 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
   };
 
   // ---- the reader ----
-  const select = (key: string | null) => setSel(key);
+  const select = (key: string | null) => {
+    if (!wide && key && !sel && scroller.current) listTop.current = scroller.current.scrollTop;
+    setSel(key);
+  };
   const openWiki = (path: string) => select(`w:${path}`);
   /** After a note went (or a document): the next row opens on a computer, the list shows on a phone. */
   const gone = (key: string) => {
@@ -322,11 +328,17 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
   );
 
   // On a phone an open item takes the list's place.
-  if (!wide && sel && reader) return <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-panel">{reader}</div>;
+  if (!wide && sel && reader)
+    return (
+      <div className="h-full px-3 pt-4 pb-3">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-panel">{reader}</div>
+      </div>
+    );
 
   return (
     <div
-      className="relative flex h-full min-h-0 flex-col gap-2.5"
+      ref={scroller}
+      className={cx('relative flex h-full min-h-0 flex-col gap-2.5', !wide && 'overflow-y-auto overscroll-y-contain px-3 pt-4 pb-3 *:shrink-0')}
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
         // A drop zone in the list (it has handled the event already) takes its own.
@@ -369,13 +381,13 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <div ref={chips} className="-mx-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-1 py-0.5">
+        <ScrollRow show={[s.id, part, counts.notes, counts.wiki, counts.documents, counts.findings].join()} className={cx('flex-1', wide ? '-mx-1 px-1' : '-ml-3 pl-3')}>
           {kindChip('all', 'All', loaded || found ? total : undefined)}
           {kindChip('notes', 'Notes', counts.notes)}
           {kindChip('wiki', 'Wiki', counts.wiki)}
           {kindChip('documents', 'Documents', counts.documents)}
           {kindChip('findings', 'Findings', counts.findings)}
-        </div>
+        </ScrollRow>
         {!found && (
           <>
             <button ref={sortRef} type="button" aria-haspopup="menu" aria-expanded={sortMenu} aria-label={sort === 'new' ? 'Newest first' : 'A to Z'} onClick={() => setSortMenu((o) => !o)} className="flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[12px] text-fg-3 hover:bg-bg-2 hover:text-fg">
@@ -406,15 +418,17 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
         )}
       </div>
 
-      {(part === 'notes' || part === 'wiki' || part === 'findings') && subs.length > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-          {subs.map((x) => (
+      {(part === 'notes' || part === 'wiki' || part === 'findings') &&
+        subs.length > 0 &&
+        (() => {
+          const list = subs.map((x) => (
             <Chip key={x.id} small on={activeSub === x.id} count={x.count} onClick={() => setSub(activeSub === x.id ? null : x.id)}>
               {x.user ? <span translate="no">{x.label}</span> : x.label}
             </Chip>
-          ))}
-        </div>
-      )}
+          ));
+          // A wiki's areas can be many: on a phone they are one line that scrolls sideways, not rows that fill the screen.
+          return wide ? <div className="flex shrink-0 flex-wrap items-center gap-1.5">{list}</div> : <ScrollRow show={`${part}:${activeSub ?? ''}`} className="-mx-3 shrink-0 px-3">{list}</ScrollRow>;
+        })()}
 
       {part === 'documents' && !found && (
         <div className="flex shrink-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] text-fg-3">
@@ -456,9 +470,9 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
       {st && !!bases?.length && <MeaningWait st={st} bases={bases} />}
       {found && !result?.meaning && <MeaningHint />}
 
-      <div className="flex min-h-0 flex-1 gap-3">
+      <div className={cx('flex gap-3', wide ? 'min-h-0 flex-1' : 'flex-[1_0_auto]')}>
         <div className={cx('flex min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-panel', wide ? 'w-[clamp(250px,40%,360px)] shrink-0' : 'flex-1', empty && wide && 'flex-1')}>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className={wide ? 'min-h-0 flex-1 overflow-y-auto' : 'flex flex-1 flex-col'}>
             {empty ? (
               empty
             ) : (
@@ -466,7 +480,7 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
                 {found && !rows.length ? (
                   <Blank title={tr(`Nothing in this project’s memory matches “${q.trim()}”.`)} />
                 ) : (
-                  shown.map((r) => <ListRow key={r.id} r={r} on={r.key === sel} onClick={() => select(r.key)} />)
+                  shown.map((r) => <ListRow key={r.id} r={r} on={r.key === sel} wide={wide} onClick={() => select(r.key)} />)
                 )}
                 {rows.length > limitRows && (
                   <div className="p-1.5">
