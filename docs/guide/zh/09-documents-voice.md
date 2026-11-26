@@ -60,6 +60,8 @@ Custom 也可以通过普通的文件读取功能来读取 PDF、Office 文档�
 
 当它修改你的文件时，会把结果保存为新的文件名，除非你要求它覆盖原文件。
 
+智能体制作的内容留在你的电脑上：会话文件夹中的一个文件，或保存在应用中的页面、文档、演示文稿或电子表格。它们不会把内容放到外部服务（claude.ai 的 artifact、ChatGPT 的画布、Google Docs），也不会用指向这类内容的链接来回复，除非你要求这样做，或任务需要这样做。在 Hydor 运行的会话中，Claude Code 的 artifact 及其 claude.ai Docs 连接器，以及 Codex 的 artifact，都是关闭的。
+
 ### Word 文档
 
 报告、信函、简历、备忘录、合同、表格、讲义和笔记，可在 Word、Google 文档或 Pages 中打开。

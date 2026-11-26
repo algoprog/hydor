@@ -91,6 +91,17 @@ export function runTools(ctx: RunCtx): RunTool[] {
   }));
 }
 
+const isTable = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * One capability's Codex settings added to the others', table by table, so two that both set `features` (memory's
+ * memories, the subagents' multi_agent) keep both. Tables are copied, never shared with the capability that gave them.
+ */
+export function mergeTables(into: Record<string, unknown>, from: Record<string, unknown> = {}): Record<string, unknown> {
+  for (const [k, v] of Object.entries(from)) into[k] = isTable(v) ? mergeTables(isTable(into[k]) ? (into[k] as Record<string, unknown>) : {}, v) : v;
+  return into;
+}
+
 /**
  * Everything the capabilities give a starting agent (their tools' guides in its instructions: Custom reads them apart,
  * featureContext). A guide whose tools are all switched off for it (its agent may not use the browser, say) is left out.
@@ -117,7 +128,7 @@ export async function spawnAdditions(s: SpawnInfo): Promise<GivenAdditions> {
       out.allowedTools.push(...(a.allowedTools ?? []));
       out.strictMcp ||= !!a.strictMcp;
       if (a.builtinTools) out.builtinTools = out.builtinTools ? out.builtinTools.filter((t) => a.builtinTools!.includes(t)) : [...a.builtinTools];
-      Object.assign(out.codexConfig, a.codexConfig);
+      mergeTables(out.codexConfig, a.codexConfig);
     } catch (e) {
       warn(f, 'spawn', e);
     }

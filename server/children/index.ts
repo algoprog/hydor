@@ -17,7 +17,7 @@ import { capReached, childShare, spending } from '../budget/index.ts';
 import { confidentialKey, confidentialRun, privateHelper } from '../confidential/index.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from '../sessionExtra.ts';
-import type { Deps, Feature, RunCtx, RunTool, TurnInfo } from '../features/types.ts';
+import type { Deps, Feature, RunCtx, RunTool, SpawnAdditions, SpawnInfo, TurnInfo } from '../features/types.ts';
 import type { LimitAfter } from '../sessions.ts';
 import { helper, helperJson } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
@@ -75,6 +75,22 @@ export const CHILD_INSTRUCTIONS = [
   'and found, the files you changed or made (with their paths), and anything left open. Put long material in a file and give its path.',
   'You cannot start Hydor subagents yourself.',
 ].join(' ');
+
+/** What a program whose own subagents Hydor cannot switch off is told instead (ownSubagentsOff). */
+export const OWN_SUBAGENTS_NOTE =
+  'Subagents here are Hydor’s alone: hand a part of the job to another agent only with start_child_session (when you have it), never with a subagent, task or delegation tool of your own program, and never through a cloud or remote agent service.';
+
+/**
+ * Subagents are Hydor's alone (start_child_session): each program's own is switched off in the sessions Hydor runs, so
+ * every part of a job shows, costs and stops as a Hydor subagent does. Claude Code: its Agent tool (Task, its old name),
+ * its workflows, and the cloud agents RemoteTrigger starts; Codex: spawn_agent and its kin (multi_agent, and its v2).
+ * Another program is told (OWN_SUBAGENTS_NOTE), since no switch for its own is known; Custom has none.
+ */
+export function ownSubagentsOff(s: Pick<SpawnInfo, 'agent' | 'acpAgent'>): SpawnAdditions {
+  if (s.agent === 'claude') return { disallowedTools: ['Agent', 'Task', 'Workflow', 'RemoteTrigger'], env: { CLAUDE_CODE_DISABLE_WORKFLOWS: '1' } };
+  if (s.agent === 'codex') return { codexConfig: { features: { multi_agent: false, multi_agent_v2: false } } };
+  return s.acpAgent === CONSOLE_ID ? {} : { instructions: [OWN_SUBAGENTS_NOTE] };
+}
 
 // ---- which agent and model -----------------------------------------------------------------------
 
@@ -233,7 +249,7 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
             .map((a) => `${a.name} (${a.description || 'no description'}${a.tier ? `; ${tierLabel(a.tier)}` : ''})`)
             .join('; ')}${agents.length > 40 ? `; and ${agents.length - 40} more` : ''}.`
         : '',
-      'The user sees each one as a Hydor subagent (a card in this conversation, a row in the tray above the message box, under this session in the sidebar), told apart from your program’s own subagents, and can open it.',
+      'The user sees each one as a Hydor subagent (a card in this conversation, a row in the tray above the message box, under this session in the sidebar), and can open it. Subagents here are Hydor’s alone: this is the only way to start one.',
     ]
       .filter(Boolean)
       .join(' '),
@@ -896,10 +912,12 @@ export const children: Feature = {
   },
 
   spawn(s, d) {
-    if (s.extra?.parent) return { instructions: [CHILD_INSTRUCTIONS] };
+    // Every session, a subagent's too: its program's own subagents are off.
+    const off = ownSubagentsOff(s);
+    if (s.extra?.parent) return { ...off, instructions: [CHILD_INSTRUCTIONS, ...(off.instructions ?? [])] };
     // The main agent of a session leads subagents on cheaper tiers (Settings → Models → Tiers).
     const team = teamNote(d, s);
-    return team ? { instructions: [team] } : undefined;
+    return { ...off, instructions: [...(team ? [team] : []), ...(off.instructions ?? [])] };
   },
 
   turnEnd(t, d) {

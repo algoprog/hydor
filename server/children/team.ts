@@ -2,7 +2,7 @@
 // Max once it has stepped up) and hands well-defined parts to subagents on cheaper tiers, so most of the work costs less
 // while the judgement stays with the strongest model in the room. Settings → Models → Tiers turns it off.
 import { swarmMode } from '../../shared/swarm.ts';
-import { modelFamily, resolvedName, tierProgram, tierRank, type Tier, type TierPick } from '../../shared/tiers.ts';
+import { resolvedName, tierProgram, tierRank, type Tier, type TierPick } from '../../shared/tiers.ts';
 import { rateFor } from '../prices.ts';
 import type { Agent } from '../../shared/types.ts';
 import type { Deps, SpawnInfo } from '../features/types.ts';
@@ -11,16 +11,6 @@ import { findAssistant } from '../assistants/store.ts';
 
 const samePick = (a: TierPick, b: TierPick) => (a.model ?? '') === (b.model ?? '') && (a.effort ?? '') === (b.effort ?? '');
 
-/** The names Claude Code's own Agent tool takes for a model. */
-const NATIVE = ['haiku', 'sonnet', 'opus', 'fable'];
-
-/** A tier's model as Claude Code's Agent tool names it ("sonnet" for Sonnet 5.5 and for claude-sonnet-4-6); none for a model it has no name for. */
-function nativeName(d: Deps, pick: TierPick): string | undefined {
-  if (!pick.model) return undefined;
-  const label = (seenModels(d.db).claude ?? []).find((m) => m.value === pick.model)?.label ?? pick.model;
-  const words = `${modelFamily(label)?.name ?? ''} ${label} ${pick.model}`.toLowerCase().split(/[^a-z]+/);
-  return NATIVE.find((n) => words.includes(n));
-}
 
 /** What a subagent on a tier costs beside its lead, in words ("about 1/40 of what you do"); `r`: its price over the lead's. */
 export function costWords(r: number): string {
@@ -35,13 +25,12 @@ export function costWords(r: number): string {
 }
 
 /**
- * What the main agent of a session is told about leading subagents. `native`: Claude Code's names for the Standard and
- * Quick models, for its own Agent tool; `stepUp`: it may step itself up to Max (step_up_session); `costs`: what a
- * subagent on each tier costs beside the lead, when both prices are known (costWords). The same words for every session
- * on one model, so the provider's cache of the instructions holds.
+ * What the main agent of a session is told about leading subagents, all of them Hydor subagents (its program's own are
+ * switched off: ownSubagentsOff). `stepUp`: it may step itself up to Max (step_up_session); `costs`: what a subagent on
+ * each tier costs beside the lead, when both prices are known (costWords). The same words for every session on one
+ * model, so the provider's cache of the instructions holds.
  */
-export function teamInstructions(o: { native?: { standard?: string; quick?: string }; stepUp?: boolean; costs?: { quick?: string; standard?: string } } = {}): string {
-  const { standard, quick } = o.native ?? {};
+export function teamInstructions(o: { stepUp?: boolean; costs?: { quick?: string; standard?: string } } = {}): string {
   const costs = o.costs?.quick && o.costs.standard ? `one on quick costs ${o.costs.quick}, one on standard ${o.costs.standard}` : 'one on quick costs a small fraction of what you do, one on standard clearly less than you';
   const lines = [
     '# Working with subagents',
@@ -53,16 +42,9 @@ export function teamInstructions(o: { native?: { standard?: string; quick?: stri
     '- best, for a hard part that stands on its own. The hardest thinking stays with you.',
     '- Where a part could go to either of two tiers, give it to the lower one and check what comes back: a try that falls short costs little, and the part then goes one tier up with what was wrong. Starting too high costs every time.',
     '- A brief stands alone, since the subagent sees nothing of this conversation: the goal, the files and facts it needs, exact names, what not to touch, how to check the result, what to report. Where the specification is already written down (a file, the request itself), the brief is a few lines that point at it: do not weigh the time a brief takes against the time the work would take you, weigh a few lines against the whole of the work at your price. Decide the design first: a subagent left to guess costs more than it saves.',
+    '- Start parts that do not depend on each other together with start_child_session, then end your turn: each reply comes back to you as a message. What depends on a part waits for it.',
+    '- You answer for what subagents hand back: run the checks and read what changed before you build on it or report it. Fix a slip yourself, send the subagent back for more, or give the part to a higher tier when the tier was too weak for it (step_up_child does that).',
   ];
-  if (standard || quick) {
-    const models = [quick ? `model "${quick}" for a quick part` : '', standard ? `model "${standard}" for a standard one` : ''].filter(Boolean).join(' and ');
-    lines.push(
-      `- Two kinds of subagent. Your program’s own (its Agent tool), for a part of a few minutes: start those that do not depend on each other in one message, each with ${models} (with no model it runs on yours and saves nothing), and their results come back in this turn. Hydor subagents (start_child_session), for a long part, one the user should be able to follow and steer, or another program’s model: start them together, then end your turn, and each reply comes back to you as a message. What depends on a part waits for it.`,
-    );
-  } else lines.push('- Start parts that do not depend on each other together with start_child_session, then end your turn: each reply comes back to you as a message. What depends on a part waits for it.');
-  lines.push(
-    '- You answer for what subagents hand back: run the checks and read what changed before you build on it or report it. Fix a slip yourself, send the subagent back for more, or give the part to a higher tier when the tier was too weak for it (step_up_child does that for a Hydor subagent).',
-  );
   if (o.stepUp)
     lines.push(
       '- When the problem proves harder than it looked (a fix that has failed twice, a cause you cannot find, constraints that pull against each other, a proof), call step_up_session to carry on with the strongest model instead of going round in circles.',
@@ -121,7 +103,6 @@ export function teamNote(d: Deps, s: SpawnInfo): string | null {
   const picks = tiersOf(d.db)[p];
   const cheaper = (['standard', 'quick'] as const).filter((t) => (picks[t].model || picks[t].effort) && !samePick(picks[t], picks[own]));
   if (!cheaper.length) return null;
-  const native = s.agent === 'claude' ? { standard: nativeName(d, picks.standard), quick: nativeName(d, picks.quick) } : undefined;
   // What each cheaper tier costs beside this lead, when the price table knows both models.
   const lead = priceOf(d, s, modelOf(d, s).model ?? picks[own].model);
   const beside = (t: 'quick' | 'standard') => {
@@ -130,7 +111,7 @@ export function teamNote(d: Deps, s: SpawnInfo): string | null {
   };
   // A session on Automatic is told of stepping up whatever it thinks with now (one already on Max too): the same words from one such session to the next.
   const stepUp = x.auto === true && teamOf(d.db).hard && !findAssistant(d.db, x.assistant)?.tier && !!(picks.max.model || picks.max.effort) && !samePick(picks.max, picks.best);
-  return teamInstructions({ native, stepUp, costs: { quick: beside('quick'), standard: beside('standard') } });
+  return teamInstructions({ stepUp, costs: { quick: beside('quick'), standard: beside('standard') } });
 }
 
 /** What a model costs for a million tokens in and a million out, at API prices; 0 for one on this computer; null when no price is known. */

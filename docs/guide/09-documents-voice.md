@@ -60,6 +60,8 @@ Each skill works the same way:
 
 When it changes a file of yours, it saves the result under a new name, unless you asked it to overwrite yours.
 
+What agents make stays on your computer: a file in the session's folder, or a page, document, deck or spreadsheet kept in the app. They don't put it in an outside service (a claude.ai artifact, a ChatGPT canvas, Google Docs) or answer with a link to one, unless you ask for that or the task needs it. Claude Code's artifacts and its claude.ai Docs connector, and Codex's artifacts, are switched off in the sessions Hydor runs.
+
 ### Word documents
 
 Reports, letters, CVs, memos, contracts, forms, handouts and notes, to open in Word, Google Docs or Pages.

@@ -710,6 +710,10 @@ agents that speak ACP and take MCP servers.
   CSV and TSV, LaTeX, notebooks, EPUB, Markdown) show as cards marked New or Updated, handed over or not (the finished
   ones before their sources, four first), and file names and paths in the reply are links that open the file in the
   window over the conversation (Full screen in its top line makes it fill the whole app, and back, and the next one opens as the last was left, kept in each browser); agents are told to hand over what they made or changed and to name each file as a link.
+  What agents make stays on this computer: they are told to write it as files or keep it with the app's own save tools,
+  not in an outside service (a claude.ai artifact, a ChatGPT canvas, Google Docs) and not to answer with a link to one,
+  unless you ask for that or the task needs it; Claude Code's Artifact tool and its claude.ai Docs connector, and Codex's
+  artifacts, are switched off in the sessions Hydor runs.
   Agents make Jupyter notebooks too (the notebooks skill: sections with text, a run from the top before handing one
   over, an environment beside it to run it in): kept in the session's project with save_notebook, or handed over as a file
   whose card opens it in the notebook page. A file card can keep a copy of a notebook, a document, a
@@ -795,8 +799,10 @@ agents that speak ACP and take MCP servers.
 - **Subagents**: an agent hands parts of a job to subagents and gets their results back. A Hydor subagent is a
   session of its own that Hydor starts, with any agent and model; it shows under its parent in the sidebar while it
   works or waits for you (and while you have it open), and in the work tray above the prompt bar, it opens to its
-  reply, and you can talk to it. A Claude Code or Codex subagent is one the program runs inside the session, and it
-  shows the same way. The subagents one turn started show together as one card under that turn (the Hydor ones in
+  reply, and you can talk to it. In the sessions Hydor runs, every subagent is a Hydor one: the programs' own are
+  switched off (Claude Code's Agent tool, its workflows and its cloud agents, Codex's multi-agent tools) and other
+  agents are told to use Hydor's. A Claude Code or Codex subagent that a session in VS Code or a terminal (or an
+  earlier one) started is one the program runs inside the session, and it shows the same way. The subagents one turn started show together as one card under that turn (the Hydor ones in
   one, the program's own in another): its top line says how many and of what kind, with what they share (“6 Claude
   Code subagents · Sonnet 5.5”, “3 Hydor subagents · Claude Code · Sonnet 5.5”, “4 researchers” in a deep research)
   and how they stand (“5 working · 1 done”, “1 needs you”), and folds or unfolds on a click; it is open while any
@@ -829,7 +835,7 @@ agents that speak ACP and take MCP servers.
   subagents on Standard and Quick (a subagent asked for with no tier gets Standard, and none thinks with a tier above
   its lead's), checks what comes back, and may move itself to Max with step_up_session when a problem proves harder
   than Best can manage (a line in the conversation says why); a request is not sent to Max on its wording alone.
-  Claude Code's own Agent tool is told the same models. A scheduled task's Model menu offers Automatic first too, and
+  A scheduled task's Model menu offers Automatic first too, and
   a new task starts on it; an app, and each agent step of its flow, can think with a tier instead of a model by name.
   Two switches, **Lead with subagents** and **Max for hard
   problems**, turn the team and stepping up to Max off. `scripts/tier-bench` measures what each tier and the team cost

@@ -60,6 +60,8 @@ Cada habilidad funciona de la misma manera:
 
 Cuando modifica un archivo tuyo, guarda el resultado con un nombre nuevo, a menos que le pidas que sobrescriba el tuyo.
 
+Lo que crean los agentes se queda en tu computadora: un archivo en la carpeta de la sesión, o una página, un documento, una presentación o una hoja de cálculo guardados en la app. No lo ponen en un servicio externo (un artefacto de claude.ai, un canvas de ChatGPT, Google Docs) ni responden con un enlace a uno, a menos que tú lo pidas o la tarea lo necesite. Los artefactos de Claude Code y su conector Docs de claude.ai, y los artefactos de Codex, están desactivados en las sesiones que Hydor ejecuta.
+
 ### Documentos de Word
 
 Informes, cartas, currículums, memorandos, contratos, formularios, folletos y notas, para abrir en Word, Google Docs o Pages.

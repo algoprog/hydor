@@ -18,7 +18,7 @@ import type { DocPreview } from '../../shared/documents.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
-import type { Feature, RunCtx, RunTool } from '../features/types.ts';
+import type { Feature, RunCtx, RunTool, SpawnAdditions, SpawnInfo } from '../features/types.ts';
 import { deckPreview } from './deck.ts';
 import { canRead, extractText, readDocument } from './extract.ts';
 import { madeRoutes } from './made.ts';
@@ -236,9 +236,11 @@ export const documents: Feature = {
     });
   },
   tools: (_ctx: RunCtx) => [READ, PRESENT, ...PDF_TOOLS],
-  spawn: () => ({
+  spawn: (s) => ({
+    ...outsideDocsOff(s),
     // Reading documents and the PDF tools are about those tools alone (guides); presenting what a turn made holds whatever tools are in use.
     instructions: [
+      KEEP_LOCAL,
       'Whenever a turn makes or changes files for the user (a document, a paper, a spreadsheet, slides, a PDF, a notebook, images), updates included, finish it by calling present_files with them: they show as cards the user can open and download (a notebook opens in the notebook page, to run). In your reply, name each file as a Markdown link to its path ([report.pdf](/full/path/report.pdf)): a click opens it in the app’s file viewer.',
     ],
     guides: [
@@ -246,6 +248,21 @@ export const documents: Feature = {
       { tools: ['pdf_look', 'pdf_form', 'pdf_fill', 'pdf_write', 'pdf_pages'], text: PDF_INSTRUCTIONS },
     ],
     // Where the office skills' helper scripts keep their Python environment.
-    env: { HYDOR_DATA_DIR: config.dataDir },
+    env: { HYDOR_DATA_DIR: config.dataDir, ...outsideDocsOff(s).env },
   }),
 };
+
+/** What every agent is told about where what it makes goes: on this computer, unless the user or the task says otherwise. */
+export const KEEP_LOCAL =
+  'Keep what you make on this computer: write documents, pages, reports, slides and other outputs as files in the working folder, or with Hydor’s save tools when you have them, and point the user to those. Do not create or publish them in an outside service (a claude.ai artifact or doc, a ChatGPT canvas, Google Docs, a gist or a paste site), nor link to one made there, unless the user asks for it or the task needs it (it is about that service, or is to be shared there).';
+
+/**
+ * The tools of an agent's own program that make documents in its maker's cloud and answer with a link there, switched
+ * off (KEEP_LOCAL says why; Hydor's own save and publish tools do that job here): Claude Code's Artifact tool and the
+ * claude.ai Claude Docs connector, Codex's artifact feature.
+ */
+export function outsideDocsOff(s: Pick<SpawnInfo, 'agent'>): SpawnAdditions {
+  if (s.agent === 'claude') return { disallowedTools: ['mcp__claude_ai_Claude_Docs'], env: { CLAUDE_CODE_DISABLE_ARTIFACT: '1' } };
+  if (s.agent === 'codex') return { codexConfig: { features: { artifact: false } } };
+  return {};
+}

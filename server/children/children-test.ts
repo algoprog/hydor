@@ -28,7 +28,9 @@ import { costWords, teamInstructions } from './team.ts';
 import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { CUT_BY_RESTART } from '../agents/acp.ts';
-import { catchUp, CHILD_INSTRUCTIONS, children, findModel, liftsAt, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
+import { catchUp, CHILD_INSTRUCTIONS, children, findModel, liftsAt, LONG_REPLY, OWN_SUBAGENTS_NOTE, reportTurn, resultMessage } from './index.ts';
+import { mergeTables } from '../features/registry.ts';
+import type { SpawnAdditions } from '../features/types.ts';
 import { ancestorsOf, betweenAgents, childKeys, FROM_LEAD, parentOf, queueGoesOn, runningBelow, runningChildren, stillRunning, workStatus } from './family.ts';
 import { childMode } from './modes.ts';
 
@@ -261,6 +263,27 @@ test('one level only: a child gets no child tools, and cannot start one', async 
   assert.deepEqual(children.spawn!({ agent: 'acp', acpAgent: 'console', cwd: tmp, runId: 'r', resume: false, extra: { parent: 'claude:p' } }, deps), { instructions: [CHILD_INSTRUCTIONS] });
 });
 
+test('subagents are Hydor’s alone: each program’s own is switched off in every session, a subagent’s too', () => {
+  const given = (agent: Agent, acpAgent?: string, extra: Record<string, unknown> = {}) => children.spawn!({ agent, acpAgent, cwd: tmp, runId: 'r', resume: false, extra }, deps) as SpawnAdditions;
+  for (const extra of [{}, { parent: 'claude:p' }, { confidential: true }]) {
+    // Claude Code: its Agent tool (and Task, its old name), its workflows and its cloud agents.
+    const claude = given('claude', undefined, extra);
+    assert.deepEqual(claude.disallowedTools, ['Agent', 'Task', 'Workflow', 'RemoteTrigger']);
+    assert.deepEqual(claude.env, { CLAUDE_CODE_DISABLE_WORKFLOWS: '1' });
+    assert.ok(!claude.instructions!.includes(OWN_SUBAGENTS_NOTE));
+    // Codex: spawn_agent and its kin.
+    assert.deepEqual(given('codex', undefined, extra).codexConfig, { features: { multi_agent: false, multi_agent_v2: false } });
+    // A program with no known switch is told; Custom has no subagents of its own.
+    assert.ok(given('acp', 'gemini', extra).instructions!.includes(OWN_SUBAGENTS_NOTE));
+    assert.ok(!given('acp', 'console', extra).instructions!.includes(OWN_SUBAGENTS_NOTE));
+  }
+  // Two capabilities that both set Codex's features keep both (memory's memories, the subagents' multi_agent).
+  const shared = { features: { memories: false } };
+  const merged = mergeTables(mergeTables({}, shared), { features: { multi_agent: false }, web_search: 'disabled' });
+  assert.deepEqual(merged, { features: { memories: false, multi_agent: false }, web_search: 'disabled' });
+  assert.deepEqual(shared, { features: { memories: false } }, 'the table a capability gave is not changed');
+});
+
 test('at most N working at once (busy children and ones still starting count)', async () => {
   kvSet(db, 'children.maxRunning', '2');
   // Two children of claude:p are working already.
@@ -466,7 +489,7 @@ test('an agent’s highest tier for helpers: asked for above it, or none asked, 
   const t = tool(k, 'start_child_session');
   assert.match(t.description, /A Hydor subagent never thinks with a tier above standard\./);
   assert.match(t.description, /^Hand a self-contained part of the job to a Hydor subagent: a new session of its own that works on it in parallel\./);
-  assert.match(t.description, /The user sees each one as a Hydor subagent \(a card in this conversation, a row in the tray above the message box, under this session in the sidebar\), told apart from your program’s own subagents/);
+  assert.match(t.description, /The user sees each one as a Hydor subagent \(a card in this conversation, a row in the tray above the message box, under this session in the sidebar\), and can open it\. Subagents here are Hydor’s alone/);
   assert.deepEqual((t.inputSchema as any).properties.tier.enum, ['quick', 'standard']);
 });
 
@@ -478,8 +501,12 @@ const leadOn = (n: string, model: string | undefined, agent: Agent = 'claude') =
   sessions.add(key, { agent, model, live: 'working', mode: agent === 'claude' ? 'acceptEdits' : 'auto', title: 'Lead', items: [user('Ship the release')] });
   return key;
 };
-const spawnOf = (o: { agent?: Agent; acpAgent?: string; key?: string; model?: string; extra?: Record<string, unknown> }) =>
-  children.spawn!({ agent: o.agent ?? 'claude', acpAgent: o.acpAgent, key: o.key, cwd: tmp, runId: 'r', resume: false, extra: o.extra ?? {}, model: o.model }, deps) as { instructions: string[] } | undefined;
+/** What the team tells a session's main agent (undefined when it is not told), apart from what every session is told. */
+const spawnOf = (o: { agent?: Agent; acpAgent?: string; key?: string; model?: string; extra?: Record<string, unknown> }) => {
+  const a = children.spawn!({ agent: o.agent ?? 'claude', acpAgent: o.acpAgent, key: o.key, cwd: tmp, runId: 'r', resume: false, extra: o.extra ?? {}, model: o.model }, deps) as SpawnAdditions;
+  const team = (a.instructions ?? []).filter((t) => t.startsWith('# Working with subagents'));
+  return team.length ? { instructions: team } : undefined;
+};
 
 test('in a team a child asked for with no tier gets Standard; with the team off, its program’s own model', async () => {
   const k = leadOn('a', undefined);
@@ -550,19 +577,17 @@ test('what a session’s main agent is told: to lead subagents on cheaper tiers,
   assert.match(told[0], /You answer for what subagents hand back/);
   // With no prices known, what subagents cost is said in words alone.
   assert.match(told[0], /one on quick costs a small fraction of what you do, one on standard clearly less than you\./);
-  // Claude Code's own Agent tool gets the tiers' models by its names for them; it may step itself up.
-  assert.match(told[0], /Two kinds of subagent\. Your program’s own \(its Agent tool\), for a part of a few minutes: .* each with model "haiku" for a quick part and model "sonnet" for a standard one \(with no model it runs on yours and saves nothing\)/);
-  assert.match(told[0], /Hydor subagents \(start_child_session\), for a long part/);
+  // Every part goes to a Hydor subagent (Claude Code's own Agent tool is off); it may step itself up.
+  assert.doesNotMatch(told[0], /Agent tool|Two kinds of subagent/);
+  assert.match(told[0], /^- Start parts that do not depend on each other together with start_child_session, then end your turn/m);
   assert.match(told[0], /call step_up_session/);
-  assert.equal(told[0], teamInstructions({ native: { standard: 'sonnet', quick: 'haiku' }, stepUp: true }));
+  assert.equal(told[0], teamInstructions({ stepUp: true }));
   // The same for a lead on Opus, on Max, and on a model the tiers do not know.
   for (const model of ['opus', 'fable', 'mystery-9']) assert.deepEqual(spawnOf({ model, extra: { auto: true } })!.instructions, told, model);
   // A session whose model was picked by name leads subagents too, but stays on its model: no word of stepping up.
-  assert.equal(spawnOf({ model: 'opus' })!.instructions[0], teamInstructions({ native: { standard: 'sonnet', quick: 'haiku' } }));
-  // Codex has no Agent tool of its own; before it lists its models its tiers differ by effort alone.
-  const codex = spawnOf({ agent: 'codex' })!.instructions[0];
-  assert.doesNotMatch(codex, /Agent tool/);
-  assert.match(codex, /^- Start parts that do not depend on each other together with start_child_session, then end your turn/m);
+  assert.equal(spawnOf({ model: 'opus' })!.instructions[0], teamInstructions());
+  // Codex is told the same; before it lists its models its tiers differ by effort alone.
+  assert.equal(spawnOf({ agent: 'codex' })!.instructions[0], teamInstructions());
   // What a helper costs beside its lead, from the prices: a fortieth, a half, nothing for a model on this computer.
   assert.equal(costWords(0.025), 'about 1/40 of what you do');
   assert.equal(costWords(0.0125), 'about 1/80 of what you do');
@@ -574,10 +599,6 @@ test('what a session’s main agent is told: to lead subagents on cheaper tiers,
   setPriceOverrides(db, { 'test-model': { input: 10, output: 30 }, opus: { input: 4, output: 20 }, sonnet: { input: 2, output: 10 }, haiku: { input: 0.1, output: 0.5 } });
   assert.match(spawnOf({ model: 'opus' })!.instructions[0], /one on quick costs about 1\/40 of what you do, one on standard about half of what you do\./);
   setPriceOverrides(db, { 'test-model': { input: 10, output: 30 } });
-  // A Quick model that Claude Code's Agent tool has no name for is left out of that line.
-  setTiers(db, { claude: { quick: { model: 'claude-3-mini' } } });
-  assert.match(spawnOf({})!.instructions[0], /each with model "sonnet" for a standard one \(with no model/);
-  setTiers(db, null);
   // Not told: a main agent on a cheaper tier itself, a swarm's lead, an app's run, a question on Help, a confidential
   // session, a program without tiers, Custom before its tiers are set, and the team turned off.
   assert.equal(spawnOf({ model: 'sonnet' }), undefined);

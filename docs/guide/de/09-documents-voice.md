@@ -60,6 +60,8 @@ Jeder Skill funktioniert auf die gleiche Weise:
 
 Wenn er eine Datei von dir ändert, speichert er das Ergebnis unter einem neuen Namen, es sei denn, du hast darum gebeten, deine Datei zu überschreiben.
 
+Was Agenten erstellen, bleibt auf deinem Computer: eine Datei im Ordner der Sitzung oder eine Seite, ein Dokument, eine Präsentation oder eine Tabelle, die in der App aufbewahrt wird. Sie legen es nicht in einem externen Dienst ab (einem claude.ai-Artefakt, einem ChatGPT-Canvas, Google Docs) und antworten auch nicht mit einem Link darauf, es sei denn, du bittest darum oder die Aufgabe erfordert es. Die Artefakte von Claude Code und dessen claude.ai-Docs-Connector sowie die Artefakte von Codex sind in den Sitzungen, die Hydor ausführt, abgeschaltet.
+
 ### Word-Dokumente
 
 Berichte, Briefe, Lebensläufe, Memos, Verträge, Formulare, Handouts und Notizen, die du in Word, Google Docs oder Pages öffnen kannst.
