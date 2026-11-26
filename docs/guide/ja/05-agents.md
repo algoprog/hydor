@@ -524,7 +524,7 @@ Claude Codeは、独自のエージェントを`.claude/agents`フォルダにMa
 いくつか制限があります。
 
 - systemdサービスを待つ機能は、Linuxでのみ使えます。
-- Windowsでは、エージェントはGitのbashでコマンドを実行します。そのため、エージェントのほかのコマンドと同じく、これらのコマンドにも[Git for Windows](https://git-scm.com/download/win)のインストールが必要です。また、コマンドを実行して待つ方法や、別のコンピューターに接続して待つ方法では、そのコマンドに必要なものが必要です。
+- Windowsでは、プログラムを名前で指定して待つにはPowerShellが必要です。コマンドやSlurmジョブを待つには[Git for Windows](https://git-scm.com/download/win)が必要ですが、これはエージェントのコマンドにもともと必要です（コマンドはGitのbashで実行されます）。
 - `sym`が定義を認識できるのはTypeScript、JavaScript、Python、Rustのファイルで、定義の終わりを判別できない場合はそのように伝えます。
 - ブラウザの1つのタブで作業するセッションにはシェルがないため、これらのコマンドは使えません。
 

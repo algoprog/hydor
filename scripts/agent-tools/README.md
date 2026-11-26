@@ -101,6 +101,16 @@ for t in waitfor edits sym; do ln -s "$PWD/scripts/agent-tools/bin/$t" ~/.local/
 The links point into your checkout, so a new version of the tools comes with a `git pull`. Check that `~/.local/bin` is
 on your `PATH`.
 
+## Where they run
+
+Linux, macOS and Windows, on Node.js 22. On Windows agents run commands in Git's bash (Git for Windows), which the app finds as it does for every command.
+
+- `waitfor` reads the process table (`--pid`, `--proc`) from `/proc` on Linux, from `ps` where there is no `/proc` (macOS), and from PowerShell on Windows, where `--proc` needs it. `--unit` (systemd) is Linux only and is refused elsewhere with a message that says so. On Windows `--until` and `--slurm` need Git's `sh`, and it says so before it starts waiting. A command started with `--` is stopped with `taskkill` on Windows.
+- `edits` tries its final rename again on Windows when a file is briefly held by another program (five tries), and puts every file back if it still cannot.
+- `sym` finds the files that hold a name with ripgrep first (the file `HYDOR_RG` names, which the app's launcher sets to the ripgrep that comes with Codex; else `rg` on the `PATH`), then `git grep`, then plain `grep`. The three give the same files; ripgrep is the fastest (about 1.0 s against 1.3 s with `git grep` in a large repository). `SYM_BACKEND=rg|git|grep` (for tests) uses one only.
+
+Honestly: the macOS and Windows paths are covered by tests that stand in for `ps`, PowerShell and `taskkill` on Linux (and a hidden `SYM_FAKE_PLATFORM`), and by the desktop builds' smoke check in CI (`desktop/scripts/smoke.mjs`), which runs the tools through their launchers on each system; the three suites themselves have not run in full on a real macOS or Windows machine.
+
 ## Tests
 
 ```bash

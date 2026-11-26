@@ -524,7 +524,7 @@ Claude Code 可以把它自己的智能体保存为 `.claude/agents` 文件夹�
 有几点限制：
 
 - 等待 systemd 服务仅在 Linux 上可用。
-- 在 Windows 上，智能体在 Git 的 bash 中运行命令，因此和智能体运行其他命令一样，这些命令需要安装 [Git for Windows](https://git-scm.com/download/win)；如果某种等待方式要运行命令或访问另一台电脑，还需要那个命令所需的条件。
+- 在 Windows 上，按名称等待程序需要 PowerShell；等待命令或 Slurm 作业需要 [Git for Windows](https://git-scm.com/download/win)，不过智能体的命令本来就需要它（它们在 Git 的 bash 中运行）。
 - `sym` 能识别 TypeScript、JavaScript、Python 和 Rust 文件中的定义，当它无法判断某个定义在哪里结束时会如实说明。
 - 在单个浏览器标签页中工作的会话没有 shell，因此不会获得这些命令。
 

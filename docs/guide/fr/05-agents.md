@@ -524,7 +524,7 @@ En bref, les agents consacrent moins d’appels à attendre, à modifier plusieu
 Quelques limites :
 
 - L’attente d’un service systemd ne fonctionne que sous Linux.
-- Sous Windows, les agents exécutent les commandes dans le bash de Git : ces commandes nécessitent donc que [Git for Windows](https://git-scm.com/download/win) soit installé, comme les commandes des agents, et un mode d’attente qui exécute une commande ou joint un autre ordinateur nécessite ce dont cette commande a besoin.
+- Sous Windows, attendre un programme d’après son nom nécessite PowerShell, et attendre une commande ou un travail Slurm nécessite [Git for Windows](https://git-scm.com/download/win), dont les commandes des agents ont de toute façon besoin (elles s’exécutent dans le bash de Git).
 - `sym` connaît les définitions des fichiers TypeScript, JavaScript, Python et Rust, et le signale lorsqu’elle ne peut pas déterminer où l’une d’elles se termine.
 - Une session qui travaille dans un seul onglet de navigateur n’a pas de shell, elle n’obtient donc pas ces commandes.
 

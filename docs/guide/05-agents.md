@@ -524,7 +524,7 @@ In short, agents spend fewer calls on waiting, on editing in several places and 
 A few limits:
 
 - Waiting for a systemd service works on Linux only.
-- On Windows, agents run commands in Git's bash, so these commands need [Git for Windows](https://git-scm.com/download/win) installed, as agents' commands do, and a way to wait that runs a command or reaches another computer needs what that command needs.
+- On Windows, waiting for a program by its name needs PowerShell, and waiting on a command or a Slurm job needs [Git for Windows](https://git-scm.com/download/win), which agents' commands need anyway (they run in Git's bash).
 - `sym` knows definitions in TypeScript, JavaScript, Python and Rust files, and says so when it cannot tell where one ends.
 - A session that works in one browser tab has no shell, so it does not get them.
 

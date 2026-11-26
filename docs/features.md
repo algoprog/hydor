@@ -231,7 +231,7 @@ agents that speak ACP and take MCP servers.
   one session (the start page's Options, or the session's menu); the more specific wins. A changed session's
   agent follows the new ones from the next message. CLAUDE.md and AGENTS.md still work, and can be edited there too.
 - **Three commands in every agent's shell**: `waitfor` (wait for a long job in one call: a program, a file, a line in a
-  log, a web address, a Slurm job, a systemd unit or a command, stopping at the first crash line, with the end of the log
+  log, a web address, a Slurm job, a systemd unit (Linux only) or a command, stopping at the first crash line, with the end of the log
   shown), `edits` (several exact search-and-replace edits across files in one atomic call, printing the changed lines)
   and `sym` (a definition with its whole body and exact line range, its references, or a file's declarations, in
   TypeScript, JavaScript, Python and Rust). Claude Code, Codex, Custom and the other agents find them on their PATH and

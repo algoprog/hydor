@@ -524,7 +524,7 @@ Kurz gesagt: Agenten brauchen weniger Aufrufe fürs Warten, für Änderungen an 
 Einige Einschränkungen:
 
 - Das Warten auf einen systemd-Dienst funktioniert nur unter Linux.
-- Unter Windows führen Agenten Befehle in der Bash von Git aus. Diese Befehle brauchen daher ein installiertes [Git for Windows](https://git-scm.com/download/win), so wie die Befehle der Agenten überhaupt, und eine Wartemethode, die einen Befehl ausführt oder einen anderen Computer erreicht, braucht das, was dieser Befehl braucht.
+- Unter Windows braucht das Warten auf ein Programm nach seinem Namen PowerShell, und das Warten auf einen Befehl oder einen Slurm-Job braucht [Git for Windows](https://git-scm.com/download/win), das die Befehle der Agenten ohnehin benötigen (sie laufen in der Bash von Git).
 - `sym` kennt Definitionen in TypeScript-, JavaScript-, Python- und Rust-Dateien und sagt es, wenn es nicht erkennen kann, wo eine endet.
 - Eine Sitzung, die in einem einzelnen Browser-Tab arbeitet, hat keine Shell und bekommt sie deshalb nicht.
 
