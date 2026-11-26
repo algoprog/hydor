@@ -3,6 +3,25 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.115.0 · 26 November 2026
+
+Folders for your sessions, outside projects or inside one, and a sidebar that reads as a tree.
+
+- **Folders for sessions**: make your own folders in the sidebar and sort sessions into them. A folder outside any
+  project shows in a new **Folders** section above **Projects** and takes sessions that are in no project; a folder
+  inside a project shows under that project's name and takes its sessions. Make one with the **+** on **Folders** or
+  **Projects**, from a project's ⋯ menu, or from a session's menu → **Move to folder** → **New folder…**, which moves
+  the session in as well.
+- **Moving sessions**: a session's menu → **Move to folder** lists the folders it can go in, with the one it is in
+  ticked, and **Take out of the folder**. On a computer you can also drag a session onto a folder's name. A session
+  that is working or pinned still shows under **Active** or **Pinned**, and is back in its folder afterwards.
+- **Renaming and deleting**: double-click a folder's name or use its ⋯ menu. Deleting a folder, or the project it is
+  in, keeps its sessions. Folders are the same on every device, and agents can make and fill them when you ask.
+- **A clearer sidebar**: under **Folders** and **Projects** every heading now starts with its arrow, the sessions of
+  a project or folder are set in under it along a thin line, and a folded one shows how many sessions it holds at
+  the end of its row. The **+** that makes projects and folders is always in sight, not only under the pointer.
+- **When a filter leaves nothing**: the list offers **Show all sessions** instead of only saying nothing matches.
+
 ## 0.114.0 · 26 November 2026
 
 Every agent finds three commands in its shell: wait for a long job, change several files at once, read a definition.

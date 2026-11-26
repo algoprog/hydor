@@ -649,6 +649,14 @@ export async function seedApi(api, home, now, s) {
   const as = { ebike: 'researcher', checkout: 'coder', settings: 'general', report: 'general', lisbon: 'planner', thesis: 'writer', garden: 'general', taxes: 'analyst', blog: 'coder', darkmode: 'coder', search: 'coder', applepay: 'coder', brief: 'general' };
   for (const [name, assistant] of Object.entries(as)) if (s[name]) await api('PATCH', `/api/sessions/${encodeURIComponent(s[name].key)}/extra`, { assistant });
   await api('POST', `/api/sessions/${encodeURIComponent(s.thesis.key)}/flags`, { pinned: true });
+  // Folders for sessions (the sidebar's Folders section, and under a project): one outside any project, one inside the shop's. They start
+  // folded, so the sessions in them are none of the pictures' business.
+  const folder = async (name, space, ...keys) => {
+    const { folder: f } = await api('POST', '/api/session-folders', { name, ...(space ? { space } : {}) });
+    for (const k of keys) await api('POST', `/api/sessions/${encodeURIComponent(k)}/folder`, { folder: f.id });
+  };
+  await folder('Reports', undefined, s.brief.key, s.report.key);
+  await folder('Payments', shopSpace, s.applepay.key);
 
   const note = (text, scope = 'global', key) => api('POST', '/api/memory/entries', { text, scope, ...(key ? { key } : {}) });
   await note('Alex prefers short answers in plain English, with the conclusion first.');

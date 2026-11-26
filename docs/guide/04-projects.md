@@ -303,7 +303,7 @@ A group's **Memory** tab, under its **Documents** chip, also lists **Also search
 
 ## Show one project's sessions in the sidebar
 
-The sidebar gives each project a group of its own, under its name and mark, with its newest sessions; the pen at the end of the group's heading starts a new session in the project. See [The session list](/guide/start#the-session-list).
+The sidebar gives each project a group of its own, under its name and mark, with its newest sessions; the pen at the end of the group's heading starts a new session in the project. See [The session list](/guide/start#the-session-list). A project can have folders of its own there, for sorting its sessions: its **⋯** menu → **New folder**, and they show under its heading before its other sessions. See [Sort sessions into folders](/guide/start#sort-sessions-into-folders). Deleting a project removes its folders; its sessions stay.
 
 To list only one project's sessions:
 

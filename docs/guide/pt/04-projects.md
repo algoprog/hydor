@@ -303,7 +303,7 @@ A aba **Memória** de um grupo, abaixo do chip **Documentos**, também lista **T
 
 ## Mostrar na barra lateral só as sessões de um projeto
 
-A barra lateral dá a cada projeto um grupo próprio, sob o nome e a marca dele, com as sessões mais recentes; a caneta no fim do título do grupo começa uma nova sessão no projeto. Veja [A lista de sessões](/guide/start#the-session-list).
+A barra lateral dá a cada projeto um grupo próprio, sob o nome e a marca dele, com as sessões mais recentes; a caneta no fim do título do grupo começa uma nova sessão no projeto. Veja [A lista de sessões](/guide/start#the-session-list). Um projeto pode ter pastas próprias ali, para organizar as sessões: no menu **⋯** dele → **Nova pasta**, e elas aparecem sob o título dele, antes das outras sessões. Veja [Organizar sessões em pastas](/guide/start#sort-sessions-into-folders). Excluir um projeto remove as pastas dele; as sessões permanecem.
 
 Para listar só as sessões de um projeto:
 

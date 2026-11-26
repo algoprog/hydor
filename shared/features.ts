@@ -23,6 +23,8 @@ export interface SessionExtra {
   arena?: ArenaStart | string;
   /** The space it belongs to (shared/spaces.ts), by its id. */
   space?: string;
+  /** The folder of the sidebar it was put in (shared/sidebar.ts SessionFolder), by its id. */
+  folder?: string;
   /** Agent Guidelines for this session alone (shared/guidelines.ts). */
   guidelines?: string;
   /** Confidential: models on this computer only, nothing sent out, commands without network (shared/confidential.ts). Set when it starts, never removed. */

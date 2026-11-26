@@ -303,7 +303,7 @@ L’onglet **Mémoire** d’un groupe, sous sa pastille **Documents**, liste aus
 
 ## Afficher les sessions d’un seul projet dans la barre latérale
 
-La barre latérale donne à chaque projet un groupe à lui, sous son nom et sa marque, avec ses sessions les plus récentes ; le crayon au bout du titre du groupe démarre une nouvelle session dans le projet. Voir [La liste des sessions](/guide/start#the-session-list).
+La barre latérale attribue à chaque projet son propre groupe, sous son nom et sa marque, avec ses sessions les plus récentes ; le stylo au bout du titre du groupe démarre une nouvelle session dans le projet. Voir [La liste des sessions](/guide/start#the-session-list). Un projet peut y avoir ses propres dossiers pour trier ses sessions : son menu **⋯** → **Nouveau dossier**, et ils apparaissent sous son titre, avant ses autres sessions. Voir [Trier les sessions dans des dossiers](/guide/start#sort-sessions-into-folders). La suppression d’un projet supprime ses dossiers ; ses sessions restent.
 
 Pour ne lister que les sessions d’un projet :
 

@@ -3,10 +3,10 @@
 // groups in their order. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/sessions/groups-test.ts && node dist/dev/groups-test.js
 import assert from 'node:assert/strict';
-import type { FolderOrigin } from '@shared/sidebar';
+import type { FolderOrigin, SessionFolder } from '@shared/sidebar';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
-import { ACTIVE_MS, groupSessions, isFolded, unpickedFolders, type SessionGroup } from './groups';
+import { ACTIVE_MS, FOLDER_MIN, groupCount, groupItems, groupSessions, isFolded, sessionFolderId, unpickedFolders, type SessionGroup } from './groups';
 
 const HOME = '/home/alex';
 const now = new Date(2026, 10, 2, 15, 0);
@@ -26,11 +26,16 @@ const ses = (cwd: string | undefined, ago: number, more: Partial<SessionSummary>
 const space = (id: string, name: string): SpaceView => ({ id, name, color: 'blue', folder: `${HOME}/Naget/Spaces/${id}`, createdAt: 0, sessions: 0, docs: 0, skills: 0 }) as SpaceView;
 const unpicked = unpickedFolders(HOME, HOME, [`${HOME}/Naget`, `${HOME}/naget-apps`, `${HOME}/.naget-agent/worktrees`, `${HOME}/.naget-agent`, '/tmp']);
 /** The list as the sidebar has it: newest first. */
-const group = (list: SessionSummary[], o: { byFolder?: boolean; spaces?: SpaceView[]; origins?: Record<string, FolderOrigin[]> } = {}) =>
+const group = (list: SessionSummary[], o: { byFolder?: boolean; spaces?: SpaceView[]; origins?: Record<string, FolderOrigin[]>; folders?: SessionFolder[] } = {}) =>
   groupSessions(
     [...list].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)),
-    { now, byFolder: o.byFolder ?? true, spaces: o.spaces ?? [], unpicked, origins: o.origins },
+    { now, byFolder: o.byFolder ?? true, spaces: o.spaces ?? [], unpicked, origins: o.origins, folders: o.folders },
   );
+/** A folder you made. */
+const box = (id: string, name: string, sp?: string): SessionFolder => ({ id, name, ...(sp ? { space: sp } : {}), createdAt: 0 });
+/** A session put in a folder, in a project, or both. */
+const inBox = (cwd: string | undefined, ago: number, folder?: string, sp?: string, more: Partial<SessionSummary> = {}) =>
+  ses(cwd, ago, { ...more, extra: { ...(folder ? { folder } : {}), ...(sp ? { space: sp } : {}) } });
 const shape = (gs: SessionGroup[]) => gs.map((g) => `${g.label}: ${g.items.map((s) => s.title).join(', ')}`);
 
 let passed = 0;
@@ -336,6 +341,140 @@ test('a group shows folded as you left it, else folded: each starts as its headi
   assert.equal(isFolded(old, {}), true);
   assert.equal(isFolded(fresh, { [fresh.id]: false }), false, 'one you opened stays open');
   assert.equal(isFolded(old, { [old.id]: true }), true);
+});
+
+test('a folder you made is a group of its own, after Pinned and before the projects and folders on disk, by name', () => {
+  n = 0;
+  const shop = space('shop', 'Shop');
+  const folders = [box('sfb', 'Zeta'), box('sfa', 'alpha 10'), box('sfc', 'alpha 2')];
+  const gs = group(
+    [
+      ses(`${HOME}/code/x`, 3 * H, { pinned: true }),
+      inBox(undefined, 4 * H, 'sfb'),
+      inBox(undefined, 5 * H, 'sfc'),
+      inBox(undefined, 6 * H, 'sfc'),
+      inBox(undefined, 7 * H, undefined, 'shop'),
+      ses(`${HOME}/code/y`, 8 * H),
+      ses(`${HOME}/code/y`, 9 * H),
+      ses(undefined, 30 * H),
+    ],
+    { spaces: [shop], folders },
+  );
+  assert.deepEqual(shape(gs), ['Pinned: Session 1', 'alpha 2: Session 3, Session 4', 'alpha 10: ', 'Zeta: Session 2', 'Shop: Session 5', 'y: Session 6, Session 7', 'Yesterday: Session 8']);
+  assert.deepEqual(gs.map((g) => g.kind), ['pinned', 'box', 'box', 'box', 'space', 'folder', 'day']);
+  assert.equal(gs[1].id, 'box:sfc');
+  assert.equal(gs[1].box?.name, 'alpha 2');
+  assert.equal(gs[1].space, undefined);
+  assert.deepEqual(gs[1].keys, []);
+});
+
+test('a folder with no session listed still shows, empty, so it can take sessions', () => {
+  n = 0;
+  const gs = group([], { folders: [box('sfa', 'Ideas')] });
+  assert.deepEqual(shape(gs), ['Ideas: ']);
+  assert.equal(gs[0].kind, 'box');
+  assert.equal(gs[0].items.length, 0);
+});
+
+test("a project's folders are on its group, by name, with the group made by a session in one of them", () => {
+  n = 0;
+  const shop = space('shop', 'Shop');
+  const blog = space('blog', 'Blog');
+  const folders = [box('sf2', 'Two', 'shop'), box('sf1', 'One', 'shop'), box('sf3', 'Empty', 'shop'), box('sf4', 'Top')];
+  const gs = group([inBox(undefined, 2 * H, 'sf2', 'shop'), inBox(undefined, 3 * H, 'sf2', 'shop'), inBox(undefined, 4 * H, undefined, 'shop'), inBox(undefined, 5 * H, undefined, 'blog')], { spaces: [shop, blog], folders });
+  assert.deepEqual(shape(gs), ['Top: ', 'Shop: Session 3', 'Blog: Session 4']);
+  const g = gs[1];
+  assert.equal(g.kind, 'space');
+  assert.deepEqual(g.boxes?.map((b) => `${b.label}: ${b.items.map((s) => s.title).join(', ')}`), ['Empty: ', 'One: ', 'Two: Session 1, Session 2']);
+  assert.ok(g.boxes?.every((b) => b.kind === 'box' && b.id === `box:${b.box!.id}` && b.space === shop));
+  assert.equal(gs[2].boxes, undefined);
+  assert.equal(groupCount(g), 3);
+  assert.deepEqual(groupItems(g).map((s) => s.title), ['Session 3', 'Session 1', 'Session 2']);
+  assert.equal(groupCount(gs[0]), 0);
+  // The project whose only listed session is in a folder comes by it, among the others by their newest session.
+  const only = group([inBox(undefined, 2 * H, undefined, 'blog'), inBox(undefined, H, 'sf1', 'shop')], { spaces: [shop, blog], folders });
+  assert.deepEqual(only.filter((x) => x.kind === 'space').map((x) => x.label), ['Shop', 'Blog']);
+  assert.deepEqual(only[1].items, []);
+  assert.equal(groupCount(only[1]), 1);
+});
+
+test('a project with folders and no session listed still has its group; one dragged into a place keeps it', () => {
+  n = 0;
+  const shop = space('shop', 'Shop');
+  const blog = space('blog', 'Blog');
+  const list = [inBox(undefined, 2 * H, undefined, 'blog')];
+  const gs = group(list, { spaces: [shop, blog], folders: [box('sf1', 'One', 'shop')] });
+  assert.deepEqual(gs.map((g) => g.id), ['space:blog', 'space:shop']);
+  assert.deepEqual(gs[1].items, []);
+  assert.deepEqual(gs[1].boxes?.map((b) => b.label), ['One']);
+  const placed = groupSessions(list, { now, byFolder: true, spaces: [shop, blog], unpicked, folders: [box('sf1', 'One', 'shop')], places: ['space:shop'] });
+  assert.deepEqual(placed.map((g) => g.id), ['space:blog', 'space:shop']);
+  const first = groupSessions(list, { now, byFolder: true, spaces: [shop, blog], unpicked, folders: [box('sf1', 'One', 'shop')], places: ['space:shop', 'space:blog'] });
+  assert.deepEqual(first.map((g) => g.id), ['space:shop', 'space:blog']);
+});
+
+test('a session at work, pinned or snoozed stays in Active, Pinned or Snoozed though it is in a folder', () => {
+  n = 0;
+  const shop = space('shop', 'Shop');
+  const folders = [box('sfa', 'Top'), box('sfb', 'In', 'shop')];
+  const gs = group(
+    [inBox(undefined, 1000, 'sfa'), inBox(undefined, H, 'sfa', undefined, { pinned: true }), inBox(undefined, 2 * H, 'sfa', undefined, { snoozedUntil: now.getTime() + H }), inBox(undefined, 3 * H, 'sfb', 'shop', { pinned: true }), inBox(undefined, 4 * H, 'sfb', 'shop')],
+    { spaces: [shop], folders },
+  );
+  assert.deepEqual(shape(gs), ['Active: Session 1', 'Pinned: Session 2, Session 4', 'Top: ', 'Shop: ', 'Snoozed: Session 3']);
+  assert.deepEqual(gs[3].boxes?.map((b) => b.items.map((s) => s.title)), [['Session 5']]);
+});
+
+test('a folder that does not exist, or one of another project, is ignored: the session goes where it would without it', () => {
+  n = 0;
+  const shop = space('shop', 'Shop');
+  const blog = space('blog', 'Blog');
+  const folders = [box('sfa', 'Top'), box('sfs', 'Of shop', 'shop'), box('sfx', 'Of nowhere', 'gone')];
+  const gs = group(
+    [
+      inBox(undefined, 2 * H, 'sfmissing'), // no such folder
+      inBox(undefined, 3 * H, 'sfs'), // a project's folder, the session in none
+      inBox(undefined, 4 * H, 'sfs', 'blog'), // another project's
+      inBox(undefined, 5 * H, 'sfa', 'blog'), // a top folder, the session in a project
+      inBox(undefined, 6 * H, 'sfx', 'shop'), // a folder of a project that is gone
+    ],
+    { spaces: [shop, blog], folders },
+  );
+  assert.deepEqual(shape(gs), ['Top: ', 'Blog: Session 3, Session 4', 'Shop: Session 5', 'Today: Session 1, Session 2']);
+  assert.deepEqual(gs[2].boxes?.map((b) => groupCount(b)), [0]);
+  assert.equal(gs.some((g) => g.id === 'box:sfx') || gs[2].boxes?.some((b) => b.id === 'box:sfx'), false, 'a folder of a project that is not there is not shown');
+  assert.equal(sessionFolderId(inBox(undefined, 0, 'sfa')), 'sfa');
+  assert.equal(sessionFolderId(ses(undefined, 0, { extra: { folder: 3 as unknown as string } })), undefined);
+  assert.equal(sessionFolderId(ses(undefined, 0)), undefined);
+});
+
+test('with grouping by folder off, folders are ignored', () => {
+  n = 0;
+  const shop = space('shop', 'Shop');
+  const gs = group([inBox(undefined, 2 * H, 'sfa'), inBox(undefined, 3 * H, 'sfb', 'shop')], { byFolder: false, spaces: [shop], folders: [box('sfa', 'Top'), box('sfb', 'In', 'shop')] });
+  assert.deepEqual(shape(gs), ['Today: Session 1, Session 2']);
+});
+
+test('a session put in a folder no longer counts for its folder on disk: two sessions there needed one more', () => {
+  n = 0;
+  const dir = `${HOME}/code/shop`;
+  assert.equal(FOLDER_MIN, 2);
+  const one = [ses(dir, H), inBox(dir, 2 * H, 'sfa')];
+  assert.deepEqual(shape(group(one, { folders: [] })), ['shop: Session 1, Session 2']);
+  const gs = group(one, { folders: [box('sfa', 'Mine')] });
+  assert.deepEqual(shape(gs), ['Mine: Session 2', 'Today: Session 1']);
+  const three = group([...one, ses(dir, 3 * H)], { folders: [box('sfa', 'Mine')] });
+  assert.deepEqual(shape(three), ['Mine: Session 2', 'shop: Session 1, Session 3']);
+  assert.deepEqual(three.map((g) => g.kind), ['box', 'folder']);
+});
+
+test("a found project's group says where its sessions came from, those in its folders too", () => {
+  n = 0;
+  const found = { ...space('old', 'Old'), found: ['claude'] } as unknown as SpaceView;
+  const gs = group([inBox(undefined, 2 * H, 'sfa', 'old')], { spaces: [found], folders: [box('sfa', 'In', 'old')] });
+  assert.equal(gs[0].kind, 'space');
+  assert.ok(gs[0].from?.length);
+  assert.equal(gs[0].from?.[0].agent, 'claude');
 });
 
 for (const [name, fn] of tests) {

@@ -91,7 +91,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   groups: {
     title: 'Sessions by project',
-    body: 'Sessions in the same project or folder gather under its name. A project’s name opens its details and the arrow beside it folds the group; a folder’s name folds it. The pen starts a new session there.',
+    body: 'Sessions in the same project or folder gather under its name. A project’s name opens its details and the arrow before it folds the group; a folder’s name folds it. The pen starts a new session there, and the + makes folders of your own to sort sessions into.',
   },
   dictate: {
     title: 'Dictate',

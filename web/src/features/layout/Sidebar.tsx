@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Folders, Inbox, ListFilter, Plus, RotateCcw, SquarePen, WifiOff, X } from 'lucide-react';
+import { FolderPlus, Folders, Inbox, ListFilter, Plus, RotateCcw, SquarePen, WifiOff, X } from 'lucide-react';
 import { usualOrder, type SidebarTool } from '@shared/sidebar';
 import type { Assistant } from '@shared/assistants';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
@@ -20,6 +20,7 @@ import { useAssistantsState } from '../assistants/state';
 import { AssistantIcon } from '../assistants/icons';
 import { assistantTranslate } from '../assistants/language';
 import { SessionList } from '../sessions/SessionList';
+import { NewFolderHost, openNewFolder } from '../sessions/FolderDialog';
 import { openPalette } from '../palette/CommandPalette';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
 import { ColumnScroll } from './ColumnScroll';
@@ -304,6 +305,12 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         <MenuItem icon={<Plus size={14} />} onClick={() => (setFilterOpen(false), setMaking(true))}>
           New project…
         </MenuItem>
+        {/* Folders show while the list is grouped. */}
+        {byFolder && (
+          <MenuItem icon={<FolderPlus size={14} />} onClick={() => (setFilterOpen(false), openNewFolder())}>
+            New folder…
+          </MenuItem>
+        )}
         <MenuItem icon={<Folders size={14} />} checked={byFolder} onClick={() => (useUI.getState().set({ groupByFolder: !byFolder }), setFilterOpen(false))}>
           Group by folder or project
         </MenuItem>
@@ -316,6 +323,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
           openProject(sp.id);
         }}
       />
+      <NewFolderHost />
     </>
   );
   // Machine, New session and the sessions: under the header of the column, or of the drawer.

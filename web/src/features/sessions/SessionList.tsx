@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useRoute } from 'wouter';
-import { AlarmClock, Archive, Boxes, CheckCheck, ChevronRight, Ellipsis, Folder, FolderOpen, FolderPen, Info, Lock, Pencil, Pin, PinOff, Plus, RotateCcw, SquarePen, Target, Trash2 } from 'lucide-react';
+import { AlarmClock, Archive, Boxes, CheckCheck, ChevronRight, Ellipsis, Folder, FolderInput, FolderOpen, FolderOutput, FolderPen, FolderPlus, Info, Lock, Pencil, Pin, PinOff, Plus, RotateCcw, SquarePen, Target, Trash2 } from 'lucide-react';
 import {
   closestCenter,
   DndContext,
@@ -38,7 +38,9 @@ import { newSessionIn } from '../files/actions';
 import { NewSpaceDialog, SpaceMark, startInSpace } from '../spaces/parts';
 import { openProject } from '../spaces/ProjectDialog';
 import { loadSpaces, useSpaces, useSpacesStore } from '../spaces/state';
-import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, isPlaceKind, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
+import { ACTIVE_MS, GROUP_ROWS, groupCount, groupItems, groupSessions, hasBackgroundWork, isFolded, isPlaceKind, lastActivityAt, sessionFolderId, sessionSpaceId, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
+import { deleteSessionFolder, moveToFolder, renameSessionFolder, useSessionFolders } from './folders';
+import { openNewFolder } from './FolderDialog';
 import { deleteSession, setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
@@ -127,6 +129,14 @@ const orderable = (kind: GroupKind) => kind === 'active' || kind === 'pinned';
 /** A space's or a folder's group: under Projects, with a heading that folds it, and dragged by that heading. */
 const isPlace = (g: SessionGroup) => isPlaceKind(g.kind);
 const PIN_ZONE = 'zone:pin';
+/** A folder you made, as a place to drop a session: its group's id ("box:<folder id>"). */
+const BOX = 'box:';
+/** Rows under a project's, a folder's heading: set in from it, along a line that runs down from its arrow. */
+const NEST = 'ml-[10px] border-l border-line pl-[3px]';
+/** A heading's name fades out under its buttons, which show over its end while the pointer is on it (or its menu is open). */
+const HEAD_FADE = 'group-hover/head:[mask-image:linear-gradient(to_left,transparent_50px,black_78px)] group-has-[:focus-visible]/head:[mask-image:linear-gradient(to_left,transparent_50px,black_78px)]';
+const HEAD_FADE_ON = '[mask-image:linear-gradient(to_left,transparent_50px,black_78px)]';
+const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
 /** A space's or a folder's group being dragged: its id after this. */
 const PLACE = 'place:';
 /** Where the group picked up was as the pointer took it, before the groups folded to their headings. */
@@ -545,7 +555,7 @@ function SectionHead({ label, folded, count, unread, onFold }: { label: string; 
       type="button"
       aria-expanded={!folded}
       onClick={onFold}
-      className="sticky top-0 z-[1] flex w-full items-center gap-1 bg-sidebar px-2.5 pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2"
+      className="sticky top-0 z-[1] flex w-full items-center gap-1.5 bg-sidebar px-1 pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2"
     >
       <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !folded && 'rotate-90')} />
       {label}
@@ -683,7 +693,9 @@ function FolderNameDialog({ dir, home, onClose }: { dir: string; home?: string; 
 /** Renames a project (its name for everyone) or a folder (what the app calls it here, on every device). */
 function renamePlace(g: SessionGroup, name: string) {
   const n = name.trim();
-  if (g.space) {
+  if (g.box) {
+    if (n && n !== g.box.name) renameSessionFolder(g.box.id, n).catch(toastError);
+  } else if (g.space) {
     if (!n || n === g.space.name) return;
     patch(`/api/projects/${enc(g.space.id)}`, { name: n })
       .then(() => loadSpaces())
@@ -703,13 +715,13 @@ function PlaceRename({ g, onDone }: { g: SessionGroup; onDone: () => void }) {
   };
   const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
   return (
-    <div className="flex h-7 min-w-0 flex-1 items-center gap-2.5 px-2.5 max-md:h-8">
-      <span className="flex w-[15px] shrink-0 justify-center">{g.space ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
+    <div className="flex h-7 min-w-0 flex-1 items-center gap-2 pr-2.5 pl-6 max-md:h-8">
+      <span className="flex w-[15px] shrink-0 justify-center">{g.space && !g.box ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
       <input
         autoFocus
         value={v}
-        maxLength={80}
-        aria-label={g.space ? 'Project name' : 'Folder name'}
+        maxLength={g.box ? 60 : 80}
+        aria-label={g.space && !g.box ? 'Project name' : 'Folder name'}
         placeholder={g.path ? basename(g.path) : undefined}
         onChange={(e) => setV(e.target.value)}
         onFocus={(e) => e.currentTarget.select()}
@@ -748,8 +760,8 @@ function sourceLines(from: FolderSource[], accounts?: AgentAccount[]) {
  * and its ⋯ can make it a project. A folder whose work began outside Hydor shows the marks of the agents its sessions
  * came from after its name, and its tooltip and ⋯ say which apps they were started in.
  */
-function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGroup; folded: boolean; home?: string; onFold?: () => void; handle?: PlaceHandle; lifted?: boolean }) {
-  const unread = folded && g.items.some(unreadOf);
+function PlaceHead({ g, folded, home, onFold, handle, lifted, touch }: { g: SessionGroup; folded: boolean; home?: string; onFold?: () => void; handle?: PlaceHandle; lifted?: boolean; touch?: boolean }) {
+  const unread = folded && groupItems(g).some(unreadOf);
   const [renaming, setRenaming] = useState(false);
   const [menu, setMenu] = useState(false);
   // A folder being made a project (its dialog).
@@ -768,94 +780,86 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
   const shown = <span className="flex w-[15px] shrink-0 justify-center">{project ? <SpaceMark s={project} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>;
   const chevron = <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />;
   return (
-    <div data-tip="groups" className={cx('group/head flex items-center gap-0.5 py-0.5', lifted ? 'rounded-lg bg-bg-2 shadow-lg ring-1 ring-line-2' : 'sticky top-0 z-[1] bg-sidebar')}>
+    <div data-tip="groups" className={cx('group/head relative flex items-center py-0.5', lifted ? 'rounded-lg bg-bg-2 shadow-lg ring-1 ring-line-2' : 'sticky top-0 z-[1] bg-sidebar')}>
       {renaming ? (
         <PlaceRename g={g} onDone={() => setRenaming(false)} />
       ) : (
-        <button
-          type="button"
-          ref={handle?.ref}
-          {...handle?.attrs}
-          {...(project ? { 'aria-haspopup': 'dialog' as const } : { 'aria-expanded': !folded })}
-          title={project ? tr(`${project.name}: its details, sessions, files and memory, in ${tildify(project.folder, home)}`) : from ? `${tildify(g.path, home)}\n${from}` : tildify(g.path, home)}
-          onClick={(e) => {
-            // On a phone a tap on a button in the list closes the drawer (it opened a session); a folder's stays.
-            e.stopPropagation();
-            // A drop ends with a click on the heading under the pointer.
-            if (Date.now() - lastDragEnd < 300) return;
-            if (project) return details(project);
-            // The second click of a double-click renames instead (the first one folded it: it opens again).
-            if (e.detail === 2) {
-              onFold?.();
-              setRenaming(true);
-              return;
-            }
-            onFold?.();
-          }}
-          onContextMenu={(e) => {
-            if (lifted) return;
-            e.preventDefault();
-            setMenu(true);
-          }}
-          className={cx(
-            'flex h-7 min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium text-fg-2 transition-colors select-none [-webkit-touch-callout:none] hover:bg-bg-2 hover:text-fg max-md:h-8',
-            project ? 'cursor-pointer' : 'flex-1 cursor-default',
+        // The arrow first, as on every heading of the list; then the mark and the name; how many it holds at the end.
+        <div className={cx('flex min-w-0 flex-1 items-center', !touch && !lifted && (menu ? HEAD_FADE_ON : HEAD_FADE))}>
+          {/* A project's arrow folds its sessions away (its name opens its details). */}
+          {project && (
+            <button
+              type="button"
+              aria-expanded={!folded}
+              aria-label={folded ? tr(`Show the sessions of ${project.name}`) : tr(`Hide the sessions of ${project.name}`)}
+              title={folded ? 'Show its sessions' : 'Hide its sessions'}
+              onClick={(e) => (e.stopPropagation(), onFold?.())}
+              className="flex h-7 w-5 shrink-0 items-center justify-center rounded-md hover:bg-bg-2 max-md:h-8 max-md:w-6"
+            >
+              {chevron}
+            </button>
           )}
-        >
-          {shown}
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="min-w-0 truncate" translate={translatable(g.label) ? undefined : 'no'}>
-              {g.label}
-            </span>
-            {g.from && (
-              <span className="flex shrink-0 items-center gap-0.5" title={from}>
-                {[...new Set(g.from.map((f) => f.agent))].map((a) => (
-                  <AgentIcon key={a} agent={a} size={12} />
-                ))}
-              </span>
-            )}
-            {folded && <span className="tnum shrink-0 text-[11.5px] font-normal text-fg-3">{g.items.length}</span>}
-            {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
-            {!project && chevron}
-          </span>
-        </button>
-      )}
-      {/* A project's arrow folds its sessions away (its name opens its details); the rest of the row is room. */}
-      {project && !renaming && (
-        <>
           <button
             type="button"
-            aria-expanded={!folded}
-            aria-label={folded ? tr(`Show the sessions of ${project.name}`) : tr(`Hide the sessions of ${project.name}`)}
-            title={folded ? 'Show its sessions' : 'Hide its sessions'}
-            onClick={(e) => (e.stopPropagation(), onFold?.())}
-            className="-ml-1.5 flex h-7 w-6 shrink-0 items-center justify-center rounded-md hover:bg-bg-2 max-md:h-8 max-md:w-8"
+            ref={handle?.ref}
+            {...handle?.attrs}
+            {...(project ? { 'aria-haspopup': 'dialog' as const } : { 'aria-expanded': !folded })}
+            title={project ? tr(`${project.name}: its details, sessions, files and memory, in ${tildify(project.folder, home)}`) : from ? `${tildify(g.path, home)}\n${from}` : tildify(g.path, home)}
+            onClick={(e) => {
+              // On a phone a tap on a button in the list closes the drawer (it opened a session); a folder's stays.
+              e.stopPropagation();
+              // A drop ends with a click on the heading under the pointer.
+              if (Date.now() - lastDragEnd < 300) return;
+              if (project) return details(project);
+              // The second click of a double-click renames instead (the first one folded it: it opens again).
+              if (e.detail === 2) {
+                onFold?.();
+                setRenaming(true);
+                return;
+              }
+              onFold?.();
+            }}
+            onContextMenu={(e) => {
+              if (lifted) return;
+              e.preventDefault();
+              setMenu(true);
+            }}
+            className={cx(
+              'flex h-7 min-w-0 items-center rounded-lg pr-2 text-left text-[13px] font-medium text-fg-2 transition-colors select-none [-webkit-touch-callout:none] hover:bg-bg-2 hover:text-fg max-md:h-8',
+              project ? 'cursor-pointer gap-2 pl-1' : 'flex-1 cursor-default',
+            )}
           >
-            {chevron}
+            {!project && <span className="mr-1 flex w-5 shrink-0 justify-center max-md:w-6">{chevron}</span>}
+            {shown}
+            <span className={cx('flex min-w-0 items-center gap-1.5', !project && 'ml-2')}>
+              <span className="min-w-0 truncate" translate={translatable(g.label) ? undefined : 'no'}>
+                {g.label}
+              </span>
+              {g.from && (
+                <span className="flex shrink-0 items-center gap-0.5" title={from}>
+                  {[...new Set(g.from.map((f) => f.agent))].map((a) => (
+                    <AgentIcon key={a} agent={a} size={12} />
+                  ))}
+                </span>
+              )}
+              {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
+            </span>
           </button>
           <span className="min-w-0 flex-1" />
-        </>
+          {folded && <span className="tnum shrink-0 pr-2.5 pl-1 text-[11.5px] text-fg-3">{groupCount(g)}</span>}
+        </div>
       )}
       {!lifted && !renaming && (
         <>
-          <IconButton
-            ref={more}
-            size="sm"
-            label={`More for “${g.label}”`}
-            onClick={(e) => (e.stopPropagation(), setMenu(true))}
-            // On hover with a mouse; always on touch screens.
-            className={cx('opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100', menu && 'opacity-100')}
-          >
-            <Ellipsis size={13} />
-          </IconButton>
-          <IconButton
-            size="sm"
-            label={`New session in ${g.label}`}
-            onClick={() => (g.space ? startInSpace(g.space) : newSessionIn(g.path!))}
-            className="opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100"
-          >
-            <SquarePen size={13} />
-          </IconButton>
+          {/* Over the heading's end while the pointer is on it (or the keyboard is in it); always there on touch screens. */}
+          <div className={cx('flex shrink-0 items-center', !touch && cx('absolute top-1/2 right-0.5 -translate-y-1/2 transition-opacity', menu ? 'opacity-100' : 'opacity-0 group-hover/head:opacity-100 group-has-[:focus-visible]/head:opacity-100'))}>
+            <IconButton ref={more} size="sm" label={`More for “${g.label}”`} active={menu} onClick={(e) => (e.stopPropagation(), setMenu(true))}>
+              <Ellipsis size={13} />
+            </IconButton>
+            <IconButton size="sm" label={`New session in ${g.label}`} onClick={() => (g.space ? startInSpace(g.space) : newSessionIn(g.path!))}>
+              <SquarePen size={13} />
+            </IconButton>
+          </div>
           <Popover anchor={more} open={menu} onClose={() => setMenu(false)} width={210} align="end">
             {g.from && (
               <>
@@ -884,6 +888,11 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
             <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(false), setRenaming(true))}>
               Rename
             </MenuItem>
+            {g.space && (
+              <MenuItem icon={<FolderPlus size={14} />} onClick={() => (setMenu(false), openNewFolder({ space: g.space }))}>
+                New folder
+              </MenuItem>
+            )}
             {mine && (
               <MenuItem icon={<RotateCcw size={14} />} onClick={() => (setMenu(false), renameFolder(g.path!, ''))}>
                 Use the folder's own name
@@ -904,6 +913,128 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
           {!g.space && making && <NewSpaceDialog open folder={g.path} onClose={() => setMaking(false)} onMade={details} />}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * A folder you made for sessions: its heading folds it (a double-click renames it), takes a session dropped on it, and
+ * its ⋯ (or a right-click) renames or deletes it. Deleted, its sessions stay in the list.
+ */
+function BoxHead({ g, folded, hot, touch, onFold }: { g: SessionGroup; folded: boolean; hot: boolean; touch: boolean; onFold: () => void }) {
+  const { setNodeRef } = useDroppable({ id: g.id });
+  const [renaming, setRenaming] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const more = useRef<HTMLButtonElement>(null);
+  const [confirm, confirmNode] = useConfirm();
+  const unread = folded && g.items.some(unreadOf);
+  const remove = async () => {
+    // An empty one goes without asking.
+    if (g.items.length && !(await confirm({ title: tr(`Delete the folder ${g.label}?`), body: 'Its sessions stay: they go back to where they were in the list.', confirm: 'Delete', danger: true }))) return;
+    deleteSessionFolder(g.box!.id).catch(toastError);
+  };
+  return (
+    <div ref={setNodeRef} className={cx('group/head relative flex items-center rounded-lg py-0.5 transition-colors', hot && 'bg-accent/10 ring-1 ring-accent/50 ring-inset')}>
+      {renaming ? (
+        <PlaceRename g={g} onDone={() => setRenaming(false)} />
+      ) : (
+        <div className={cx('flex min-w-0 flex-1 items-center', !touch && (menu ? HEAD_FADE_ON : HEAD_FADE))}>
+          <button
+            type="button"
+            aria-expanded={!folded}
+            title={g.space ? tr(`A folder in ${g.space.name}`) : 'A folder for sessions'}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (Date.now() - lastDragEnd < 300) return;
+              // The second click of a double-click renames instead (the first one folded it: it opens again).
+              if (e.detail === 2) {
+                onFold();
+                setRenaming(true);
+                return;
+              }
+              onFold();
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu(true);
+            }}
+            className="flex h-7 min-w-0 flex-1 cursor-default items-center rounded-lg pr-2 text-left text-[13px] font-medium text-fg-2 transition-colors select-none [-webkit-touch-callout:none] hover:bg-bg-2 hover:text-fg max-md:h-8"
+          >
+            <span className="mr-1 flex w-5 shrink-0 justify-center max-md:w-6">
+              <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />
+            </span>
+            <span className="flex w-[15px] shrink-0 justify-center text-fg-3">{folded ? <Folder size={14} /> : <FolderOpen size={14} />}</span>
+            <span className="ml-2 min-w-0 truncate" translate="no">
+              {g.label}
+            </span>
+            {unread && <span className="ml-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
+          </button>
+          {folded && <span className="tnum shrink-0 pr-2.5 pl-1 text-[11.5px] text-fg-3">{g.items.length}</span>}
+        </div>
+      )}
+      {!renaming && (
+        <div className={cx('flex shrink-0 items-center', !touch && cx('absolute top-1/2 right-0.5 -translate-y-1/2 transition-opacity', menu ? 'opacity-100' : 'opacity-0 group-hover/head:opacity-100 group-has-[:focus-visible]/head:opacity-100'))}>
+          <IconButton ref={more} size="sm" label={`More for “${g.label}”`} active={menu} onClick={(e) => (e.stopPropagation(), setMenu(true))}>
+            <Ellipsis size={13} />
+          </IconButton>
+        </div>
+      )}
+      <Popover anchor={more} open={menu} onClose={() => setMenu(false)} width={190} align="end">
+        <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(false), setRenaming(true))}>
+          Rename
+        </MenuItem>
+        <MenuSep />
+        <MenuItem danger icon={<Trash2 size={14} />} onClick={() => (setMenu(false), void remove())}>
+          Delete folder
+        </MenuItem>
+      </Popover>
+      {confirmNode}
+    </div>
+  );
+}
+
+/**
+ * A session's menu, on Move to folder: the folders it can go in (its project's, or those outside any project for a
+ * session in none), the one it is in ticked, taking it out again, and a new one made for it.
+ */
+function FolderItems({ s, onDone }: { s: SessionSummary; onDone: () => void }) {
+  const spaces = useSpaces();
+  const folders = useSessionFolders();
+  const sid = sessionSpaceId(s);
+  const space = sid ? spaces?.find((x) => x.id === sid) : undefined;
+  const here = folders.filter((f) => (f.space ?? null) === (space?.id ?? null)).sort(byName);
+  const cur = here.find((f) => f.id === sessionFolderId(s));
+  return (
+    <>
+      <MenuLabel>{space ? tr(`Folders in ${space.name}`) : 'Move to folder'}</MenuLabel>
+      {here.map((f) => (
+        <MenuItem key={f.id} icon={<Folder size={14} />} checked={f.id === cur?.id} onClick={() => (f.id !== cur?.id && moveToFolder(s, f.id), onDone())}>
+          <span translate="no">{f.name}</span>
+        </MenuItem>
+      ))}
+      {!here.length && <div className="px-2.5 pb-1.5 text-[12.5px] text-fg-3">No folders yet.</div>}
+      {cur && (
+        <MenuItem icon={<FolderOutput size={14} />} onClick={() => (moveToFolder(s, null), onDone())}>
+          Take out of the folder
+        </MenuItem>
+      )}
+      <MenuSep />
+      <MenuItem icon={<FolderPlus size={14} />} onClick={() => (onDone(), openNewFolder({ space, moving: s }))}>
+        New folder…
+      </MenuItem>
+    </>
+  );
+}
+
+/** The Folders and Projects headings: a click folds the section, and the + beside it makes one (always in sight: it is how they are made). */
+function ListHead({ label, folded, onFold, tip, action, first }: { label: string; folded: boolean; onFold: () => void; tip?: string; action: ReactNode; first: boolean }) {
+  return (
+    <div className={cx('flex items-center pr-2', !first && 'mt-2')}>
+      <button type="button" data-tip={tip} aria-expanded={!folded} onClick={onFold} className="flex min-w-0 flex-1 items-center gap-1.5 px-3 pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2">
+        <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !folded && 'rotate-90')} />
+        {label}
+      </button>
+      {action}
     </div>
   );
 }
@@ -942,6 +1073,8 @@ export function SessionList({ query }: { query: string }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<SessionSummary | null>(null);
   const [snoozing, setSnoozing] = useState(false);
+  /** The session's menu shows the folders it can go in. */
+  const [moving, setMoving] = useState(false);
   /** The folder whose name is being changed from a session's menu. */
   const [namingFolder, setNamingFolder] = useState<string | null>(null);
   // The + on the Projects heading: its menu, and the dialog for a new project or a group of them.
@@ -973,11 +1106,13 @@ export function SessionList({ query }: { query: string }) {
   const folds = useUI((s) => s.groupFolds);
   const sectionFolds = useUI((s) => s.sidebarSectionFolds);
   // Top-level sections are independent of the project and folder folds inside them.
-  const foldSection = (section: 'active' | 'pinned' | 'projects') => {
+  const foldSection = (section: 'active' | 'pinned' | 'folders' | 'projects') => {
     const current = useUI.getState().sidebarSectionFolds;
     useUI.getState().set({ sidebarSectionFolds: { ...current, [section]: !current?.[section] } });
   };
   const spaces = useSpaces();
+  // The folders you made for sessions: outside any project, and inside each.
+  const folders = useSessionFolders();
   const defaultCwd = useApp((s) => s.boot?.defaultCwd);
   const autoFolders = useApp((s) => s.boot?.autoFolders);
   const unpicked = useMemo(() => unpickedFolders(home, defaultCwd, autoFolders), [home, defaultCwd, autoFolders]);
@@ -995,7 +1130,7 @@ export function SessionList({ query }: { query: string }) {
   const groups = useMemo(() => {
     const listed = [...standIns, ...order.map((k) => byKey[k])].filter((s): s is SessionSummary => !!s && !s.archived && !s.subagentOf && shown(s) && !nest.under.has(s.key));
     // The list showing one space: its sessions go by day.
-    const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked, places, names: folderNames, origins });
+    const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked, places, names: folderNames, origins, folders });
     const snz = out.find((g) => g.kind === 'snoozed');
     if (snz) snz.items.sort((a, b) => (a.snoozedUntil ?? 0) - (b.snoozedUntil ?? 0));
     const act = out.find((g) => g.kind === 'active');
@@ -1006,7 +1141,7 @@ export function SessionList({ query }: { query: string }) {
     // A session still starting cannot be dragged: it is in no group's order.
     for (const g of out) g.keys = g.items.filter((s) => !isStartingKey(s.key)).map((s) => s.key);
     return out;
-  }, [standIns, byKey, order, filter, agentFilter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime, folderNames, origins]);
+  }, [standIns, byKey, order, filter, agentFilter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime, folderNames, origins, folders]);
 
   // Move sessions out of Active even when no new session events arrive.
   useEffect(() => {
@@ -1022,7 +1157,7 @@ export function SessionList({ query }: { query: string }) {
 
   const groupOf = useMemo(() => {
     const m = new Map<string, 'active' | 'pinned' | 'dated'>();
-    for (const g of groups) for (const s of g.items) m.set(s.key, g.kind === 'active' || g.kind === 'pinned' ? g.kind : 'dated');
+    for (const g of groups) for (const s of groupItems(g)) m.set(s.key, g.kind === 'active' || g.kind === 'pinned' ? g.kind : 'dated');
     return m;
   }, [groups]);
   const keysOf = (kind: 'active' | 'pinned') => groups.find((g) => g.kind === kind)?.keys ?? [];
@@ -1035,11 +1170,24 @@ export function SessionList({ query }: { query: string }) {
   };
 
   // A space's or a folder's group: the nearest of those groups. Active or Pinned: the nearest row of the same group.
-  // A dated row: only a Pinned row or the pin zone right under the pointer.
+  // A dated row: only a Pinned row or the pin zone right under the pointer, or a folder's heading it can go in (one of
+  // its own project, or outside any for a session in none; not the folder it is in).
+  const fits = (boxId: string, key: string) => {
+    const s = byKey[key];
+    const f = folders.find((x) => BOX + x.id === boxId);
+    if (!s || !f || f.id === sessionFolderId(s)) return false;
+    const sid = sessionSpaceId(s);
+    const space = sid && spaces?.some((x) => x.id === sid) ? sid : null;
+    return (f.space ?? null) === space;
+  };
   const collision: CollisionDetection = (args) => {
     if (String(args.active.id).startsWith(PLACE)) return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => String(c.id).startsWith(PLACE)) });
     const from = groupOf.get(String(args.active.id));
-    if (from === 'dated') return pointerWithin({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id === PIN_ZONE || groupOf.get(String(c.id)) === 'pinned') });
+    if (from === 'dated')
+      return pointerWithin({
+        ...args,
+        droppableContainers: args.droppableContainers.filter((c) => c.id === PIN_ZONE || groupOf.get(String(c.id)) === 'pinned' || (String(c.id).startsWith(BOX) && fits(String(c.id), String(args.active.id)))),
+      });
     return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => groupOf.get(String(c.id)) === from) });
   };
 
@@ -1075,6 +1223,12 @@ export function SessionList({ query }: { query: string }) {
     }
     const key = String(active.id);
     const from = groupOf.get(key);
+    // Dropped on a folder's heading: it goes in.
+    if (String(over.id).startsWith(BOX)) {
+      const s = byKey[key];
+      if (s && from === 'dated') moveToFolder(s, String(over.id).slice(BOX.length));
+      return;
+    }
     const to = over.id === PIN_ZONE ? 'pinned' : groupOf.get(String(over.id));
     if (from && from === to && from !== 'dated') {
       const keys = keysOf(from);
@@ -1100,6 +1254,7 @@ export function SessionList({ query }: { query: string }) {
       menuAnchor.current = el;
       setMenuByButton(false);
       setSnoozing(false);
+      setMoving(false);
       setMenu(s);
     },
     [coarse],
@@ -1109,6 +1264,7 @@ export function SessionList({ query }: { query: string }) {
     menuAnchor.current = el;
     setMenuByButton(true);
     setSnoozing(false);
+    setMoving(false);
     setMenu((m) => (m?.key === s.key ? null : s));
   }, []);
 
@@ -1136,7 +1292,23 @@ export function SessionList({ query }: { query: string }) {
     );
   }
   if (!groups.length)
-    return <div className="px-4 py-10 text-center text-[13px] text-fg-3">{filter !== 'all' || agentFilter || spaceFilter ? 'No sessions match the filter.' : 'No sessions yet.'}</div>;
+    return (
+      <div className="px-4 py-10 text-center text-[13px] text-fg-3">
+        {filter !== 'all' || agentFilter || spaceFilter ? (
+          <>
+            <p>No sessions match the filter.</p>
+            <button type="button" onClick={() => useUI.getState().set({ agentFilter: 'all', assistantFilter: null, spaceFilter: null })} className="mt-2 rounded-md px-2 py-1 text-accent hover:bg-accent/10">
+              Show all sessions
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-fg-2">No sessions yet.</p>
+            <p className="mt-1">Start one with New session: it shows here, and stays to come back to.</p>
+          </>
+        )}
+      </div>
+    );
 
   const dragging = dragKey ? byKey[dragKey] : null;
   const draggingPlace = dragPlace ? groups.find((g) => g.id === dragPlace) : undefined;
@@ -1154,20 +1326,23 @@ export function SessionList({ query }: { query: string }) {
       const open = activeKey ? g.items.find((s) => s.key === activeKey) : undefined;
       return open ? [open] : [];
     }
+    // A folder outside any project draws its own rows (boxBlock).
+    if (g.kind === 'box') return [];
     if (!isPlace(g)) return g.items;
     if (dragPlace) return [];
-    const rows = shut.has(g.id) ? [] : shownWhole.has(g.id) ? g.items : g.items.slice(0, GROUP_ROWS);
+    // Folded: only the session open, wherever in it (one of its folders too).
+    if (shut.has(g.id)) {
+      const open = activeKey ? groupItems(g).find((s) => s.key === activeKey) : undefined;
+      return open ? [open] : [];
+    }
+    const rows = shownWhole.has(g.id) ? g.items : g.items.slice(0, GROUP_ROWS);
     const open = activeKey ? g.items.find((s) => s.key === activeKey) : undefined;
     return open && !rows.includes(open) ? [...rows, open] : rows;
   });
-  // Each group's frame and contents; the spaces' and folders' groups (one run of them, under Projects) drag among
-  // themselves by their headings.
-  const items = groups.map((g, i) => {
-    const sortable = orderable(g.kind);
-    const place = isPlace(g);
-    const visible = shownRows[i];
-    const before = shownRows.slice(0, i).reduce((n, x) => n + x.length, 0);
-    const rows = visible.map((s, k) => {
+  // Rows drawn so far: the first ones are drawn at once, the rest as they come near.
+  let drawn = 0;
+  const rowsOf = (list: SessionSummary[], o: { place: boolean; inPinned?: boolean; sortable?: boolean }) =>
+    list.map((s) => {
       const p: RowProps = {
         s,
         active: s.key === activeKey,
@@ -1178,11 +1353,11 @@ export function SessionList({ query }: { query: string }) {
         onMore,
         menuOpen: menu?.key === s.key,
         touch: coarse,
-        eager: before + k < 30,
-        place,
-        inPinned: g.kind === 'pinned',
+        eager: drawn++ < 30,
+        place: o.place,
+        inPinned: o.inPinned,
       };
-      const row = isStartingKey(s.key) ? <StartingRow key={s.key} {...p} /> : sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
+      const row = isStartingKey(s.key) ? <StartingRow key={s.key} {...p} /> : o.sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
       const kids = nest.byParent.get(s.key);
       if (!kids) return row;
       return (
@@ -1193,65 +1368,111 @@ export function SessionList({ query }: { query: string }) {
             kids={kids}
             activeKey={activeKey}
             // A program's own subagent has no menu: nothing in it applies.
-            row={(c, active) => <RowBody s={c} active={active} home={home} onMore={c.subagentOf ? undefined : onMore} menuOpen={menu?.key === c.key} touch={coarse} place={place} />}
+            row={(c, active) => <RowBody s={c} active={active} home={home} onMore={c.subagentOf ? undefined : onMore} menuOpen={menu?.key === c.key} touch={coarse} place={o.place} />}
           />
         </Fragment>
       );
     });
-    const shutNow = place && shut.has(g.id);
-    // Rows left out, or all of them shown since asked: a line to show them, or fewer again.
-    const more = g.items.length - visible.length;
+  // Rows left out of a group, or all of them shown since asked: a line to show them, or fewer again.
+  const moreLine = (g: SessionGroup, more: number) => {
     const whole = shownWhole.has(g.id);
+    if (!(whole ? g.items.length > GROUP_ROWS : more > 0)) return null;
+    return (
+      <button
+        type="button"
+        aria-expanded={whole}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!shownWhole.delete(g.id)) shownWhole.add(g.id);
+          redraw((n) => n + 1);
+        }}
+        className="flex h-7 w-full items-center rounded-lg pl-[35px] text-left text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2 max-md:h-8"
+      >
+        {whole ? 'Show fewer' : `Show ${more} more`}
+      </button>
+    );
+  };
+  // A folder you made: its heading, and under it (set in) its newest few sessions until asked for more; folded, only
+  // the session open. An empty one says how sessions get in.
+  const boxBlock = (b: SessionGroup) => {
+    const shutB = isFolded(b, folds);
+    const open = activeKey ? b.items.find((s) => s.key === activeKey) : undefined;
+    const first = shutB ? [] : shownWhole.has(b.id) ? b.items : b.items.slice(0, GROUP_ROWS);
+    const rows = open && !first.includes(open) ? [...first, open] : first;
+    return (
+      <Fragment key={b.id}>
+        <BoxHead g={b} folded={shutB} hot={overGroup === b.id} touch={coarse} onFold={() => fold(b)} />
+        {(rows.length > 0 || !shutB) && (
+          <div className={NEST}>
+            {rowsOf(rows, { place: true })}
+            {!shutB && !b.items.length && <div className="px-2.5 py-1.5 text-[12px] leading-4 text-fg-3">{coarse ? 'Empty. Put a session in from its ⋯ menu: Move to folder.' : 'Empty. Drag a session here, or use its menu: Move to folder.'}</div>}
+            {!shutB && moreLine(b, b.items.length - rows.length)}
+          </div>
+        )}
+      </Fragment>
+    );
+  };
+  // Each group's frame and contents; the spaces' and folders' groups (one run of them, under Projects) drag among
+  // themselves by their headings.
+  const items = groups.map((g, i) => {
+    const sortable = orderable(g.kind);
+    const place = isPlace(g);
+    // Under Folders or Projects: a heading with its rows set in under it.
+    const tree = place || g.kind === 'box';
+    const visible = shownRows[i];
+    const shutNow = place && shut.has(g.id);
     // Folded spaces and folders close up into a list of them.
     const prev = groups[i - 1];
     const afterPlace = !!prev && isPlace(prev);
     const frame = cx(
       'px-2 transition-colors',
-      i > 0 && (!place ? 'mt-2' : afterPlace && !shut.has(prev.id) && 'mt-1.5'),
-      !shutNow && 'pb-1',
+      i > 0 && (!tree ? 'mt-2' : afterPlace && !shut.has(prev.id) && 'mt-1.5'),
+      !shutNow && g.kind !== 'box' && 'pb-1',
       datedDrag && g.kind === 'pinned' && overGroup === 'pinned' && 'rounded-xl bg-accent/[0.06]',
     );
-    const body = (handle?: PlaceHandle) => (
-      <>
-        {place ? (
-          <PlaceHead g={g} folded={shutNow} home={home} onFold={() => fold(g)} handle={handle} />
-        ) : g.kind === 'active' || g.kind === 'pinned' ? (
-          <SectionHead label={g.label} folded={!!sectionFolds?.[g.kind]} count={g.items.length} unread={g.items.some(unreadOf)} onFold={() => foldSection(g.kind as 'active' | 'pinned')} />
-        ) : (
-          <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
-        )}
-        {sortable ? (
-          <SortableContext items={g.keys} strategy={verticalListSortingStrategy}>
-            {rows}
-          </SortableContext>
-        ) : (
-          rows
-        )}
-        {place && !shutNow && (whole ? g.items.length > GROUP_ROWS : more > 0) && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!shownWhole.delete(g.id)) shownWhole.add(g.id);
-              redraw((n) => n + 1);
-            }}
-            className="flex h-7 w-full items-center rounded-lg pl-[35px] text-left text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2 max-md:h-8"
-          >
-            {whole ? 'Show fewer' : `Show ${more} more`}
-          </button>
-        )}
-      </>
-    );
+    const body = (handle?: PlaceHandle) => {
+      if (g.kind === 'box') return boxBlock(g);
+      const rows = rowsOf(visible, { place, inPinned: g.kind === 'pinned', sortable });
+      return (
+        <>
+          {place ? (
+            <PlaceHead g={g} folded={shutNow} home={home} onFold={() => fold(g)} handle={handle} touch={coarse} />
+          ) : g.kind === 'active' || g.kind === 'pinned' ? (
+            <SectionHead label={g.label} folded={!!sectionFolds?.[g.kind]} count={g.items.length} unread={g.items.some(unreadOf)} onFold={() => foldSection(g.kind as 'active' | 'pinned')} />
+          ) : (
+            <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
+          )}
+          {sortable ? (
+            <SortableContext items={g.keys} strategy={verticalListSortingStrategy}>
+              {rows}
+            </SortableContext>
+          ) : place ? (
+            // A project's folders first, then its other sessions, all set in under its heading.
+            (rows.length > 0 || (!shutNow && !!g.boxes?.length)) && (
+              <div className={NEST}>
+                {!shutNow && g.boxes?.map(boxBlock)}
+                {rows}
+                {!shutNow && moreLine(g, g.items.length - visible.length)}
+              </div>
+            )
+          ) : (
+            rows
+          )}
+        </>
+      );
+    };
     return { g, i, frame, body };
   });
   type Item = (typeof items)[number];
-  const listed: ({ kind: 'one'; item: Item } | { kind: 'places'; first: number; items: Item[] })[] = [];
+  const listed: ({ kind: 'one'; item: Item } | { kind: 'places'; first: number; items: Item[] } | { kind: 'boxes'; first: number; items: Item[] })[] = [];
   for (const it of items) {
     const last = listed[listed.length - 1];
-    if (!isPlace(it.g)) listed.push({ kind: 'one', item: it });
-    else if (last?.kind === 'places') last.items.push(it);
-    else listed.push({ kind: 'places', first: it.i, items: [it] });
+    const run = isPlace(it.g) ? 'places' : it.g.kind === 'box' ? 'boxes' : null;
+    if (!run) listed.push({ kind: 'one', item: it });
+    else if (last && last.kind !== 'one' && last.kind === run) last.items.push(it);
+    else listed.push({ kind: run, first: it.i, items: [it] });
   }
+  const closeMenu = () => (setMenu(null), setSnoozing(false), setMoving(false));
 
   return (
     <DndContext
@@ -1267,7 +1488,7 @@ export function SessionList({ query }: { query: string }) {
         } else setDragKey(id);
         setMenu(null);
       }}
-      onDragOver={({ over }) => setOverGroup(!over ? null : over.id === PIN_ZONE ? 'pinned' : (groupOf.get(String(over.id)) ?? null))}
+      onDragOver={({ over }) => setOverGroup(!over ? null : over.id === PIN_ZONE ? 'pinned' : String(over.id).startsWith(BOX) ? String(over.id) : (groupOf.get(String(over.id)) ?? null))}
       onDragEnd={onDragEnd}
       onDragCancel={() => {
         setDragKey(null);
@@ -1276,31 +1497,49 @@ export function SessionList({ query }: { query: string }) {
       }}
       accessibility={{
         screenReaderInstructions: {
-          draggable: 'Drag to move this session. Active and Pinned keep the order you set; drop a session on Pinned to pin it. Drag a project or folder by its name to move its group.',
+          draggable: 'Drag to move this session. Active and Pinned keep the order you set; drop a session on Pinned to pin it, or on a folder to put it in. Drag a project or folder by its name to move its group.',
         },
       }}
     >
       {/* Touches that land on the list may pick a row (or a group's heading) up (lib/dragTouch). */}
       <div ref={listRef}>
         {listed.map((part) =>
-          part.kind === 'places' ? (
+          part.kind === 'boxes' ? (
+            <Fragment key={`boxes:${part.first}`}>
+              {part.first === zoneAt && <PinZone hot={overGroup === 'pinned'} />}
+              <ListHead
+                label="Folders"
+                first={part.first === 0}
+                folded={!!sectionFolds?.folders}
+                onFold={() => foldSection('folders')}
+                action={
+                  <IconButton size="sm" label="New folder" onClick={(e) => (e.stopPropagation(), openNewFolder())} className="h-6 w-6 text-fg-3">
+                    <Plus size={13} />
+                  </IconButton>
+                }
+              />
+              {!sectionFolds?.folders &&
+                part.items.map((x) => (
+                  <div key={x.g.id} className={x.frame}>
+                    {x.body()}
+                  </div>
+                ))}
+            </Fragment>
+          ) : part.kind === 'places' ? (
             <Fragment key={`places:${part.first}`}>
               {part.first === zoneAt && <PinZone hot={overGroup === 'pinned'} />}
-              <div className={cx('group/sec flex items-center pr-2', part.first > 0 && 'mt-2')}>
-                <button type="button" data-tip="spaces" aria-expanded={!sectionFolds?.projects} onClick={() => foldSection('projects')} className="flex min-w-0 flex-1 items-center gap-1 px-[18px] pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2">
-                  <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !sectionFolds?.projects && 'rotate-90')} />Projects
-                </button>
-                {/* On hover with a mouse; always on touch screens. */}
-                <IconButton
-                  ref={newMore}
-                  size="sm"
-                  label="New project or group"
-                  onClick={(e) => (e.stopPropagation(), setNewMenu(true))}
-                  className={cx('h-6 w-6 opacity-0 group-hover/sec:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100', newMenu && 'opacity-100')}
-                >
-                  <Plus size={13} />
-                </IconButton>
-              </div>
+              <ListHead
+                label="Projects"
+                tip="spaces"
+                first={part.first === 0}
+                folded={!!sectionFolds?.projects}
+                onFold={() => foldSection('projects')}
+                action={
+                  <IconButton ref={newMore} size="sm" label="New project, group or folder" active={newMenu} onClick={(e) => (e.stopPropagation(), setNewMenu(true))} className="h-6 w-6 text-fg-3">
+                    <Plus size={13} />
+                  </IconButton>
+                }
+              />
               {!sectionFolds?.projects && <SortableContext items={part.items.map((x) => PLACE + x.g.id)} strategy={verticalListSortingStrategy}>
                 {part.items.map((x) => (
                   <SortablePlace key={x.g.id} id={x.g.id} className={x.frame}>
@@ -1327,6 +1566,10 @@ export function SessionList({ query }: { query: string }) {
         <MenuItem icon={<Boxes size={14} />} onClick={() => (setNewMenu(false), setNewSpace('group'))}>
           New group of projects…
         </MenuItem>
+        <MenuSep />
+        <MenuItem icon={<FolderPlus size={14} />} onClick={() => (setNewMenu(false), openNewFolder())}>
+          New folder…
+        </MenuItem>
       </Popover>
       <NewSpaceDialog
         open={!!newSpace}
@@ -1339,13 +1582,14 @@ export function SessionList({ query }: { query: string }) {
       />
       {createPortal(
         <DragOverlay dropAnimation={null} modifiers={[stayUnderPointer]}>
-          {dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : draggingPlace ? <PlaceHead g={draggingPlace} folded home={home} lifted /> : null}
+          {dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : draggingPlace ? <PlaceHead g={draggingPlace} folded home={home} lifted touch={coarse} /> : null}
         </DragOverlay>,
         document.body,
       )}
-      <Popover anchor={menuAnchor} open={!!menu} onClose={() => (setMenu(null), setSnoozing(false))} width={snoozing ? 240 : 190} align={menuByButton ? 'end' : 'start'}>
-        {menu && snoozing && <SnoozeItems s={menu} onDone={() => (setMenu(null), setSnoozing(false))} />}
-        {menu && !snoozing && (
+      <Popover anchor={menuAnchor} open={!!menu} onClose={closeMenu} width={snoozing ? 240 : moving ? 230 : 190} align={menuByButton ? 'end' : 'start'}>
+        {menu && snoozing && <SnoozeItems s={menu} onDone={closeMenu} />}
+        {menu && moving && <FolderItems s={menu} onDone={closeMenu} />}
+        {menu && !snoozing && !moving && (
           <>
             <MenuItem
               icon={<Pencil size={14} />}
@@ -1376,6 +1620,12 @@ export function SessionList({ query }: { query: string }) {
             >
               {menu.pinned ? 'Unpin' : 'Pin'}
             </MenuItem>
+            {/* Folders show while the list is grouped. */}
+            {byFolder && !spaceFilter && (
+              <MenuItem icon={<FolderInput size={14} />} onClick={() => setMoving(true)}>
+                Move to folder
+              </MenuItem>
+            )}
             {menu.snoozedUntil ? (
               <SnoozeItems s={menu} onDone={() => setMenu(null)} />
             ) : (

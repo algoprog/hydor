@@ -88,3 +88,33 @@ export interface FolderOrigin {
   sources: string[];
   sessions: number;
 }
+
+/** A folder you made for sessions in the sidebar: at the top level, or inside one project (`space`, its id). */
+export interface SessionFolder {
+  id: string;
+  name: string;
+  space?: string;
+  createdAt: number;
+}
+
+/** At most this many session folders; a name is cut at this many characters. */
+export const MAX_SESSION_FOLDERS = 200;
+export const MAX_SESSION_FOLDER_NAME = 60;
+
+/** The folders as kept: well-formed ones only (an id, a name), repeats of an id dropped, at most MAX_SESSION_FOLDERS. */
+export function sessionFolderList(v: unknown): SessionFolder[] {
+  const out: SessionFolder[] = [];
+  if (!Array.isArray(v)) return out;
+  const seen = new Set<string>();
+  for (const x of v) {
+    if (out.length >= MAX_SESSION_FOLDERS) break;
+    if (!x || typeof x !== 'object') continue;
+    const f = x as Record<string, unknown>;
+    if (typeof f.id !== 'string' || !/^sf[\w-]{4,40}$/.test(f.id) || seen.has(f.id)) continue;
+    const name = typeof f.name === 'string' ? f.name.trim().slice(0, MAX_SESSION_FOLDER_NAME).trim() : '';
+    if (!name) continue;
+    seen.add(f.id);
+    out.push({ id: f.id, name, ...(typeof f.space === 'string' && f.space ? { space: f.space } : {}), createdAt: typeof f.createdAt === 'number' && Number.isFinite(f.createdAt) ? f.createdAt : 0 });
+  }
+  return out;
+}

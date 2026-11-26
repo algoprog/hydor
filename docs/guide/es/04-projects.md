@@ -303,7 +303,7 @@ La pestaña **Memoria** de un grupo, bajo su chip **Documentos**, también muest
 
 ## Mostrar en la barra lateral solo las sesiones de un proyecto
 
-La barra lateral da a cada proyecto un grupo propio, con su nombre y su marca, con sus sesiones más recientes; el lápiz al final del encabezado del grupo empieza una nueva sesión en el proyecto. Consulta [La lista de sesiones](/guide/start#the-session-list).
+La barra lateral le da a cada proyecto su propio grupo, bajo su nombre y su marca, con sus sesiones más recientes; el lápiz al final del encabezado del grupo empieza una nueva sesión en el proyecto. Consulta [La lista de sesiones](/guide/start#the-session-list). Un proyecto puede tener allí carpetas propias para ordenar sus sesiones: su menú **⋯** → **Nueva carpeta**, y aparecen bajo su encabezado antes de sus demás sesiones. Consulta [Ordenar las sesiones en carpetas](/guide/start#sort-sessions-into-folders). Al eliminar un proyecto se quitan sus carpetas; sus sesiones se conservan.
 
 Para mostrar solo las sesiones de un proyecto:
 

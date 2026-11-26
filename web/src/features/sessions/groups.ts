@@ -1,22 +1,30 @@
-// The sidebar's groups of sessions: Active, Pinned, a group for each space and for each folder you work in, then the
-// rest by day (Today, Yesterday, This week, months, years), and Snoozed at the bottom. Spaces' and folders' groups
-// come by their newest session, or in the order you dragged them into (any you never moved first). A space's
-// sessions are in its group from the first; a folder needs two sessions for one, and a session in a worktree counts
-// for its main checkout. Folders no one picked get no group, so their sessions go by day: the home folder and the default one, and
-// what is under the app's own places (task folders, apps' runs, worktrees, the temporary folder: the server's
-// autoFolders). With grouping off, or while the list shows one space, the rest all go by day. A folder whose work began
-// outside Hydor (its first session came from VS Code, a terminal, Claude's or Codex's own app) says where its sessions
-// came from, as a found project's group does.
-import { isChatgptProjectFolder, type FolderOrigin } from '@shared/sidebar';
+// The sidebar's groups of sessions: Active, Pinned, the folders you made, a group for each space and for each folder you
+// work in, then the rest by day (Today, Yesterday, This week, months, years), and Snoozed at the bottom. Spaces' and
+// folders' groups come by their newest session, or in the order you dragged them into (any you never moved first). A
+// space's sessions are in its group from the first; a folder needs two sessions for one, and a session in a worktree
+// counts for its main checkout. Folders no one picked get no group, so their sessions go by day: the home folder and
+// the default one, and what is under the app's own places (task folders, apps' runs, worktrees, the temporary folder:
+// the server's autoFolders). With grouping off, or while the list shows one space, the rest all go by day. A folder
+// whose work began outside Hydor (its first session came from VS Code, a terminal, Claude's or Codex's own app) says
+// where its sessions came from, as a found project's group does.
+// The folders you made are different: you name them and put sessions in them. One at the top is for sessions in no
+// project and one inside a project is for that project's; each shows by name, even with nothing in it, so it can take
+// sessions, and a project's are in the project's group, which comes when one of its sessions does (or, for a project
+// with a folder and no session listed, after the others). A session in a folder stays in Active, Pinned or Snoozed
+// while it is one of those, and otherwise shows in its folder instead of its project's group, its folder on disk's or
+// its day (a folder on disk then counts one less towards its two). A folder of a project that is gone is ignored, a
+// session whose folder is not in its own project goes as if it had none, and with grouping off all folders are ignored.
+import { isChatgptProjectFolder, type FolderOrigin, type SessionFolder } from '@shared/sidebar';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
 import { basename, dayGroup, dirname, inside, isWinPath, joinPath, pathParts, sepOf } from '../../lib/format';
 import { folderSources, fromOrigins, type FolderSource } from '../../lib/origin';
 
-export type GroupKind = 'active' | 'pinned' | 'space' | 'folder' | 'day' | 'snoozed';
+/** 'folder' is a folder on disk; 'box' is a folder you made in the sidebar. */
+export type GroupKind = 'active' | 'pinned' | 'box' | 'space' | 'folder' | 'day' | 'snoozed';
 
 export interface SessionGroup {
-  /** "active", "pinned", "snoozed", "day:Today", "space:<its id>" or "dir:<the folder>": what a fold is kept by. */
+  /** "active", "pinned", "snoozed", "day:Today", "space:<its id>", "dir:<the folder>" or "box:<its id>": what a fold is kept by. */
   id: string;
   kind: GroupKind;
   /** Its heading: "Active", "Today", the space's name or the folder's. */
@@ -26,6 +34,10 @@ export interface SessionGroup {
   /** A folder group's folder. */
   path?: string;
   space?: SpaceView;
+  /** A 'box' group's folder (one you made). */
+  box?: SessionFolder;
+  /** A space group's folders you made, each a 'box' group, by name (all of the project's, empty ones too). */
+  boxes?: SessionGroup[];
   /** A folder group whose first session was started outside Hydor: where its sessions came from (Claude Code, Codex; the apps). */
   from?: FolderSource[];
 }
@@ -93,7 +105,17 @@ export function workFolder(s: SessionSummary): string | undefined {
   return dir ? trim(dir) : undefined;
 }
 
-const RANK: Record<GroupKind, number> = { active: 0, pinned: 1, space: 2, folder: 2, day: 3, snoozed: 4 };
+const RANK: Record<GroupKind, number> = { active: 0, pinned: 1, box: 2, space: 3, folder: 3, day: 4, snoozed: 5 };
+
+/** The folder you put a session in, by its id. */
+export const sessionFolderId = (s: SessionSummary): string | undefined => (typeof s.extra?.folder === 'string' ? s.extra.folder : undefined);
+
+const byName = (a: SessionGroup, b: SessionGroup) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' });
+
+/** A group's sessions, with those of the folders you made in it. */
+export const groupItems = (g: SessionGroup): SessionSummary[] => (g.boxes?.length ? [...g.items, ...g.boxes.flatMap((b) => b.items)] : g.items);
+/** How many sessions a group holds, its folders' included. */
+export const groupCount = (g: SessionGroup): number => groupItems(g).length;
 
 /** The project a session belongs to, by its id: the one its own record names (the sidebar groups it under that project, if the project exists). */
 export const sessionSpaceId = (s: SessionSummary): string | undefined => (typeof s.extra?.space === 'string' ? s.extra.space : undefined);
@@ -118,12 +140,32 @@ export function groupSessions(
     names?: Record<string, string>;
     /** Where each folder's work began, as the server knows it (bootstrap's folderOrigins); a folder it leaves out goes by the sessions listed. */
     origins?: Record<string, FolderOrigin[]>;
+    /** The folders you made (with `byFolder`): each shows as a group, even empty, and takes the sessions put in it. */
+    folders?: SessionFolder[];
   },
 ): SessionGroup[] {
   const spaces = new Map((o.spaces ?? []).map((sp) => [sp.id, sp]));
   const spaceOf = (s: SessionSummary) => {
     const id = sessionSpaceId(s);
     return id ? spaces.get(id) : undefined;
+  };
+  // The folders that count: one in a project that is not there is ignored altogether.
+  const boxGroups = new Map<string, SessionGroup>();
+  const boxesOfSpace = new Map<string, SessionGroup[]>();
+  if (o.byFolder) {
+    for (const f of o.folders ?? []) {
+      const sp = f.space ? spaces.get(f.space) : undefined;
+      if ((f.space && !sp) || boxGroups.has(f.id)) continue;
+      const g: SessionGroup = { id: `box:${f.id}`, kind: 'box', label: f.name, items: [], keys: [], box: f, ...(sp ? { space: sp } : {}) };
+      boxGroups.set(f.id, g);
+      if (sp) boxesOfSpace.set(sp.id, [...(boxesOfSpace.get(sp.id) ?? []), g]);
+    }
+    for (const l of boxesOfSpace.values()) l.sort(byName);
+  }
+  /** The folder a session is in: one that exists, in the session's own project (or in none, as the folder is). */
+  const boxOf = (s: SessionSummary) => {
+    const g = boxGroups.get(sessionFolderId(s) ?? '');
+    return g && g.box!.space === spaceOf(s)?.id ? g : undefined;
   };
   const folderOf = (s: SessionSummary) => {
     const dir = workFolder(s);
@@ -134,34 +176,51 @@ export function groupSessions(
   const inFolder = new Map<string, SessionSummary[]>();
   if (o.byFolder) {
     for (const s of list) {
-      const dir = spaceOf(s) ? undefined : folderOf(s);
+      const dir = spaceOf(s) || boxOf(s) ? undefined : folderOf(s);
       if (!dir) continue;
       const l = inFolder.get(dir);
       if (l) l.push(s);
       else inFolder.set(dir, [s]);
     }
   }
-  const out = new Map<string, SessionGroup>();
+  const out = new Map<string, SessionGroup>([...boxGroups.values()].filter((g) => !g.box!.space).sort(byName).map((g) => [g.id, g]));
   const put = (s: SessionSummary, id: string, kind: GroupKind, label: string, more?: Pick<SessionGroup, 'path' | 'space'>) => {
     let g = out.get(id);
     if (!g) out.set(id, (g = { id, kind, label, items: [], keys: [], ...more }));
     g.items.push(s);
   };
+  /** A project's group, made with its folders the first time one of its sessions (or, at the end, one of its folders) asks for it. */
+  const spaceGroup = (sp: SpaceView) => {
+    const id = `space:${sp.id}`;
+    let g = out.get(id);
+    if (!g) {
+      out.set(id, (g = { id, kind: 'space', label: sp.name, items: [], keys: [], space: sp }));
+      const boxes = boxesOfSpace.get(sp.id);
+      if (boxes) g.boxes = boxes;
+    }
+    return g;
+  };
   const t = o.now.getTime();
   for (const s of list) {
     const space = o.byFolder ? spaceOf(s) : undefined;
-    const dir = o.byFolder && !space ? folderOf(s) : undefined;
+    const box = o.byFolder ? boxOf(s) : undefined;
+    const dir = o.byFolder && !space && !box ? folderOf(s) : undefined;
     // Snoozed ones wait at the bottom until their time (or until they need you).
     if (s.snoozedUntil && s.snoozedUntil > t) put(s, 'snoozed', 'snoozed', 'Snoozed');
     else if (s.resumeAt != null || hasBackgroundWork(s) || lastActivityAt(s) > t - ACTIVE_MS) put(s, 'active', 'active', 'Active');
     else if (s.pinned) put(s, 'pinned', 'pinned', 'Pinned');
-    else if (space) put(s, `space:${space.id}`, 'space', space.name, { space });
+    else if (box) {
+      if (space) spaceGroup(space);
+      box.items.push(s);
+    } else if (space) spaceGroup(space).items.push(s);
     else if (dir && (inFolder.get(dir)?.length ?? 0) >= FOLDER_MIN) put(s, `dir:${dir}`, 'folder', basename(dir) || dir, { path: dir });
     else {
       const day = dayGroup(s.updatedAt, o.now);
       put(s, `day:${day}`, 'day', day);
     }
   }
+  // A project with folders and no session listed still has its group, for the folders.
+  for (const id of boxesOfSpace.keys()) spaceGroup(spaces.get(id)!);
   const groups = [...out.values()];
   const folders = groups.filter((g) => g.kind === 'folder');
   const labels = folderLabels(folders.map((g) => g.path!), o.names);
@@ -174,10 +233,10 @@ export function groupSessions(
   for (const g of groups) {
     if (g.kind === 'space' && g.space?.found?.length) {
       const known = o.origins?.[g.space.folder];
-      g.from = (known ? fromOrigins(known) : undefined) ?? folderSources(g.items) ?? g.space.found.map((agent) => ({ agent, apps: [], sessions: 0 }));
+      g.from = (known ? fromOrigins(known) : undefined) ?? folderSources(groupItems(g)) ?? g.space.found.map((agent) => ({ agent, apps: [], sessions: 0 }));
     }
   }
   const placed = new Map((o.places ?? []).map((id, i) => [id, i]));
   const at = (g: SessionGroup) => (isPlaceKind(g.kind) ? (placed.get(g.id) ?? -1) : 0);
-  return groups.sort((a, b) => RANK[a.kind] - RANK[b.kind] || at(a) - at(b));
+  return groups.sort((a, b) => RANK[a.kind] - RANK[b.kind] || (a.kind === 'box' ? byName(a, b) : 0) || at(a) - at(b));
 }

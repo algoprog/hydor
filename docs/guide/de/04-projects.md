@@ -303,7 +303,7 @@ Der Tab **Memory** einer Gruppe listet unter dem Chip **Dokumente** außerdem un
 
 ## Projektsitzungen in der Seitenleiste filtern
 
-Jedes Projekt hat in der Seitenleiste eine Gruppe mit Namen, Zeichen und neuesten Sitzungen. Der Stift an der Überschrift startet eine Projektsitzung. Siehe [Die Sitzungsliste](/guide/start#the-session-list).
+Die Seitenleiste gibt jedem Projekt eine eigene Gruppe unter seinem Namen und Zeichen, mit seinen neuesten Sitzungen. Der Stift am Ende der Gruppenüberschrift startet eine neue Sitzung im Projekt. Siehe [Die Sitzungsliste](/guide/start#the-session-list). Ein Projekt kann dort eigene Ordner haben, um seine Sitzungen zu sortieren: sein Menü **⋯** → **Neuer Ordner**. Sie erscheinen unter seiner Überschrift vor seinen anderen Sitzungen. Siehe [Sitzungen in Ordner sortieren](/guide/start#sort-sessions-into-folders). Beim Löschen eines Projekts werden seine Ordner entfernt, seine Sitzungen bleiben.
 
 So zeigst du nur ein Projekt:
 

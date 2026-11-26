@@ -21,6 +21,7 @@ import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
 import { repoRoot } from '../memory/store.ts';
+import { folderNewsOfSpace } from '../sidebar/folders.ts';
 import { spacesActivity } from './activity.ts';
 import { claimSessions } from './found.ts';
 import { hideSuggestion, spaceSuggestions } from './suggest.ts';
@@ -374,6 +375,7 @@ export const spaces: Feature = {
     });
     d.app.delete('/api/projects/:id', async (req) => {
       const skills = deleteSpace(d.db, id(req));
+      folderNewsOfSpace(d, id(req));
       changed();
       // Its knowledge bases are shared now, and its skills in the library.
       d.broadcast({ t: 'feature', id: 'knowledge', data: { changed: true } });

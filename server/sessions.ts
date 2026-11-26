@@ -3589,6 +3589,13 @@ export class SessionManager extends EventEmitter {
     this.queueSummary(key);
   }
 
+  /** Puts the session in one of the sidebar's folders (server/sidebar/folders.ts: the caller has checked it), or with null out of any; does nothing for a session that is not there. */
+  setFolder(key: string, folder: string | null) {
+    if (!this.exists(key)) return;
+    setSessionExtra(this.db, key, { folder });
+    this.queueSummary(key);
+  }
+
   /** What waits on the user in the sessions: each approval, question and form, and sessions waiting elsewhere (VS Code, a terminal). */
   inbox(): InboxItem[] {
     const out: InboxItem[] = [];
