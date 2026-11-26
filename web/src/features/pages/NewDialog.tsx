@@ -47,17 +47,20 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { ContentKind, ContentType } from '@shared/content-types';
+import type { MediaItem } from '@shared/media';
 import type { PageInfo } from '@shared/pages';
 import { newDeck, THEMES, type Ratio } from '@shared/slides';
 import { texFromTemplate, texTemplate, type TexTemplateId } from '@shared/latex-templates';
 import { designSize, type DesignSize } from '@shared/design';
 import { templateById, templatePage, templatesFor } from '@shared/design-templates';
-import { post } from '../../lib/api';
+import { enc, patch, post } from '../../lib/api';
+import { basename } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { Button, cx, Dialog, IconButton, inputCls, Segmented, useIsMobile } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { useAskRun } from '../guide/ask';
+import { useMedia } from '../media/state';
 import { SpaceSelect } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { STARTERS } from './templates';
@@ -231,8 +234,11 @@ function KindChip({ on, icon, label, title, onClick }: { on: boolean; icon: Reac
   );
 }
 
-/** New: a page, slides, a document… made in a project (`space`: the one picked to start with; the dialog offers the others, and none). */
-export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }: { open: boolean; onClose: () => void; kind?: NewKind; space?: string | null }) {
+/**
+ * New: a page, slides, a document… made in a project (`space`: the one picked to start with; the dialog offers the
+ * others, and none; `dir`: a folder inside its folder to start with, where the new thing's file goes).
+ */
+export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, dir }: { open: boolean; onClose: () => void; kind?: NewKind; space?: string | null; dir?: string }) {
   const mobile = useIsMobile();
   const [kind, setKind] = useState<NewKind>(startKind);
   const [pick, setPick] = useState(STARTERS[0].id);
@@ -254,6 +260,8 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
   // Where it goes: the project given, another one, or none; asked only when there are projects.
   const spaces = useSpaces();
   const [where, setWhere] = useState<string | null>(space ?? null);
+  // A folder picked inside its folder (none: the top).
+  const [whereDir, setWhereDir] = useState(dir);
   // A design: its size, the template it starts from (none: blank) and its colours.
   const brand = useBrand();
   const [dSize, setDSize] = useState<DesignSize>(() => designSize('instagram-post')!);
@@ -283,12 +291,13 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
     setAsk('');
     setType(null);
     setWhere(space ?? null);
+    setWhereDir(dir);
     setPSize({ w: 1080, h: 1080 });
     setPCustom(false);
     setPBg('white');
     // The gallery's kinds, so a chip or More kinds answers at once.
     preloadTypes();
-  }, [open, startKind, space]);
+  }, [open, startKind, space, dir]);
   // On a computer the words box takes the keys at once; on a phone the keyboard waits for a tap.
   useEffect(() => {
     if (open && !mobile) requestAnimationFrame(() => askBox.current?.focus());
@@ -315,13 +324,24 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
       const f = fitNewSize(pSize.w, pSize.h);
       const fill = pBg === 'transparent' ? null : pBg === 'white' ? '#ffffff' : pColor.slice(0, 7);
       onClose();
-      openEditor({ kind: 'image', src: blankSrc(f.w, f.h, fill), title: title.trim() || newPictureName(f.w, f.h), from: { label: pageName() }, fresh: { space: where }, save: (r) => void (r.media && toast(spaces?.find((x) => x.id === where) ? tr(`Saved to ${spaces.find((x) => x.id === where)!.name}’s files`) : 'Saved', 'ok')) });
+      const saved = (media: string) => {
+        const name = spaces?.find((x) => x.id === where)?.name;
+        if (!whereDir) return toast(name ? tr(`Saved to ${name}’s files`) : 'Saved', 'ok');
+        // The editor keeps it at the top of the project's folder: its file then moves into the folder picked.
+        patch<{ item: MediaItem }>(`/api/media/${enc(media)}`, { space: where, dir: whereDir })
+          .then((r) => {
+            useMedia.getState().put(r.item);
+            toast(tr(`Saved to ${basename(whereDir)}`), 'ok');
+          })
+          .catch(toastError);
+      };
+      openEditor({ kind: 'image', src: blankSrc(f.w, f.h, fill), title: title.trim() || newPictureName(f.w, f.h), from: { label: pageName() }, fresh: { space: where }, save: (r) => void (r.media && saved(r.media)) });
       return;
     }
     setBusy(true);
     try {
       const t = title.trim() || defaultTitle;
-      const at = { space: where };
+      const at = { space: where, dir: whereDir };
       const dt = dTpl ? (templateById(dTpl) ?? null) : null;
       const r =
         kind === 'design'
@@ -365,10 +385,19 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
   };
   /** A PowerPoint deck, a Word document or a PDF, a spreadsheet or a CSV opened as a page of its kind. */
   const openFile = () =>
-    fromFile(OPENS[kind]?.accept ?? '', async (f) => post('/api/pages/import', { name: f.name, data: await base64Of(f), space: where, ...(kind === 'diagram' ? { kind } : {}) }));
+    fromFile(OPENS[kind]?.accept ?? '', async (f) => post('/api/pages/import', { name: f.name, data: await base64Of(f), space: where, dir: whereDir, ...(kind === 'diagram' ? { kind } : {}) }));
   /** A page made from a file (Markdown, a Notion export, a Word file, a web page): it opens in Edit. */
   const importPage = () =>
-    fromFile('.md,.markdown,.txt,.zip,.docx,.html,.htm,.csv', async (f) => post('/api/pages/import-page', { name: f.name, data: await base64Of(f), space: where }), '?mode=edit');
+    fromFile(
+      '.md,.markdown,.txt,.zip,.docx,.html,.htm,.csv',
+      async (f) => {
+        const r = await post<{ page: PageInfo; notes?: string[] }>('/api/pages/import-page', { name: f.name, data: await base64Of(f), space: where });
+        // Made at the top of the project's folder: its file then moves into the folder picked. Should that fail, the page is there all the same.
+        if (whereDir) await patch(`/api/pages/${enc(r.page.id)}`, { space: where, dir: whereDir }).catch(toastError);
+        return r;
+      },
+      '?mode=edit',
+    );
 
   const switchKind = (k: NewKind) => {
     if (title === defaultTitle || !title.trim()) setTitle(NEW_TITLE[k] || starter.title);
@@ -417,7 +446,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
       const words = ask.trim();
       const end = named && !/[.!?…。！？]$/.test(words) ? '.' : '';
       onClose();
-      return startMaking(run, { prompt: `${tr(ASK_FOR[kind] ?? '')}${words}${end}${named}`, space: sp });
+      return startMaking(run, { prompt: `${tr(ASK_FOR[kind] ?? '')}${words}${end}${named}`, space: sp, dir: whereDir });
     }
     const th = kind === 'slides' ? THEMES.find((x) => x.id === theme) : undefined;
     const r = madeRequest(type, ask, {
@@ -430,7 +459,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
     });
     if (!r) return;
     onClose();
-    startMaking(run, { prompt: r.prompt, make: r.make, space: sp });
+    startMaking(run, { prompt: r.prompt, make: r.make, space: sp, dir: whereDir });
   };
   const primary = () => (aiReady ? describe() : busy ? undefined : make());
   /** A double click on a starting point: it is made at once, whatever the box says. */
@@ -444,7 +473,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
   const otherType = type && !featured.some((f) => f.id === type.id) ? type : null;
   // A kind from More kinds goes first, in place of the last of the others, so the chips keep to a line.
   const shownFeatured = otherType ? featured.slice(0, -1) : featured;
-  const projectPick = !!spaces?.length && <SpaceSelect value={where} onChange={setWhere} className="w-full" />;
+  const projectPick = !!spaces?.length && <SpaceSelect value={where} dir={whereDir} onChange={(id, to) => (setWhere(id), setWhereDir(to))} className="w-full" />;
   const nameBox = (cls: string) => (
     <input value={title} maxLength={120} aria-label="Name" onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && primary()} className={cls} />
   );
@@ -633,7 +662,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
             {/* Files of yours instead, as many as you pick, each made what it is, in the project picked above. */}
             <button
               type="button"
-              onClick={() => pickFiles(where, onClose)}
+              onClick={() => pickFiles(where, onClose, whereDir)}
               title="Add files of yours: documents, spreadsheets, slides, pictures, videos and sounds"
               className="flex h-9 items-center gap-2 rounded-[10px] px-2 text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
             >
@@ -761,7 +790,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
           </div>
 
           <div className="flex shrink-0 items-center gap-2 border-t border-line px-6 pt-3 pb-3 max-md:px-4 max-sm:pb-[max(12px,var(--safe-bottom))]">
-            <IconButton label="Upload files" onClick={() => pickFiles(where, onClose)} className="md:hidden">
+            <IconButton label="Upload files" onClick={() => pickFiles(where, onClose, whereDir)} className="md:hidden">
               <Upload size={17} />
             </IconButton>
             <label

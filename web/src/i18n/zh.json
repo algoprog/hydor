@@ -29755,5 +29755,20 @@
   "† Better than {0} at p < {1} ({2}). ‡ Worse than {3}, by the same test.": "† 在 p < {1} 水平上优于 {0}（{2}）。‡ 按同一检验，差于 {3}。",
   "goalmap::Map": "示意图",
   "goalmap::Start": "起点",
-  "goalmap::working": "进行中"
+  "goalmap::working": "进行中",
+  "It goes from this project. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "它会从这个项目中移除。如果保存它时所用的原文件还在，原文件会保留。它在项目文件夹中的文件会移到废纸篓。",
+  "It goes from what you kept. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "它会从你保留的内容中移除。如果保存它时所用的原文件还在，原文件会保留。它在项目文件夹中的文件会移到废纸篓。",
+  "Its versions, what it keeps and any published copy go with it. Its file in the project’s folder goes to the Trash.": "它的各个版本、它保留的内容和所有已发布的副本都会一并删除。它在项目文件夹中的文件会移到废纸篓。",
+  "Kept a copy in {0}: “{1}”": "已在{0}中保留一份副本：“{1}”",
+  "Kept in {0}": "保留在{0}中",
+  "Pick a folder in it": "选择其中的文件夹",
+  "Saved to {0}; a title and a description are being written for it": "已保存到 {0}；正在为它撰写标题和说明",
+  "Send its new title, its description, the project to move it to (space: an id, or null), the folder to put it in (folder: an id, or null), or the folder of its project for its file (dir)": "发送它的新标题、说明、要移到的项目（space：一个 id，或 null）、要放入的文件夹（folder：一个 id，或 null），或它的文件在所属项目中要放入的文件夹（dir）",
+  "Show the folders in it": "显示其中的文件夹",
+  "Top of {0}": "{0}的顶层",
+  "changed in its file": "在它的文件中有改动",
+  "dir: a folder that is there, the project’s folder or one inside it (its whole path)": "dir：一个已存在的文件夹，即项目文件夹或其中的某个文件夹（完整路径）",
+  "dir: this is in no project, so its file has no folder to go in": "dir：它不在任何项目中，所以它的文件没有可放入的文件夹",
+  "projectFolder: a folder’s path from the project’s folder, such as \"reports/2026\" (not an absolute path, and without \"..\")": "projectFolder：从项目文件夹算起的文件夹路径，例如 \"reports/2026\"（不能是绝对路径，也不能包含 \"..\"）",
+  "projectFolder: that leads out of the project’s folder": "projectFolder：这个路径指向了项目文件夹之外"
 }

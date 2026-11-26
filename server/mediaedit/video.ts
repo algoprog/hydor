@@ -53,7 +53,7 @@ import { deletePath, resolvePath, trashCopy } from '../files.ts';
 import { slug } from '../images/openrouter.ts';
 import { ffmpegInfo, ffmpegTools, frameGrid, NO_FFMPEG, still, waveform } from '../media/frames.ts';
 import { keepFile } from '../media/index.ts';
-import { filesOf, getMedia, initMedia, MEDIA_DIR, mustMedia } from '../media/store.ts';
+import { filesOf, getMedia, initMedia, MEDIA_DIR, mediaChanged, mustMedia } from '../media/store.ts';
 import { keepEarlierVersion } from '../media/versions.ts';
 import { putInFolder } from '../pages/folders.ts';
 import { getAsset, MAX_ASSET, pictureType, putAsset } from '../pages/assets.ts';
@@ -676,6 +676,7 @@ export async function replaceMediaFile(d: Deps, m: MediaItem, from: string, ext:
   d.db
     .prepare('update media set file = ?, mime = ?, bytes = ?, width = ?, height = ?, duration = ?, sha = ?, who = ?, updated_at = ? where id = ?')
     .run(name, mime, st.size, facts?.width ?? null, facts?.height ?? null, facts?.duration ?? null, await fileHash(to), who ?? null, Date.now(), m.id);
+  mediaChanged(m.id);
   const item = getMedia(d.db, m.id)!;
   const f = filesOf(item);
   await fs.promises.rm(f.still, { force: true }).catch(() => {});

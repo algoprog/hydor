@@ -142,8 +142,9 @@ export function PageMenu({ req, onPick, onDone }: { req: PageMenuRequest; onPick
   };
   // The tab it was opened on: whether its page is translated (or being translated) decides the words of Translate.
   const translated = useBrowser((s) => !!s.views[BROWSING_KEY]?.tabs.find((t) => t.id === req.target)?.translation && s.views[BROWSING_KEY]?.tabs.find((t) => t.id === req.target)?.translation?.state !== 'failed');
-  // The project Save uses (SaveButton.tsx) is where the picture goes.
-  const saveTo = useSavePlace().name;
+  // The project (or folder in it) Save uses (SaveButton.tsx) is where the picture goes.
+  const where = useSavePlace();
+  const saveTo = where.folder ?? where.name;
   const items = req.items.map((it) =>
     entry(
       it,

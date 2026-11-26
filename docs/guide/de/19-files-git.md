@@ -186,11 +186,44 @@ Projekte speichern eigene Dateien im Projektordner und können weitere vorhanden
 1. Öffne das Kontextmenü einer Datei oder eines Ordners oder wähle mehrere und dann **Zu einem Projekt hinzufügen**.
 2. Wähle das Projekt oder erstelle mit **Neues Projekt** eines.
 
-Dateien werden in den Projektordner kopiert. Ordner werden nicht kopiert, sondern an ihrem bisherigen Ort eingebunden. Die Meldung nennt das Ergebnis und **Anzeigen** öffnet den Projekttab **Dateien**. Bereits enthaltene Inhalte bleiben unverändert.
+Dateien werden oben in den Projektordner kopiert oder in einen Ordner darin, den du wählst. Ordner werden nicht kopiert, sondern an ihrem bisherigen Ort eingebunden. Die Meldung nennt das Ergebnis und **Anzeigen** öffnet den Projekttab **Dateien**. Bereits enthaltene Inhalte bleiben unverändert.
 
 **Zu einem Projekt hinzufügen** steht auch unter **Mehr** (⋯) einer Datei im Editor, in dem Fenster, in dem sich eine Datei über einer Sitzung öffnet, auf den Karten von Dateien, die ein Agent dir übergeben hat, und auf Bildern, die ein Agent erstellt hat.
 
 Sitzungen, die du danach im Projekt startest, finden die Dateien dort: Jeder Sitzung wird gesagt, was der Ordner des Projekts enthält und mit welchen anderen Ordnern es arbeitet.
+
+**Einen Ordner innerhalb des Projekts wählen.** Ein Klick auf ein Projekt legt den Inhalt oben in dessen Ordner ab. Ein Projekt, dessen Ordner Ordner enthält, zeigt außerdem am Ende seiner Zeile eine Ordner-Schaltfläche (**Einen Ordner darin auswählen**). Sie listet diese Ordner auf: Klicke auf einen, um den Inhalt dort abzulegen, oder auf sein › (**Ordner darin anzeigen**), um hineinzugehen. Die erste Zeile, **Oberste Ebene von** *Projekt* (**Dieser Ordner**, sobald du in einem bist), wählt den Ordner, in dem du bist, und die Zeile darüber geht wieder zurück. Dieselbe Auswahl findest du bei **Behalten** (im Menü **Speichern in**), **Kopie behalten**, **In ein Projekt verschieben** und **In ein anderes Projekt verschieben**, im Menü **Speichern** (▾) des Browsers und beim Projekt im Fenster **Neu**. Wählst du einen Ordner in dem Projekt, in dem ein Inhalt schon ist, wandert seine Datei dorthin. Die Meldung nennt dann den Ordner („notes.pdf zu drafts hinzugefügt“, „Verschoben nach drafts“).
+
+## Auch Behaltenes sind Dateien
+
+Was du oder ein Agent in einem Projekt behält (siehe [Eine Seite behalten](/guide/library#keep-a-page)), hat auch eine eigene Datei im Ordner des Projekts, benannt nach seinem Titel. So erscheint es in **Dateien**, im Finder oder Datei-Explorer und bei Agenten, die in diesem Ordner arbeiten. Hydor schreibt die Datei nach jedem Speichern neu, ob deinem oder dem eines Agenten.
+
+- Ein Dokument ist eine Word-Datei (.docx), eine Tabelle eine Excel-Datei (.xlsx), ein Notebook eine .ipynb-Datei und ein Diagramm eine draw.io-Datei (.drawio).
+- Folien für das Web, die übliche Art, sind eine Webseite (.html); PowerPoint-kompatibel gemachte Folien sind eine PowerPoint-Datei (.pptx).
+- Eine Seite, ein Design oder eine gespeicherte Webseite ist eine .html-Datei.
+- Ein LaTeX-Dokument ist eine .tex-Datei oder, wenn es Bilder oder weitere Dateien hat, ein nach ihm benannter Ordner.
+- Ein Bild, ein Video oder ein Ton ist eine Datei seiner eigenen Art.
+
+Das gilt auch für das, was Agenten in den Sitzungen eines Projekts speichern. Boards haben keine Datei, da ihre Karten live sind, und nichts, was eine als **Vertraulich** markierte Sitzung behalten hat, kommt in den Ordner. Was du in einem Projekt behalten hast, bevor Hydor das tat, bekommt seine Datei kurz nach dem Start von Hydor. Ein Agent kann den Ordner innerhalb des Projekts nennen, in den eine Datei kommt, und einer, der in einem solchen Ordner arbeitet, speichert dort. Agenten wird gesagt, einen behaltenen Inhalt mit den Werkzeugen zu ändern, die ihn speichern, statt seine Datei zu bearbeiten.
+
+**Öffnen.** In **Dateien** und im Tab **Dateien** eines Projekts trägt die Datei ein Abzeichen, das sagt, was sie ist (**Dokument**, **Folien**, **Bild** …). Ein Klick öffnet sie im Editor von Hydor oder auf der eigenen Seite des Bildes, Videos oder Tons, mit ihren Versionen, Kommentaren und dem Teilen. Ihr ⋯-Menü ist das einer Datei (siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)); was zum Inhalt selbst gehört, etwa ihn zu teilen, zu exportieren oder nach **Kein Projekt** zu verschieben, steht auf der Seite, die sich öffnet. Ein LaTeX-Dokument, das ein Ordner ist, trägt das Abzeichen **LaTeX**: Ein Klick öffnet den Ordner, und die main.tex darin öffnet das Dokument im Editor von Hydor.
+
+**Änderungen außerhalb von Hydor.** Wenn du, ein anderes Programm (etwa Word) oder das Skript eines Agenten die Datei ändert, kommt die Änderung als neue Version zurück, die in den Versionen des Inhalts als **in der Datei geändert** erscheint. Ein Bild, ein Video oder ein Ton behält den vorherigen Stand unter **Frühere Versionen**.
+
+- Hast du ihn inzwischen auch in Hydor geändert, bleiben beide als Versionen erhalten, und die von Hydor bleibt die aktuelle.
+- Bevor Hydor eine außerhalb geänderte Datei überschreibt, kommt eine Kopie davon in den Papierkorb.
+- Eine Datei, die Hydor nicht zurücklesen kann (die .html von Folien für das Web oder eine beschädigte Datei), oder die Datei einer gesperrten Seite bleibt daneben als „*Name* (changed outside Hydor)“ erhalten, und eine neue Datei wird geschrieben.
+- Eine außerhalb von Hydor gelöschte Datei wird bei der nächsten Änderung des Inhalts neu geschrieben. Sie außerhalb von Hydor umzubenennen oder zu verschieben, gilt als Löschen: Die verschobene Datei bleibt eine gewöhnliche Datei.
+
+**Umbenennen, verschieben und löschen.** Die Verknüpfung folgt der Datei:
+
+- Benenne die Datei in den **Dateien** von Hydor um oder verschiebe sie dort, und sie bleibt verknüpft. Ändert sich der Titel des Inhalts, benennt Hydor auch die Datei um, es sei denn, du hast sie selbst umbenannt. Eine neue Endung (etwa .docx zu .txt) macht sie zu einer gewöhnlichen Datei, und der Inhalt bekommt bei seiner nächsten Änderung eine neue.
+- Verschiebe die Datei in den Ordner eines anderen Projekts, und der Inhalt wechselt in dieses Projekt. Verschiebe sie aus den Ordnern aller Projekte heraus, und der Inhalt verlässt sein Projekt.
+- Lösche die Datei in **Dateien**, und der Inhalt verlässt sein Projekt. Der Inhalt selbst bleibt, und das Suchfeld findet ihn.
+- Löschst du den Inhalt in Hydor oder verschiebst ihn nach **Kein Projekt**, kommt seine Datei in den Papierkorb. Verschiebst du ihn in ein anderes Projekt, wandert seine Datei in dessen Ordner.
+- Löschst du das Projekt, bleiben die Dateien, wo sie sind, als gewöhnliche Dateien.
+
+**Ein Bild, das du schon hattest.** Behältst du ein Bild, ein Video oder einen Ton aus einer Datei, die schon im Ordner des Projekts liegt, wird diese Datei als seine eigene verwendet, ohne Kopie. Hydor verschiebt sie nie und legt sie nie in den Papierkorb. Was du in Hydor bearbeitest, wird in sie gespeichert, und ihre früheren Versionen bleiben wie bei jedem Bild erhalten.
 
 ## Sitzung mit Dateien starten
 
@@ -751,6 +784,7 @@ Während die Seite offen ist, wird alle zwei Sekunden gemessen und ein Verlauf v
 
 - „Ergänze über jeder Funktion der geöffneten Datei einen Kommentar zu ihrem Zweck.“
 - „Kopiere die PDFs dieser Woche aus ~/Downloads in mein Projekt Taxes 2026.“
+- „Verschiebe den Lesetracker meines Projekts Abschlussarbeit in dessen Ordner notes.“
 - „Fülle ~/Downloads/rental-application.pdf mit meinen Angaben aus und frage nach Fehlendem.“
 - „Fasse meine Markierungen und Notizen aus ~/Papers/sparse-retrieval.pdf nach Seiten zusammen.“
 - „Welche Notizen zur geöffneten Paper widersprechen ihrem Inhalt?“

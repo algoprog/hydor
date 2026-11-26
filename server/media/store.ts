@@ -58,6 +58,15 @@ export function initMedia(db: DB) {
   // Its comments (shared/media-comments.ts, as JSON), and who saved this version of it through their link (a name).
   if (!cols.includes('comments')) db.exec('alter table media add column comments text');
   if (!cols.includes('who')) db.exec('alter table media add column who text');
+  // Its own file in its project's folder, and how it stood when last written or read (spaces/kept-files.ts).
+  if (!cols.includes('project_file')) db.exec('alter table media add column project_file text');
+  if (!cols.includes('project_file_sig')) db.exec('alter table media add column project_file_sig text');
+  if (!cols.includes('project_file_sha')) db.exec('alter table media add column project_file_sha text');
+  if (!cols.includes('project_file_auto')) db.exec('alter table media add column project_file_auto integer');
+  if (!cols.includes('project_file_title')) db.exec('alter table media add column project_file_title text');
+  // That file was there before (adopted): the user's own, never trashed or moved by the app.
+  if (!cols.includes('project_file_adopted')) db.exec('alter table media add column project_file_adopted integer');
+  db.exec('create index if not exists media_project_file on media(project_file)');
   // Earlier versions of it, each file kept in media/versions/<id>/ (versions.ts).
   db.exec(`
     create table if not exists media_versions (
@@ -102,6 +111,8 @@ interface Row {
   lyrics: string | null;
   sha: string | null;
   who: string | null;
+  project_file: string | null;
+  project_file_adopted: number | null;
   /** How many earlier versions are kept (counted by the query). */
   versions?: number;
   created_at: number;
@@ -145,7 +156,27 @@ const toItem = (r: Row): MediaItem => ({
   file: path.join(MEDIA_DIR, r.file),
   ...(r.who ? { who: r.who } : {}),
   ...(r.versions ? { versions: r.versions } : {}),
+  ...(r.project_file ? { projectFile: r.project_file } : {}),
+  ...(r.project_file && r.project_file_adopted ? { projectFileAdopted: true as const } : {}),
 });
+
+/**
+ * What hears that a picture, video or sound was kept, renamed, moved to another project, edited or deleted (`gone`:
+ * the file it had in its project's folder): its file there follows (spaces/kept-files.ts).
+ */
+const listeners: ((id: string, what?: { gone: string | undefined }) => void)[] = [];
+export function onMediaChange(fn: (id: string, what?: { gone: string | undefined }) => void) {
+  listeners.push(fn);
+}
+export function mediaChanged(id: string, what?: { gone: string | undefined }) {
+  for (const fn of listeners) {
+    try {
+      fn(id, what);
+    } catch (e) {
+      console.warn(`[media] after a change to ${id}: ${(e as Error).message}`);
+    }
+  }
+}
 
 /** An item's row, with how many earlier versions it keeps. */
 const SELECT = 'select m.*, (select count(*) from media_versions v where v.media_id = m.id) as versions from media m';
@@ -266,6 +297,7 @@ export async function addMedia(db: DB, n: NewMedia): Promise<MediaItem> {
     sha: n.sha ?? null,
     now,
   });
+  mediaChanged(id);
   return getMedia(db, id)!;
 }
 
@@ -281,7 +313,9 @@ export function setCaption(db: DB, id: string, c: { title?: string; description?
     by: c.by === undefined ? (m.captionBy ?? null) : c.by,
     now: Date.now(),
   });
-  return getMedia(db, id);
+  const item = getMedia(db, id);
+  if (item && item.title !== m.title) mediaChanged(id);
+  return item;
 }
 
 /** The user's own title or description: kept as they wrote it. */
@@ -298,6 +332,7 @@ export function setMediaSpace(db: DB, id: string, space: string | null): MediaIt
   db.prepare('update media set space = ? where id = ?').run(space, id);
   // Out of its folder, unless that folder is in the space too.
   fitFolder(db, 'media', id);
+  mediaChanged(id);
   return getMedia(db, id)!;
 }
 
@@ -305,6 +340,8 @@ export async function deleteMedia(db: DB, id: string) {
   const m = mustMedia(db, id);
   db.prepare('delete from media where id = ?').run(id);
   db.prepare('delete from media_versions where media_id = ?').run(id);
+  // A file that was the user's own before (adopted) stays where it is.
+  mediaChanged(id, { gone: m.projectFileAdopted ? undefined : m.projectFile });
   const f = filesOf(m);
   for (const p of [f.file, f.still, f.frames]) await fs.promises.rm(p, { force: true });
   await fs.promises.rm(versionsDir(id), { recursive: true, force: true });

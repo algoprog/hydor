@@ -81,15 +81,22 @@ const PRINT_CSS = '<style>@media print{:root{--n-bg:#fff}}</style>';
 /** The kit as a page has it in the app, light, with the data it keeps (and nothing to send it to). */
 const pageHead = (db: DB, id: string) => kitHead({ n: '', theme: 'light', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: storageMap(db, id) }) + PRINT_CSS;
 
+/** What marks the app's own part of a page's file in a project's folder, so it can be taken out when the file is read back. */
+export const FILE_HEAD_START = '<!--hydor:file-head-->';
+export const FILE_HEAD_END = '<!--/hydor:file-head-->';
+
 /**
  * A page as a file to open anywhere: with the kit's stylesheet, light or dark as that device is, its code blocks'
  * colours, and its databases with what they hold now (`dbs`: their stored values by key), shown as they are.
+ * `marked`: what is added stands between FILE_HEAD_START and FILE_HEAD_END.
  */
-export const pageFileHtml = (html: string, dbs?: Record<string, string>) =>
-  injectHead(
-    html,
-    `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${hasDbParts(html) ? pageDbScript(null, dbs) : ''}`,
-  );
+export const pageFileHtml = (html: string, dbs?: Record<string, string>, marked = false) => {
+  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>${hasCode(html) ? codeColoursScript() : ''}${hasDbParts(html) ? pageDbScript(null, dbs) : ''}`;
+  return injectHead(html, marked ? `${FILE_HEAD_START}${head}${FILE_HEAD_END}` : head);
+};
+
+/** A page's videos and kept pictures inside it, as its file has them: those small enough to carry. */
+export const insideFile = (db: DB, html: string) => picturesInside(db, videosInside(db, html), { bytes: 12 * 1024 * 1024 });
 
 /** A picture made into PNG by the browser (an SVG, or WebP that PowerPoint may not read), at its own size or `w`×`h`. */
 async function rasterize(data: Buffer, mime: string, w?: number, h?: number): Promise<Picture | null> {
@@ -153,8 +160,8 @@ async function fitScales(db: DB, k: KindDef, text: string, title: string): Promi
 /** What a kind exports as: its own files, a PDF and a web page. */
 export const formatsOf = (k: KindDef): ExportFormat[] => [...new Set([...(Object.keys(k.files) as ExportFormat[]), 'pdf', 'html'] as ExportFormat[])];
 
-/** A page, deck, document or spreadsheet (its current version, or `version`) as a file. */
-export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number; scale?: number; transparent?: boolean }): Promise<{ data: Buffer; type: string; name: string; note?: string }> {
+/** A page, deck, document or spreadsheet (its current version, or `version`) as a file. `markHead`: pageFileHtml's `marked`. */
+export async function exportPage(db: DB, id: string, o: { format: ExportFormat; version?: number; paper?: Paper; slide?: number; scale?: number; transparent?: boolean; markHead?: boolean }): Promise<{ data: Buffer; type: string; name: string; note?: string }> {
   mustPage(db, id);
   const src = pageSource(db, id, Number.isInteger(o.version) && o.version! > 0 ? o.version : undefined);
   if (!src) throw new HttpError(404, 'That version is no longer kept');
@@ -247,7 +254,7 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
   }
 
   // Its videos inside it, those small enough to carry.
-  if (o.format === 'html') return out(pageFileHtml(picturesInside(db, videosInside(db, src.text), { bytes: 12 * 1024 * 1024 }), dbSeed(db, id)), 'html');
+  if (o.format === 'html') return out(pageFileHtml(insideFile(db, src.text), dbSeed(db, id), o.markHead), 'html');
   if (o.format === 'pdf') {
     if (!canCapture()) throw noBrowser();
     const html = injectHead(picturesInside(db, src.text, { bytes: 12 * 1024 * 1024 }), pageHead(db, id));

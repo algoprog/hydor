@@ -186,11 +186,44 @@ Un projet conserve ses fichiers dans son dossier, et peut aussi travailler avec 
 1. Ouvrez le menu d’un fichier ou d’un dossier (ou sélectionnez-en plusieurs), puis cliquez sur **Ajouter à un projet**.
 2. Choisissez le projet, ou **Nouveau projet** pour en créer un d’abord pour eux.
 
-Un fichier est copié dans le dossier du projet. Un dossier n’est pas copié : il rejoint les dossiers avec lesquels le projet travaille, là où il se trouve. Un message indique ce qui a été ajouté, avec **Afficher**, qui ouvre l’onglet **Fichiers** du projet. Ce qui se trouve déjà dans le projet reste tel quel.
+Un fichier est copié à la racine du dossier du projet, ou dans un dossier que vous choisissez à l’intérieur. Un dossier n’est pas copié : il rejoint les dossiers avec lesquels le projet travaille, là où il se trouve. Un message indique ce qui a été ajouté, avec **Afficher**, qui ouvre l’onglet **Fichiers** du projet. Ce qui se trouve déjà dans le projet reste tel quel.
 
 **Ajouter à un projet** figure aussi dans **Plus** (⋯) d’un fichier dans l’éditeur, dans la fenêtre où un fichier s’ouvre au-dessus d’une session, sur les cartes des fichiers qu’un agent vous a remis, et sur les images créées par un agent.
 
 Les sessions que vous démarrez dans le projet y retrouvent ensuite les fichiers : chacune est informée de ce que contient le dossier du projet et des autres dossiers avec lesquels il travaille.
+
+**Choisir un dossier à l’intérieur du projet.** Un clic sur un projet place l’élément à la racine de son dossier. Un projet dont le dossier contient des dossiers affiche aussi un bouton dossier au bout de sa ligne (**Choisir un dossier qu’il contient**). Il liste ces dossiers : cliquez sur l’un d’eux pour y placer l’élément, ou sur son › (**Afficher les dossiers qu’il contient**) pour y entrer. La première ligne, **Racine de** *le projet* (**Ce dossier** une fois entré dans un dossier), choisit le dossier où vous êtes, et la ligne au-dessus remonte. Le même choix se trouve dans **Garder** (son menu **Le garder dans**), **Garder une copie**, **Déplacer vers un projet** et **Déplacer vers un autre projet**, le menu **Enregistrer** (▾) du navigateur et le projet de la fenêtre **Nouveau**. Choisir un dossier du projet où se trouve déjà un élément y déplace son fichier. Le message nomme alors le dossier (« notes.pdf ajouté à drafts », « Déplacé vers drafts »).
+
+## Ce que vous conservez est aussi un fichier
+
+Ce que vous ou un agent conservez dans un projet (voir [Conserver une page](/guide/library#keep-a-page)) a aussi un fichier à lui dans le dossier du projet, nommé d’après son titre. Il apparaît donc dans **Fichiers**, dans le Finder ou l’Explorateur de fichiers, et pour les agents qui travaillent dans ce dossier. Hydor réécrit le fichier après chaque enregistrement, le vôtre ou celui d’un agent.
+
+- Un document est un fichier Word (.docx), une feuille de calcul un fichier Excel (.xlsx), un notebook un fichier .ipynb et un diagramme un fichier draw.io (.drawio).
+- Les diapositives faites pour le web, le type habituel, sont une page web (.html) ; celles rendues compatibles avec PowerPoint sont un fichier PowerPoint (.pptx).
+- Une page, un design ou une page web enregistrée est un fichier .html.
+- Un document LaTeX est un fichier .tex ou, quand il a des images ou d’autres fichiers, un dossier à son nom.
+- Une image, une vidéo ou un son est un fichier de son propre type.
+
+Cela vaut aussi pour ce que les agents enregistrent dans les sessions d’un projet. Les tableaux de bord n’ont pas de fichier, leurs cartes étant en direct, et rien de ce qu’a conservé une session marquée **Confidentielle** ne va dans le dossier. Ce que vous aviez conservé dans un projet avant que Hydor ne fasse cela reçoit son fichier peu après le démarrage de Hydor. Un agent peut nommer le dossier du projet où va un fichier, et un agent qui travaille dans un tel dossier y enregistre. Les agents ont pour consigne de modifier un élément conservé avec les outils qui l’enregistrent plutôt qu’en modifiant son fichier.
+
+**En ouvrir un.** Dans **Fichiers** et dans l’onglet **Fichiers** d’un projet, le fichier porte un badge disant ce que c’est (**Document**, **Diapositives**, **Image**…). Un clic l’ouvre dans l’éditeur de Hydor, ou sur la page propre de l’image, de la vidéo ou du son, avec ses versions, ses commentaires et son partage. Son menu ⋯ est celui d’un fichier (voir [Travailler avec des fichiers et des dossiers](/guide/files-git#work-with-files-and-folders)) ; ce qui appartient à l’élément lui-même, comme le partager, l’exporter ou le déplacer vers **Aucun projet**, se trouve sur la page qui s’ouvre. Un document LaTeX qui est un dossier porte le badge **LaTeX** : un clic ouvre le dossier, et son main.tex y ouvre le document dans l’éditeur de Hydor.
+
+**Modifications faites hors de Hydor.** Quand vous, un autre programme (comme Word) ou le script d’un agent modifiez le fichier, la modification revient comme une nouvelle version, que les versions de l’élément indiquent comme **modifié dans son fichier**. Une image, une vidéo ou un son garde son état précédent parmi ses **Versions précédentes**.
+
+- Si vous l’avez aussi modifié dans Hydor entre-temps, les deux sont conservées comme versions, et celle de Hydor reste la version actuelle.
+- Avant que Hydor n’écrive par-dessus un fichier modifié à l’extérieur, une copie de celui-ci va à la Corbeille.
+- Un fichier que Hydor ne peut pas relire (le .html de diapositives faites pour le web, ou un fichier endommagé), ou le fichier d’une page verrouillée, est conservé à côté sous le nom « *nom* (changed outside Hydor) », et un nouveau fichier est écrit.
+- Un fichier supprimé hors de Hydor est réécrit à la prochaine modification de l’élément. Le renommer ou le déplacer hors de Hydor compte comme une suppression : le fichier déplacé reste un simple fichier.
+
+**Renommer, déplacer et supprimer.** Le lien suit le fichier :
+
+- Renommez ou déplacez le fichier dans les **Fichiers** de Hydor et il reste lié. Quand le titre de l’élément change, Hydor renomme aussi le fichier, sauf si vous l’avez renommé vous-même. Une nouvelle extension (de .docx à .txt, par exemple) en fait un simple fichier, et l’élément en reçoit un nouveau à sa prochaine modification.
+- Déplacez le fichier dans le dossier d’un autre projet et l’élément passe dans ce projet. Sortez-le des dossiers de tous les projets et l’élément quitte son projet.
+- Supprimez le fichier dans **Fichiers** et l’élément quitte son projet. L’élément lui-même reste, et la zone de recherche le trouve.
+- Si vous supprimez l’élément dans Hydor, ou le déplacez vers **Aucun projet**, son fichier va à la Corbeille. Si vous le déplacez vers un autre projet, son fichier passe dans le dossier de ce projet.
+- Si vous supprimez le projet, les fichiers restent où ils sont, comme de simples fichiers.
+
+**Une image que vous aviez déjà.** Quand vous conservez une image, une vidéo ou un son à partir d’un fichier déjà présent dans le dossier du projet, ce fichier sert de fichier à l’élément, sans copie. Hydor ne le déplace jamais et ne le met jamais à la Corbeille. Ce que vous modifiez dans Hydor y est enregistré, et ses versions précédentes sont conservées comme pour toute image.
 
 ## Démarrer une session avec des fichiers
 
@@ -751,6 +784,7 @@ Une mesure est prise toutes les 2 secondes tant que la page est ouverte, et les 
 
 - « Dans le fichier que j’ai ouvert, ajoute un commentaire au-dessus de chaque fonction pour dire ce qu’elle fait. »
 - « Copie les PDF de ~/Downloads de cette semaine dans mon projet Impôts 2026. »
+- « Déplace le suivi de lectures de mon projet Thèse dans son dossier notes. »
 - « Remplis ~/Downloads/rental-application.pdf avec mes informations, et demande-moi tout ce que tu ne sais pas. »
 - « Résume mes surlignages de ~/Papers/sparse-retrieval.pdf, page par page, avec mes notes. »
 - « Parmi mes notes sur l’article que j’ai ouvert, lesquelles contredisent ce que dit l’article ? »

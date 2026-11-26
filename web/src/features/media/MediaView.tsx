@@ -26,6 +26,7 @@ import { NavButton } from '../layout/PageHeader';
 import { openEditor } from '../mediaedit/host';
 import { editLibraryVideo } from '../mediaedit/video/open';
 import { editLibrarySound } from '../mediaedit/audio/open';
+import { folderName } from '../spaces/FolderPick';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { openShare, useSharedThings } from '../spaces/ShareHost';
@@ -120,7 +121,9 @@ function MediaView({ id }: { id: string }) {
   };
   const remove = async () => {
     setMenu(false);
-    if (!(await confirm({ title: `Delete “${m.title}”?`, body: 'It goes from what you kept. The file it was saved from, if it is still there, stays.', confirm: 'Delete', danger: true }))) return;
+    // Each said whole, so it is translated whole: with its file in the project's folder, and without.
+    const body = m.projectFile && !m.projectFileAdopted ? 'It goes from what you kept. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.' : 'It goes from what you kept. The file it was saved from, if it is still there, stays.';
+    if (!(await confirm({ title: `Delete “${m.title}”?`, body, confirm: 'Delete', danger: true }))) return;
     try {
       await del(`/api/media/${enc(m.id)}`);
       go(m.space ? `/projects/${m.space}/files` : '/');
@@ -248,12 +251,13 @@ function MediaView({ id }: { id: string }) {
             onClose={() => setMoving(false)}
             title="Move it to"
             value={m.space ?? null}
-            onPick={(space) => {
-              if (space === (m.space ?? null)) return;
-              patch<{ item: MediaItem }>(`/api/media/${enc(m.id)}`, { space })
+            onPick={(space, dir) => {
+              if (space === (m.space ?? null) && !dir) return;
+              patch<{ item: MediaItem }>(`/api/media/${enc(m.id)}`, { space, dir })
                 .then((r) => {
                   useMedia.getState().put(r.item);
-                  const name = spaces?.find((x) => x.id === space)?.name;
+                  const s = spaces?.find((x) => x.id === space);
+                  const name = folderName(s, dir) ?? s?.name;
                   toast(name ? tr(`Moved to ${name}`) : 'Moved out of its project', 'ok');
                 })
                 .catch(toastError);

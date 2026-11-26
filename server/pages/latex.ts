@@ -1630,14 +1630,19 @@ export async function texPage(db: DB, doc: TexDoc, title: string, mode: 'viewer'
 /** main.tex alone. */
 export const texSource = (doc: TexDoc) => doc.main;
 
-/** The project as a .zip: main.tex, its files and its pictures, as TeX reads them. */
-export function texZip(db: DB, doc: TexDoc): Buffer {
+/** The project's files: main.tex, its others and its pictures, as TeX reads them. */
+export function texParts(db: DB, doc: TexDoc): { name: string; data: string | Buffer }[] {
   const parts: { name: string; data: string | Buffer }[] = [{ name: TEX_MAIN, data: doc.main }, ...doc.files.map((f) => ({ name: f.name, data: f.text }))];
   for (const p of doc.pictures) {
     const b = pictureBytes(db, p);
     if (b) parts.push({ name: p.name, data: b });
   }
-  return zipParts(parts);
+  return parts;
+}
+
+/** The project as a .zip of them. */
+export function texZip(db: DB, doc: TexDoc): Buffer {
+  return zipParts(texParts(db, doc));
 }
 
 /** The typeset PDF: 503 when there is no TeX here, 422 (with its first error) when it does not typeset. */

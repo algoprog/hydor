@@ -14,6 +14,7 @@ import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { Throbber, IconButton, cx, useMediaQuery } from '../../components/ui';
 import { useKeepIn } from '../spaces/SpacePick';
+import { basename } from '../../lib/format';
 import { useSpacesStore } from '../spaces/state';
 import { callDoc, offerBeside, openOver, showBeside } from '../pages/Canvas';
 import { pageFile, pageStore, PageFrame, shownStore, StreamFrame, usePreviewMax, type Pick } from '../pages/frame';
@@ -153,21 +154,21 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
   }, [kept]);
 
   // With spaces, Keep asks which one it goes in (this session's first); with none, it keeps at once.
-  const keepIn = async (space: string | null) => {
+  const keepIn = async (space: string | null, dir?: string) => {
     if (!sessionKey) return;
     setKeeping(true);
     try {
-      const r = await post<{ page: PageInfo }>('/api/pages', { title, html, sessionKey, item: item.id, data: memory.dump(), space });
+      const r = await post<{ page: PageInfo }>('/api/pages', { title, html, sessionKey, item: item.id, data: memory.dump(), space, dir });
       usePagesStore.getState().setKept(sessionKey, item.id, r.page.id);
       const name = space ? useSpacesStore.getState().list?.find((x) => x.id === space)?.name : undefined;
-      toast(name ? tr(`Kept in the files of ${name}`) : 'Kept', 'ok');
+      toast(dir ? tr(`Kept in ${basename(dir)}`) : name ? tr(`Kept in the files of ${name}`) : 'Kept', 'ok');
     } catch (e) {
       toastError(e);
     } finally {
       setKeeping(false);
     }
   };
-  const keepMenu = useKeepIn(sessionKey, (space) => void keepIn(space));
+  const keepMenu = useKeepIn(sessionKey, (space, dir) => void keepIn(space, dir));
 
   if (sessionKey && wide && besideOpen) {
     const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : kept ? `Kept${keptInfo && keptInfo.version > 1 ? ` · version ${keptInfo.version}` : ''}` : `A page · ${kb(html.length)}`;

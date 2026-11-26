@@ -1,6 +1,6 @@
 // What can be done with files and folders, on the Files page and wherever else they show (a file's window
-// over a session, an agent's file cards): add them to a space (a file copied into its folder, a folder joining
-// those it works with), keep a copy of a notebook, a document, a spreadsheet or a LaTeX file (in the editor of its
+// over a session, an agent's file cards): add them to a space (a file copied into its folder or one picked in it, a
+// folder joining those it works with), keep a copy of a notebook, a document, a spreadsheet or a LaTeX file (in the editor of its
 // kind, among its project's files), start a session with them, move or copy them into a folder, duplicate or rename one,
 // download (a folder, or several, as one .zip), copy their paths, and delete them (to the trash, with Undo;
 // something on another disk is deleted for good only once you say so). Moving rows by dragging them is here too.
@@ -9,8 +9,9 @@ import type { Space } from '@shared/spaces';
 import { api, ApiError, patch, post } from '../../lib/api';
 import { basename, dirname, joinPath } from '../../lib/format';
 import { mu } from '../../lib/machine';
-import { go } from '../../lib/nav';
+import { go, projectHref } from '../../lib/nav';
 import { startSessionWith } from '../../lib/startFiles';
+import { folderName } from '../spaces/FolderPick';
 import { toast, toastError, useToasts } from '../../lib/store';
 import { entriesFromDrop, pickedFromInput, startUpload, walkEntries } from '../../lib/upload';
 import { loadSpaces } from '../spaces/state';
@@ -32,12 +33,13 @@ const done = (text: string, action?: { label: string; run: () => void }) => useT
 export const goFolder = (dir: string, select?: string, replace = false) => go(`/files?dir=${encodeURIComponent(dir)}${select ? `&sel=${encodeURIComponent(select)}` : ''}`, replace);
 
 /**
- * Adds them to a space: files are copied into its folder; folders join the folders it works with, where they
- * are (copying a whole project would make two of it). What is in it already stays as it is. Show opens the
- * space's files.
+ * Adds them to a space: files are copied into its folder (`dir`: a folder picked inside it); folders join the folders
+ * it works with, where they are (copying a whole project would make two of it). What is in it already stays as it is.
+ * Show opens the space's files, at the folder picked.
  */
-export async function addToSpace(items: Item[], space: Pick<Space, 'id' | 'name' | 'folder'>) {
-  const show = { label: 'Show', run: () => go(`/projects/${space.id}/files`) };
+export async function addToSpace(items: Item[], space: Pick<Space, 'id' | 'name' | 'folder'>, dir?: string) {
+  const picked = folderName(space, dir);
+  const show = { label: 'Show', run: () => go(projectHref(space.id, 'files', { dir: picked && items.some((i) => !i.dir) ? dir : undefined })) };
   let cur: Space;
   try {
     cur = (await api<{ space: Space }>(`/api/projects/${encodeURIComponent(space.id)}`)).space;
@@ -60,11 +62,13 @@ export async function addToSpace(items: Item[], space: Pick<Space, 'id' | 'name'
     }
   }
   const files = todo.filter((i) => !i.dir);
+  // Where the files go, by name.
+  const where = picked ?? space.name;
   // Big files take a moment to copy.
-  if (files.some((i) => (i.size ?? 0) > 50 * 1024 * 1024)) toast(files.length === 1 ? `Copying ${files[0].name} to ${space.name}…` : `Copying ${files.length} files to ${space.name}…`);
+  if (files.some((i) => (i.size ?? 0) > 50 * 1024 * 1024)) toast(files.length === 1 ? `Copying ${files[0].name} to ${where}…` : `Copying ${files.length} files to ${where}…`);
   for (const i of files) {
     try {
-      await post('/api/fs/copy', { from: i.path, into: cur.folder });
+      await post('/api/fs/copy', { from: i.path, into: dir ?? cur.folder });
       added.push(i);
     } catch (e) {
       toastError(e);
@@ -73,14 +77,16 @@ export async function addToSpace(items: Item[], space: Pick<Space, 'id' | 'name'
   if (!added.length) return;
   // A sentence of its own for one and for several, so each is translated whole.
   const one = added.length === 1 ? added[0].name : null;
+  // Folders joined the project itself, wherever in it the files went.
+  const into = added.some((i) => i.dir) ? space.name : where;
   done(
     added.every((i) => i.dir)
       ? one
         ? `${space.name} works with ${one} now`
         : `${space.name} works with ${added.length} folders now`
       : one
-        ? `Added ${one} to ${space.name}`
-        : `Added ${added.length} items to ${space.name}`,
+        ? `Added ${one} to ${into}`
+        : `Added ${added.length} items to ${into}`,
     show,
   );
 }
@@ -93,11 +99,15 @@ export async function addToSpace(items: Item[], space: Pick<Space, 'id' | 'name'
  */
 export const LIBRARY_FILE = /\.(ipynb|pptx|ppsx|potx|pptm|docx|docm|dotx|md|markdown|txt|xlsx|ods|csv|tsv|tex|ltx)$/i;
 
-/** Keeps a copy of a file, in the editor of its kind, in the project picked (null: none; left out: the session's), and offers to open it. */
-export async function saveToLibrary(item: Item, sessionKey?: string, space?: string | null) {
+/**
+ * Keeps a copy of a file, in the editor of its kind, in the project picked (null: none; left out: the session's; `dir`:
+ * a folder picked in the project's), and offers to open it.
+ */
+export async function saveToLibrary(item: Item, sessionKey?: string, space?: string | null, dir?: string) {
   try {
-    const r = await post<{ page: { id: string; title: string }; notes?: string[] }>('/api/pages/import', { path: item.path, ...(sessionKey ? { sessionKey } : {}), ...(space !== undefined ? { space } : {}) });
-    done(`Kept a copy: “${r.page.title}”`, { label: 'Open', run: () => go(`/pages/${r.page.id}`) });
+    const r = await post<{ page: { id: string; title: string }; notes?: string[] }>('/api/pages/import', { path: item.path, ...(sessionKey ? { sessionKey } : {}), ...(space !== undefined ? { space } : {}), ...(dir ? { dir } : {}) });
+    const folder = dir ? basename(dir) : null;
+    done(folder ? `Kept a copy in ${folder}: “${r.page.title}”` : `Kept a copy: “${r.page.title}”`, { label: 'Open', run: () => go(`/pages/${r.page.id}`) });
     for (const n of r.notes ?? []) toast(n);
   } catch (e) {
     toastError(e);

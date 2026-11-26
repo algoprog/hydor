@@ -7,13 +7,15 @@
 //
 // Routes, signed in:
 //   GET  /api/media                      every item, newest first
-//   POST /api/media                      keeps a file: { path, prompt?, model?, lyrics?, sessionKey?, space? }
-//   GET/PATCH/DELETE /api/media/:id      one item; PATCH { title?, description?, space?, folder? }
+//   POST /api/media                      keeps a file: { path, prompt?, model?, lyrics?, sessionKey?, space?, dir? }
+//   GET/PATCH/DELETE /api/media/:id      one item; PATCH { title?, description?, space?, folder?, dir? }
 //   POST /api/media/:id/caption          writes its title and description again
 //   GET  /api/media/:id/file             the file (?download=1 to save it), in parts for a video player
 //   GET  /api/media/:id/still            a still to show it by; GET /api/media/:id/frames a video's frames
 //   GET/PUT /api/media/settings          the model that writes titles and descriptions (MediaSettings)
 //   GET  /api/media/caption-models?provider=&q=   the models a provider offers for it
+// An item in a project also has its own file in the project's folder (spaces/kept-files.ts): `dir` (a whole path, the
+// project's folder or one inside it) says which folder it goes in; a file kept from inside the project's folder is it.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -29,10 +31,11 @@ import { frameGrid, hasFfmpeg, probe, still, waveform } from './frames.ts';
 import { addMedia, deleteMedia, editMedia, filesOf, initMedia, keptWithBytes, listMedia, mustMedia, savedFrom, setCaption, setMediaSpace } from './store.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 import { fileHash } from '../filemove.ts';
-import { putInFolder } from '../pages/folders.ts';
+import { mustFolder, putInFolder } from '../pages/folders.ts';
 import { isInternal } from '../internal.ts';
 import { changeMediaComments, mediaComments } from './comments.ts';
 import { listMediaVersions, mediaVersionFile, restoreMediaVersion } from './versions.ts';
+import { adoptKeptMedia, checkProjectDir, keptFileNow, placeKeptFile, startKeptFiles } from '../spaces/kept-files.ts';
 
 const TYPES: Record<string, { kind: MediaKind; mime: string }> = {
   png: { kind: 'image', mime: 'image/png' },
@@ -106,10 +109,12 @@ function caption(d: Deps, id: string) {
  * an upload's, a file the desktop app drops), recording `source` (the call's, or the request's `source`: the page a picture
  * came from) as what it came from when that is not its path. The
  * same file kept already (its path and size, or anywhere its bytes) comes back instead, and nothing is copied or moved.
+ * In a project, a file already inside the project's folder becomes the item's file there; `dir` says which folder a
+ * new copy of it goes in otherwise (spaces/kept-files.ts).
  */
 export async function keepFile(
   d: Deps,
-  b: { path?: unknown; prompt?: unknown; model?: unknown; lyrics?: unknown; sessionKey?: unknown; space?: unknown; source?: unknown },
+  b: { path?: unknown; prompt?: unknown; model?: unknown; lyrics?: unknown; sessionKey?: unknown; space?: unknown; source?: unknown; dir?: unknown },
   o: { move?: boolean; source?: string } = {},
 ): Promise<{ item: MediaItem; existed: boolean }> {
   if (typeof b.path !== 'string' || !b.path.trim()) throw new HttpError(400, 'path: the image, video or sound to keep');
@@ -129,6 +134,7 @@ export async function keepFile(
   const str = (v: unknown, n: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : undefined);
   // The space picked, or (not asked) the session's.
   const space = spaceChoice(d.db, b.space, sessionSpace(d.db, str(b.sessionKey, 200)));
+  const dir = checkProjectDir(d.db, space, b.dir);
   const prompt = str(b.prompt, 4000);
   let size: { width?: number; height?: number; duration?: number; peaks?: number[] } = {};
   if (type.kind === 'video') {
@@ -171,15 +177,19 @@ export async function keepFile(
     sessionKey: str(b.sessionKey, 200),
     space,
   });
+  // A file of the project's folder is the item's file there; any other gets a copy, where it was asked.
+  const adopted = !o.move && adoptKeptMedia(d.db, item.id, file, sha);
+  if (!adopted && dir) placeKeptFile('media', item.id, dir);
   // A still to show it by: a tenth of the way into a video; a smaller copy of a large picture (a sound has none).
   const f = filesOf(item);
   if (type.kind === 'video') {
     await still(f.file, f.still, { at: item.duration ? Math.min(item.duration * 0.1, 2) : undefined, width: 720 });
     void frameGrid(f.file, f.frames, { duration: item.duration, width: item.width, height: item.height });
   } else if (type.kind === 'image' && (st.size > 400 * 1024 || (item.width ?? 0) > 1200)) await still(f.file, f.still, { width: 720 });
-  tell(d, { what: 'media', item });
+  const kept = mustMedia(d.db, item.id);
+  tell(d, { what: 'media', item: kept });
   caption(d, item.id);
-  return { item, existed: false };
+  return { item: kept, existed: false };
 }
 
 // ---- files -----------------------------------------------------------------------------------------------------
@@ -210,6 +220,9 @@ async function settingsOf(db: DB, d: Deps): Promise<MediaSettings> {
 
 export const media: Feature = {
   id: 'media',
+  start(d) {
+    startKeptFiles(d);
+  },
   routes(d) {
     const { app, db } = d;
     initMedia(db);
@@ -232,12 +245,22 @@ export const media: Feature = {
       const id = (req.params as { id: string }).id;
       const b = (req.body ?? {}) as Record<string, unknown>;
       // Moved to a space (or out of one), into a folder (or out of one), and/or its own title and description.
+      // The folder of the project its file goes in (`dir`) is checked against the project it will be in, before anything changes.
+      const folder = typeof b.folder === 'string' && b.folder ? b.folder : null;
+      const to = folder ? (mustFolder(db, folder).space ?? null) : b.space !== undefined ? spaceChoice(db, b.space) : (mustMedia(db, id).space ?? null);
+      const dir = checkProjectDir(db, to, b.dir);
       let item = b.space !== undefined ? setMediaSpace(db, id, spaceChoice(db, b.space)) : mustMedia(db, id);
       if (b.folder !== undefined) {
         putInFolder(db, 'media', id, typeof b.folder === 'string' && b.folder ? b.folder : null);
         item = mustMedia(db, id);
       }
       if (b.title !== undefined || b.description !== undefined) item = editMedia(db, id, b);
+      if (dir) placeKeptFile('media', id, dir);
+      // A move is done with before the answer, which then says where the file is (a rename follows in a moment).
+      if (dir || b.space !== undefined || b.folder !== undefined) {
+        await keptFileNow('media', id);
+        item = mustMedia(db, id);
+      }
       tell(d, { what: 'media', item });
       return { item };
     });

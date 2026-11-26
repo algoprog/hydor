@@ -64,6 +64,7 @@ import { moveFileComments } from './pages/filecomments.ts';
 import { keepPicture, markdownDoc } from './pages/index.ts';
 import { PART_FRAME_HTML } from './pages/slides.ts';
 import { movedPdfNotes } from './pdfnotes/index.ts';
+import { annotateKept, keptFilesDeleted, keptFilesMoved } from './spaces/kept-files.ts';
 import * as setup from './setup.ts';
 import { standAll } from './openForms.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
@@ -1302,7 +1303,10 @@ app.post('/api/accounts/:agent/logout', async (req) => {
 
 app.get('/api/fs/list', async (req) => {
   const q = req.query as Record<string, string>;
-  return files.listDir(q.path, { hidden: q.hidden === '1', dirsOnly: q.dirs === '1' });
+  const list = await files.listDir(q.path, { hidden: q.hidden === '1', dirsOnly: q.dirs === '1' });
+  // The files that are kept things' own say so: they open as the things they are (spaces/kept-files.ts).
+  annotateKept(db, list.path, list.entries);
+  return list;
 });
 app.get('/api/fs/read', async (req) => files.readFile((req.query as Record<string, string>).path));
 app.get('/api/fs/stat', async (req) => {
@@ -1345,9 +1349,16 @@ app.post('/api/fs/rename', async (req) => {
   // The comments the app keeps on LaTeX files go with them (and with a folder's files), and the notes on PDFs.
   moveFileComments(db, files.resolvePath((req.body as any)?.from), r.path);
   movedPdfNotes(db, files.resolvePath((req.body as any)?.from), r.path);
+  // Kept things whose files these are follow them, into another project too.
+  keptFilesMoved({ db, broadcast }, files.resolvePath((req.body as any)?.from), r.path);
   return r;
 });
-app.post('/api/fs/delete', async (req) => files.deletePath((req.body as any)?.path, { forGood: (req.body as any)?.forGood === true }));
+app.post('/api/fs/delete', async (req) => {
+  const r = await files.deletePath((req.body as any)?.path, { forGood: (req.body as any)?.forGood === true });
+  // Kept things whose files these were leave their project; they are not deleted.
+  keptFilesDeleted({ db, broadcast }, files.resolvePath((req.body as any)?.path));
+  return r;
+});
 app.post('/api/fs/copy', async (req) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
   return files.copyPath(String(b.from ?? ''), { to: typeof b.to === 'string' ? b.to : undefined, into: typeof b.into === 'string' ? b.into : undefined });

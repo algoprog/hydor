@@ -80,6 +80,15 @@ export function initPages(db: DB) {
   // A web page saved from the user's own browser (server/pages/webpage.ts): the address it came from and its site's name.
   if (!cols.includes('source_url')) db.exec('alter table pages add column source_url text');
   if (!cols.includes('site')) db.exec('alter table pages add column site text');
+  // Its own file in its project's folder, and how it stood when last written or read (spaces/kept-files.ts).
+  if (!cols.includes('project_file')) db.exec('alter table pages add column project_file text');
+  if (!cols.includes('project_file_sig')) db.exec('alter table pages add column project_file_sig text');
+  if (!cols.includes('project_file_version')) db.exec('alter table pages add column project_file_version integer');
+  if (!cols.includes('project_file_auto')) db.exec('alter table pages add column project_file_auto integer');
+  if (!cols.includes('project_file_sha')) db.exec('alter table pages add column project_file_sha text');
+  if (!cols.includes('project_file_title')) db.exec('alter table pages add column project_file_title text');
+  if (!cols.includes('project_file_outside')) db.exec('alter table pages add column project_file_outside integer');
+  db.exec('create index if not exists pages_project_file on pages(project_file)');
   initFolders(db);
   // A page's icon (the emoji the page editor puts at its top), for links to it in other pages: kept as each version is
   // saved, and read once from the pages saved before ('' for none).
@@ -139,6 +148,7 @@ interface Row {
   locked: number | null;
   source_url: string | null;
   site: string | null;
+  project_file: string | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
@@ -173,6 +183,7 @@ const toInfo = (r: Row): PageInfo => ({
   ...(r.description ? { description: r.description } : {}),
   ...(r.locked ? { locked: true } : {}),
   ...(r.source_url ? { source: { url: r.source_url, site: r.site ?? '' } } : {}),
+  ...(r.project_file ? { projectFile: r.project_file } : {}),
 });
 
 /** The kept pages: a template's screens stay with their template. */
@@ -364,14 +375,19 @@ export const FOLD_MS = 5 * 60_000;
  * a version brought back, a copy): a board's cards' refreshes are kept in step with it (board-refresh.ts). A listener
  * that fails does not undo the change.
  */
-const listeners: ((id: string, kind: 'page' | PageKind | null) => void)[] = [];
-export function onPageChange(fn: (id: string, kind: 'page' | PageKind | null) => void) {
+const listeners: ((id: string, kind: 'page' | PageKind | null, what?: PageChange) => void)[] = [];
+/** More about a change: `data`, its databases' rows changed (not the page); `gone`, the file a deleted page had in its project's folder. */
+export interface PageChange {
+  data?: boolean;
+  gone?: string;
+}
+export function onPageChange(fn: (id: string, kind: 'page' | PageKind | null, what?: PageChange) => void) {
   listeners.push(fn);
 }
-function heard(id: string, kind: 'page' | PageKind | null) {
+function heard(id: string, kind: 'page' | PageKind | null, what?: PageChange) {
   for (const fn of listeners) {
     try {
-      fn(id, kind);
+      fn(id, kind, what);
     } catch (e) {
       console.warn(`[pages] after a change to ${id}: ${(e as Error).message}`);
     }
@@ -469,13 +485,15 @@ export function setPageSpace(db: DB, id: string, space: string | null): PageInfo
   if (p.app) throw new HttpError(400, 'An app’s screen stays with its app');
   db.prepare('update pages set space = ? where id = ?').run(space, id);
   fitFolder(db, 'pages', id);
+  heard(id, p.kind ?? 'page');
   return pageInfo(db, id)!;
 }
 
 export function deletePage(db: DB, id: string) {
+  const gone = pageInfo(db, id)?.projectFile;
   db.prepare('delete from pages where id = ?').run(id);
   dropRefs(db, id);
-  heard(id, null);
+  heard(id, null, { gone });
 }
 
 /** Which show_html calls of a session were kept, and as which page. */
@@ -563,6 +581,7 @@ export function storageOp(db: DB, id: string, body: unknown): { value: unknown }
     }
     case 'remove':
       db.prepare('delete from page_storage where page_id = ? and key = ?').run(id, checkKey(b.key));
+      dataChanged(db, id, [String(b.key)]);
       return { value: null };
     case 'set': {
       const key = checkKey(b.key);
@@ -594,6 +613,12 @@ export function putValues(db: DB, id: string, entries: [string, string][]) {
       put.run(id, key, json, bytes, now);
     }
   })();
+  dataChanged(db, id, entries.map(([k]) => k));
+}
+
+/** A database's rows show in the page's file (dbSeed): a change to them is heard. */
+function dataChanged(db: DB, id: string, keys: string[]) {
+  if (keys.some((k) => k.startsWith('n-db:')) && db.prepare('select 1 from pages where id = ? and kind is null').get(id)) heard(id, 'page', { data: true });
 }
 
 /** Every value a page keeps, for its Data view. */
@@ -607,7 +632,9 @@ export function storageEntries(db: DB, id: string): PageDataEntry[] {
 /** Forgets everything a page keeps. */
 export function clearStorage(db: DB, id: string) {
   mustPage(db, id);
+  const keys = rows(db, id).map((r) => r.key);
   db.prepare('delete from page_storage where page_id = ?').run(id);
+  dataChanged(db, id, keys);
 }
 
 /** When a page's data last changed (0: it keeps none). */

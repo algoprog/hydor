@@ -328,7 +328,7 @@ agents that speak ACP and take MCP servers.
     or **Keyboard shortcuts** (the keys the browser answers, by group), still open by `?panel=`. A sheet over the page in a narrow window.
   - **Save** keeps a reader copy of the page in a project's files as a Web page (the article as Mozilla's Readability finds it,
     with its pictures and videos, without the site's menus, ads and comments), whose Bookmarks, Read later, Downloads, History and
-    Highlights panels list this browser's own. A ▾ beside it (Choose a project to save to) picks which project, or No project,
+    Highlights panels list this browser's own. A ▾ beside it (Choose a project to save to) picks which project (or a folder inside one), or No project,
     kept on this device.
   - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
     you go to often and lately first, typed addresses counting most, a bookmark as twenty visits), what you typed as an address or a search (a **search shortcut** such as `yt` before your words, `yt lofi`, searches that
@@ -636,16 +636,20 @@ agents that speak ACP and take MCP servers.
   page, slide or cells of a Word, PowerPoint, Excel or OpenDocument file, how an HTML file or a notebook opens, the first
   lines of text, Markdown, code, CSV and JSON on a paper-like tile, and the kind's icon for anything else; the pictures
   are made on this computer (ffmpeg, poppler, the app's own browser, Quick Look on a Mac) and kept for 30 days. What was kept in the project (pages,
-  designs, slides, documents, spreadsheets, LaTeX documents, notebooks, diagrams, boards, saved web pages, and pictures,
-  videos and sounds, whether an agent made them or you did) shows in the same grid at the top of the project's own
-  folder, after the folders and before its files, the newest first, each with its kind on it, its name and when it changed,
-  and opens in its editor or viewer. Its ⋯ menu has Edit (Present for slides), Rename, Open the original page, Start a session with it
-  (pictures, videos and sounds), Share with people, Move to another project, Duplicate, Turn it into, Download as, Download,
-  Write its title and description again and Delete. The bar has Find in the folder, Upload (and from its ▾ Upload a folder),
+  designs, slides, documents, spreadsheets, LaTeX documents, notebooks, diagrams, saved web pages, and pictures, videos
+  and sounds, whether an agent made them or you did) is each a file of its own in the project's folder, shown there with
+  a badge saying what it is; it opens in its editor or viewer, and its ⋯ menu is a file's. Boards (and anything with no
+  file) show in the same grid at the top of the project's own folder, after the folders and before its files, the newest
+  first, each with its kind on it, its name and when it changed. A kept thing's tile there, and in the Overview's Files
+  card, has Edit (Present for slides), Rename, Open the original page, Start a session with it (pictures, videos and
+  sounds), Share with people, Move to another project, Duplicate, Turn it into, Download as, Download, Write its title
+  and description again and Delete. An open page's ⋯ menu has Turn it into too, and a saved web page's Open the original
+  page. The bar has Find in the folder, Upload (and from its ▾ Upload a folder),
   New and the switch between tiles and a list: New makes a folder, a file or a notebook, and, under them, a Document, Slides,
   Spreadsheet, Page, Design, LaTeX, Diagram, Board or Picture for this project. Files and folders dropped anywhere on the
   tab go into the folder shown as they are, in pieces up to 1 GB with a tray of each file's progress (a Word, Excel or
-  LaTeX file in Files opens in the app's own editors). A thing kept in a session that has no project stays with its
+  LaTeX file in Files opens in the app's own editors). With a folder inside the project's open, what New makes goes
+  into it. A thing kept in a session that has no project stays with its
   conversation, whose card opens it; the search box finds it, and its own page can move it into a project.
 - **Projects found in Claude Code and Codex**: Hydor lists the sessions you had in Claude Code and Codex outside it, and
   the folders you work in with them become projects by themselves: a folder once at least two sessions you started in
@@ -695,9 +699,29 @@ agents that speak ACP and take MCP servers.
   day with Show older, and Highlights by page with Copy, a note and Ask an agent about these), for every project;
   agents are refused them. A picture kept from a page with Save image to a project (in the right-click menu) is a kept
   picture like any other (with the page it came from as its source).
+- **Kept things as files**: everything kept in a project (agents' saves in its sessions too) has its own file in the
+  project's folder, named after its title, so it shows in Files, Finder or File Explorer and to agents working there: a
+  document as .docx, PowerPoint-compatible slides as .pptx and web-format slides as .html, a spreadsheet as .xlsx, a
+  notebook as .ipynb, a diagram as .drawio, a page, design or saved web page as .html, LaTeX as .tex (or a folder named
+  after it when it has pictures or other files: the folder carries the LaTeX badge, and its main.tex opens the document
+  in the LaTeX editor), pictures, videos and sounds as themselves. Boards have none, nor does
+  anything a Confidential session kept; things kept before get theirs shortly after Hydor starts. Hydor writes the file
+  again after each save. A change made to it outside (in Word, another program, an agent's script) comes back as a new
+  version, "changed in its file"; changed on both sides, both are kept and Hydor's stays current; a copy goes to the
+  Trash before Hydor writes over an outside change; a file it cannot read back (a web deck's .html, a damaged one, a
+  locked page's) is kept beside it as "<name> (changed outside Hydor)" and written anew; one deleted outside is written
+  again at the next change. Renaming or moving it in Files keeps the link (a title change renames it, unless you named
+  it yourself); moving it into another project's folder moves the thing, out of every project's takes it out of its
+  project; deleting it in Files takes the thing out of the project (the thing stays); deleting the thing or moving it to
+  No project trashes the file; deleting a project leaves the files. A picture, video or sound kept from a file already
+  in the folder uses that file, which Hydor never moves or trashes. A folder inside the project can be picked wherever a
+  project is picked (the folder button at the end of its row, Pick a folder in it): Add to a project, Keep, Keep a copy,
+  Move to a project, the Browser's Save ▾ and the New dialog. Agents' save tools (not save_board) take projectFolder, and
+  an agent working in a subfolder saves there; the API takes `dir`.
 - **Folders in a project**: a project's Files are real folders: New → New folder makes one, and dragging tiles onto a
-  folder moves them into it. Kept things (pages, documents, pictures…) stay at the top of the project's own folder, and
-  Move to another project in their menu puts one in another project. Agents keep what they make in the session's project.
+  folder moves them into it. A kept thing's file can be in any of them (boards show at the top of the
+  project's own folder), and Move to another project in their menu puts one in another project. Agents keep what they
+  make in the session's project.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
@@ -721,7 +745,7 @@ agents that speak ACP and take MCP servers.
   Agents make Jupyter notebooks too (the notebooks skill: sections with text, a run from the top before handing one
   over, an environment beside it to run it in): kept in the session's project with save_notebook, or handed over as a file
   whose card opens it in the notebook page. A file card can keep a copy of a notebook, a document, a
-  spreadsheet or a LaTeX file in a project's files, the project you pick. Agents fill in PDF forms (every kind of field,
+  spreadsheet or a LaTeX file in a project's files, the project (and folder) you pick. Agents fill in PDF forms (every kind of field,
   drawn so every viewer shows the values, Greek and Chinese too; a form already signed digitally keeps its signature
   valid), write on PDF pages beside the words printed there (text, ticks, pictures, white-out, highlights, comments)
   and rotate, reorder, merge and split their pages, saving a copy unless asked to replace the file. Signatures: draw

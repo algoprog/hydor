@@ -339,8 +339,9 @@ On a Mac, the app puts the command on your PATH by itself.
   Qwen3.5-0.8B beside it, both on your computer (on from the start: about 1.2 GB downloaded the first time you type). Nothing you
   type leaves it ([word suggestions](docs/guide/09-documents-voice.md#word-suggestions-as-you-type)).
 - **Everything you keep is in the files of its project**: a project's details (from the sidebar) have a **Files** tab
-  with tiles that show each file's picture, an **Upload** button, and the pages, documents, slides, spreadsheets,
-  pictures, videos and sounds that agents made for it, next to the files in its folder ([projects](docs/guide/04-projects.md)).
+  with tiles that show each file's picture and an **Upload** button. The pages, documents, slides, spreadsheets,
+  pictures, videos and sounds made for it are real files in its folder (Word, Excel, PowerPoint and the like), kept in
+  step both ways: change one in Word and it comes back as a new version ([projects](docs/guide/04-projects.md)).
 
 **For researchers and engineers**
 

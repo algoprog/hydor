@@ -1,12 +1,14 @@
 // Adding files to a space, wherever files show: the spaces to pick from (in a menu's place, as its submenu),
-// and the ⋯ of a file shown outside the Files page (a file's window over a session, an agent's file card,
-// a picture it made), with Start a session with it, Add to a space and Copy path.
+// each with the folders of its folder to pick one (spaces/FolderPick.tsx), and the ⋯ of a file shown outside the
+// Files page (a file's window over a session, an agent's file card, a picture it made), with Start a session with
+// it, Add to a space and Copy path.
 import { useRef, useState, type ReactNode } from 'react';
 import { Boxes, Copy, CopyPlus, Ellipsis, FolderOpen, MessageSquarePlus, Plus, Search } from 'lucide-react';
 import type { Space } from '@shared/spaces';
 import { cx, IconButton, MenuBack, MenuItem, MenuSep, Popover, Throbber } from '../../components/ui';
 import { dirname } from '../../lib/format';
 import { canReveal, reveal, revealLabel } from '../../lib/reveal';
+import { FolderStep, ProjectRow, useSubfolders } from '../spaces/FolderPick';
 import { NewSpaceDialog, SpaceMark } from '../spaces/parts';
 import { useKeepIn } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
@@ -15,21 +17,31 @@ import { addToSpace, copyPaths, goFolder, itemOf, LIBRARY_FILE, saveToLibrary, s
 /** Up to this many spaces show at once; more, and a field finds the one wanted. */
 const SHOWN = 7;
 
-/** The spaces to add to, in a menu: a field to find one when there are many, then New space. */
-export function SpaceChoices({ onPick, onNew }: { onPick: (s: Space) => void; onNew?: () => void }) {
+/**
+ * The spaces to add to, in a menu: a field to find one when there are many, then New space. `head`: what goes above
+ * them (its title, the way back); a project's folders take the whole menu's place, `head` too.
+ */
+export function SpaceChoices({ onPick, onNew, head }: { onPick: (s: Space, dir?: string) => void; onNew?: () => void; head?: ReactNode }) {
   const spaces = useSpaces();
   const [q, setQ] = useState('');
+  const [into, setInto] = useState<Space | null>(null);
+  const many = (spaces?.length ?? 0) > SHOWN;
+  const t = q.trim().toLowerCase();
+  const list = (t ? (spaces ?? []).filter((s) => s.name.toLowerCase().includes(t)) : (spaces ?? [])).slice(0, SHOWN);
+  const folders = useSubfolders(list.map((s) => s.folder));
   if (!spaces)
     return (
-      <div className="flex justify-center py-3 text-fg-3">
-        <Throbber />
-      </div>
+      <>
+        {head}
+        <div className="flex justify-center py-3 text-fg-3">
+          <Throbber />
+        </div>
+      </>
     );
-  const many = spaces.length > SHOWN;
-  const t = q.trim().toLowerCase();
-  const list = (t ? spaces.filter((s) => s.name.toLowerCase().includes(t)) : spaces).slice(0, SHOWN);
+  if (into) return <FolderStep project={into} onBack={() => setInto(null)} onPick={(dir) => onPick(into, dir)} />;
   return (
     <>
+      {head}
       {many && (
         <div className="relative mb-1">
           <Search size={14} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-3" />
@@ -45,9 +57,11 @@ export function SpaceChoices({ onPick, onNew }: { onPick: (s: Space) => void; on
         </div>
       )}
       {list.map((s) => (
-        <MenuItem key={s.id} icon={<SpaceMark s={s} size={15} />} onClick={() => onPick(s)}>
-          <span translate="no">{s.name}</span>
-        </MenuItem>
+        <ProjectRow key={s.id} folders={folders(s.folder)} onFolders={() => setInto(s)}>
+          <MenuItem icon={<SpaceMark s={s} size={15} />} onClick={() => onPick(s)}>
+            <span translate="no">{s.name}</span>
+          </MenuItem>
+        </ProjectRow>
       ))}
       {!spaces.length && <div className="px-2.5 py-1.5 text-[12.5px] text-fg-3">No projects yet: make one, and its folder holds the files.</div>}
       {t && !list.length && <div className="px-2.5 py-1.5 text-[12.5px] text-fg-3">No project by that name</div>}
@@ -65,7 +79,8 @@ export function SpaceChoices({ onPick, onNew }: { onPick: (s: Space) => void; on
 
 /**
  * A menu's "Add to a space" with its submenu, for `items`: the menu shows `main` until it is picked, then
- * the spaces in its place. Picking one copies them into its folder; New space makes one for them first.
+ * the spaces in its place. Picking one copies them into its folder (or the folder picked in it); New space makes one
+ * for them first.
  */
 export function useSpaceMenu(items: () => Item[], close: () => void) {
   const [open, setOpen] = useState(false);
@@ -76,21 +91,19 @@ export function useSpaceMenu(items: () => Item[], close: () => void) {
     </MenuItem>
   );
   const sub = open && (
-    <>
-      <MenuBack onClick={() => setOpen(false)}>Add to a project</MenuBack>
-      <SpaceChoices
-        onPick={(s) => {
-          setOpen(false);
-          close();
-          void addToSpace(items(), s);
-        }}
-        onNew={() => {
-          setMade(items());
-          setOpen(false);
-          close();
-        }}
-      />
-    </>
+    <SpaceChoices
+      head={<MenuBack onClick={() => setOpen(false)}>Add to a project</MenuBack>}
+      onPick={(s, dir) => {
+        setOpen(false);
+        close();
+        void addToSpace(items(), s, dir);
+      }}
+      onNew={() => {
+        setMade(items());
+        setOpen(false);
+        close();
+      }}
+    />
   );
   const dialog = <NewSpaceDialog open={!!made} onClose={() => setMade(null)} onMade={(s) => made && void addToSpace(made, s)} />;
   return { entry, sub, dialog, reset: () => setOpen(false) };
@@ -128,7 +141,7 @@ export function FileMore({
   const close = () => setOpen(false);
   const space = useSpaceMenu(() => [item], close);
   // Keep a copy asks which project the copy goes in when there are projects (the session's first), as Keep does.
-  const lib = useKeepIn(sessionKey, (to) => void saveToLibrary(item, sessionKey, to));
+  const lib = useKeepIn(sessionKey, (to, dir) => void saveToLibrary(item, sessionKey, to, dir));
   return (
     <>
       <IconButton

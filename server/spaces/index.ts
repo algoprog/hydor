@@ -229,6 +229,15 @@ export function deleteSpace(db: DB, id: string): string[] {
   // Its folder is not suggested again, nor made a project again when it was one found in Claude Code or Codex.
   if (s?.folder) hideSuggestion(db, s.folder);
   releaseSpace(db, id);
+  // The files its things had in its folder stay as they are, plain files (kept-files.ts): forgotten before the things
+  // leave the project, or they would go to the Trash.
+  for (const [table, more] of [
+    ['pages', ''],
+    ['media', ', project_file_adopted = null'],
+  ])
+    try {
+      db.prepare(`update ${table} set project_file = null, project_file_sig = null, project_file_sha = null, project_file_auto = null, project_file_title = null${more} where space = ?`).run(id);
+    } catch {}
   // What was kept in it stays, in no space.
   for (const table of ['pages', 'media', 'library_folders'])
     try {
@@ -377,6 +386,9 @@ export const spaces: Feature = {
       const skills = deleteSpace(d.db, id(req));
       folderNewsOfSpace(d, id(req));
       changed();
+      // What it held is in no project, with no file of its own there any more.
+      d.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
+      d.broadcast({ t: 'feature', id: 'media', data: { what: 'media', reload: true } });
       // Its knowledge bases are shared now, and its skills in the library.
       d.broadcast({ t: 'feature', id: 'knowledge', data: { changed: true } });
       if (skills.length) d.broadcast({ t: 'feature', id: 'skillpack', data: { library: true } });

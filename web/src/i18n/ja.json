@@ -27904,5 +27904,21 @@
   "† Better than {0} at p < {1} ({2}). ‡ Worse than {3}, by the same test.": "† p < {1}で{0}より優れています（{2}）。‡ 同じ検定で{3}より劣っています。",
   "goalmap::Map": "マップ",
   "goalmap::Start": "開始時",
-  "goalmap::working": "作業中"
+  "goalmap::working": "作業中",
+  "It goes from this project. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "このプロジェクトから削除されます。保存元のファイルがまだある場合、そのファイルは残ります。プロジェクトのフォルダ内のファイルはゴミ箱に移動します。",
+  "It goes from what you kept. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "残したものから削除されます。保存元のファイルがまだある場合、そのファイルは残ります。プロジェクトのフォルダ内のファイルはゴミ箱に移動します。",
+  "Its versions, what it keeps and any published copy go with it. Its file in the project’s folder goes to the Trash.": "バージョン、保持している内容、公開したコピーも一緒に削除されます。プロジェクトのフォルダ内のファイルはゴミ箱に移動します。",
+  "Kept a copy in {0}: “{1}”": "{0}にコピーを残しました：「{1}」",
+  "Kept in {0}": "{0}に残しました",
+  "Pick a folder in it": "中のフォルダを選択",
+  "Saved to {0}": "{0}に保存しました",
+  "Saved to {0}; a title and a description are being written for it": "{0}に保存しました。タイトルと説明を作成しています",
+  "Send its new title, its description, the project to move it to (space: an id, or null), the folder to put it in (folder: an id, or null), or the folder of its project for its file (dir)": "新しいタイトル、説明、移動先のプロジェクト（space：idまたはnull）、入れるフォルダ（folder：idまたはnull）、またはファイルを置くプロジェクト内のフォルダ（dir）を送信してください",
+  "Show the folders in it": "中のフォルダを表示",
+  "Top of {0}": "{0}の直下",
+  "changed in its file": "ファイル側で変更されました",
+  "dir: a folder that is there, the project’s folder or one inside it (its whole path)": "dir：実在するフォルダで、プロジェクトのフォルダかその中のフォルダを指定してください（完全なパス）",
+  "dir: this is in no project, so its file has no folder to go in": "dir：これはどのプロジェクトにも属していないため、ファイルを入れるフォルダがありません",
+  "projectFolder: a folder’s path from the project’s folder, such as \"reports/2026\" (not an absolute path, and without \"..\")": "projectFolder：プロジェクトのフォルダからのフォルダパスを指定してください（例：\"reports/2026\"。絶対パスや\"..\"は使えません）",
+  "projectFolder: that leads out of the project’s folder": "projectFolder：プロジェクトのフォルダの外を指しています"
 }

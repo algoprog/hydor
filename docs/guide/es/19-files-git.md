@@ -186,11 +186,44 @@ Un proyecto guarda sus archivos en su carpeta, y puede trabajar con otras carpet
 1. Abre el menú de un archivo o una carpeta (o elige varios) y haz clic en **Añadir a un proyecto**.
 2. Elige el proyecto, o **Nuevo proyecto** para crear uno primero para ellos.
 
-Un archivo se copia en la carpeta del proyecto. Una carpeta no se copia: se suma a las carpetas con las que trabaja el proyecto, donde está. Un mensaje indica lo que se añadió, con **Mostrar**, que abre la pestaña **Archivos** del proyecto. Lo que ya está en el proyecto se queda como está.
+Un archivo se copia en la parte superior de la carpeta del proyecto, o en una carpeta que elijas dentro de ella. Una carpeta no se copia: se suma a las carpetas con las que trabaja el proyecto, donde está. Un mensaje indica lo que se añadió, con **Mostrar**, que abre la pestaña **Archivos** del proyecto. Lo que ya está en el proyecto se queda como está.
 
 **Añadir a un proyecto** también está en el **Más** (⋯) de un archivo en el editor, en la ventana en la que se abre un archivo sobre una sesión, en las tarjetas de archivos que un agente te entregó y en las imágenes que creó un agente.
 
 Las sesiones que empieces en el proyecto encuentran entonces los archivos allí: a cada una se le indica qué contiene la carpeta del proyecto y con qué otras carpetas trabaja.
+
+**Elige una carpeta dentro del proyecto.** Un clic en un proyecto pone la cosa en la parte superior de su carpeta. Un proyecto cuya carpeta tiene carpetas muestra además un botón de carpeta al final de su fila (**Elegir una carpeta dentro**). Ese botón enumera las carpetas: haz clic en una para poner la cosa allí, o en su › (**Mostrar las carpetas que contiene**) para entrar. La primera fila, **Nivel principal de** *el proyecto* (**Esta carpeta** cuando ya estás dentro de una), elige la carpeta en la que estás, y la fila de arriba vuelve atrás. La misma elección está en **Conservar** (su menú **Guardarla en**), **Guardar una copia**, **Mover a un proyecto** y **Mover a otro proyecto**, el menú **Guardar** (▾) del Navegador y el proyecto de la ventana **Nueva**. Elegir una carpeta del proyecto en el que ya está algo mueve allí su archivo. El mensaje nombra entonces la carpeta ("Se agregó notes.pdf a drafts", "Movido a drafts").
+
+## Lo que conservas también son archivos
+
+Lo que tú o un agente conserváis en un proyecto (consulta [Guardar una página](/guide/library#keep-a-page)) tiene además un archivo propio en la carpeta del proyecto, con el nombre de su título. Así aparece en **Archivos**, en Finder o el Explorador de archivos y para los agentes que trabajan en esa carpeta. Hydor vuelve a escribir el archivo después de cada guardado, tuyo o de un agente.
+
+- Un documento es un archivo de Word (.docx), una hoja de cálculo un archivo de Excel (.xlsx), un cuaderno un archivo .ipynb y un diagrama un archivo de draw.io (.drawio).
+- Las diapositivas hechas para la web, el tipo habitual, son una página web (.html); las hechas compatibles con PowerPoint son un archivo de PowerPoint (.pptx).
+- Una página, un diseño o una página web guardada es un archivo .html.
+- Un documento LaTeX es un archivo .tex o, cuando tiene imágenes u otros archivos, una carpeta con su nombre.
+- Una imagen, un video o un sonido es un archivo de su propio tipo.
+
+Esto incluye lo que los agentes guardan en las sesiones de un proyecto. Los tableros no tienen archivo, porque sus tarjetas están vivas, y nada de lo que conservó una sesión marcada como **Confidencial** va a la carpeta. Lo que conservaste en un proyecto antes de que Hydor hiciera esto recibe su archivo poco después de que Hydor arranque. Un agente puede nombrar la carpeta de dentro del proyecto a la que va un archivo, y uno que trabaja en una de esas carpetas guarda allí. A los agentes se les indica que cambien lo conservado con las herramientas que lo guardan, en lugar de editar su archivo.
+
+**Abrir uno.** En **Archivos** y en la pestaña **Archivos** de un proyecto, el archivo lleva una etiqueta que dice qué es (**Documento**, **Diapositivas**, **Imagen**…). Un clic lo abre en el editor de Hydor, o en la página propia de la imagen, el video o el sonido, con sus versiones, comentarios y formas de compartir. Su menú ⋯ es el de un archivo (consulta [Trabajar con archivos y carpetas](/guide/files-git#work-with-files-and-folders)); lo que pertenece a la cosa en sí, como compartirla, exportarla o moverla a **Sin proyecto**, está en la página que se abre. Un documento LaTeX que es una carpeta lleva la etiqueta **LaTeX**: un clic abre la carpeta, y su main.tex abre allí el documento en el editor de Hydor.
+
+**Cambios hechos fuera de Hydor.** Cuando tú, otro programa (como Word) o el script de un agente cambiáis el archivo, el cambio vuelve como una versión nueva, que las versiones de la cosa muestran como **cambiado en su archivo**. Una imagen, un video o un sonido conserva la que era entre sus **Versiones anteriores**.
+
+- Si mientras tanto también la cambiaste en Hydor, se conservan las dos como versiones, y la de Hydor sigue siendo la actual.
+- Antes de que Hydor escriba encima de un archivo cambiado fuera, una copia suya va a la Papelera.
+- Un archivo que Hydor no puede volver a leer (el .html de unas diapositivas hechas para la web, o un archivo dañado), o el archivo de una página bloqueada, se conserva al lado como "*nombre* (changed outside Hydor)", y se escribe un archivo nuevo.
+- Un archivo borrado fuera de Hydor se vuelve a escribir en el siguiente cambio de la cosa. Cambiarle el nombre o moverlo fuera de Hydor cuenta como borrarlo: el archivo que moviste queda como un archivo normal.
+
+**Cambiar nombre, mover y eliminar.** El vínculo sigue al archivo:
+
+- Cambia el nombre del archivo o muévelo en los **Archivos** de Hydor y sigue vinculado. Cuando cambia el título de la cosa, Hydor cambia también el nombre del archivo, salvo que se lo hayas cambiado tú. Una terminación nueva (de .docx a .txt, por ejemplo) lo convierte en un archivo normal, y la cosa recibe otro en su siguiente cambio.
+- Mueve el archivo a la carpeta de otro proyecto y la cosa pasa a ese proyecto. Sácalo de las carpetas de todos los proyectos y la cosa sale de su proyecto.
+- Elimina el archivo en **Archivos** y la cosa sale de su proyecto. La cosa en sí se queda, y el cuadro de búsqueda la encuentra.
+- Si eliminas la cosa en Hydor, o la mueves a **Sin proyecto**, su archivo va a la Papelera. Si la mueves a otro proyecto, su archivo pasa a la carpeta de ese proyecto.
+- Si eliminas el proyecto, los archivos se quedan donde están, como archivos normales.
+
+**Una imagen que ya tenías.** Cuando conservas una imagen, un video o un sonido a partir de un archivo que ya está en la carpeta del proyecto, ese archivo se usa como suyo, sin copia. Hydor nunca lo mueve ni lo manda a la Papelera. Lo que editas en Hydor se guarda en él, y sus versiones anteriores se conservan como las de cualquier imagen.
 
 ## Empezar una sesión con archivos
 
@@ -751,6 +784,7 @@ Toma una lectura cada 2 segundos mientras la página está abierta y conserva lo
 
 - "En el archivo que tengo abierto, añade un comentario sobre cada función que diga qué hace."
 - "Copia los PDF de ~/Downloads de esta semana en mi proyecto Impuestos 2026."
+- "Mueve el seguimiento de lecturas de mi proyecto Tesis a su carpeta notes."
 - "Rellena ~/Downloads/rental-application.pdf con mis datos, y pídeme lo que no sepas."
 - "Resume mis resaltados de ~/Papers/sparse-retrieval.pdf, página por página, con mis notas."
 - "¿Cuáles de mis notas sobre el artículo que tengo abierto contradicen lo que dice el artículo?"

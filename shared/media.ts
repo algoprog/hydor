@@ -148,6 +148,18 @@ export interface MediaItem {
   updatedAt: number;
   /** Where the app keeps its copy: a picture an agent can work from (generate_image's images). */
   file: string;
+  /**
+   * Its own file in its project's folder (an absolute path), while it is in a project: a copy of the kept file, named
+   * after its title, written again when it is edited in the app and taken back in as a new version when it is changed
+   * outside the app (server/spaces/kept-files.ts).
+   */
+  projectFile?: string;
+  /**
+   * projectFile was already there in the project's folder when it was kept (adopted rather than copied): it is the
+   * user's own file, which the app never trashes or moves. Deleting the item, taking it out of its project or deleting
+   * the project leaves the file where it is; moved to another project (or folder), the item gets a copy of its own there.
+   */
+  projectFileAdopted?: true;
   /** Someone it is shared with saved this version of it, through their link: their name. */
   who?: string;
   /** How many earlier versions of it are kept (it was saved over): GET /api/media/:id/versions. */

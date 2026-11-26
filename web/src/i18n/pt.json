@@ -27904,5 +27904,21 @@
   "† Better than {0} at p < {1} ({2}). ‡ Worse than {3}, by the same test.": "† Melhor que {0} com p < {1} ({2}). ‡ Pior que {3}, pelo mesmo teste.",
   "goalmap::Map": "Mapa",
   "goalmap::Start": "Ponto de partida",
-  "goalmap::working": "trabalhando"
+  "goalmap::working": "trabalhando",
+  "It goes from this project. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "Sai deste projeto. O arquivo de onde foi salvo, se ainda estiver lá, permanece. O arquivo dele na pasta do projeto vai para a Lixeira.",
+  "It goes from what you kept. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "Sai do que você guardou. O arquivo de onde foi salvo, se ainda estiver lá, permanece. O arquivo dele na pasta do projeto vai para a Lixeira.",
+  "Its versions, what it keeps and any published copy go with it. Its file in the project’s folder goes to the Trash.": "As versões, o que ela guarda e qualquer cópia publicada vão junto. O arquivo dela na pasta do projeto vai para a Lixeira.",
+  "Kept a copy in {0}: “{1}”": "Uma cópia foi mantida em {0}: “{1}”",
+  "Kept in {0}": "Mantido em {0}",
+  "Pick a folder in it": "Escolher uma pasta dentro dela",
+  "Saved to {0}": "Salvo em {0}",
+  "Saved to {0}; a title and a description are being written for it": "Salvo em {0}; um título e uma descrição estão sendo escritos",
+  "Send its new title, its description, the project to move it to (space: an id, or null), the folder to put it in (folder: an id, or null), or the folder of its project for its file (dir)": "Envie o novo título, a descrição, o projeto para onde mover (space: um id, ou null), a pasta onde colocar (folder: um id, ou null) ou a pasta do projeto para o arquivo (dir)",
+  "Show the folders in it": "Mostrar as pastas dentro dela",
+  "Top of {0}": "Início de {0}",
+  "changed in its file": "alterado no arquivo",
+  "dir: a folder that is there, the project’s folder or one inside it (its whole path)": "dir: uma pasta que existe, a pasta do projeto ou uma dentro dela (o caminho completo)",
+  "dir: this is in no project, so its file has no folder to go in": "dir: isto não está em nenhum projeto, então o arquivo não tem uma pasta para onde ir",
+  "projectFolder: a folder’s path from the project’s folder, such as \"reports/2026\" (not an absolute path, and without \"..\")": "projectFolder: o caminho de uma pasta a partir da pasta do projeto, como \"reports/2026\" (não um caminho absoluto, e sem \"..\")",
+  "projectFolder: that leads out of the project’s folder": "projectFolder: isso leva para fora da pasta do projeto"
 }

@@ -15,7 +15,7 @@ import type { DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { moveWhole } from '../filemove.ts';
 import { frameGrid, still } from './frames.ts';
-import { filesOf, getMedia, initMedia, MEDIA_DIR, mustMedia, versionsDir } from './store.ts';
+import { filesOf, getMedia, initMedia, MEDIA_DIR, mediaChanged, mustMedia, versionsDir } from './store.ts';
 
 interface Row {
   media_id: string;
@@ -154,6 +154,7 @@ export async function restoreMediaVersion(d: Pick<Deps, 'db' | 'broadcast'>, id:
   );
   const item = getMedia(db, id)!;
   await remakeStills(item);
+  mediaChanged(id);
   d.broadcast({ t: 'feature', id: 'media', data: { what: 'media', item: getMedia(db, id)! } });
   return getMedia(db, id)!;
 }

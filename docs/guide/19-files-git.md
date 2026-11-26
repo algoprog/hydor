@@ -186,11 +186,44 @@ A project keeps a project's files in its folder, and can work with other folders
 1. Open the menu of a file or folder (or pick several), and click **Add to a project**.
 2. Pick the project, or **New project** to make one for them first.
 
-A file is copied into the project's folder. A folder isn't copied: it joins the folders the project works with, where it is. A message says what was added, with **Show**, which opens the project's **Files** tab. Something already in the project stays as it is.
+A file is copied to the top of the project's folder, or into a folder you pick inside it. A folder isn't copied: it joins the folders the project works with, where it is. A message says what was added, with **Show**, which opens the project's **Files** tab. Something already in the project stays as it is.
 
 **Add to a project** is also in a file's **More** (⋯) in the editor, in the window a file opens in over a session, on the cards of files an agent handed you, and on pictures an agent made.
 
 Sessions you start in the project then find the files there: each is told what the project's folder holds and which other folders it works with.
+
+**Pick a folder inside the project.** Clicking a project puts the thing at the top of its folder. A project whose folder has folders also shows a folder button at the end of its row (**Pick a folder in it**). It lists those folders: click one to put the thing there, or its › (**Show the folders in it**) to go inside. The first row, **Top of** *the project* (**This folder** once you are inside one), picks the folder you are in, and the row above goes back up. You find the same choice in **Keep** (its **Keep it in** menu), **Keep a copy**, **Move to a project** and **Move to another project**, the Browser's **Save** menu (▾) and the **New** window's project. Picking a folder in the project a thing is already in moves its file there. The message then names the folder ("Added notes.pdf to drafts", "Moved to drafts").
+
+## Kept things are files too
+
+What you or an agent keep in a project (see [Keep a page](/guide/library#keep-a-page)) also has a file of its own in the project's folder, named after its title. So it shows in **Files**, in Finder or File Explorer, and to agents working in that folder. Hydor writes the file again after each save, yours or an agent's.
+
+- A document is a Word file (.docx), a spreadsheet an Excel file (.xlsx), a notebook an .ipynb file and a diagram a draw.io file (.drawio).
+- Slides made for the web, the usual kind, are a web page (.html); slides made PowerPoint compatible are a PowerPoint file (.pptx).
+- A page, a design or a saved web page is an .html file.
+- A LaTeX document is a .tex file, or a folder named after it when it has pictures or other files.
+- A picture, a video or a sound is a file of its own kind.
+
+This covers what agents save in a project's sessions too. Boards have no file, as their cards are live, and nothing a session marked **Confidential** kept goes into the folder. Things you kept in a project before Hydor did this get their files shortly after it starts. An agent can name the folder inside the project that a file goes in, and one working in such a folder saves there. Agents are told to change a kept thing with the tools that save it rather than by editing its file.
+
+**Open one.** In **Files** and in a project's **Files** tab, the file has a badge saying what it is (**Document**, **Slides**, **Picture**…). A click opens it in Hydor's editor, or the picture's, video's or sound's own page, with its versions, comments and sharing. Its ⋯ menu is a file's menu (see [Work with files and folders](/guide/files-git#work-with-files-and-folders)); what belongs to the thing itself, such as sharing it, exporting it or moving it to **No project**, is on the page that opens. A LaTeX document that is a folder has the **LaTeX** badge: a click opens the folder, and its main.tex there opens the document in Hydor's editor.
+
+**Changes made outside Hydor.** When you, another program (such as Word) or an agent's script change the file, the change comes back in as a new version, which the thing's versions show as **changed in its file**. A picture, a video or a sound keeps the one it was among its **Earlier versions**.
+
+- If you changed it in Hydor too meanwhile, both are kept as versions, and Hydor's stays the current one.
+- Before Hydor writes over a file that was changed outside, a copy of it goes to the Trash.
+- A file Hydor can't read back (the .html of slides made for the web, or a damaged file), or a locked page's file, is kept beside it as "*name* (changed outside Hydor)", and a fresh file is written.
+- A file deleted outside Hydor is written again at the thing's next change. Renaming or moving it outside Hydor counts as deleting it: the file you moved stays as a plain file.
+
+**Rename, move and delete.** The link follows the file:
+
+- Rename or move the file in Hydor's **Files** and it stays linked. When the thing's title changes, Hydor renames the file too, unless you renamed it yourself. A new ending (.docx to .txt, say) makes it a plain file, and the thing gets a new one at its next change.
+- Move the file into another project's folder and the thing moves to that project. Move it out of every project's folder and the thing leaves its project.
+- Delete the file in **Files** and the thing leaves its project. The thing itself stays, and the search box finds it.
+- Delete the thing in Hydor, or move it to **No project**, and its file goes to the Trash. Move it to another project and its file moves into that project's folder.
+- Delete the project and the files stay where they are, as plain files.
+
+**A picture you already had.** When you keep a picture, a video or a sound from a file that is already in the project's folder, that file is used as its own, with no copy. Hydor never moves it or puts it in the Trash. What you edit in Hydor is saved into it, and its earlier versions are kept as for any picture.
 
 ## Start a session with files
 
@@ -751,6 +784,7 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 
 - "In the file I have open, add a comment over each function saying what it does."
 - "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 project."
+- "Move my Thesis project's reading tracker into its notes folder."
 - "Fill in ~/Downloads/rental-application.pdf with my details, and ask me for anything you don't know."
 - "Sum up my highlights of ~/Papers/sparse-retrieval.pdf, page by page, with my notes."
 - "Which of my notes on the paper I have open disagree with what the paper says?"

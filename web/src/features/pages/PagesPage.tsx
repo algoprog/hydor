@@ -44,6 +44,8 @@ import { LOCALE } from '../../i18n/locale';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { LibraryRedirect } from './LibraryRedirect';
 import { PublishDialog, RenameDialog } from './parts';
+import { openOriginal, TurnMenu } from './kept';
+import { folderName } from '../spaces/FolderPick';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { pageStore, previewStore, type AppBridge } from './frame';
@@ -245,7 +247,7 @@ interface Loaded {
   link: string;
 }
 
-const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'kept by you', restore: 'brought back', edit: 'changed by you', made: 'made by you' };
+const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'kept by you', restore: 'brought back', edit: 'changed by you', made: 'made by you', file: 'changed in its file' };
 
 /**
  * Where a request to an agent is for: what the open editor offers (this slide, the section the caret is in, the
@@ -273,7 +275,7 @@ function PageView({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   // An older version on view.
   const [old, setOld] = useState<{ version: number; title: string; html?: string; model?: unknown } | null>(null);
-  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | 'space' | 'links' | null>(null);
+  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | 'space' | 'links' | 'turn' | null>(null);
   const spaces = useSpaces();
   // Back goes to the Files of the project it is in; with none, to the start page.
   const backName = data?.page.space ? spaces?.find((x) => x.id === data.page.space)?.name : undefined;
@@ -386,7 +388,9 @@ function PageView({ id }: { id: string }) {
   };
   const remove = async () => {
     setMenu(null);
-    if (!data || !(await confirm({ title: `Delete “${data.page.title}”?`, body: 'Its versions, what it keeps and any published copy go with it.', confirm: 'Delete', danger: true }))) return;
+    // Each said whole, so it is translated whole: with its file in the project's folder, and without.
+    const body = data?.page.projectFile ? 'Its versions, what it keeps and any published copy go with it. Its file in the project’s folder goes to the Trash.' : 'Its versions, what it keeps and any published copy go with it.';
+    if (!data || !(await confirm({ title: `Delete “${data.page.title}”?`, body, confirm: 'Delete', danger: true }))) return;
     try {
       await del(`/api/pages/${enc(id)}`);
       closePageAsk();
@@ -702,9 +706,17 @@ function PageView({ id }: { id: string }) {
             <MenuItem icon={<Copy size={14} />} onClick={duplicate}>
               Duplicate
             </MenuItem>
+            <MenuItem icon={<Sparkles size={14} />} submenu onClick={() => setMenu('turn')}>
+              Turn it into
+            </MenuItem>
             {!!spaces?.length && !data.page.app && (
               <MenuItem icon={<FolderInput size={14} />} hint={<span translate="no">{spaces.find((x) => x.id === data.page.space)?.name ?? ''}</span>} onClick={() => setMenu('space')}>
                 Move to a project
+              </MenuItem>
+            )}
+            {data.page.source && (
+              <MenuItem icon={<ExternalLink size={14} />} onClick={() => (setMenu(null), openOriginal(data.page.source!.url))}>
+                Open the original page
               </MenuItem>
             )}
             <MenuItem
@@ -727,17 +739,19 @@ function PageView({ id }: { id: string }) {
             )}
           </Popover>
           {!kind && <BacklinksPopover pageId={id} anchor={moreRef} open={menu === 'links'} onClose={() => setMenu(null)} />}
+          {menu === 'turn' && <TurnMenu p={data.page} anchor={moreRef} onClose={() => setMenu(null)} onBack={() => setMenu('more')} />}
           <SpaceMenu
             anchor={moreRef}
             open={menu === 'space'}
             onClose={() => setMenu(null)}
             title="Move it to"
             value={data.page.space ?? null}
-            onPick={(space) => {
-              if (space === (data.page.space ?? null)) return;
-              patch(`/api/pages/${enc(id)}`, { space })
+            onPick={(space, dir) => {
+              if (space === (data.page.space ?? null) && !dir) return;
+              patch(`/api/pages/${enc(id)}`, { space, dir })
                 .then(() => {
-                  const name = spaces?.find((x) => x.id === space)?.name;
+                  const s = spaces?.find((x) => x.id === space);
+                  const name = folderName(s, dir) ?? s?.name;
                   toast(name ? tr(`Moved to ${name}`) : 'Moved out of its project', 'ok');
                 })
                 .catch(toastError);

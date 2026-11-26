@@ -21,7 +21,7 @@ import { agentPicture, inPlace, saveForAgent, savedLines } from '../images/cutou
 import { dimensions } from '../images/openrouter.ts';
 import { still } from '../media/frames.ts';
 import { keepFile } from '../media/index.ts';
-import { filesOf, getMedia, MEDIA_DIR, mustMedia } from '../media/store.ts';
+import { filesOf, getMedia, MEDIA_DIR, mediaChanged, mustMedia } from '../media/store.ts';
 import { keepEarlierVersion } from '../media/versions.ts';
 import { mustFolder, putInFolder } from '../pages/folders.ts';
 import { MAX_ASSET, putAsset } from '../pages/assets.ts';
@@ -87,6 +87,7 @@ export async function replaceInLibrary(d: Deps, id: string, data: Buffer, fmt: I
   await fs.promises.rm(f.still, { force: true });
   if (data.length > 400 * 1024 || (dim?.w ?? 0) > 1200) await still(dest, f.still, { width: 720 });
   const item = getMedia(d.db, id)!;
+  mediaChanged(id);
   d.broadcast({ t: 'feature', id: 'media', data: { what: 'media', item } });
   return item;
 }

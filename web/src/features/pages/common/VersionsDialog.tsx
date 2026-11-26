@@ -6,7 +6,7 @@ import { api } from '../../../lib/api';
 import { ago } from '../../../lib/format';
 import { Dialog, Throbber } from '../../../components/ui';
 
-const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'kept by you', restore: 'brought back', edit: 'changed by you', made: 'made by you' };
+const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'kept by you', restore: 'brought back', edit: 'changed by you', made: 'made by you', file: 'changed in its file' };
 
 export function VersionsDialog({
   open,

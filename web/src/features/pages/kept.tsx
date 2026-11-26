@@ -3,7 +3,8 @@
 // project, and the pictures, videos and sounds kept in it, are things of the app and not files in its folder: each shows
 // as a tile like a file's (its picture, its kind, its name, when it changed, ⋯) or as a row of the list, opens in its
 // own editor or viewer, and has its own menu (edit, rename, share, move to another project, duplicate, turn it into
-// another kind, download or export, delete). `useKept` lists them for a project, the newest first.
+// another kind, download or export, delete). `useKept` lists them for a project, the newest first. Most also have a
+// file of their own in the project's folder (`keptFile`), which the Files tab shows instead.
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   AppWindow,
@@ -37,6 +38,7 @@ import {
 import { TURN_INTO, type TurnTo } from '@shared/content-asks';
 import type { MediaItem } from '@shared/media';
 import type { PageInfo } from '@shared/pages';
+import type { SpaceView } from '@shared/spaces';
 import { del, enc, patch, post } from '../../lib/api';
 import { ago, bytes } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -48,6 +50,7 @@ import { ownBrowserHere } from '../browser/browsing';
 import { useAskRun } from '../guide/ask';
 import { downloadMedia, recaption, SoundTile, startSessionWithMedia, Still } from '../media/parts';
 import { useMedia } from '../media/state';
+import { folderName, FolderStep, ProjectRow, useSubfolders } from '../spaces/FolderPick';
 import { openShare, useSharedThings } from '../spaces/ShareHost';
 import { SpaceMark } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
@@ -76,7 +79,7 @@ export interface Kept {
   media?: MediaItem;
 }
 
-const KIND: Record<KeptKind, { label: string; icon: ReactNode }> = {
+export const KIND: Record<KeptKind, { label: string; icon: ReactNode }> = {
   page: { label: 'Page', icon: <AppWindow size={12} /> },
   slides: { label: 'Slides', icon: <Presentation size={12} /> },
   doc: { label: 'Document', icon: <FileText size={12} /> },
@@ -93,6 +96,9 @@ const KIND: Record<KeptKind, { label: string; icon: ReactNode }> = {
 
 const fromPage = (p: PageInfo): Kept => ({ key: `p:${p.id}`, kind: p.source ? 'web' : (p.kind ?? 'page'), title: p.title, space: p.space, at: p.updatedAt, made: p.createdAt, page: p });
 const fromMedia = (m: MediaItem): Kept => ({ key: `m:${m.id}`, kind: m.kind, title: m.title, space: m.space, at: m.updatedAt, made: m.createdAt, media: m });
+
+/** Its own file in its project's folder, when it has one. */
+export const keptFile = (it: Kept): string | undefined => it.page?.projectFile ?? it.media?.projectFile;
 
 /** What a project keeps (pages, and pictures, videos and sounds), the last changed first; null until it is known. */
 export function useKept(space: string): Kept[] | null {
@@ -127,7 +133,7 @@ const TURN: Record<TurnTo, { label: string; icon: ReactNode }> = {
  * from it, its message "Turn “Bakery plan” into slides", its agent told the rest; in its project, what is made landing
  * there. Mounted while open, so the tiles do not each ask which agent would run it.
  */
-function TurnMenu({ p, anchor, onClose, onBack }: { p: PageInfo; anchor: RefObject<HTMLButtonElement | null>; onClose: () => void; onBack: () => void }) {
+export function TurnMenu({ p, anchor, onClose, onBack }: { p: PageInfo; anchor: RefObject<HTMLButtonElement | null>; onClose: () => void; onBack: () => void }) {
   const run = useAskRun();
   const spaces = useSpaces();
   const turn = (to: TurnTo) => {
@@ -147,18 +153,42 @@ function TurnMenu({ p, anchor, onClose, onBack }: { p: PageInfo; anchor: RefObje
   );
 }
 
-/** Moves a kept thing to another project, saying where it went. */
-async function moveTo(it: Kept, space: string, name?: string) {
+/** The page a web page was saved from, in your own browser (the desktop app) or a new tab. */
+export const openOriginal = (url: string) => (ownBrowserHere() ? openInBrowser(url) : void window.open(url, '_blank', 'noopener'));
+
+/** Moves a kept thing to another project (`dir`: a folder picked in its folder), saying where it went. */
+async function moveTo(it: Kept, space: string, name?: string, dir?: string) {
   try {
-    if (it.page) await patch(`/api/pages/${enc(it.page.id)}`, { space });
+    if (it.page) await patch(`/api/pages/${enc(it.page.id)}`, { space, dir });
     else if (it.media) {
-      const r = await patch<{ item: MediaItem }>(`/api/media/${enc(it.media.id)}`, { space });
+      const r = await patch<{ item: MediaItem }>(`/api/media/${enc(it.media.id)}`, { space, dir });
       useMedia.getState().put(r.item);
     }
     toast(name ? tr(`Moved to ${name}`) : 'Moved', 'ok');
   } catch (e) {
     toastError(e);
   }
+}
+
+/** The projects a kept thing can move to, each with its folders. */
+function MoveChoices({ to, onPick }: { to: SpaceView[]; onPick: (s: SpaceView, dir?: string) => void }) {
+  const [into, setInto] = useState<SpaceView | null>(null);
+  const folders = useSubfolders(to.map((s) => s.folder));
+  if (into) return <FolderStep project={into} onBack={() => setInto(null)} onPick={(dir) => onPick(into, dir)} />;
+  return (
+    <>
+      <MenuLabel>Move it to</MenuLabel>
+      <div className={cx(to.length > 8 && 'max-h-[260px] overflow-y-auto')}>
+        {to.map((s) => (
+          <ProjectRow key={s.id} folders={folders(s.folder)} onFolders={() => setInto(s)}>
+            <MenuItem icon={<SpaceMark s={s} size={16} />} onClick={() => onPick(s)}>
+              <span translate="no">{s.name}</span>
+            </MenuItem>
+          </ProjectRow>
+        ))}
+      </div>
+    </>
+  );
 }
 
 // ---- one kept thing -------------------------------------------------------------------------------------
@@ -180,9 +210,17 @@ function useKeptThing(it: Kept) {
   const close = () => setMenu(false);
   const remove = async () => {
     close();
+    // Each said whole, so it is translated whole: with its file in the project's folder, and without.
+    const filed = !!keptFile(it) && !it.media?.projectFileAdopted;
     const ok = await confirm({
       title: tr(`Delete “${it.title}”?`),
-      body: p ? 'Its versions, what it keeps and any published copy go with it.' : 'It goes from this project. The file it was saved from, if it is still there, stays.',
+      body: p
+        ? filed
+          ? 'Its versions, what it keeps and any published copy go with it. Its file in the project’s folder goes to the Trash.'
+          : 'Its versions, what it keeps and any published copy go with it.'
+        : filed
+          ? 'It goes from this project. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.'
+          : 'It goes from this project. The file it was saved from, if it is still there, stays.',
       confirm: 'Delete',
       danger: true,
     });
@@ -207,8 +245,6 @@ function useKeptThing(it: Kept) {
       toastError(e);
     }
   };
-  // The page it was saved from, in your own browser (the desktop app) or a new tab.
-  const openOriginal = () => (ownBrowserHere() ? openInBrowser(web!.url) : void window.open(web!.url, '_blank', 'noopener'));
   const others = (spaces ?? []).filter((s) => s.id !== it.space);
 
   const menus = (
@@ -230,7 +266,7 @@ function useKeptThing(it: Kept) {
               Rename
             </MenuItem>
             {web && (
-              <MenuItem icon={<ExternalLink size={14} />} onClick={() => (close(), openOriginal())}>
+              <MenuItem icon={<ExternalLink size={14} />} onClick={() => (close(), openOriginal(web.url))}>
                 Open the original page
               </MenuItem>
             )}
@@ -290,14 +326,7 @@ function useKeptThing(it: Kept) {
       </Popover>
       {p && turning && <TurnMenu p={p} anchor={anchor} onClose={() => setTurning(false)} onBack={() => (setTurning(false), setMenu(true))} />}
       <Popover anchor={anchor} open={moving} onClose={() => setMoving(false)} align="end" width={250}>
-        <MenuLabel>Move it to</MenuLabel>
-        <div className={cx(others.length > 8 && 'max-h-[260px] overflow-y-auto')}>
-          {others.map((s) => (
-            <MenuItem key={s.id} icon={<SpaceMark s={s} size={16} />} onClick={() => (setMoving(false), void moveTo(it, s.id, s.name))}>
-              <span translate="no">{s.name}</span>
-            </MenuItem>
-          ))}
-        </div>
+        <MoveChoices to={others} onPick={(s, dir) => (setMoving(false), void moveTo(it, s.id, folderName(s, dir) ?? s.name, dir))} />
       </Popover>
       {p && <RenameDialog page={p} open={rename} onClose={() => setRename(false)} />}
       {confirmNode}

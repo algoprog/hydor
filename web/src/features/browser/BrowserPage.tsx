@@ -48,10 +48,10 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { tr } from '../../i18n/runtime';
-import { enc, post } from '../../lib/api';
+import { enc, patch, post } from '../../lib/api';
 import { LOCALE } from '../../i18n/locale';
 import { machineId } from '../../lib/machine';
-import { MOD } from '../../lib/format';
+import { basename, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { canReveal, revealLabel } from '../../lib/reveal';
 import { toastError, useApp, useToasts, useUI } from '../../lib/store';
@@ -66,7 +66,7 @@ import { askAboutTab, BrowserAskPanel, canDoOn, doOnTab, pickForAsk, useAskMode 
 import { toggleBookmark } from './BookmarkBar';
 import { BookmarksPanel } from './Bookmarks';
 import { keepPicture } from './pictures';
-import { SaveButton, useSavePlace } from './SaveButton';
+import { folderStill, SaveButton, useSavePlace } from './SaveButton';
 import {
   activeTab,
   addBookmark,
@@ -516,9 +516,20 @@ function OwnBrowser() {
     setSaving(true);
     try {
       const { place, name } = where;
+      const dir = await folderStill(where);
       const r = await post<{ id?: string; page?: { id: string } }>(`/api/browser/browsing/tabs/${enc(tab.id)}/save-page`, { space: place.space });
       const id = r.page?.id ?? r.id;
-      useToasts.getState().push('ok', name ? tr(`Saved to ${name}’s files`) : tr('Saved. Pick a project beside Save to keep copies in its files.'), id ? { label: 'Open', run: () => go(`/pages/${id}`) } : undefined);
+      // The page is saved at the top of the project's folder: its file then moves into the folder picked. Should that fail, it is saved all the same.
+      let into: string | null = null;
+      if (dir && id) {
+        try {
+          await patch(`/api/pages/${enc(id)}`, { space: place.space, dir });
+          into = basename(dir);
+        } catch (e) {
+          toastError(e);
+        }
+      }
+      useToasts.getState().push('ok', into ? tr(`Saved to ${into}`) : name ? tr(`Saved to ${name}’s files`) : tr('Saved. Pick a project beside Save to keep copies in its files.'), id ? { label: 'Open', run: () => go(`/pages/${id}`) } : undefined);
     } catch (e) {
       toastError(e);
     } finally {

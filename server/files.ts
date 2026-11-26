@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import type { KeptFileRef } from '../shared/pages.ts';
 import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
 import { HttpError } from './auth.ts';
@@ -24,6 +25,8 @@ export interface FsEntry {
   git?: string;
   /** Symlink points at a directory. */
   dirLink?: boolean;
+  /** The file is a kept thing's own file in its project's folder: it opens in the app's editor or viewer. */
+  kept?: KeptFileRef;
 }
 
 export function resolvePath(p: string | undefined): string {

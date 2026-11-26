@@ -50,7 +50,7 @@ import { byteRange, deletePath, resolvePath, trashCopy } from '../files.ts';
 import { slug } from '../images/openrouter.ts';
 import { ffmpegTools, waveform } from '../media/frames.ts';
 import { keepFile } from '../media/index.ts';
-import { getMedia, initMedia, MEDIA_DIR, mustMedia } from '../media/store.ts';
+import { getMedia, initMedia, MEDIA_DIR, mediaChanged, mustMedia } from '../media/store.ts';
 import { keepEarlierVersion } from '../media/versions.ts';
 import { putInFolder } from '../pages/folders.ts';
 import { getVideo, sendVideo } from '../pages/videos.ts';
@@ -583,6 +583,7 @@ export async function replaceLibrarySound(d: Deps, m: MediaItem, from: string, e
   d.db
     .prepare('update media set file = ?, mime = ?, bytes = ?, duration = ?, peaks = ?, sha = ?, who = ?, updated_at = ? where id = ?')
     .run(name, SOUND_MIME[ext] ?? 'audio/mpeg', st.size, f?.duration ?? null, peaks?.length ? JSON.stringify(peaks) : null, await fileHash(to), who ?? null, Date.now(), m.id);
+  mediaChanged(m.id);
   const item = getMedia(d.db, m.id)!;
   d.broadcast({ t: 'feature', id: 'media', data: { what: 'media', item } });
   return item;

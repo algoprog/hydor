@@ -146,11 +146,11 @@ async function roomToMove(file: string, size: number, to: string) {
 // ---- what a file becomes, once it is here ----------------------------------------------------------------------
 
 /** The import route, in this process: a page of the file at `file`, or why not (its status and words). */
-async function importPage(d: Deps, file: string, space: string | null): Promise<{ page: PageInfo; notes: string[] } | { status: number; error: string }> {
+async function importPage(d: Deps, file: string, space: string | null, into?: string): Promise<{ page: PageInfo; notes: string[] } | { status: number; error: string }> {
   const r = await d.app.inject({
     method: 'POST',
     url: '/api/pages/import',
-    payload: JSON.stringify({ path: file, space }),
+    payload: JSON.stringify({ path: file, space, dir: into }),
     headers: { ...internalHeaders(), 'content-type': 'application/json' },
   });
   let body: { page?: PageInfo; notes?: string[]; error?: string } = {};
@@ -205,17 +205,31 @@ interface Upload {
 const uploads = new Map<string, Upload>();
 const partOf = (id: string) => path.join(dir(), `${id}.part`);
 
+/**
+ * The folder of the project a file dropped inside a folder goes in, by its place there (`rel`), for the file of the page
+ * or media made of it (spaces/kept-files.ts); none for one dropped at the top.
+ */
+async function keptDir(db: DB, space: string | null, rel: string): Promise<string | undefined> {
+  const s = space ? spaceById(db, space) : null;
+  if (!s) return undefined;
+  const root = path.resolve(s.folder);
+  const at = path.resolve(root, path.dirname(rel));
+  if (at === root || !at.startsWith(root + path.sep)) return undefined;
+  await fs.promises.mkdir(at, { recursive: true });
+  return within(real(root), real(at)) ? at : undefined;
+}
+
 /** An upload whose bytes are all here, at `file` (named as it was), made what it is. */
 async function finishUpload(d: Deps, u: Upload, file: string): Promise<FileAdded> {
   const space = u.space ?? undefined;
   if (u.plan.as === 'page') {
-    const r = await importPage(d, file, u.space);
+    const r = await importPage(d, file, u.space, await keptDir(d.db, u.space, u.rel));
     if ('page' in r) return { as: 'page', page: r.page, space, notes: r.notes };
     const notes = notPage(u.name, r, u.space);
     return { as: 'file', path: await intoProject(d.db, file, u.space!, u.rel), space, notes };
   }
   if (u.plan.as !== 'file') {
-    const { item, existed } = await keepFile(d, { path: file, space: u.space }, { move: true, source: u.name });
+    const { item, existed } = await keepFile(d, { path: file, space: u.space, dir: await keptDir(d.db, u.space, u.rel) }, { move: true, source: u.name });
     return { as: 'media', item, existed, space: item.space, notes: [] };
   }
   return { as: 'file', path: await intoProject(d.db, file, u.space!, u.rel), space, notes: [] };
@@ -370,7 +384,7 @@ function left(file: string, done: FileAdded): FileAdded {
 async function moveIn(d: Deps, file: string, plan: Plan, space: string | null, rel: string): Promise<FileAdded> {
   const sp = space ?? undefined;
   if (plan.as === 'page') {
-    const r = await importPage(d, file, space);
+    const r = await importPage(d, file, space, await keptDir(d.db, space, rel));
     if ('page' in r) {
       const lost = await lostOf(d.db, file, r.page);
       if (r.notes.length || lost.length) return { as: 'page', page: r.page, space: sp, notes: r.notes, stayed: true, lost };
@@ -385,7 +399,7 @@ async function moveIn(d: Deps, file: string, plan: Plan, space: string | null, r
     return left(file, { as: 'file', path: await intoProject(d.db, file, space!, rel), space: sp, notes });
   }
   if (plan.as !== 'file') {
-    const { item, existed } = await keepFile(d, { path: file, space }, { move: true, source: file });
+    const { item, existed } = await keepFile(d, { path: file, space, dir: await keptDir(d.db, space, rel) }, { move: true, source: file });
     const done: FileAdded = { as: 'media', item, existed, space: item.space, notes: [] };
     return existed ? done : left(file, done);
   }

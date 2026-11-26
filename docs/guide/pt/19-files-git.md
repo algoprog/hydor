@@ -186,11 +186,44 @@ Um projeto guarda os arquivos dele em sua pasta e pode trabalhar com outras past
 1. Abra o menu de um arquivo ou de uma pasta (ou selecione vários) e clique em **Adicionar a um projeto**.
 2. Escolha o projeto, ou **Novo projeto** para criar um para eles primeiro.
 
-Um arquivo é copiado para a pasta do projeto. Uma pasta não é copiada: ela passa a fazer parte das pastas com que o projeto trabalha, onde está. Uma mensagem diz o que foi adicionado, com **Mostrar**, que abre a aba **Arquivos** do projeto. O que já estiver no projeto permanece como está.
+Um arquivo é copiado para o início da pasta do projeto, ou para uma pasta que você escolher dentro dela. Uma pasta não é copiada: ela passa a fazer parte das pastas com que o projeto trabalha, onde está. Uma mensagem diz o que foi adicionado, com **Mostrar**, que abre a aba **Arquivos** do projeto. O que já estiver no projeto permanece como está.
 
 **Adicionar a um projeto** também está no **Mais** (⋯) de um arquivo no editor, na janela em que um arquivo abre sobre uma sessão, nos cartões de arquivos que um agente entregou a você e nas imagens que um agente criou.
 
 As sessões que você começar no projeto encontram então os arquivos lá: cada uma é informada do que a pasta do projeto contém e com quais outras pastas ele trabalha.
+
+**Escolha uma pasta dentro do projeto.** Um clique em um projeto coloca a coisa no início da pasta dele. Um projeto cuja pasta tem pastas mostra também um botão de pasta no fim da linha dele (**Escolher uma pasta dentro dela**). Ele lista essas pastas: clique em uma para colocar a coisa lá, ou no › dela (**Mostrar as pastas dentro dela**) para entrar. A primeira linha, **Início de** *o projeto* (**Esta pasta** depois que você entra em uma), escolhe a pasta em que você está, e a linha de cima volta. A mesma escolha está em **Manter** (no menu **Manter em**), **Manter uma cópia**, **Mover para um projeto** e **Mover para outro projeto**, no menu **Salvar** (▾) do Navegador e no projeto da janela **Nova**. Escolher uma pasta no projeto em que a coisa já está leva o arquivo dela para lá. A mensagem então diz o nome da pasta ("notes.pdf adicionado a drafts", "Movido para drafts").
+
+## O que você guarda também são arquivos
+
+O que você ou um agente guarda em um projeto (veja [Guardar uma página](/guide/library#keep-a-page)) também tem um arquivo próprio na pasta do projeto, com o nome do título. Assim ele aparece em **Arquivos**, no Finder ou no Explorador de Arquivos e para os agentes que trabalham naquela pasta. O Hydor escreve o arquivo de novo depois de cada salvamento, seu ou de um agente.
+
+- Um documento é um arquivo do Word (.docx), uma planilha um arquivo do Excel (.xlsx), um notebook um arquivo .ipynb e um diagrama um arquivo do draw.io (.drawio).
+- Slides feitos para a web, o tipo comum, são uma página da web (.html); slides feitos compatíveis com o PowerPoint são um arquivo do PowerPoint (.pptx).
+- Uma página, um design ou uma página da web salva é um arquivo .html.
+- Um documento LaTeX é um arquivo .tex ou, quando tem imagens ou outros arquivos, uma pasta com o nome dele.
+- Uma imagem, um vídeo ou um som é um arquivo do próprio tipo.
+
+Isso vale também para o que os agentes salvam nas sessões de um projeto. Painéis não têm arquivo, porque os cartões deles são ao vivo, e nada do que uma sessão marcada como **Confidencial** guardou vai para a pasta. O que você guardou em um projeto antes de o Hydor fazer isso ganha o arquivo pouco depois de o Hydor iniciar. Um agente pode dizer em qual pasta dentro do projeto um arquivo deve ficar, e um que trabalha em uma pasta dessas salva ali. Os agentes são orientados a mudar uma coisa guardada com as ferramentas que a salvam, em vez de editar o arquivo.
+
+**Abrir uma.** Em **Arquivos** e na aba **Arquivos** de um projeto, o arquivo tem um selo dizendo o que é (**Documento**, **Slides**, **Imagem**…). Um clique o abre no editor do Hydor, ou na página própria da imagem, do vídeo ou do som, com as versões, os comentários e o compartilhamento. O menu ⋯ dele é o de um arquivo (veja [Trabalhar com arquivos e pastas](/guide/files-git#work-with-files-and-folders)); o que pertence à coisa em si, como compartilhá-la, exportá-la ou movê-la para **Nenhum projeto**, está na página que abre. Um documento LaTeX que é uma pasta tem o selo **LaTeX**: um clique abre a pasta, e o main.tex dentro dela abre o documento no editor do Hydor.
+
+**Mudanças feitas fora do Hydor.** Quando você, outro programa (como o Word) ou o script de um agente muda o arquivo, a mudança volta como uma versão nova, que as versões da coisa mostram como **alterado no arquivo**. Uma imagem, um vídeo ou um som mantém a versão anterior entre as **Versões anteriores**.
+
+- Se você também a mudou no Hydor nesse meio tempo, as duas ficam como versões, e a do Hydor continua sendo a atual.
+- Antes de o Hydor escrever por cima de um arquivo mudado fora, uma cópia dele vai para a Lixeira.
+- Um arquivo que o Hydor não consegue ler de volta (o .html de slides feitos para a web, ou um arquivo danificado), ou o arquivo de uma página bloqueada, é guardado ao lado como "*nome* (changed outside Hydor)", e um arquivo novo é escrito.
+- Um arquivo excluído fora do Hydor é escrito de novo na próxima mudança da coisa. Renomeá-lo ou movê-lo fora do Hydor conta como excluí-lo: o arquivo que você moveu fica como um arquivo comum.
+
+**Renomear, mover e excluir.** O vínculo acompanha o arquivo:
+
+- Renomeie ou mova o arquivo nos **Arquivos** do Hydor e ele continua vinculado. Quando o título da coisa muda, o Hydor renomeia o arquivo também, a menos que você o tenha renomeado. Uma extensão nova (de .docx para .txt, por exemplo) o torna um arquivo comum, e a coisa ganha um novo na próxima mudança.
+- Mova o arquivo para a pasta de outro projeto e a coisa passa para esse projeto. Tire-o das pastas de todos os projetos e a coisa sai do projeto dela.
+- Exclua o arquivo em **Arquivos** e a coisa sai do projeto. A coisa em si continua, e a caixa de busca a encontra.
+- Se você excluir a coisa no Hydor, ou movê-la para **Nenhum projeto**, o arquivo dela vai para a Lixeira. Se movê-la para outro projeto, o arquivo passa para a pasta desse projeto.
+- Se você excluir o projeto, os arquivos ficam onde estão, como arquivos comuns.
+
+**Uma imagem que você já tinha.** Quando você guarda uma imagem, um vídeo ou um som a partir de um arquivo que já está na pasta do projeto, esse arquivo é usado como o dele, sem cópia. O Hydor nunca o move nem o manda para a Lixeira. O que você edita no Hydor é salvo nele, e as versões anteriores são guardadas como as de qualquer imagem.
 
 ## Começar uma sessão com arquivos
 
@@ -751,6 +784,7 @@ Ele faz uma leitura a cada 2 segundos enquanto a página está aberta e guarda o
 
 - "No arquivo que estou com aberto, adicione um comentário acima de cada função dizendo o que ela faz."
 - "Copie os PDFs de ~/Downloads desta semana para o meu projeto Impostos 2026."
+- "Mova o acompanhamento de leituras do meu projeto Tese para a pasta notes dele."
 - "Preencha o ~/Downloads/rental-application.pdf com os meus dados e me pergunte o que você não souber."
 - "Resuma os meus destaques de ~/Papers/sparse-retrieval.pdf, página por página, com as minhas notas."
 - "Quais das minhas notas sobre o artigo que estou com aberto discordam do que o artigo diz?"

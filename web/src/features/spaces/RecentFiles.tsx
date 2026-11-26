@@ -1,7 +1,7 @@
 // A project's newest files, on its Overview: what was kept in the project (pages, documents, slides, pictures…:
-// pages/kept.tsx) and the files at the top of its folder, the last changed first, as the Files tab's tiles. A click
-// opens one: a kept thing in its own editor, a file in a window over the page. All files opens the Files tab. Nothing
-// shows while the project has no files.
+// pages/kept.tsx) and the files at the top of its folder, the last changed first, as the Files tab's tiles. A kept
+// thing's own file there shows once, as the thing. A click opens one: a kept thing in its own editor, a file in a
+// window over the page. All files opens the Files tab. Nothing shows while the project has no files.
 import { useEffect, useMemo, useState } from 'react';
 import type { Space } from '@shared/spaces';
 import { api } from '../../lib/api';
@@ -53,12 +53,17 @@ export function RecentFiles({ s, card }: { s: Space; card: (count: number, body:
       live = false;
     };
   }, [s.folder]);
+  // The files less those that are one of the kept things' own: the thing shows, not its file too.
+  const others = useMemo(() => {
+    const here = new Set((kept ?? []).map((k) => k.page?.id ?? k.media?.id));
+    return (files ?? []).filter((f) => !(f.kept && here.has(f.kept.id)));
+  }, [kept, files]);
   // Kept things and files together, the last changed first.
   const newest = useMemo(() => {
-    const all: { at: number; kept?: Kept; file?: FsEntry }[] = [...(kept ?? []).map((k) => ({ at: k.at, kept: k })), ...(files ?? []).map((f) => ({ at: f.mtime, file: f }))];
+    const all: { at: number; kept?: Kept; file?: FsEntry }[] = [...(kept ?? []).map((k) => ({ at: k.at, kept: k })), ...others.map((f) => ({ at: f.mtime, file: f }))];
     return all.sort((a, b) => b.at - a.at).slice(0, SHOWN);
-  }, [kept, files]);
-  const count = (kept?.length ?? 0) + (files?.length ?? 0);
+  }, [kept, others]);
+  const count = (kept?.length ?? 0) + others.length;
   if (!kept || !files || !count) return null;
   return card(
     count,

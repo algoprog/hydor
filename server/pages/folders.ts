@@ -14,6 +14,24 @@ import { spaceById } from '../spaces/index.ts';
 /** The tables whose rows go in folders: the kept pages, and the pictures, videos and sounds kept. */
 export type ItemTable = 'pages' | 'media';
 
+/**
+ * What hears that something kept may have changed project by going into a folder, or with its folder: its file in the
+ * project's folder follows (spaces/kept-files.ts).
+ */
+const placeListeners: ((table: ItemTable, id: string) => void)[] = [];
+export function onPlaceChange(fn: (table: ItemTable, id: string) => void) {
+  placeListeners.push(fn);
+}
+const placed = (table: ItemTable, id: string) => {
+  for (const fn of placeListeners) {
+    try {
+      fn(table, id);
+    } catch (e) {
+      console.warn(`[folders] after a change to ${id}: ${(e as Error).message}`);
+    }
+  }
+};
+
 export function initFolders(db: DB) {
   db.exec(`
     create table if not exists library_folders (
@@ -192,8 +210,15 @@ export function changeFolder(db: DB, id: string, o: { name?: unknown; parent?: s
 function setSubtreeSpace(db: DB, ids: string[], space: string | null): boolean {
   const marks = ids.map(() => '?').join(',');
   db.prepare(`update library_folders set space = ? where id in (${marks})`).run(space, ...ids);
-  if (folderColumn(db, 'pages')) db.prepare(`update pages set space = ? where folder in (${marks})`).run(space, ...ids);
-  return folderColumn(db, 'media') && db.prepare(`update media set space = ? where folder in (${marks})`).run(space, ...ids).changes > 0;
+  let media = false;
+  for (const table of ['pages', 'media'] as const) {
+    if (!folderColumn(db, table)) continue;
+    const inside = db.prepare(`select id from ${table} where folder in (${marks})`).all(...ids) as { id: string }[];
+    db.prepare(`update ${table} set space = ? where folder in (${marks})`).run(space, ...ids);
+    if (table === 'media') media = inside.length > 0;
+    for (const x of inside) placed(table, x.id);
+  }
+  return media;
 }
 
 /**
@@ -239,6 +264,7 @@ export function putInFolder(db: DB, table: ItemTable, id: string, folder: string
   }
   const f = mustFolder(db, folder);
   db.prepare(`update ${table} set folder = ?, space = ? where id = ?`).run(f.id, f.space ?? null, id);
+  placed(table, id);
 }
 
 /** After something moved to another project (or out of one): out of its folder, unless the folder is in that place. */

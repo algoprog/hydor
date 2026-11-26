@@ -84,6 +84,13 @@ export interface PageInfo {
   description?: string;
   /** Locked by its owner, so it doesn't change by accident: no new version until it is unlocked. */
   locked?: boolean;
+  /**
+   * Its own file in its project's folder (an absolute path), while it is in a project: a Word document, a PowerPoint
+   * deck, an Excel workbook, a .tex file, an .ipynb notebook, a draw.io diagram or an HTML page (PROJECT_FILE_EXT),
+   * written again after each save and read back in as a new version when it is changed outside the app
+   * (server/spaces/kept-files.ts). Missing while it is in no project, before it is first written, or for a board.
+   */
+  projectFile?: string;
   /** A web page saved from the user's own browser (a document): the address it came from and its site ("example.com"). It shows as a Web page. */
   source?: { url: string; site: string };
 }
@@ -132,7 +139,7 @@ export interface PageVersion {
   bytes: number;
   createdAt: number;
   /** agent: save_page; user: Keep; restore: an older version brought back; edit: changed by the user in the editor; made: a page the user made. */
-  by: 'agent' | 'user' | 'restore' | 'edit' | 'made';
+  by: 'agent' | 'user' | 'restore' | 'edit' | 'made' | 'file';
   /** Changed (or commented on) by someone the project is shared with, through their link: their name. */
   who?: string;
   /** An agent's saves in a row kept as this one version (left out for one). */
@@ -250,4 +257,31 @@ export interface PageEditNote {
   title: string;
   version: number;
   told: boolean;
+}
+
+/**
+ * The file each kind of kept thing has in its project's folder (PageInfo.projectFile): a page of HTML (a saved web page
+ * too) as an HTML file, the others in the format their editors read back in. A board has none (its cards are live).
+ */
+export const PROJECT_FILE_EXT: Record<'page' | Exclude<PageInfo['kind'], undefined>, string | null> = {
+  page: 'html',
+  slides: 'pptx',
+  doc: 'docx',
+  sheet: 'xlsx',
+  tex: 'tex',
+  notebook: 'ipynb',
+  diagram: 'drawio',
+  board: null,
+};
+
+/**
+ * A file in a project's folder that is a kept thing's own file (GET /api/fs/list's entries carry it as `kept`): it
+ * opens in the app's editor (a page: /pages/<id>) or viewer (a picture, video or sound: /media/<id>), not as a file.
+ * `kind`: the page's kind ('page' for HTML, 'web' for a saved web page) or the media's.
+ */
+export interface KeptFileRef {
+  type: 'page' | 'media';
+  id: string;
+  kind: 'page' | 'web' | Exclude<PageInfo['kind'], undefined> | 'image' | 'video' | 'audio';
+  title: string;
 }

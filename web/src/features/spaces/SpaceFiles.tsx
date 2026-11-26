@@ -1,10 +1,11 @@
 // A project's Files tab: its folder, and each folder it works with besides, in the Files page's own view (tiles with
 // pictures, or the list; pick several, drag, upload, the menus). The folders show as chips over it, with one to attach
 // another folder of yours, where it is; a chip's × leaves a folder out (the folder itself stays as it is). Files open
-// in a window over the page. At the top of the project's own folder what was kept in the project (pages, documents,
-// slides, designs, pictures, videos, sounds: pages/kept.tsx) comes in the same view, after the folders and before the
-// files, each opening in its own editor; New there also makes those. Files and folders dropped anywhere on the tab are
-// uploaded into the folder shown.
+// in a window over the page. What was kept in the project (pages, documents, slides, designs, pictures, videos,
+// sounds) has a file of its own in the project's folder, which opens in its editor. Those without one (a board) show
+// at the top of the project's own folder (pages/kept.tsx), in the same view, after the folders and before the files.
+// New there also makes those, in the folder shown. Files and folders dropped anywhere on the tab are uploaded into
+// the folder shown.
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 import { ExternalLink, Folder, Plus, X } from 'lucide-react';
 import { MAX_FOLDERS, type Space } from '@shared/spaces';
@@ -16,7 +17,7 @@ import { go, openProject, useFilePeek } from '../../lib/nav';
 import { toastError, useApp, useToasts } from '../../lib/store';
 import { dropInto, goFolder, takesDrop } from '../files/actions';
 import { FolderView } from '../files/FolderView';
-import { KeptThings, useKept } from '../pages/kept';
+import { keptFile, KeptThings, useKept } from '../pages/kept';
 import { SpaceMark } from './parts';
 import { loadSpaces } from './state';
 
@@ -31,8 +32,12 @@ export function SpaceFiles({ s, asked, onSaved }: { s: Space; asked?: string; on
   const [attach, setAttach] = useState(false);
   const attachRef = useRef<HTMLButtonElement>(null);
   const kept = useKept(s.id);
-  // The kept things come at the top of the project's own folder, not in its subfolders or the other folders it works with.
-  const extra = useMemo(() => (dir === s.folder && kept?.length ? { titles: kept.map((k) => k.title), render: (o: { grid: boolean; filter: string }) => <KeptThings items={kept} {...o} /> } : undefined), [dir, s.folder, kept]);
+  // Those with a file of their own show as that file, in the folder it is in. The rest come at the top of the project's
+  // own folder, not in its subfolders or the other folders it works with.
+  const extra = useMemo(() => {
+    const unfiled = dir === s.folder ? (kept ?? []).filter((k) => !keptFile(k)) : [];
+    return unfiled.length ? { titles: unfiled.map((k) => k.title), render: (o: { grid: boolean; filter: string }) => <KeptThings items={unfiled} {...o} /> } : undefined;
+  }, [dir, s.folder, kept]);
   // Files dropped on the tab outside the view (over the chips) go into the folder shown too.
   const [over, setOver] = useState(false);
   const open = (d: string) => openProject(s.id, 'files', { dir: d === s.folder ? undefined : d });
@@ -130,6 +135,7 @@ export function SpaceFiles({ s, asked, onSaved }: { s: Space; asked?: string; on
           onSearch={(q) => go(`/search?q=${enc(q)}&in=${enc(dir)}`)}
           embedded
           project={s.id}
+          makeDir={dir !== s.folder && under(dir, s.folder) ? dir : undefined}
           extra={extra}
         />
       </div>

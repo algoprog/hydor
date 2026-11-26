@@ -8,8 +8,11 @@
 // the folder shown (so does Upload in the bar). A right-click or ⋯ has the rest, and the keyboard works too:
 // arrows, Enter, Backspace for the folder above, F2, Delete, Ctrl+A.
 // A project's Files gives it `project` (New then also makes what the app makes: a document, slides, a spreadsheet,
-// a page, a design, LaTeX, a diagram, a board, a picture, kept in the project) and `extra`: the project's kept
-// things, which come after the folders and before the files, as tiles or as rows.
+// a page, a design, LaTeX, a diagram, a board, a picture, kept in the project; in the folder shown, with `makeDir`)
+// and `extra`: the project's kept things without a file of their own, which come after the folders and before the
+// files, as tiles or as rows. A file that is a kept thing's own (`kept`) says its kind and opens in the app's editor
+// or viewer; its menu is a file's. A kept page's file shows the page's own picture (its first slide, its diagram). A
+// folder that is a kept thing's (a LaTeX document of several files) says its kind too, and opens as a folder.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import {
   AppWindow,
@@ -51,18 +54,22 @@ import {
   Workflow,
   X,
 } from 'lucide-react';
+import type { KeptFileRef } from '@shared/pages';
 import { FolderFinder } from '../../components/FolderPicker';
 import { RefreshIcon } from '../../components/RefreshIcon';
 import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { api, post, put } from '../../lib/api';
 import { ago, basename, bytes, dirname, joinPath } from '../../lib/format';
-import { openFile } from '../../lib/nav';
+import { go, openFile, useFilePeek } from '../../lib/nav';
 import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { pickedFromInput, startUpload } from '../../lib/upload';
 import { FileIcon } from '../documents/fileTypes';
 import { newNotebookText } from '../notebook/model';
+import { KIND } from '../pages/kept';
 import { NewPageDialog, type NewKind } from '../pages/NewDialog';
+import { Thumb } from '../pages/parts';
+import { usePagesStore } from '../pages/state';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { addToSpace, copyPaths, download, dragStart, dropInto, moveInto, newSessionIn, rename, startSession, takesDrop, trash, type Item } from './actions';
 import { FileThumb, kindBadge, rowPictureUrl } from './FileThumb';
@@ -82,6 +89,15 @@ export interface FsEntry {
   mtime: number;
   git?: string;
   dirLink?: boolean;
+  /** A kept thing's own file in its project's folder, which opens in the app's editor or viewer; or its own folder (a LaTeX document's). */
+  kept?: KeptFileRef;
+}
+
+/** Opens a kept thing's own file where the thing is: a page in its editor, a picture, video or sound in its viewer. */
+function openKept(k: KeptFileRef) {
+  // The file window goes, even when the page under it is that one already.
+  useFilePeek.setState({ file: null, show: undefined });
+  go(`/${k.type === 'page' ? 'pages' : 'media'}/${encodeURIComponent(k.id)}`);
 }
 
 export const isDir = (e: Pick<FsEntry, 'type' | 'dirLink'>) => e.type === 'dir' || !!e.dirLink;
@@ -241,6 +257,7 @@ const ListRow = memo(function ListRow({ e, depth, open, picked, picking, focused
   const ref = useRef<HTMLDivElement>(null);
   const press = useRef<number | null>(null);
   const dir = isDir(e);
+  const kept = e.kept;
   const when = changedWhen(e.mtime);
   return (
     <div
@@ -310,11 +327,28 @@ const ListRow = memo(function ListRow({ e, depth, open, picked, picking, focused
       </button>
       <Icon e={e} size={narrow ? 36 : 20} />
       <span className="min-w-0 flex-1">
-        <span translate="no" title={e.path} className={cx('block truncate', e.git && e.git !== '•' && GIT_CLS[e.git])}>
-          {e.name}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span translate="no" title={e.path} className={cx('min-w-0 truncate', e.git && e.git !== '•' && GIT_CLS[e.git])}>
+            {e.name}
+          </span>
+          {kept && !narrow && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-accent-soft px-1.5 text-[11px] leading-[18px] font-medium text-accent">
+              {KIND[kept.kind].icon}
+              {KIND[kept.kind].label}
+            </span>
+          )}
         </span>
         {narrow && (
           <span className="block truncate text-[12.5px] text-fg-3">
+            {kept && (
+              <>
+                <span className="inline-flex items-center gap-1 align-bottom text-accent">
+                  {KIND[kept.kind].icon}
+                  <span>{KIND[kept.kind].label}</span>
+                </span>
+                {' · '}
+              </>
+            )}
             {!dir && (
               <>
                 <span>{bytes(e.size)}</span>
@@ -350,6 +384,13 @@ const ListRow = memo(function ListRow({ e, depth, open, picked, picking, focused
   );
 });
 
+/** The picture of a kept page's file: the page's own, once the page is known and has one; until then the file's (`fallback`). */
+function KeptPicture({ id, fallback }: { id: string; fallback: ReactNode }) {
+  const page = usePagesStore((s) => s.pages?.find((p) => p.id === id));
+  const made = usePagesStore((s) => s.thumbs[id]);
+  return page && (made ?? page.thumb) ? <Thumb page={page} corner className="h-full w-full" /> : fallback;
+}
+
 /** A tile, shaped like a card: the file's picture on top (4:3), its kind for a document, its name, when it changed, ⋯; a folder's is slim (its icon and name). */
 const Tile = memo(function Tile({
   e,
@@ -369,6 +410,7 @@ const Tile = memo(function Tile({
   const press = useRef<number | null>(null);
   const dir = isDir(e);
   const badge = dir ? null : kindBadge(e.name);
+  const kept = e.kept;
   // What every tile does with the pointer, the keys' focus, a drag and a long press.
   const handlers = {
     ref,
@@ -436,8 +478,17 @@ const Tile = memo(function Tile({
           <Folder size={19} strokeWidth={1.7} fill="currentColor" fillOpacity={0.14} className={cx('transition-opacity', picked || picking ? 'opacity-0' : 'group-hover:opacity-0 max-md:group-hover:opacity-100')} />
           {pick('absolute inset-0')}
         </span>
-        <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-fg">
-          {e.name}
+        {/* A kept thing's folder says its kind under its name, so the name keeps the card's width. */}
+        <span className="flex min-w-0 flex-1 flex-col items-start">
+          <span translate="no" className={cx('max-w-full truncate text-[13.5px] font-medium text-fg', kept && 'leading-[18px]')}>
+            {e.name}
+          </span>
+          {kept && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-accent-soft px-1.5 text-[11px] leading-4 font-medium text-accent">
+              {KIND[kept.kind].icon}
+              {KIND[kept.kind].label}
+            </span>
+          )}
         </span>
         {more}
       </div>
@@ -445,9 +496,23 @@ const Tile = memo(function Tile({
   return (
     <div {...handlers} className={cx('press-card group relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border bg-panel transition-colors select-none [-webkit-touch-callout:none]', state)}>
       <div className="relative aspect-[4/3] overflow-hidden border-b border-line bg-bg-1">
-        <FileThumb key={`${e.path}|${e.mtime}`} path={e.path} name={e.name} size={e.size} mtime={e.mtime} />
-        {badge && (
-          <span className="pointer-events-none absolute top-2 left-2 inline-flex items-center rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">{badge}</span>
+        {kept?.type === 'page' ? (
+          <KeptPicture id={kept.id} fallback={<FileThumb key={`${e.path}|${e.mtime}`} path={e.path} name={e.name} size={e.size} mtime={e.mtime} />} />
+        ) : (
+          <FileThumb key={`${e.path}|${e.mtime}`} path={e.path} name={e.name} size={e.size} mtime={e.mtime} />
+        )}
+        {/* A kept thing's own file says what it is in the app (as its tile did), in place of the file's kind. */}
+        {(kept || badge) && (
+          <span className="pointer-events-none absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+            {kept ? (
+              <>
+                {KIND[kept.kind].icon}
+                {KIND[kept.kind].label}
+              </>
+            ) : (
+              badge
+            )}
+          </span>
         )}
       </div>
       <div className="flex min-w-0 items-start gap-1 py-2 pr-1 pl-3">
@@ -503,6 +568,8 @@ export interface FolderViewProps {
   embedded?: boolean;
   /** A project's Files: the project's id. New then also makes what the app makes (a document, slides…), kept in it. */
   project?: string;
+  /** The folder shown, when it is one inside the project's folder: what New makes there gets its file in it. */
+  makeDir?: string;
   /**
    * The project's kept things, among the folder's own: `titles` (to know how many there are, and which the field leaves
    * in) and what shows for them, tiles after the folders (a grid) or rows (a list), given what the field says.
@@ -523,7 +590,7 @@ const MAKES: { kind: NewKind; label: string; icon: ReactNode }[] = [
   { kind: 'picture', label: 'Picture', icon: <ImageIcon size={14} /> },
 ];
 
-export function FolderView({ dir, onDir, base, select, onFile = openFile, onSearch, embedded, project, extra }: FolderViewProps) {
+export function FolderView({ dir, onDir, base, select, onFile = openFile, onSearch, embedded, project, makeDir, extra }: FolderViewProps) {
   const mobile = useIsMobile();
   const home = useApp((s) => s.boot?.home);
   // A narrow view (a phone, or a small window beside the sidebar) keeps its bar short: the field behind a
@@ -663,6 +730,11 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
   }, [dir, hidden, sort, reverse, expanded, f, grid, version]);
   const items = useMemo(() => rows.filter((r): r is Extract<Row, { kind: 'item' }> => r.kind === 'item'), [rows]);
   const picked = items.filter((r) => sel.has(r.e.path)).map((r) => itemFor(r.e));
+  // Kept pages' files show the pages' own pictures: the pages are asked for once there is one.
+  const keptPages = items.some((r) => r.e.kept?.type === 'page');
+  useEffect(() => {
+    if (keptPages && !usePagesStore.getState().pages) usePagesStore.getState().loadPages().catch(toastError);
+  }, [keptPages]);
   const shown = rows.slice(0, limit);
 
   const pick = (p: string, only = false) => {
@@ -692,7 +764,7 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
     if (picking && !sel.size) setPicking(false);
   }, [picking, sel.size]);
 
-  const openEntry = (e: FsEntry) => (isDir(e) ? onDir(e.path) : onFile(e.path));
+  const openEntry = (e: FsEntry) => (isDir(e) ? onDir(e.path) : e.kept ? openKept(e.kept) : onFile(e.path));
   const toggle = (p: string) =>
     setExpanded((s) => {
       const n = new Set(s);
@@ -1346,7 +1418,7 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
           </span>
         </div>
       )}
-      {project && <NewPageDialog open={!!making} kind={making ?? 'page'} space={project} onClose={() => setMaking(null)} />}
+      {project && <NewPageDialog open={!!making} kind={making ?? 'page'} space={project} dir={makeDir} onClose={() => setMaking(null)} />}
       <div ref={pointRef} aria-hidden style={{ position: 'fixed', left: menu?.at?.x ?? 0, top: menu?.at?.y ?? 0, width: 1, height: 1, pointerEvents: 'none' }} />
       <ItemMenu
         items={menu?.items ?? []}
@@ -1354,7 +1426,12 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
         open={!!menu}
         onClose={() => setMenu(null)}
         after={() => (clearPicks(), refresh())}
-        onOpen={(it) => (it.dir ? onDir(it.path) : onFile(it.path))}
+        onOpen={(it) => {
+          const e = items.find((r) => r.e.path === it.path)?.e;
+          if (e) openEntry(e);
+          else if (it.dir) onDir(it.path);
+          else onFile(it.path);
+        }}
         onRename={(it) => setRenaming(it.path)}
       />
       <input

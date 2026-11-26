@@ -7,8 +7,10 @@
 // server will not move (in a project's folder, the app's own, the system's, a link) is uploaded as a copy, as in a browser.
 import { create } from 'zustand';
 import type { FileAdded, FileBecomes, FileRefused, MoveRefused, UploadStarted } from '@shared/library-files';
-import { ApiError, enc, post } from '../../lib/api';
+import { ApiError, enc, patch, post } from '../../lib/api';
+import { basename, joinPath } from '../../lib/format';
 import { machineId, mu } from '../../lib/machine';
+import { toastError } from '../../lib/store';
 import { entriesFromDrop, pickedFromInput, walkEntries, type PickedFile } from '../../lib/upload';
 
 /** Where an item is: waiting its turn, its bytes on their way, the server making it what it is (or moving it), or over. */
@@ -22,6 +24,8 @@ export interface UpItem {
   size: number;
   /** The project it goes in, or none. */
   space: string | null;
+  /** A folder picked inside the project's folder: where its file goes. */
+  dir?: string;
   status: UpStatus;
   /** Bytes sent so far. */
   sent: number;
@@ -98,14 +102,14 @@ const LEFT_OUT = (rel: string) => {
   return rel.includes('/') && (name.startsWith('.') || name === 'Thumbs.db' || name === 'desktop.ini');
 };
 
-/** Keeps files as what they are, in a project or none: each joins the queue, which sends a few at a time. */
-export function addToLibrary(picked: PickedFile[], space: string | null) {
+/** Keeps files as what they are, in a project (`dir`: a folder in its folder) or none: each joins the queue, which sends a few at a time. */
+export function addToLibrary(picked: PickedFile[], space: string | null, dir?: string) {
   const list = picked.filter((p) => !LEFT_OUT(p.rel));
   if (!list.length) return;
   const items: UpItem[] = list.map((p) => {
     const id = rid();
     files.set(id, p.file);
-    return { id, name: p.file.name, rel: p.rel, size: p.file.size, space, status: 'waiting', sent: 0 };
+    return { id, name: p.file.name, rel: p.rel, size: p.file.size, space, dir, status: 'waiting', sent: 0 };
   });
   // The newest drop first, in the order it came.
   useLibraryUploads.setState((s) => ({ items: [...items, ...s.items] }));
@@ -123,13 +127,13 @@ export function droppedFiles(dt: DataTransfer): Promise<PickedFile[]> {
 }
 
 /** Upload files: the device's file chooser, several at once, into a project or none; `picked` hears when some were chosen. */
-export function pickFiles(space: string | null, picked?: () => void) {
+export function pickFiles(space: string | null, picked?: () => void, dir?: string) {
   const input = document.createElement('input');
   input.type = 'file';
   input.multiple = true;
   input.onchange = () => {
     if (!input.files?.length) return;
-    addToLibrary(pickedFromInput(input.files), space);
+    addToLibrary(pickedFromInput(input.files), space, dir);
     picked?.();
   };
   input.click();
@@ -170,7 +174,7 @@ async function run(id: string) {
     set(id, { status: 'making', byPath: true });
     try {
       const done = await post<FileAdded>('/api/library/move', { path: p, space: it.space, rel: it.rel, root: rootOf(p, it.rel) });
-      return set(id, { status: 'done', done, sent: it.size });
+      return set(id, { status: 'done', done: await intoFolder(done, it), sent: it.size });
     } catch (e) {
       // A file the server will not move goes as a copy, as from a browser; the original stays.
       if (!(e instanceof ApiError && e.data?.copy)) return fail(id, e);
@@ -186,7 +190,7 @@ async function run(id: string) {
       set(id, { becomes: s.becomes, kind: s.kind, sent: 0 });
       try {
         const done = await sendPieces(id, file, s);
-        return set(id, { status: 'done', done, sent: it.size });
+        return set(id, { status: 'done', done: await intoFolder(done, it), sent: it.size });
       } catch (e) {
         if (!(e instanceof ApiError && e.status === 404 && again < 1)) throw e;
       }
@@ -194,6 +198,27 @@ async function run(id: string) {
   } catch (e) {
     fail(id, e);
   }
+}
+
+/**
+ * The server adds a file at the top of the project's folder: with a folder picked in it, what the file became then goes
+ * there (one kept already stays where it is). Should that fail, it stays added at the top, and a toast says why.
+ */
+async function intoFolder(done: FileAdded, it: UpItem): Promise<FileAdded> {
+  const { space, dir } = it;
+  if (!space || !dir || done.existed) return done;
+  try {
+    if (done.page) await patch(`/api/pages/${enc(done.page.id)}`, { space, dir });
+    else if (done.item) await patch(`/api/media/${enc(done.item.id)}`, { space, dir });
+    else if (done.path) {
+      const to = joinPath(dir, basename(done.path));
+      await post('/api/fs/rename', { from: done.path, to });
+      return { ...done, path: to };
+    }
+  } catch (e) {
+    toastError(e);
+  }
+  return done;
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));

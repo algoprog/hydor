@@ -27903,5 +27903,21 @@
   "† Better than {0} at p < {1} ({2}). ‡ Worse than {3}, by the same test.": "† Mejor que {0} con p < {1} ({2}). ‡ Peor que {3}, según la misma prueba.",
   "goalmap::Map": "Mapa",
   "goalmap::Start": "Punto de partida",
-  "goalmap::working": "trabajando"
+  "goalmap::working": "trabajando",
+  "It goes from this project. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "Se quita de este proyecto. El archivo desde el que se guardó, si todavía existe, se queda. Su archivo en la carpeta del proyecto va a la Papelera.",
+  "It goes from what you kept. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "Se quita de lo que conservaste. El archivo desde el que se guardó, si todavía existe, se queda. Su archivo en la carpeta del proyecto va a la Papelera.",
+  "Its versions, what it keeps and any published copy go with it. Its file in the project’s folder goes to the Trash.": "Sus versiones, lo que conserva y cualquier copia publicada se van con ello. Su archivo en la carpeta del proyecto va a la Papelera.",
+  "Kept a copy in {0}: “{1}”": "Se conservó una copia en {0}: “{1}”",
+  "Kept in {0}": "Conservado en {0}",
+  "Pick a folder in it": "Elegir una carpeta dentro",
+  "Saved to {0}": "Guardado en {0}",
+  "Saved to {0}; a title and a description are being written for it": "Guardado en {0}; se está escribiendo un título y una descripción",
+  "Send its new title, its description, the project to move it to (space: an id, or null), the folder to put it in (folder: an id, or null), or the folder of its project for its file (dir)": "Envía su nuevo título, su descripción, el proyecto al que moverlo (space: un id o null), la carpeta donde ponerlo (folder: un id o null) o la carpeta de su proyecto para su archivo (dir)",
+  "Show the folders in it": "Mostrar las carpetas que contiene",
+  "Top of {0}": "Nivel principal de {0}",
+  "changed in its file": "cambiado en su archivo",
+  "dir: a folder that is there, the project’s folder or one inside it (its whole path)": "dir: una carpeta que exista, la carpeta del proyecto o una dentro de ella (su ruta completa)",
+  "dir: this is in no project, so its file has no folder to go in": "dir: esto no está en ningún proyecto, así que su archivo no tiene una carpeta donde ir",
+  "projectFolder: a folder’s path from the project’s folder, such as \"reports/2026\" (not an absolute path, and without \"..\")": "projectFolder: la ruta de una carpeta desde la carpeta del proyecto, como \"reports/2026\" (no una ruta absoluta, y sin \"..\")",
+  "projectFolder: that leads out of the project’s folder": "projectFolder: esa ruta sale de la carpeta del proyecto"
 }

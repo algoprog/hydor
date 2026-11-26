@@ -16,7 +16,7 @@ import { loadModelVersion } from '../kinds';
 import { lineDiff } from './linediff';
 import { nameVersion } from './api';
 
-const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'kept by you', restore: 'brought back', edit: 'changed by you', made: 'made by you' };
+const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'kept by you', restore: 'brought back', edit: 'changed by you', made: 'made by you', file: 'changed in its file' };
 const SPLIT_KEY = 'wa.tex.compare.split';
 const when = (t: number) => new Date(t).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
 

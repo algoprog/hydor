@@ -28538,5 +28538,20 @@
   "† Better than {0} at p < {1} ({2}). ‡ Worse than {3}, by the same test.": "† Besser als {0} bei p < {1} ({2}). ‡ Schlechter als {3}, nach demselben Test.",
   "goalmap::Map": "Übersicht",
   "goalmap::Start": "Ausgangsstand",
-  "goalmap::working": "in Arbeit"
+  "goalmap::working": "in Arbeit",
+  "It goes from this project. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "Es wird aus diesem Projekt entfernt. Die Datei, aus der es gespeichert wurde, bleibt erhalten, falls sie noch da ist. Die zugehörige Datei im Ordner des Projekts wandert in den Papierkorb.",
+  "It goes from what you kept. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "Es wird aus dem Behaltenen entfernt. Die Datei, aus der es gespeichert wurde, bleibt erhalten, falls sie noch da ist. Die zugehörige Datei im Ordner des Projekts wandert in den Papierkorb.",
+  "Its versions, what it keeps and any published copy go with it. Its file in the project’s folder goes to the Trash.": "Die Versionen, die gespeicherten Inhalte und jede veröffentlichte Kopie werden mit entfernt. Die zugehörige Datei im Ordner des Projekts wandert in den Papierkorb.",
+  "Kept a copy in {0}: “{1}”": "Eine Kopie wurde in {0} behalten: „{1}“",
+  "Kept in {0}": "In {0} behalten",
+  "Pick a folder in it": "Einen Ordner darin auswählen",
+  "Saved to {0}; a title and a description are being written for it": "In {0} gespeichert; Titel und Beschreibung werden gerade dafür geschrieben",
+  "Send its new title, its description, the project to move it to (space: an id, or null), the folder to put it in (folder: an id, or null), or the folder of its project for its file (dir)": "Neuen Titel, Beschreibung, das Projekt, in das verschoben werden soll (space: eine ID oder null), den Ordner, in den es gelegt werden soll (folder: eine ID oder null), oder den Ordner im Projekt für die zugehörige Datei (dir) senden",
+  "Show the folders in it": "Ordner darin anzeigen",
+  "Top of {0}": "Oberste Ebene von {0}",
+  "changed in its file": "in der Datei geändert",
+  "dir: a folder that is there, the project’s folder or one inside it (its whole path)": "dir: ein vorhandener Ordner, entweder der Ordner des Projekts oder einer darin (sein ganzer Pfad)",
+  "dir: this is in no project, so its file has no folder to go in": "dir: Das hier gehört zu keinem Projekt, daher gibt es für die Datei keinen Ordner",
+  "projectFolder: a folder’s path from the project’s folder, such as \"reports/2026\" (not an absolute path, and without \"..\")": "projectFolder: der Pfad eines Ordners ab dem Ordner des Projekts, etwa \"reports/2026\" (kein absoluter Pfad und ohne \"..\")",
+  "projectFolder: that leads out of the project’s folder": "projectFolder: Das führt aus dem Ordner des Projekts hinaus"
 }

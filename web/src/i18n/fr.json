@@ -27903,5 +27903,21 @@
   "† Better than {0} at p < {1} ({2}). ‡ Worse than {3}, by the same test.": "† Meilleur que {0} à p < {1} ({2}). ‡ Moins bon que {3}, selon le même test.",
   "goalmap::Map": "Schéma",
   "goalmap::Start": "Départ",
-  "goalmap::working": "en cours"
+  "goalmap::working": "en cours",
+  "It goes from this project. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "Il est retiré de ce projet. Le fichier à partir duquel il a été enregistré reste en place, s’il existe encore. Son fichier dans le dossier du projet va à la Corbeille.",
+  "It goes from what you kept. The file it was saved from, if it is still there, stays. Its file in the project’s folder goes to the Trash.": "Il est retiré de ce que vous avez conservé. Le fichier à partir duquel il a été enregistré reste en place, s’il existe encore. Son fichier dans le dossier du projet va à la Corbeille.",
+  "Its versions, what it keeps and any published copy go with it. Its file in the project’s folder goes to the Trash.": "Ses versions, ce qu’elle conserve et toute copie publiée disparaissent avec elle. Son fichier dans le dossier du projet va à la Corbeille.",
+  "Kept a copy in {0}: “{1}”": "Une copie a été conservée dans {0} : « {1} »",
+  "Kept in {0}": "Conservé dans {0}",
+  "Pick a folder in it": "Choisir un dossier qu’il contient",
+  "Saved to {0}": "Enregistré dans {0}",
+  "Saved to {0}; a title and a description are being written for it": "Enregistré dans {0} ; un titre et une description sont en cours de rédaction",
+  "Send its new title, its description, the project to move it to (space: an id, or null), the folder to put it in (folder: an id, or null), or the folder of its project for its file (dir)": "Envoyez son nouveau titre, sa description, le projet vers lequel le déplacer (space : un identifiant, ou null), le dossier où le ranger (folder : un identifiant, ou null), ou le dossier de son projet destiné à son fichier (dir)",
+  "Show the folders in it": "Afficher les dossiers qu’il contient",
+  "Top of {0}": "Racine de {0}",
+  "changed in its file": "modifié dans son fichier",
+  "dir: a folder that is there, the project’s folder or one inside it (its whole path)": "dir : un dossier existant, celui du projet ou un dossier qu’il contient (son chemin complet)",
+  "dir: this is in no project, so its file has no folder to go in": "dir : cet élément n’est dans aucun projet, son fichier n’a donc aucun dossier où aller",
+  "projectFolder: a folder’s path from the project’s folder, such as \"reports/2026\" (not an absolute path, and without \"..\")": "projectFolder : le chemin d’un dossier à partir du dossier du projet, par exemple « reports/2026 » (pas un chemin absolu, et sans « .. »)",
+  "projectFolder: that leads out of the project’s folder": "projectFolder : ce chemin sort du dossier du projet"
 }
