@@ -46,7 +46,8 @@ import { voiceFeature } from './voice/feature';
 
 /** A view of a note in the conversation. One that shows several (`many`) gets the later notes of its kind in that turn as `more`, shown as one note with the first. */
 /** `afterChanges`: it shows below the turn's changed files rather than above them (the commits it made). */
-export type NoteView = ComponentType<{ note: SessionNote; sessionKey: string; more?: SessionNote[] }> & { many?: boolean; afterChanges?: boolean };
+/** `chip`: it is a chip (`replyChip`) in the row under the reply, beside the changed files' chip, and opens below that row. */
+export type NoteView = ComponentType<{ note: SessionNote; sessionKey: string; more?: SessionNote[] }> & { many?: boolean; afterChanges?: boolean; chip?: boolean };
 
 /** How one of the app's own MCP tools shows in the conversation. */
 export interface ToolView {

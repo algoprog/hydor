@@ -11,7 +11,7 @@ import { QuietWork } from '../webapps/simple/QuietWork';
 import { useQuietWork } from '../webapps/simple/quiet';
 import { stoppedTurn } from '../../lib/stopping';
 import { DiffStat, DiffView } from '../../components/DiffView';
-import { Button, cx, Throbber } from '../../components/ui';
+import { Button, cx, replyChip, replyChipPanel, Throbber } from '../../components/ui';
 import { ApprovalCard } from './Approval';
 import { AgentIcon } from '../../components/AgentIcon';
 import { QuoteSelection } from './QuoteSelection';
@@ -19,7 +19,7 @@ import { ConvZoomCtx, zoomOf } from '../../lib/convZoom';
 import { AssistantBlock, hiddenThought, SessionCtx, StepLine, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UNFOLD, UserBubble, WorkTime } from './items';
 import { noteLike, noteTitle, partsOf, plainText, runsOf, type Part, type Run } from './outline';
 import { toolView } from '../registry';
-import { LooseNotes, TurnNotes, useSessionNotes } from './Notes';
+import { LooseNotes, type NoteGroup, NoteChips, TurnNotes, turnChips, useSessionNotes } from './Notes';
 import { ProgramCards } from '../children/ProgramCard';
 import { ProgramReplyRow } from '../children/ChildReply';
 import { TurnCost } from './TurnCost';
@@ -660,61 +660,79 @@ function FileDiffs({ f, sessionKey }: { f: FileEntry; sessionKey: string }) {
   );
 }
 
-/** Every file a turn changed, under its reply; a file opens its diff in place. */
+/**
+ * Every file a turn changed, as a chip in the row under its reply ("8 files changed +70 −23"): it opens to the list below
+ * that row, five at first, and a file opens to its diff in place. One file opens straight to its diff.
+ */
 function TurnChanges({ files, sessionKey }: { files: FileEntry[]; sessionKey: string }) {
   const { cwd } = useContext(SessionCtx);
   const home = useApp((s) => s.boot?.home);
-  const [open, setOpen] = useState<string | null>(null);
+  const [shown, setShown] = useState(false);
+  const [open, setOpen] = useState<string | null>(files.length === 1 ? files[0].path : null);
   const [all, setAll] = useState(false);
   const MAX = 5;
-  const shown = all ? files : files.slice(0, MAX);
+  const list = all ? files : files.slice(0, MAX);
   const added = files.reduce((n, f) => n + f.added, 0);
   const removed = files.reduce((n, f) => n + f.removed, 0);
   return (
-    <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-panel">
-      <div className="flex items-center gap-2 px-4 py-2.5 text-[13px]">
-        <FileDiff size={15} className="shrink-0 text-fg-3" />
-        <span className="font-medium">{plural(files.length, 'file')} changed</span>
+    <>
+      <button onClick={() => setShown((v) => !v)} aria-expanded={shown} className={replyChip(shown)}>
+        <FileDiff size={13} className="shrink-0 text-fg-3" />
+        <span className="truncate">{plural(files.length, 'file')} changed</span>
         <DiffStat added={added} removed={removed} compact />
-      </div>
-      <div className="border-t border-line">
-        {shown.map((f) => {
-          const rel = prettyPath(f.path, cwd, home);
-          const dir = rel.includes('/') ? dirname(rel) : '';
-          const isOpen = open === f.path;
-          return (
-            <div key={f.path} className="border-b border-line last:border-0">
-              <button
-                onClick={() => setOpen(isOpen ? null : f.path)}
-                title={f.path}
-                className={cx('flex w-full items-center gap-2.5 px-4 py-2 text-left transition-colors hover:bg-bg-2', isOpen && 'bg-bg-1')}
-              >
-                {f.deleted ? (
-                  <FileX size={15} className="shrink-0 text-del" />
-                ) : f.created ? (
-                  <FilePlus2 size={15} className="shrink-0 text-add" />
-                ) : (
-                  <FilePen size={15} className="shrink-0 text-fg-3" />
-                )}
-                <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                  <span className="shrink-0 truncate text-[13.5px] text-fg">{basename(f.path)}</span>
-                  {f.movedTo && <span className="truncate text-[12px] text-fg-3">→ {basename(f.movedTo)}</span>}
-                  {dir && <span className="min-w-0 truncate text-[12px] text-fg-3">{dir}</span>}
-                </span>
-                {f.deleted ? <span className="shrink-0 text-[12px] text-del">deleted</span> : f.created && <span className="shrink-0 text-[12px] text-fg-3">new</span>}
-                <DiffStat added={f.added} removed={f.removed} compact />
-                <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform duration-200', isOpen && 'rotate-90')} />
-              </button>
-              {isOpen && <FileDiffs f={f} sessionKey={sessionKey} />}
-            </div>
-          );
-        })}
-      </div>
-      {files.length > MAX && (
-        <button onClick={() => setAll((a) => !a)} className="w-full border-t border-line px-4 py-2 text-left text-[12.5px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2">
-          {all ? 'Show fewer' : `Show ${plural(files.length - MAX, 'more file')}`}
-        </button>
+        <ChevronRight size={13} className={cx('shrink-0 text-fg-3 transition-transform duration-200', shown && 'rotate-90')} />
+      </button>
+      {shown && (
+        <div className={replyChipPanel}>
+          {list.map((f) => {
+            const rel = prettyPath(f.path, cwd, home);
+            const dir = rel.includes('/') ? dirname(rel) : '';
+            const isOpen = open === f.path;
+            return (
+              <div key={f.path} className="border-b border-line last:border-0">
+                <button
+                  onClick={() => setOpen(isOpen ? null : f.path)}
+                  title={f.path}
+                  className={cx('flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-bg-2', isOpen && 'bg-bg-1')}
+                >
+                  {f.deleted ? (
+                    <FileX size={14} className="shrink-0 text-del" />
+                  ) : f.created ? (
+                    <FilePlus2 size={14} className="shrink-0 text-add" />
+                  ) : (
+                    <FilePen size={14} className="shrink-0 text-fg-3" />
+                  )}
+                  <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                    <span className="shrink-0 truncate text-[13px] text-fg">{basename(f.path)}</span>
+                    {f.movedTo && <span className="truncate text-[12px] text-fg-3">→ {basename(f.movedTo)}</span>}
+                    {dir && <span className="min-w-0 truncate text-[12px] text-fg-3">{dir}</span>}
+                  </span>
+                  {f.deleted ? <span className="shrink-0 text-[12px] text-del">deleted</span> : f.created && <span className="shrink-0 text-[12px] text-fg-3">new</span>}
+                  <DiffStat added={f.added} removed={f.removed} compact />
+                  <ChevronRight size={14} className={cx('shrink-0 text-fg-3 transition-transform duration-200', isOpen && 'rotate-90')} />
+                </button>
+                {isOpen && <FileDiffs f={f} sessionKey={sessionKey} />}
+              </div>
+            );
+          })}
+          {files.length > MAX && (
+            <button onClick={() => setAll((a) => !a)} className="w-full border-t border-line px-3 py-1.5 text-left text-[12.5px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2">
+              {all ? 'Show fewer' : `Show ${plural(files.length - MAX, 'more file')}`}
+            </button>
+          )}
+        </div>
       )}
+    </>
+  );
+}
+
+/** The row under a turn's reply: the chip of the files it changed, then those of its notes (its commits, its memory). */
+function TurnFoot({ files, chips, sessionKey }: { files?: FileEntry[]; chips: NoteGroup[]; sessionKey: string }) {
+  if (!files?.length && !chips.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {!!files?.length && <TurnChanges files={files} sessionKey={sessionKey} />}
+      <NoteChips groups={chips} sessionKey={sessionKey} />
     </div>
   );
 }
@@ -1017,7 +1035,7 @@ const SegmentView = memo(function SegmentView({
       {/* The subagents of the program's own this turn started: one group, like Hydor subagents have. */}
       {!quiet && subCalls.length > 0 && <ProgramCards items={subCalls} sessionKey={sessionKey} />}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} />}
-      {!quiet && !live && stats.files.size > 0 && <TurnChanges files={[...stats.files.values()]} sessionKey={sessionKey} />}
+      <TurnFoot files={!quiet && !live && stats.files.size > 0 ? [...stats.files.values()] : undefined} chips={notes.length > 0 ? turnChips(notes, segIds(seg)) : []} sessionKey={sessionKey} />
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} after />}
     </section>
   );

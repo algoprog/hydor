@@ -20,6 +20,17 @@ import { createPortal } from 'react-dom';
 
 export const cx = clsx;
 
+/**
+ * A chip in the row under a reply (the files the turn changed, its commits, its memory). The row wraps; what a chip
+ * opens goes in `replyChipPanel`, which puts it on a line of its own below the chips, so they stay together.
+ */
+export const replyChip = (open?: boolean) =>
+  clsx(
+    'inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-line px-2.5 text-[12.5px] transition-colors hover:bg-bg-2 hover:text-fg',
+    open ? 'bg-bg-2 text-fg' : 'bg-panel text-fg-2',
+  );
+export const replyChipPanel = 'order-last basis-full min-w-0 overflow-hidden rounded-xl border border-line bg-panel';
+
 // ---- buttons ---------------------------------------------------------------------
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle';

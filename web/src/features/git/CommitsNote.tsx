@@ -1,12 +1,12 @@
-// The commits an agent made in a turn, under its reply: one small line ("2 commits · main · +120 −30") that
-// opens to the list, and each commit opens to its message and diff.
+// The commits an agent made in a turn, under its reply: a chip ("2 commits · main · +120 −30") in the row of the
+// turn's chips, that opens to the list below that row, and each commit opens to its message and diff.
 import { useEffect, useState } from 'react';
 import { ChevronRight, Copy, ExternalLink, GitCommitHorizontal } from 'lucide-react';
 import type { CommitsNote as Data, TurnCommit } from '@shared/commits';
 import type { SessionNote } from '@shared/features';
 import type { GitCommitDetail } from '@shared/types';
 import { DiffStat } from '../../components/DiffView';
-import { Button, cx, Dialog, Empty, Throbber } from '../../components/ui';
+import { Button, cx, Dialog, Empty, replyChip, replyChipPanel, Throbber } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 import { api } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
@@ -33,14 +33,16 @@ export function CommitsNote({ note, sessionKey }: { note: SessionNote; sessionKe
   // One commit opens straight to itself; several open to their list.
   const one = list.length === 1;
   return (
-    <div className="px-1">
+    <>
       <button
         onClick={() => (one ? setShown(list[0]) : setOpen((o) => !o))}
         aria-expanded={one ? undefined : open}
-        className="group inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-panel py-1 pr-2 pl-2.5 text-[12.5px] transition-colors hover:bg-bg-2"
+        className={replyChip(!one && open)}
+        // Its title takes what room the row has left, shortened; with less than 16rem left the chip goes on the next line.
+        style={one ? { flex: '1 1 0', minWidth: '16rem', maxWidth: 'max-content' } : undefined}
       >
         <GitCommitHorizontal size={13} className="shrink-0 text-fg-3" />
-        <span className="shrink-0 font-medium text-fg-2">{one ? 'Committed' : commitsN(list.length)}</span>
+        <span className="shrink-0">{one ? 'Committed' : commitsN(list.length)}</span>
         {one ? (
           <span translate="no" className="min-w-0 truncate text-fg-3">
             · {list[0].subject}
@@ -56,9 +58,9 @@ export function CommitsNote({ note, sessionKey }: { note: SessionNote; sessionKe
         <ChevronRight size={13} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !one && open && 'rotate-90')} />
       </button>
       {!one && open && (
-        <div className="mt-1.5 divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
+        <div className={cx(replyChipPanel, 'divide-y divide-line')}>
           {list.map((c) => (
-            <button key={c.hash} onClick={() => setShown(c)} className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left hover:bg-bg-2">
+            <button key={c.hash} onClick={() => setShown(c)} className="flex w-full min-w-0 items-center gap-2 px-3 py-1.5 text-left hover:bg-bg-2">
               <span translate="no" className="shrink-0 font-mono text-[11.5px] text-fg-3">
                 {short(c.hash)}
               </span>
@@ -76,12 +78,13 @@ export function CommitsNote({ note, sessionKey }: { note: SessionNote; sessionKe
         </div>
       )}
       {shown && <CommitDialog sessionKey={sessionKey} c={shown} onClose={() => setShown(null)} />}
-    </div>
+    </>
   );
 }
 
-// Below the turn's changed files: what was changed first, then how it was committed.
+// A chip in the row under the reply, last: its title takes the room the other chips leave.
 CommitsNote.afterChanges = true;
+CommitsNote.chip = true;
 
 /** A commit the agent made: its whole message, who made it and when, and each file it changed with its diff. */
 function CommitDialog({ sessionKey, c, onClose }: { sessionKey: string; c: TurnCommit; onClose: () => void }) {

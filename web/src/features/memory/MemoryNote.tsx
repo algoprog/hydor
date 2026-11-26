@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArchiveRestore, Brain, ChevronRight, MoreHorizontal, Pencil, Settings2, Trash2, Undo2 } from 'lucide-react';
 import type { SessionNote } from '@shared/features';
 import { changeSummary, isUserProfile, type MemoryChange, type MemoryEntry, type MemoryNoteData } from '@shared/memory';
-import { cx, IconButton, MenuItem, Popover } from '../../components/ui';
+import { cx, IconButton, MenuItem, Popover, replyChip, replyChipPanel } from '../../components/ui';
 import { del, enc, patch, post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toastError, useSessions } from '../../lib/store';
@@ -252,49 +252,40 @@ export function MemoryNote({ note, sessionKey, more }: { note: SessionNote; sess
   if (!rows.length) return null;
   // One entry changed again and again reads "1 updated, 8 times"; with several, each says how often.
   const summary = changeSummary(rows.map((r) => r.c)) + (rows.length === 1 && rows[0].steps.length > 1 ? `, ${rows[0].steps.length} times` : '');
-  if (!open)
-    return (
-      <div className="mt-3">
-        <button
-          onClick={() => setOpen(true)}
-          aria-expanded={false}
-          data-tip="memory-note"
-          title="What memory kept from this turn"
-          className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full border border-line bg-panel px-2.5 text-[12.5px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
-        >
+  // A chip in the row under the reply; open, its options (⋯) beside it and the changes below that row.
+  return (
+    <>
+      <span className="inline-flex max-w-full min-w-0 items-center gap-0.5">
+        <button onClick={() => setOpen((o) => !o)} aria-expanded={open} data-tip="memory-note" title="What memory kept from this turn" className={replyChip(open)}>
           <Brain size={13} className="shrink-0 text-fg-3" />
           <span className="truncate">Memory · {summary}</span>
-          <ChevronRight size={13} className="shrink-0 text-fg-3" />
+          <ChevronRight size={13} className={cx('shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-90')} />
         </button>
-      </div>
-    );
-  return (
-    <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-panel">
-      <div className="flex items-center gap-1 py-1 pr-1.5 pl-2">
-        <button onClick={() => setOpen(false)} aria-expanded className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-bg-2">
-          <Brain size={15} className="shrink-0 text-fg-3" />
-          <span className="shrink-0 font-medium">Memory</span>
-          <span className="truncate text-fg-3">{summary}</span>
-          <ChevronRight size={14} className="ml-auto shrink-0 rotate-90 text-fg-3" />
-        </button>
-        <IconButton ref={menuRef} size="sm" label="Memory options" onClick={() => setMenu((m) => !m)}>
-          <MoreHorizontal size={16} />
-        </IconButton>
-        <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={270}>
-          <SessionMemoryItem sessionKey={sessionKey} on={on} allOff={!!state && !state.enabled} close={() => setMenu(false)} />
-          <MenuItem icon={<Settings2 size={15} />} onClick={() => (setMenu(false), go('/settings?s=memory'))}>
-            All memory
-          </MenuItem>
-        </Popover>
-      </div>
-      <div className="divide-y divide-line border-t border-line">
-        {rows.map((r) => (
-          <ChangeRow key={`${r.steps[0].noteId}-${r.steps[0].index}`} row={r} entry={live ? (live.get(r.c.entry) ?? null) : undefined} here={sessionKey} reload={reload} />
-        ))}
-      </div>
-    </div>
+        {open && (
+          <>
+            <IconButton ref={menuRef} size="sm" label="Memory options" onClick={() => setMenu((m) => !m)}>
+              <MoreHorizontal size={16} />
+            </IconButton>
+            <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={270}>
+              <SessionMemoryItem sessionKey={sessionKey} on={on} allOff={!!state && !state.enabled} close={() => setMenu(false)} />
+              <MenuItem icon={<Settings2 size={15} />} onClick={() => (setMenu(false), go('/settings?s=memory'))}>
+                All memory
+              </MenuItem>
+            </Popover>
+          </>
+        )}
+      </span>
+      {open && (
+        <div className={cx(replyChipPanel, 'divide-y divide-line')}>
+          {rows.map((r) => (
+            <ChangeRow key={`${r.steps[0].noteId}-${r.steps[0].index}`} row={r} entry={live ? (live.get(r.c.entry) ?? null) : undefined} here={sessionKey} reload={reload} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
-// A turn's memory notes show as one.
+// A turn's memory notes show as one chip, in the row under the reply.
 MemoryNote.many = true;
+MemoryNote.chip = true;
