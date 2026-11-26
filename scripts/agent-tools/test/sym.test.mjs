@@ -9,8 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { main } from '../lib/sym/cli.mjs';
 import { braceEnd, indentEnd } from '../lib/sym/heuristic.mjs';
-import { isTestPath, skipPath } from '../lib/sym/search.mjs';
-import { loadLanguage, parse } from '../lib/sym/grammar.mjs';
+import { isTestPath, skipPath, grepWord, rgCommand, rgArgs, parseRg, parseGitGrep, parseGrep, keepFilesWithAllWords, searchLocale, pyStemMatches } from '../lib/sym/search.mjs';
+import { posixPath, relPosix, relOrDot, isWithin, relSegments, cleanFound, moduleStem } from '../lib/sym/paths.mjs';
+import { loadLanguage, parse, langFilter } from '../lib/sym/grammar.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIX = path.join(ROOT, 'fixtures', 'sym');
@@ -813,4 +814,319 @@ test('grammars: vendored wasm files match the checksums in their SOURCE.txt file
       if (fs.statSync(full).isFile()) assert.doesNotMatch(fs.readFileSync(full, 'utf8'), /(?:from|import\()\s*['"]web-tree-sitter['"]/, `${dir}/${f}`);
     }
   }
+});
+
+// ------------------------------------------------------------------ search backends: ripgrep, git grep, grep -r
+
+const REPO_ROOT = path.join(ROOT, '..', '..');
+// a ripgrep binary shipped with a dependency of the repository, found by globbing node_modules/@openai/*/vendor/*/codex-path/rg*
+function findRipgrep() {
+  const base = path.join(REPO_ROOT, 'node_modules', '@openai');
+  const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
+  for (const pkg of ls(base)) {
+    for (const triple of ls(path.join(base, pkg, 'vendor'))) {
+      for (const f of ls(path.join(base, pkg, 'vendor', triple, 'codex-path'))) {
+        const full = path.join(base, pkg, 'vendor', triple, 'codex-path', f);
+        if (/^rg(\.exe)?$/.test(f) && fs.statSync(full).isFile()) return full;
+      }
+    }
+  }
+  return null;
+}
+const RG = findRipgrep();
+const haveTool = (cmd) => { try { return spawnSync(cmd, ['--version'], { stdio: 'ignore' }).status === 0; } catch { return false; } };
+const BACKEND_LIST = ['git', 'grep', ...(RG ? ['rg'] : [])].filter((b) => b === 'rg' || haveTool(b));
+const RG_SKIP = RG ? false : 'no ripgrep binary found (looked for node_modules/@openai/*/vendor/*/codex-path/rg*): the rg backend is NOT tested';
+if (!RG) process.stderr.write(`# SKIPPED: ${RG_SKIP}\n`);
+
+// run fn with environment variables set (undefined deletes), then restore them
+async function withEnv(vars, fn) {
+  const old = {};
+  for (const k of Object.keys(vars)) { old[k] = process.env[k]; if (vars[k] === undefined) delete process.env[k]; else process.env[k] = vars[k]; }
+  try { return await fn(); } finally { for (const k of Object.keys(old)) { if (old[k] === undefined) delete process.env[k]; else process.env[k] = old[k]; } }
+}
+const viaBackend = (backend, extra, fn) => withEnv({ SYM_BACKEND: backend, HYDOR_RG: RG || undefined, ...extra }, fn);
+
+const GIT_ENV = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
+function putFiles(dir, files) {
+  for (const [rel, content] of Object.entries(files)) {
+    const f = path.join(dir, rel);
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, content);
+  }
+}
+// one tree for every backend: tracked + untracked files, a hidden folder, skipped folders, CRLF, non-ASCII names and paths
+function mkProject() {
+  const dir = mkTmp('sym-backends-');
+  putFiles(dir, {
+    'src/a.ts': 'export function target(x: number) {\n  return x + 1;\n}\nexport const useTarget = target(2);\n',
+    'src/b.rs': 'pub fn target() {}\n',
+    'src/modq.py': 'def func():\n    return 1\n',
+    'lib/pkg/__init__.py': 'def func():\n    return 2\n',
+    'lib/other.py': 'def func():\n    return 3\n',
+    'src/crlf.js': 'function target() {\r\n  return 1;\r\n}\r\n',
+    'src/café/naïve.ts': 'export function größe() {\n  return 1;\n}\nexport const 識別子 = größe();\n',
+    'src/store.ts': 'export const $store = { n: 1 };\n',
+    '.hidden/h.ts': 'export function target() {}\n',
+    'node_modules/x/e.ts': 'export function target() {}\n',
+    'dist/f.ts': 'export function target() {}\n',
+    'src/lib.min.js': 'function target(){}\n',
+    'README.md': 'target is documented here\n',
+  });
+  const git = (...a) => execFileSync('git', a, { cwd: dir, stdio: 'pipe', env: GIT_ENV });
+  git('init', '-q');
+  git('add', '.');
+  git('commit', '-q', '-m', 'init');
+  putFiles(dir, { 'src/untracked.ts': 'export const fresh = target(3);\n' });
+  return dir;
+}
+const flatten = (m) => [...m].sort(([a], [b]) => (a < b ? -1 : 1)).flatMap(([f, ls]) => ls.map((l) => `${f}:${l.n}:${l.text}`));
+
+const LOOKUPS = [
+  ['plain name', ['target'], {}],
+  ['non-ASCII identifier', ['größe'], {}],
+  ['CJK identifier', ['識別子'], {}],
+  ['dollar name', ['$store'], {}],
+  ['python module.func, stem not in the text', ['modq', 'func'], {}],
+  ['python package.func through __init__.py', ['pkg', 'func'], {}],
+  ['restricted to a folder', ['func'], { inPaths: ['lib'] }],
+  ['restricted to files', ['target'], { inPaths: ['src/a.ts', 'src/b.rs'] }],
+  ['restricted to a folder with a non-ASCII name', ['größe'], { inPaths: ['src/café'] }],
+  ['restricted to a language', ['target'], { langSet: langFilter('ts') }],
+  ['two words, only one in a file', ['target', 'useTarget'], {}],
+];
+
+test('backends: git grep and grep -r give the same candidates for the same lookups', async () => {
+  const dir = mkProject();
+  const refs = {};
+  for (const [name, words, o] of LOOKUPS) refs[name] = flatten(await viaBackend('git', {}, () => grepWord(words, { cwd: dir, ...o })));
+  assert.ok(refs['plain name'].length >= 6, refs['plain name'].join('\n'));
+  for (const b of BACKEND_LIST.filter((x) => x !== 'git' && x !== 'rg')) {
+    for (const [name, words, o] of LOOKUPS) {
+      assert.deepEqual(flatten(await viaBackend(b, {}, () => grepWord(words, { cwd: dir, ...o }))), refs[name], `${b}: ${name}`);
+    }
+  }
+});
+
+test('backends: ripgrep gives the same candidates as git grep for the same lookups', { skip: RG_SKIP }, async () => {
+  const dir = mkProject();
+  for (const [name, words, o] of LOOKUPS) {
+    const git = flatten(await viaBackend('git', {}, () => grepWord(words, { cwd: dir, ...o })));
+    const rg = flatten(await viaBackend('rg', {}, () => grepWord(words, { cwd: dir, ...o })));
+    assert.deepEqual(rg, git, `rg vs git: ${name}`);
+  }
+});
+
+test('backends: what each one finds (hidden, untracked, CRLF, non-ASCII path; node_modules, dist, .min.js, other languages are not)', async () => {
+  const dir = mkProject();
+  for (const b of BACKEND_LIST) {
+    const m = await viaBackend(b, {}, () => grepWord(['target'], { cwd: dir }));
+    assert.deepEqual([...m.keys()].sort(), ['.hidden/h.ts', 'src/a.ts', 'src/b.rs', 'src/crlf.js', 'src/untracked.ts'], b);
+    assert.deepEqual(m.get('src/a.ts').map((l) => l.n), [1, 4], b);
+    const w = await viaBackend(b, {}, () => grepWord(['größe'], { cwd: dir }));
+    assert.deepEqual([...w.keys()], ['src/café/naïve.ts'], `${b}: non-ASCII path printed as is`);
+    assert.deepEqual(w.get('src/café/naïve.ts').map((l) => l.n), [1, 4], b);
+  }
+});
+
+test('backends: the Python module.func lookup finds a file by its stem although the stem is not in its text (every backend)', async () => {
+  const dir = mkProject();
+  for (const b of BACKEND_LIST) {
+    const m = await viaBackend(b, {}, () => grepWord(['modq', 'func'], { cwd: dir }));
+    assert.deepEqual([...m.keys()], ['src/modq.py'], `${b}: only the file named modq`);
+    const p = await viaBackend(b, {}, () => grepWord(['pkg', 'func'], { cwd: dir }));
+    assert.deepEqual([...p.keys()], ['lib/pkg/__init__.py'], `${b}: __init__.py is named by its folder`);
+    const r = await viaBackend(b, {}, () => sym(['modq.func'], dir));
+    assert.equal(r.code, 0, `${b}: ${r.out}`);
+    assert.match(r.out, /^src\/modq\.py:1-2 {2}function func/, b);
+  }
+});
+
+test('backends: whole CLI output (definitions and references) is identical through every backend', async () => {
+  const dir = mkProject();
+  const outs = {};
+  for (const b of BACKEND_LIST) {
+    outs[b] = await viaBackend(b, {}, async () => {
+      const parts = [];
+      for (const args of [['target', '--all'], ['--refs', 'target'], ['größe'], ['--refs', 'größe'], ['modq.func'], ['識別子']]) {
+        const r = await sym(args, dir);
+        parts.push(`$ ${args.join(' ')} -> ${r.code}\n${r.out}${r.err}`);
+      }
+      return parts.join('\n');
+    });
+  }
+  const ref = outs[BACKEND_LIST[0]];
+  assert.match(ref, /function größe/);
+  for (const b of BACKEND_LIST) assert.equal(outs[b], ref, `${b} differs from ${BACKEND_LIST[0]}`);
+});
+
+test('backends: ripgrep honours .gitignore and .ignore, also outside a git work tree; hidden folders and skipped folders behave as with git', { skip: RG_SKIP }, async () => {
+  const dir = mkTmp('sym-rg-ignore-');
+  putFiles(dir, {
+    '.gitignore': 'ignored/\n',
+    '.ignore': 'skipme.ts\n',
+    'ignored/x.ts': 'export function lookme() {}\n',
+    'skipme.ts': 'export function lookme() {}\n',
+    'kept.ts': 'export function lookme() {}\n',
+    '.dot/y.ts': 'export function lookme() {}\n',
+    'node_modules/z.ts': 'export function lookme() {}\n',
+  });
+  const m = await viaBackend('rg', {}, () => grepWord(['lookme'], { cwd: dir }));
+  assert.deepEqual([...m.keys()].sort(), ['.dot/y.ts', 'kept.ts']);
+});
+
+test('backends: HYDOR_RG names the ripgrep to use; a missing file falls back to rg on PATH and then to git grep / grep', async () => {
+  assert.equal(rgCommand({ HYDOR_RG: process.execPath }), process.execPath);
+  assert.equal(rgCommand({ HYDOR_RG: path.join(os.tmpdir(), 'no-such-rg-binary') }), 'rg');
+  assert.equal(rgCommand({}), 'rg');
+  assert.equal(rgCommand({ HYDOR_RG: os.tmpdir() }), 'rg', 'a directory is not a program');
+  const dir = mkProject();
+  // no usable ripgrep anywhere (PATH without it, HYDOR_RG pointing nowhere): the search still works through git grep
+  const empty = mkTmp('sym-nopath-');
+  const gitDir = path.dirname(execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim());
+  const m = await withEnv({ SYM_BACKEND: undefined, HYDOR_RG: path.join(empty, 'missing'), PATH: [empty, gitDir].join(path.delimiter) }, () => grepWord(['target'], { cwd: dir }));
+  assert.ok(m.has('src/a.ts'));
+  // the automatic order starts with the ripgrep named by HYDOR_RG: a stand-in that prints one match proves it was the one run
+  const fake = path.join(empty, 'fake-rg');
+  fs.writeFileSync(fake, `#!/bin/sh\necho "$@" > "${path.join(empty, 'rg.args')}"\nprintf 'src/a.ts\\000'\nprintf '7:fake target\\n'\nexit 0\n`, { mode: 0o755 });
+  const m2 = await withEnv({ SYM_BACKEND: undefined, HYDOR_RG: fake }, () => grepWord(['target'], { cwd: dir }));
+  assert.deepEqual([...m2], [['src/a.ts', [{ n: 7, text: 'fake target' }]]]);
+  assert.match(fs.readFileSync(path.join(empty, 'rg.args'), 'utf8'), /--fixed-strings .*-e target -- \.\n$/);
+});
+
+test('backends: with no search tool at all sym says so (exit 3) instead of reporting nothing found', async () => {
+  const dir = mkProject();
+  const empty = mkTmp('sym-notools-');
+  const r = await withEnv({ SYM_BACKEND: undefined, HYDOR_RG: undefined, PATH: empty }, () => sym(['target'], dir));
+  assert.equal(r.code, 3);
+  assert.match(r.err, /^sym: no search tool could be run \(install ripgrep, or git, or grep\)\n$/);
+  assert.equal(r.out, '');
+});
+
+test('backends: a ripgrep that cannot run (exit 2, no output) falls through to git grep', async () => {
+  const dir = mkProject();
+  const empty = mkTmp('sym-badrg-');
+  const bad = path.join(empty, 'rg');
+  fs.writeFileSync(bad, '#!/bin/sh\necho "rg: unrecognized flag" >&2\nexit 2\n', { mode: 0o755 });
+  const m = await withEnv({ SYM_BACKEND: undefined, HYDOR_RG: bad }, () => grepWord(['target'], { cwd: dir }));
+  assert.ok(m.has('src/a.ts') && m.has('src/untracked.ts'));
+});
+
+test('rg command line: fixed-string, whole-word, same globs and exclusions, ignore files honoured, hidden included', () => {
+  const a = rgArgs(['Foo', 'bar'], ['src']);
+  for (const f of ['--fixed-strings', '--word-regexp', '--hidden', '--null', '--line-number', '--no-config']) assert.ok(a.includes(f), f);
+  assert.ok(!a.includes('--no-ignore') && !a.includes('-u'), 'ignore files are honoured');
+  assert.deepEqual(a.slice(a.indexOf('--')), ['--', 'src']);
+  assert.deepEqual(a.filter((x, i) => a[i - 1] === '-e'), ['Foo', 'bar']);
+  const types = a.filter((x, i) => a[i - 1] === '--type-add');
+  for (const g of ['*.ts', '*.tsx', '*.mts', '*.cts', '*.js', '*.jsx', '*.mjs', '*.cjs', '*.py', '*.pyi', '*.rs']) assert.ok(types.includes(`sym:${g}`), g);
+  assert.deepEqual(a.filter((x, i) => a[i - 1] === '--type'), ['sym']);
+  assert.ok(!a.includes('-g') || a.filter((x, i) => a[i - 1] === '-g').every((g) => g.startsWith('!')), 'no whitelist glob: it would override the ignore files');
+  const globs = a.filter((x, i) => a[i - 1] === '-g');
+  for (const g of ['!node_modules', '!dist', '!build', '!target', '!.git', '!venv', '!.venv', '!__pycache__', '!site-packages', '!*.min.js']) assert.ok(globs.includes(g), g);
+  assert.deepEqual(rgArgs(['x'], null).slice(-2), ['--', '.']);
+});
+
+test('output parsers: rg, git grep and grep lines, CRLF text, colons in text, binary-file notices', () => {
+  assert.deepEqual(parseRg('./src/a.ts\x0012:  const x = 1; // a:b\nsrc/b.ts\x007:y\r\nsrc/bin.ts\x00binary file matches (found "\\0" byte around offset 3)\n'), [
+    { file: 'src/a.ts', n: 12, text: '  const x = 1; // a:b' },
+    { file: 'src/b.ts', n: 7, text: 'y\r' },
+  ]);
+  assert.deepEqual(parseRg('.\\src\\w.ts\x003:z\n'), [{ file: '.\\src\\w.ts', n: 3, text: 'z' }], 'POSIX keeps a backslash as part of the name');
+  assert.deepEqual(parseGitGrep('src/a.ts\x0012\x00  x: 1\n\nsrc/café/naïve.ts\x001\x00größe\n'), [
+    { file: 'src/a.ts', n: 12, text: '  x: 1' }, { file: 'src/café/naïve.ts', n: 1, text: 'größe' }]);
+  assert.deepEqual(parseGrep('./src/a.ts:12:  x: 1\nsrc/b.ts:3:a:4:b\nsrc/c.js:1:function f() {\r\ngarbage\n'), [
+    { file: 'src/a.ts', n: 12, text: '  x: 1' }, { file: 'src/b.ts', n: 3, text: 'a:4:b' }, { file: 'src/c.js', n: 1, text: 'function f() {\r' }],
+  'a CRLF line is a candidate too');
+  const L = (file, text) => ({ file, n: 1, text });
+  assert.deepEqual(keepFilesWithAllWords([L('a', 'Foo bar'), L('b', 'Foo only'), L('b', 'again Foo'), L('c', 'bar'), L('c', 'Foo')], ['Foo', 'bar']).map((l) => l.file), ['a', 'c', 'c']);
+  assert.deepEqual(keepFilesWithAllWords([L('a', 'Foo')], ['Foo']).length, 1);
+  assert.equal(keepFilesWithAllWords([L('a', 'FooBar bar')], ['Foo', 'bar']).length, 0, 'whole words only');
+});
+
+// ------------------------------------------------------------------ locale and encodings
+
+test('locale: Linux keeps C.UTF-8, other systems get the C locale that every system has', () => {
+  assert.equal(searchLocale('linux'), 'C.UTF-8');
+  assert.equal(searchLocale('darwin'), 'C');
+  assert.equal(searchLocale('win32'), 'C');
+});
+
+test('locale: non-ASCII identifiers and paths work through every backend with the macOS and Windows locale rules', async () => {
+  const dir = mkProject();
+  for (const plat of ['darwin', 'win32']) {
+    for (const b of BACKEND_LIST) {
+      // LANG=C and no LC_ALL: what a GUI-launched app on macOS has
+      const r = await viaBackend(b, { SYM_FAKE_PLATFORM: plat, LANG: 'C', LC_ALL: undefined, LC_CTYPE: undefined }, () => sym(['größe', '識別子'], dir));
+      assert.equal(r.code, 0, `${plat}/${b}: ${r.out}${r.err}`);
+      assert.match(r.out, /^src\/café\/naïve\.ts:1-3 {2}function größe/m, `${plat}/${b}`);
+      assert.match(r.out, /^src\/café\/naïve\.ts:4-4 {2}const 識別子/m, `${plat}/${b}`);
+      assert.match(r.out, /return 1;/);
+    }
+  }
+});
+
+test('locale: a file with invalid UTF-8 (Latin-1 comment) is still searched byte-safely (macOS and Windows rules)', async () => {
+  const dir = mkProject();
+  fs.writeFileSync(path.join(dir, 'src', 'latin1.ts'), Buffer.concat([Buffer.from('// caf'), Buffer.from([0xe9]), Buffer.from('\nexport function legacyOne() {}\n')]));
+  for (const b of BACKEND_LIST) {
+    const m = await viaBackend(b, { SYM_FAKE_PLATFORM: 'darwin', LC_ALL: undefined }, () => grepWord(['legacyOne'], { cwd: dir }));
+    assert.deepEqual([...m.keys()], ['src/latin1.ts'], b);
+    assert.equal(m.get('src/latin1.ts')[0].n, 2, b);
+  }
+});
+
+// ------------------------------------------------------------------ paths: forward slashes, drive letters, backslashes
+
+test('paths (Windows flavour): printed paths use forward slashes, drive letters and backslashes work', () => {
+  const w = path.win32;
+  assert.equal(posixPath('src\\a\\b.ts', w), 'src/a/b.ts');
+  assert.equal(posixPath('src\\a\\b.ts', path.posix), 'src\\a\\b.ts', 'a POSIX file name may contain a backslash');
+  assert.equal(relPosix('C:\\proj', 'C:\\proj\\src\\a.ts', w), 'src/a.ts');
+  assert.equal(relPosix('C:\\proj', 'src\\a.ts', w), 'src/a.ts');
+  assert.equal(relPosix('C:\\proj', 'src/a.ts', w), 'src/a.ts');
+  assert.equal(relPosix('c:\\Proj', 'C:\\proj\\src\\a.ts', w), 'src/a.ts', 'drive letter and case are not significant');
+  assert.equal(relPosix('C:\\proj\\sub', 'C:\\proj\\lib\\x.ts', w), '../lib/x.ts');
+  assert.equal(relPosix('C:\\proj', 'D:\\other\\x.ts', w), 'D:/other/x.ts', 'another drive stays absolute');
+  assert.equal(relPosix('C:\\proj', 'C:\\proj', w), '');
+  assert.equal(relOrDot('C:\\proj', 'C:\\proj\\', w), '.');
+  assert.equal(relOrDot('C:\\proj', 'src', w), 'src');
+  assert.equal(relOrDot('/work/p', '/work/p/src/a.ts', path.posix), 'src/a.ts');
+  assert.equal(cleanFound('.\\src\\a.ts', w), 'src/a.ts');
+  assert.equal(cleanFound('./src/a.ts', w), 'src/a.ts');
+  assert.equal(cleanFound('./src/a.ts', path.posix), 'src/a.ts');
+  assert.deepEqual(relSegments('C:\\proj\\sub', 'C:\\proj\\lib\\x.ts', w), ['..', 'lib', 'x.ts']);
+  assert.deepEqual(relSegments('/p/sub', '../lib/x.ts', path.posix), ['..', 'lib', 'x.ts']);
+});
+
+test('paths: isWithin on both flavours (siblings with a common prefix and ..names are not inside)', () => {
+  const w = path.win32;
+  assert.equal(isWithin('C:\\proj\\src\\a.ts', 'C:\\proj\\src', w), true);
+  assert.equal(isWithin('C:\\proj\\src', 'C:\\proj\\src', w), true);
+  assert.equal(isWithin('c:\\PROJ\\SRC\\a.ts', 'C:\\proj\\src', w), true);
+  assert.equal(isWithin('C:\\proj\\srcx\\a.ts', 'C:\\proj\\src', w), false);
+  assert.equal(isWithin('D:\\proj\\src\\a.ts', 'C:\\proj\\src', w), false);
+  assert.equal(isWithin('C:\\proj\\..foo\\a.ts', 'C:\\proj\\..foo', w), true);
+  assert.equal(isWithin('C:\\proj\\a.ts', 'C:\\proj\\src', w), false);
+  assert.equal(isWithin('/p/src/a.ts', '/p/src', path.posix), true);
+  assert.equal(isWithin('/p/srcx/a.ts', '/p/src', path.posix), false);
+  assert.equal(isWithin('/p/other', '/p/src', path.posix), false);
+});
+
+test('paths: Python module names from files, with POSIX and Windows paths', () => {
+  const w = path.win32;
+  assert.equal(moduleStem('src/forms.py'), 'forms');
+  assert.equal(moduleStem('src\\forms.pyi', w), 'forms');
+  assert.equal(moduleStem('lib/pkg/__init__.py'), 'pkg');
+  assert.equal(moduleStem('C:\\proj\\lib\\pkg\\__init__.py', w), 'pkg');
+  assert.equal(moduleStem('src/a.ts'), null);
+  assert.equal(pyStemMatches('C:\\proj\\forms.py', 'forms', w), true);
+  assert.equal(pyStemMatches('C:\\proj\\forms.py', 'other', w), false);
+  assert.equal(pyStemMatches('src/forms.rs', 'forms'), false);
+});
+
+test('paths: classification of Windows-style paths', () => {
+  assert.equal(isTestPath('src\\__tests__\\a.ts'), true);
+  assert.equal(isTestPath('C:\\proj\\src\\latest.ts'), false);
+  assert.equal(skipPath('node_modules/x/a.js'), true);
 });

@@ -3,10 +3,11 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { parseArgs } from 'node:util';
 import { langFilter, langForFile, family, loadLanguage, preload } from './grammar.mjs';
-import { grepWord, declLineRegex, isTestPath, escapeRe } from './search.mjs';
+import { grepWord, declLineRegex, isTestPath, escapeRe, SearchToolError } from './search.mjs';
 import { FileCache, findDeclsInFile, outlineOf } from './core.mjs';
 import { selectDefs, sortDefs, normalizeKind, isTestDecl } from './select.mjs';
 import { refsInFile } from './refs.mjs';
+import { relPosix } from './paths.mjs';
 import { headerLine, renderBody, renderFitted, allocate, cutLine, displayName, attrText } from './format.mjs';
 
 const HELP = `sym - symbol definitions with full bodies, references and outlines (no index; parses candidate files on demand)
@@ -86,7 +87,11 @@ async function collectCandidates(parts, opts) {
 // Runs the CLI; returns the exit code. `io` ({out, err}) lets tests capture output.
 export async function main(argv, cwd = process.cwd(), io = null) {
   RT = { out: io ? io.out : (s) => process.stdout.write(s), err: io ? io.err : (s) => process.stderr.write(s), code: 0 };
-  await run(argv, cwd);
+  try { await run(argv, cwd); } catch (e) {
+    if (!(e instanceof SearchToolError)) throw e;
+    RT.err(`sym: ${e.message}\n`);
+    RT.code = 3;
+  }
   return RT.code;
 }
 
@@ -316,7 +321,7 @@ async function outlineMode(files, cfg, cache) {
   let ok = 0;
   await preload(files.map(langForFile));
   for (const f of files) {
-    const rel = path.relative(cfg.cwd, path.resolve(cfg.cwd, f)) || f;
+    const rel = relPosix(cfg.cwd, f) || f;
     const abs = path.resolve(cfg.cwd, f);
     if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory()) { out.push(`${f}: no such file`); continue; }
     if (!langForFile(f)) { out.push(`${f}: unsupported file type (supported: .ts .tsx .js .jsx .mjs .cjs .py .rs)`); continue; }
