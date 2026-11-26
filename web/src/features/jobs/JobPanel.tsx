@@ -10,6 +10,7 @@ import { CopyButton } from '../../components/Markdown';
 import { Button, cx, IconButton, Sheet, Throbber } from '../../components/ui';
 import { fullDate, JobDot, JobIcon, JobLinks, linkCls, openJob, openWords, taggable, toneState, useKindLabel } from './JobRow';
 import { TagPills } from './TagPill';
+import { projectOf } from './tags';
 import { allDoneWords, endedReason, progressText, percent, queuePlace, runClock, startsIn, stateWords, timeLeft, tookTime, waitingWords } from './words';
 
 /** One of the details: its label and what it is; `wide` takes the whole row. */
@@ -25,6 +26,7 @@ function Detail({ label, wide, children }: { label: string; wide?: boolean; chil
 /** What is known of a job, only what it has. */
 function Details({ job, now, waits, then, onShow }: { job: JobEntry; now: number; waits: JobEntry[]; then: JobEntry[]; onShow: (id: string) => void }) {
   const { session } = job;
+  const project = projectOf(job);
   const running = job.state === 'running';
   const queued = job.state === 'queued';
   const left = timeLeft(job, now);
@@ -44,10 +46,10 @@ function Details({ job, now, waits, then, onShow }: { job: JobEntry; now: number
           </button>
         </Detail>
       )}
-      {session?.project && (
+      {project && (
         <Detail label="Project">
-          <button type="button" translate="no" onClick={() => openProject(session.project!.id)} className={cx(linkCls, 'block max-w-full')}>
-            {session.project.name}
+          <button type="button" translate="no" onClick={() => openProject(project.id)} className={cx(linkCls, 'block max-w-full')}>
+            {project.name}
           </button>
         </Detail>
       )}

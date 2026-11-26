@@ -21,7 +21,7 @@ Quatre cases en haut résument la situation :
 - **Tout est terminé** : quand l’ensemble de ce travail devrait être fini, par exemple « dans environ 2 h 10 min ». La case affiche un tiret tant que chaque traitement n’a pas une estimation encore à venir, sans compter les sous-agents, qui n’en ont jamais ;
 - **Terminés aujourd’hui** : combien se sont terminés aujourd’hui. À côté, « 1 en échec » (ou le nombre en question) vous y conduit.
 
-Sous les cases se trouvent une pastille pour chaque [étiquette](#tags) et le champ **Filtrer les traitements**. Saisissez du texte dans ce champ pour ne voir que les traitements dont le nom, la commande, la session, le projet ou les étiquettes contiennent ces mots ; **Afficher tous les traitements** fait tout réapparaître quand rien ne correspond. En dessous viennent **En activité**, **Serveurs** et **Terminés**, chacune présente quand elle a quelque chose à montrer. Les cases ne comptent que ce que l’étiquette et le filtre laissent affiché. Les serveurs en marche ne sont comptés ni dans les cases ni dans le nombre de la barre d’icônes. La page se met à jour toute seule.
+Sous les cases se trouvent une pastille pour chaque [étiquette](#tags), le menu des projets (**Tous les projets**, voir [Voir les traitements d’un projet](#see-one-projects-jobs)) et le champ **Filtrer les traitements**. Saisissez du texte dans ce champ pour ne voir que les traitements dont le nom, la commande, la session, le projet ou les étiquettes contiennent ces mots ; **Afficher tous les traitements** fait tout réapparaître quand rien ne correspond. En dessous viennent **En activité**, **Serveurs** et **Terminés**, chacune présente quand elle a quelque chose à montrer. Les cases ne comptent que ce que l’étiquette, le projet et le filtre laissent affiché. Les serveurs en marche ne sont comptés ni dans les cases ni dans le nombre de la barre d’icônes. La page se met à jour toute seule.
 
 Quand rien ne tourne ni n’attend, vous lisez « Rien ne tourne en arrière-plan pour le moment. »
 
@@ -29,7 +29,7 @@ Quand rien ne tourne ni n’attend, vous lisez « Rien ne tourne en arrière-pla
 
 **En activité** regroupe les traitements en cours et ceux qui attendent, dans une carte par étiquette ; les traitements sans étiquette sont dans la dernière, **Sans étiquette**. Le haut d’une carte montre l’étiquette, combien de ses traitements tournent et attendent (par exemple « 3 en cours · 1 en attente ») et, quand chacun d’eux a une estimation, quand ils devraient être finis (« terminé dans environ 34 min »). Quand tout le travail d’une carte vient d’une seule session, cette session et son projet y sont aussi indiqués, et les lignes ne les répètent pas. Cliquez sur le haut d’une carte pour la replier ou la rouvrir ; l’application s’en souvient dans ce navigateur. Pendant que vous filtrez ou qu’une étiquette est choisie, rien n’est replié. Tant qu’aucun traitement n’a d’étiquette, ils sont simplement listés, sans cartes par étiquette.
 
-Chaque traitement occupe une ligne. Son icône indique de quel type il est (survolez-la pour lire **Commande**, **Surveillance**, **Sous-agent Claude Code**, **Sous-agent Hydor**, **Exécution d’expérience** ou **Traitement**), et le point sur l’icône indique son état. À côté du nom figurent les éventuelles autres étiquettes ; survolez le nom pour voir sa commande. En dessous se trouvent sa situation, la session qui l’a démarré et son projet (chacun étant un lien), puis la dernière chose qu’il a affichée.
+Chaque traitement occupe une ligne. Son icône indique de quel type il est (survolez-la pour lire **Commande**, **Surveillance**, **Sous-agent Claude Code**, **Sous-agent Hydor**, **Exécution d’expérience** ou **Traitement**), et le point sur l’icône indique son état. À côté du nom figurent les éventuelles autres étiquettes ; survolez le nom pour voir sa commande. En dessous se trouvent sa situation, la session qui l’a démarré et son [projet](#see-one-projects-jobs) (chacun étant un lien), puis la dernière chose qu’il a affichée.
 
 Cliquez sur une ligne pour ouvrir [le panneau du traitement](#a-jobs-panel-and-stop). Son menu **⋯** propose **Détails et sortie**, **Ouvrir la session** (**Ouvrir l’exécution** pour une exécution des Expériences), **Modifier les étiquettes…** et **Arrêter**.
 
@@ -74,7 +74,7 @@ Certaines commandes ne se terminent jamais d’elles-mêmes : un serveur de dév
 - **Jamais démarré**, avec la raison, par exemple l’échec d’un traitement qu’il attendait ;
 - **Terminé** : un travail qui tournait déjà quand il a été ajouté à la page Jobs s’est terminé, et personne n’a vu s’il s’était bien passé.
 
-Quand quelque chose a échoué, passez de **Tout** à **Échec** pour ne voir que ces cas. **Retirer de cette liste**, dans le menu **⋯** d’une ligne, en enlève un, et **Effacer** les enlève tous après confirmation, y compris ceux qu’une étiquette ou le filtre masque. Cela ne fait que ranger la liste : vos sessions et les exécutions des Expériences restent.
+Quand quelque chose a échoué, passez de **Tout** à **Échec** pour ne voir que ces cas. **Retirer de cette liste**, dans le menu **⋯** d’une ligne, en enlève un, et **Effacer** les enlève tous après confirmation, y compris ceux qu’une étiquette, le menu des projets ou le filtre masque. Cela ne fait que ranger la liste : vos sessions et les exécutions des Expériences restent.
 
 ## Étiquettes
 
@@ -99,9 +99,23 @@ Cliquez sur la pastille d’une étiquette pour ne voir que le travail listé so
 
 L’étiquette choisie fait partie de l’adresse de la page (qui se termine par `?tag=` suivi du nom de l’étiquette) : vous pouvez donc l’ajouter à vos favoris ou l’envoyer sur votre téléphone. Une pastille se fonde sur la première étiquette de chaque traitement ; pour trouver un traitement par une autre de ses étiquettes, saisissez celle-ci dans **Filtrer les traitements**.
 
+## Voir les traitements d’un projet
+
+Le menu des projets se trouve à côté de **Filtrer les traitements**. Il affiche **Tous les projets**, ou le nom du projet choisi, avec sa marque. Ouvrez-le pour choisir :
+
+- **Tous les projets** : tous les traitements ;
+- un projet qui a des traitements ici ; le nombre à côté indique combien d’entre eux tournent ou attendent ;
+- **Aucun projet** : les traitements qui n’appartiennent à aucun.
+
+Les cases, **En activité**, **Serveurs**, **Terminés** et la chronologie ne montrent alors que ces traitements. Choisir un projet vous ramène à la pastille **Tout**, et les pastilles et leurs nombres ne portent que sur ses traitements ; cliquez sur l’une d’elles pour voir cette étiquette au sein du projet. Tant qu’un seul projet est choisi, les lignes n’indiquent pas son nom. Le menu apparaît dès qu’un traitement appartient à un projet.
+
+Le projet choisi fait lui aussi partie de l’adresse de la page (`?project=` suivi de son identifiant, ou `?project=none`) : vous pouvez donc l’ajouter à vos favoris. Les traitements d’un [groupe](/guide/projects#bring-projects-together-in-a-group) comprennent ceux des projets qu’il réunit. Tant qu’un projet a des traitements en cours ou en attente, ou des serveurs restés en marche, sa propre page les montre sous [Vue d’ensemble](/guide/projects#overview).
+
+Un traitement appartient au projet de sa session. Quand il n’y en a pas (sa session n’est dans aucun projet, ou il n’a pas de session, comme un traitement lancé depuis votre propre terminal ou une exécution lancée sur la page Expériences), il appartient au projet dans le dossier duquel il s’exécute. Quand le dossier d’un projet se trouve dans celui d’un autre, c’est le projet intérieur qui le reçoit. Un groupe, de même qu’un projet dont le dossier est votre dossier personnel ou un disque entier, ne reçoit jamais de traitements de cette façon. Le panneau d’un traitement indique son **Projet**.
+
 ## La vue Chronologie
 
-Passez de **Liste** à **Chronologie** en haut à droite ; l’application retient votre choix dans ce navigateur. La chronologie trace, le long des heures, une barre pour chaque traitement en cours ou en attente, avec un point de la couleur de son étiquette devant son nom. Les pastilles d’étiquettes et **Filtrer les traitements** la restreignent comme la liste :
+Passez de **Liste** à **Chronologie** en haut à droite ; l’application retient votre choix dans ce navigateur. La chronologie trace, le long des heures, une barre pour chaque traitement en cours ou en attente, avec un point de la couleur de son étiquette devant son nom. Les pastilles d’étiquettes, le menu des projets et **Filtrer les traitements** la restreignent comme la liste :
 
 - **Exécution jusqu’ici** correspond à la partie pleine, et **Estimation** à la partie rayée au-delà ;
 - les traitements **En file d’attente** sont en pointillés, à l’endroit où ils devraient démarrer ;
@@ -139,6 +153,7 @@ Si l’application est injoignable au moment où un agent lance un traitement, l
 - « Lance l’évaluation sous forme de traitement une fois la construction de l’index terminée. »
 - « Ajoute l’étiquette search-index à la construction de l’index. »
 - « Qu’est-ce qui tourne encore pour intent-data ? »
+- « Qu’est-ce qui tourne dans mon projet Thèse ? »
 - « Montre dans Jobs l’entraînement que tu as lancé tout à l’heure. »
 - « Exécute ces trois balayages un par un dans une file d’attente. »
 - « Qu’est-ce qui tourne encore, et quand est-ce que ce sera fini ? »

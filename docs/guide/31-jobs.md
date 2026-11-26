@@ -21,7 +21,7 @@ Four tiles at the top sum it up:
 - **All done**: when all of that work should be finished, such as "in about 2 h 10 min". It shows a dash unless every job has an estimate still to come, leaving out subagents, which never have one;
 - **Finished today**: how many ended today. Beside it, "1 failed" or however many there are takes you to them.
 
-Under the tiles are a chip for each [tag](#tags) and the field **Filter jobs**. Type in the field to see only the jobs whose name, command, session, project or tags have those words; **Show all jobs** brings everything back when nothing matches. Below are **At work**, **Servers** and **Finished**, each there when it has something to show. The tiles count only what the tag and the filter leave. Servers that run are not counted in the tiles or in the number on the rail. The page updates by itself.
+Under the tiles are a chip for each [tag](#tags), the project menu (**All projects**, see [See one project's jobs](#see-one-projects-jobs)) and the field **Filter jobs**. Type in the field to see only the jobs whose name, command, session, project or tags have those words; **Show all jobs** brings everything back when nothing matches. Below are **At work**, **Servers** and **Finished**, each there when it has something to show. The tiles count only what the tag, the project and the filter leave. Servers that run are not counted in the tiles or in the number on the rail. The page updates by itself.
 
 When nothing runs or waits, you read "Nothing runs in the background now."
 
@@ -29,7 +29,7 @@ When nothing runs or waits, you read "Nothing runs in the background now."
 
 **At work** holds the jobs that run and the ones that wait, in a card for each tag; the jobs with no tag are in the last one, **No tag**. The top of a card shows the tag, how many of its jobs run and wait (such as "3 running · 1 queued") and, when each of them has an estimate, when they should be done ("done in about 34 min"). When all of a card's work comes from one session, that session and its project are named there too, and its rows leave them out. Click the top of a card to fold it away or open it again; the app remembers this in this browser. While you filter or have a tag picked, nothing is folded. While no job has a tag, the jobs are simply listed, with no cards by tag.
 
-Each job is one row. Its icon says what kind it is (point at it to read **Command**, **Monitor**, **Claude Code subagent**, **Hydor subagent**, **Experiment run** or **Job**), and the dot on the icon its state. Beside the name are any further tags; point at the name to see its command. Under it are how it stands, the session that started it and its project, each a link, and the last thing it printed.
+Each job is one row. Its icon says what kind it is (point at it to read **Command**, **Monitor**, **Claude Code subagent**, **Hydor subagent**, **Experiment run** or **Job**), and the dot on the icon its state. Beside the name are any further tags; point at the name to see its command. Under it are how it stands, the session that started it and its [project](#see-one-projects-jobs), each a link, and the last thing it printed.
 
 Click a row to open [the job's panel](#a-jobs-panel-and-stop). Its **⋯** menu has **Details and output**, **Open session** (**Open run** for a run of Experiments), **Edit tags…** and **Stop**.
 
@@ -74,7 +74,7 @@ Some commands never finish by themselves: a development server, a web or API ser
 - **Never started**, and the reason, such as a job it waited for having failed;
 - **Ended**: work that was already running when it was added to Jobs has ended, and nobody saw whether it went well.
 
-When something failed, switch from **All** to **Failed** to see only those. **Remove from this list**, in a row's **⋯** menu, takes one out, and **Clear** takes them all out after asking, including those a tag or the filter hides. This only tidies the list: your sessions and runs of Experiments stay.
+When something failed, switch from **All** to **Failed** to see only those. **Remove from this list**, in a row's **⋯** menu, takes one out, and **Clear** takes them all out after asking, including those a tag, the project menu or the filter hides. This only tidies the list: your sessions and runs of Experiments stay.
 
 ## Tags
 
@@ -99,9 +99,23 @@ Click a tag's chip to see only the work listed under it: the tiles, **At work**,
 
 The tag you pick is part of the page's address (it ends in `?tag=` and the tag's name), so you can bookmark it or send it to your phone. A chip goes by each job's first tag; to find a job by another of its tags, type that tag in **Filter jobs**.
 
+## See one project's jobs
+
+The project menu stands beside **Filter jobs**. It says **All projects**, or the name of the project you picked, with its mark. Open it to pick:
+
+- **All projects**: every job;
+- a project that has jobs here; the number beside it says how many of them run or wait;
+- **No project**: the jobs that belong to none.
+
+The tiles, **At work**, **Servers**, **Finished** and the timeline then show only those jobs. Picking a project takes you back to the chip **All**, and the chips and their numbers cover only its jobs; click one to see that tag within the project. While one project is picked, the rows leave its name out. The menu shows once some job belongs to a project.
+
+The project you pick is part of the page's address too (`?project=` and its id, or `?project=none`), so you can bookmark it. A [group](/guide/projects#bring-projects-together-in-a-group)'s jobs include those of the projects it brings together. While a project has jobs running or waiting, or servers left running, its own page shows them under [Overview](/guide/projects#overview).
+
+A job belongs to its session's project. When there is none (its session is in no project, or it has no session, such as a job you started from your own terminal or a run you started on the Experiments page), it belongs to the project whose folder it runs in. When one project's folder is inside another's, the inner project gets it. A group, and a project whose folder is your home folder or a whole disk, never get jobs this way. A job's panel names its **Project**.
+
 ## The Timeline view
 
-Switch between **List** and **Timeline** at the top right; the app remembers your choice in this browser. The timeline draws one bar for each job that runs or waits, along the clock, with a dot of its tag's colour before its name. The tag chips and **Filter jobs** narrow it as they do the list:
+Switch between **List** and **Timeline** at the top right; the app remembers your choice in this browser. The timeline draws one bar for each job that runs or waits, along the clock, with a dot of its tag's colour before its name. The tag chips, the project menu and **Filter jobs** narrow it as they do the list:
 
 - **Run so far** is solid, and **Estimated** is the striped part beyond it;
 - **Queued** jobs are dashed, where they should start;
@@ -139,6 +153,7 @@ If the app can't be reached when an agent starts a job, the command runs anyway;
 - "Run the evaluation as a job after the index build finishes."
 - "Tag the index build as search-index."
 - "What is still running for intent-data?"
+- "What is running in my Thesis project?"
 - "Show the training you started earlier in Jobs."
 - "Run these three sweeps one at a time in a queue."
 - "What is still running, and when will it be done?"

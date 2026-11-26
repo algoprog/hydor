@@ -28198,5 +28198,6 @@
   "in about {0} h {1} min": "約{0}時間{1}分後",
   "jobs::Done": "完了",
   "Long work your sessions run in the background, sorted by tags: what runs, how long it has left, and what waits for what.": "セッションがバックグラウンドで実行する長時間の作業をタグごとに整理して表示します。何が実行中か、残り時間はどれくらいか、何が何を待っているかを確認できます。",
-  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag filter group organize sort search failed today": "ジョブ バックグラウンドタスク 長時間の作業 実行中 キュー 待機中 順番待ち 完了後 依存関係 ひとつずつ 順番に 進捗 パーセント 残り時間 予想 eta あとどれくらい 完了 失敗 停止 タイムライン ガントチャート 出力 ログ 中止 コマンド 監視 モニター サブエージェント サーバー 開発サーバー ビルド 学習実行 トレーニング インデックス作成 ダウンロード job command 引き継ぐ タグ フィルタ グループ 整理 並べ替え 検索 今日失敗した"
+  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag filter group organize sort search failed today": "ジョブ バックグラウンドタスク 長時間の作業 実行中 キュー 待機中 順番待ち 完了後 依存関係 ひとつずつ 順番に 進捗 パーセント 残り時間 予想 eta あとどれくらい 完了 失敗 停止 タイムライン ガントチャート 出力 ログ 中止 コマンド 監視 モニター サブエージェント サーバー 開発サーバー ビルド 学習実行 トレーニング インデックス作成 ダウンロード job command 引き継ぐ タグ フィルタ グループ 整理 並べ替え 検索 今日失敗した",
+  "All jobs": "すべてのジョブ"
 }

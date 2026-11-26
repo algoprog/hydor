@@ -21,7 +21,7 @@ Vier Kacheln oben fassen alles zusammen:
 - **Alles erledigt**: wann all diese Arbeit fertig sein sollte, zum Beispiel „in etwa 2 h 10 min“. Dort steht ein Strich, solange nicht für jeden Job eine Schätzung vorliegt. Subagenten zählen dabei nicht mit, denn für sie gibt es nie eine;
 - **Heute beendet**: wie viele heute geendet haben. Daneben bringt dich „Fehlgeschlagen: 1“ (mit der jeweiligen Zahl) direkt zu ihnen.
 
-Unter den Kacheln stehen ein Chip für jeden [Tag](#tags) und das Feld **Jobs filtern**. Tippe in das Feld, um nur die Jobs zu sehen, deren Name, Befehl, Sitzung, Projekt oder Tags diese Wörter enthalten. Passt nichts, bringt **Alle Jobs anzeigen** alles zurück. Darunter folgen **In Arbeit**, **Server** und **Abgeschlossen**, jeweils nur, wenn es dort etwas zu zeigen gibt. Die Kacheln zählen nur, was Tag und Filter übrig lassen. Laufende Server werden weder in den Kacheln noch in der Zahl in der Leiste mitgezählt. Die Seite aktualisiert sich von selbst.
+Unter den Kacheln stehen ein Chip für jeden [Tag](#tags), das Projektmenü (**Alle Projekte**, siehe [Die Jobs eines Projekts ansehen](#see-one-projects-jobs)) und das Feld **Jobs filtern**. Tippe in das Feld, um nur die Jobs zu sehen, deren Name, Befehl, Sitzung, Projekt oder Tags diese Wörter enthalten. Passt nichts, bringt **Alle Jobs anzeigen** alles zurück. Darunter folgen **In Arbeit**, **Server** und **Abgeschlossen**, jeweils nur, wenn es dort etwas zu zeigen gibt. Die Kacheln zählen nur, was Tag, Projekt und Filter übrig lassen. Laufende Server werden weder in den Kacheln noch in der Zahl in der Leiste mitgezählt. Die Seite aktualisiert sich von selbst.
 
 Wenn nichts läuft oder wartet, liest du „Gerade läuft nichts im Hintergrund.“
 
@@ -29,7 +29,7 @@ Wenn nichts läuft oder wartet, liest du „Gerade läuft nichts im Hintergrund.
 
 **In Arbeit** enthält die Jobs, die laufen, und die, die warten, mit einer Karte für jeden Tag. Die Jobs ohne Tag stehen in der letzten, **Ohne Tag**. Oben auf einer Karte stehen der Tag, wie viele seiner Jobs laufen und warten (zum Beispiel „3 aktiv · 1 in der Warteschlange“) und, wenn für jeden eine Schätzung vorliegt, wann sie fertig sein sollten („fertig in etwa 34 min“). Stammt die gesamte Arbeit einer Karte aus einer Sitzung, werden diese Sitzung und ihr Projekt auch dort genannt, und in den Zeilen fehlen sie dann. Klicke oben auf eine Karte, um sie einzuklappen oder wieder zu öffnen. Die App merkt sich das in diesem Browser. Während du filterst oder einen Tag ausgewählt hast, ist nichts eingeklappt. Solange kein Job einen Tag hat, werden die Jobs einfach aufgelistet, ohne Karten nach Tags.
 
-Jeder Job ist eine Zeile. Das Symbol sagt, welche Art er ist (zeige darauf, um **Befehl**, **Überwachung**, **Claude Code Subagent**, **Hydor-Subagent**, **Experiment-Durchlauf** oder **Job** zu lesen), und der Punkt am Symbol zeigt seinen Zustand. Neben dem Namen stehen weitere Tags. Zeige auf den Namen, um den Befehl zu sehen. Darunter stehen der aktuelle Stand, die Sitzung, die ihn gestartet hat, und ihr Projekt (beide als Link) sowie das Letzte, was er ausgegeben hat.
+Jeder Job ist eine Zeile. Das Symbol sagt, welche Art er ist (zeige darauf, um **Befehl**, **Überwachung**, **Claude Code Subagent**, **Hydor-Subagent**, **Experiment-Durchlauf** oder **Job** zu lesen), und der Punkt am Symbol zeigt seinen Zustand. Neben dem Namen stehen weitere Tags. Zeige auf den Namen, um den Befehl zu sehen. Darunter stehen der aktuelle Stand, die Sitzung, die ihn gestartet hat, und ihr [Projekt](#see-one-projects-jobs) (beide als Link) sowie das Letzte, was er ausgegeben hat.
 
 Klicke auf eine Zeile, um [das Panel des Jobs](#a-jobs-panel-and-stop) zu öffnen. Ihr Menü **⋯** enthält **Details und Ausgabe**, **Sitzung öffnen** (bei einem Lauf von Experimente **Lauf öffnen**), **Tags bearbeiten …** und **Stoppen**.
 
@@ -74,7 +74,7 @@ Manche Befehle enden nie von selbst: ein Entwicklungsserver, ein Web- oder API-S
 - **Nie gestartet**, mit dem Grund, zum Beispiel weil ein Job, auf den er gewartet hat, fehlgeschlagen ist;
 - **Beendet**: Arbeit, die schon lief, als sie zu Jobs hinzugefügt wurde, ist zu Ende, und niemand hat gesehen, ob sie gut ausgegangen ist.
 
-Wenn etwas fehlgeschlagen ist, wechsle von **Alle** zu **Fehlgeschlagen**, um nur diese zu sehen. **Aus dieser Liste entfernen** im Menü **⋯** einer Zeile nimmt einen Eintrag heraus, und **Leeren** nimmt nach einer Rückfrage alle heraus, auch die, die ein Tag oder der Filter ausblendet. Das räumt nur die Liste auf: Deine Sitzungen und die Läufe von Experimente bleiben erhalten.
+Wenn etwas fehlgeschlagen ist, wechsle von **Alle** zu **Fehlgeschlagen**, um nur diese zu sehen. **Aus dieser Liste entfernen** im Menü **⋯** einer Zeile nimmt einen Eintrag heraus, und **Leeren** nimmt nach einer Rückfrage alle heraus, auch die, die ein Tag, das Projektmenü oder der Filter ausblendet. Das räumt nur die Liste auf: Deine Sitzungen und die Läufe von Experimente bleiben erhalten.
 
 ## Tags
 
@@ -99,9 +99,23 @@ Klicke auf den Chip eines Tags, um nur die Arbeit zu sehen, die darunter aufgeli
 
 Der ausgewählte Tag ist Teil der Adresse der Seite (sie endet auf `?tag=` und den Namen des Tags). Du kannst sie also als Lesezeichen speichern oder an dein Handy schicken. Ein Chip richtet sich nach dem ersten Tag jedes Jobs. Um einen Job über einen seiner anderen Tags zu finden, tippe diesen Tag in **Jobs filtern** ein.
 
+## Die Jobs eines Projekts ansehen
+
+Das Projektmenü steht neben **Jobs filtern**. Dort steht **Alle Projekte** oder der Name des ausgewählten Projekts mit seinem Zeichen. Öffne es, um auszuwählen:
+
+- **Alle Projekte**: jeder Job;
+- ein Projekt, das hier Jobs hat; die Zahl daneben sagt, wie viele davon laufen oder warten;
+- **Kein Projekt**: die Jobs, die zu keinem gehören.
+
+Die Kacheln, **In Arbeit**, **Server**, **Abgeschlossen** und die Zeitleiste zeigen dann nur diese Jobs. Wenn du ein Projekt auswählst, springst du zurück zum Chip **Alle**, und die Chips und ihre Zahlen umfassen nur seine Jobs; klicke auf einen, um diesen Tag innerhalb des Projekts zu sehen. Solange ein Projekt ausgewählt ist, lassen die Zeilen seinen Namen weg. Das Menü erscheint, sobald ein Job zu einem Projekt gehört.
+
+Auch das ausgewählte Projekt ist Teil der Adresse der Seite (`?project=` und seine ID oder `?project=none`), sodass du ein Lesezeichen setzen kannst. Zu den Jobs einer [Gruppe](/guide/projects#bring-projects-together-in-a-group) gehören die der Projekte, die sie zusammenfasst. Solange ein Projekt laufende oder wartende Jobs oder noch laufende Server hat, zeigt seine eigene Seite sie unter [Übersicht](/guide/projects#overview).
+
+Ein Job gehört zum Projekt seiner Sitzung. Wenn es keines gibt (seine Sitzung ist in keinem Projekt, oder er hat keine Sitzung, etwa ein Job, den du aus deinem eigenen Terminal gestartet hast, oder ein Lauf, den du auf der Seite Experimente gestartet hast), gehört er zu dem Projekt, in dessen Ordner er läuft. Liegt der Ordner eines Projekts in dem eines anderen, bekommt ihn das innere Projekt. Eine Gruppe und ein Projekt, dessen Ordner dein persönlicher Ordner oder ein ganzes Laufwerk ist, bekommen auf diesem Weg nie Jobs. Das Panel eines Jobs nennt sein **Projekt**.
+
 ## Die Ansicht „Zeitleiste“
 
-Wechsle oben rechts zwischen **Liste** und **Zeitleiste**. Die App merkt sich deine Wahl in diesem Browser. Die Zeitleiste zeichnet für jeden Job, der läuft oder wartet, einen Balken entlang der Uhrzeit, mit einem Punkt in der Farbe seines Tags vor dem Namen. Die Tag-Chips und **Jobs filtern** grenzen sie genauso ein wie die Liste:
+Wechsle oben rechts zwischen **Liste** und **Zeitleiste**. Die App merkt sich deine Wahl in diesem Browser. Die Zeitleiste zeichnet für jeden Job, der läuft oder wartet, einen Balken entlang der Uhrzeit, mit einem Punkt in der Farbe seines Tags vor dem Namen. Die Tag-Chips, das Projektmenü und **Jobs filtern** grenzen sie genauso ein wie die Liste:
 
 - **Bisher gelaufen** ist durchgehend gefüllt, und **Geschätzt** ist der gestreifte Teil dahinter;
 - Jobs **In der Warteschlange** sind gestrichelt und stehen dort, wo sie starten sollten;
@@ -139,6 +153,7 @@ Wenn die App nicht erreichbar ist, während ein Agent einen Job startet, läuft 
 - „Führe die Auswertung als Job aus, sobald der Indexaufbau fertig ist.“
 - „Gib dem Indexaufbau den Tag search-index.“
 - „Was läuft noch für intent-data?“
+- „Was läuft gerade in meinem Projekt Thesis?“
 - „Zeig mir das Training, das du vorhin gestartet hast, in den Jobs.“
 - „Führe diese drei Sweeps nacheinander in einer Warteschlange aus.“
 - „Was läuft noch, und wann ist es fertig?“

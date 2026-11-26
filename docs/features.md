@@ -613,7 +613,10 @@ agents that speak ACP and take MCP servers.
   Files, Show in Finder, Only its sessions in the sidebar, Share with people, Delete the project) and the tabs under it:
   Overview, Files, Memory, Skills, Agents and Settings (on a phone the tabs that do not fit are under More at the row's
   end, and the window fills the screen). Esc, ✕ or a click outside closes the window, and so does going to another page,
-  such as opening a document from Files; deleting the project from its page goes back to the Projects page. Its Overview has
+  such as opening a document from Files; deleting the project from its page goes back to the Projects page. Its Overview has,
+  while the project has jobs running or queued or servers left running, a Jobs card at the top (up to six of them, three
+  on a phone, with their progress, time left and what they wait for; a row opens the job's panel; All jobs opens the Jobs
+  page filtered to the project; a group's has its projects' jobs), then
   its sessions (with what each is doing), its newest files (up to six tiles, with All files to open the Files tab) and
   what every session in it gets (its folder, guidelines, memory as a line of notes, articles and documents, skills and
   assistant), who it is shared with, and a group's projects too; its Memory tab is one list of its notes, its wiki's articles and sources and its documents, newest first (the project's profile pinned at the top), with a search over all three at once (`GET /api/projects/:id/memory/search`: words, and meaning when search by meaning is on; it looks only in that project, and a note search inside a project now covers only that project's notes, which it could miss before), Add (a note, files, a folder kept up to date), a ⋯ menu (the wiki's jobs and Wiki updates…, Ask an agent to check the wiki, add a source or adopt a plan, Read the documents again, Open the wiki's folder, Memory settings, Deleted notes), chips All, Notes, Wiki and Documents with their counts (Notes: You said so, Not checked yet, Topics, Ends soon; Wiki: its areas, Sources, Plans; Documents: the folders it reads), and a pane that opens a note, a topic, an article or a document in place (`?part=notes`, `?part=wiki`, `?part=documents`; the old Knowledge and LLM Wiki addresses open it); on a phone the whole tab scrolls, its rows of chips are one line each that scrolls sideways (fading at an edge with more), titles take two lines, and an opened item goes back to the list where it was; files dropped anywhere on it join the project's documents; its Settings tab sets its name,
@@ -2099,8 +2102,13 @@ programs shows each program's version and what is out, with Check now, Update no
   in the background, all in one place and organized by tags: sessions' background commands, monitors and subagents
   (those of sessions in VS Code or a terminal too), jobs run with the `job` command, runs of Experiments and Hydor
   subagents. Four tiles say what runs, what is queued, when it should all be done and how many finished today (with
-  those that failed); a chip for each tag and a **Filter jobs** field narrow the whole page, and a picked tag is in its
-  address (`/jobs?tag=…`, `/jobs?untagged=1`). **At work** groups what runs and waits by tag, in cards that fold, each
+  those that failed); a chip for each tag, a project menu and a **Filter jobs** field narrow the whole page, and the
+  picked tag and project are in its address (`/jobs?tag=…`, `/jobs?untagged=1`, `/jobs?project=<id>` or `none`, together).
+  The project menu (**All projects**) lists the projects that have jobs, each with how many run or wait, and **No
+  project**; the tag chips then count only that project's jobs, and a group takes its projects' jobs too. A job is its
+  session's project's, else that of the project whose folder it runs in (the innermost; never a group, or a project whose
+  folder is the home folder or a disk's root), so a `job run` from your own terminal or a run started on the Experiments
+  page counts too (`GET /api/jobs?project=<id>`). **At work** groups what runs and waits by tag, in cards that fold, each
   with its counts, its session when all of its work comes from one, and when it should be done. A row is compact; a
   click opens the job's panel (details, its command with a copy button, the end of its output), and its ⋯ menu has
   **Details and output**, **Open session** or **Open run**, **Edit tags…**, and **Stop** or **Remove from this list**.

@@ -12,23 +12,38 @@ export function tagTone(name: string): string {
 
 export const firstTag = (job: JobEntry): string | null => job.tags?.[0] ?? null;
 
+/** The project a job belongs to: as the server says (its session's, else its folder's), else its session's. */
+export const projectOf = (job: JobEntry): JobEntry['project'] => job.project ?? job.session?.project;
+
+/** In the address, the jobs of no project (/jobs?project=none); a project's id never is this. */
+export const NO_PROJECT = 'none';
+
 export interface JobFilter {
   /** Only the jobs under this tag. */
   tag?: string;
   /** Only the jobs with no tag. */
   untagged?: boolean;
+  /** Only the jobs of these projects (a project, with the projects it brings together when it is a group), or of none. */
+  projects?: readonly string[] | typeof NO_PROJECT;
   /** Words looked for in a job's name, command, session, project and tags. */
   query?: string;
 }
 
-export const filtering = (f: JobFilter): boolean => !!(f.tag || f.untagged || f.query?.trim());
+export const filtering = (f: JobFilter): boolean => !!(f.tag || f.untagged || f.projects || f.query?.trim());
+
+export function inProjects(job: JobEntry, projects: JobFilter['projects']): boolean {
+  if (!projects) return true;
+  const id = projectOf(job)?.id;
+  return projects === NO_PROJECT ? !id : !!id && projects.includes(id);
+}
 
 export function matches(job: JobEntry, filter: JobFilter): boolean {
+  if (!inProjects(job, filter.projects)) return false;
   if (filter.tag && firstTag(job) !== filter.tag) return false;
   if (!filter.tag && filter.untagged && firstTag(job) !== null) return false;
   const q = filter.query?.trim().toLocaleLowerCase();
   if (!q) return true;
-  return [job.name, job.command, job.session?.title, job.session?.project?.name, ...(job.tags ?? [])].some((s) => s?.toLocaleLowerCase().includes(q));
+  return [job.name, job.command, job.session?.title, projectOf(job)?.name, ...(job.tags ?? [])].some((s) => s?.toLocaleLowerCase().includes(q));
 }
 
 /** Subagents never say how long they take: the end of everything is told without them (as server/jobs does). */
@@ -82,6 +97,41 @@ export function tagChips(list: JobsList): { tags: TagCount[]; untagged: { atWork
   count(list.ended, false, true);
   const tags = [...by.values()].sort((a, b) => b.atWork - a.atWork || b.lastAt - a.lastAt || a.name.localeCompare(b.name));
   return { tags, untagged };
+}
+
+export interface ProjectCount {
+  id: string;
+  name: string;
+  /** Running and queued. */
+  atWork: number;
+  /** All of its jobs in the list, servers and finished ones too. */
+  total: number;
+}
+
+/** The projects the jobs belong to, for the project menu: those with work running or queued first (the most first), then
+ *  by name; and how many jobs belong to none. */
+export function projectCounts(list: JobsList): { projects: ProjectCount[]; none: { atWork: number; total: number } } {
+  const by = new Map<string, ProjectCount>();
+  const none = { atWork: 0, total: 0 };
+  const count = (jobs: JobEntry[], atWork: boolean) => {
+    for (const j of jobs) {
+      const p = projectOf(j);
+      let c: { atWork: number; total: number } = none;
+      if (p) {
+        let x = by.get(p.id);
+        if (!x) by.set(p.id, (x = { id: p.id, name: p.name, atWork: 0, total: 0 }));
+        c = x;
+      }
+      c.total++;
+      if (atWork) c.atWork++;
+    }
+  };
+  count(list.running, true);
+  count(list.queued, true);
+  count(list.servers ?? [], false);
+  count(list.ended, false);
+  const projects = [...by.values()].sort((a, b) => b.atWork - a.atWork || a.name.localeCompare(b.name));
+  return { projects, none };
 }
 
 export interface JobGroup {

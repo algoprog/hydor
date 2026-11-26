@@ -21,7 +21,7 @@ Cuatro recuadros en la parte superior lo resumen:
 - **Todo terminado**: cuándo debería estar acabado todo ese trabajo, como “en unas 2 h 10 min”. Muestra un guion a menos que todos los trabajos tengan una estimación aún por cumplirse, sin contar los subagentes, que nunca la tienen;
 - **Terminados hoy**: cuántos terminaron hoy. A su lado, “1 con error”, o los que haya, te lleva a ellos.
 
-Debajo de los recuadros hay un botón para cada [etiqueta](#tags) y el campo **Filtrar trabajos**. Escribe en el campo para ver solo los trabajos cuyo nombre, comando, sesión, proyecto o etiquetas contengan esas palabras; **Mostrar todos los trabajos** vuelve a mostrar todo cuando nada coincide. Más abajo están **En marcha**, **Servidores** y **Terminados**, cada uno presente cuando tiene algo que mostrar. Los recuadros cuentan solo lo que dejan la etiqueta y el filtro. Los servidores en ejecución no se cuentan en los recuadros ni en el número de la barra de iconos. La página se actualiza sola.
+Debajo de los recuadros hay un botón para cada [etiqueta](#tags), el menú de proyectos (**Todos los proyectos**, consulta [Ver los trabajos de un proyecto](#see-one-projects-jobs)) y el campo **Filtrar trabajos**. Escribe en el campo para ver solo los trabajos cuyo nombre, comando, sesión, proyecto o etiquetas contengan esas palabras; **Mostrar todos los trabajos** vuelve a mostrar todo cuando nada coincide. Más abajo están **En marcha**, **Servidores** y **Terminados**, cada uno presente cuando tiene algo que mostrar. Los recuadros cuentan solo lo que dejan la etiqueta, el proyecto y el filtro. Los servidores en ejecución no se cuentan en los recuadros ni en el número de la barra de iconos. La página se actualiza sola.
 
 Cuando no hay nada en ejecución ni en espera, lees “Ahora no se ejecuta nada en segundo plano.”
 
@@ -29,7 +29,7 @@ Cuando no hay nada en ejecución ni en espera, lees “Ahora no se ejecuta nada 
 
 **En marcha** reúne los trabajos que se están ejecutando y los que esperan, en una tarjeta por cada etiqueta; los trabajos sin etiqueta están en la última, **Sin etiqueta**. La parte superior de una tarjeta muestra la etiqueta, cuántos de sus trabajos están en ejecución y en espera (como “3 en ejecución · 1 en cola”) y, cuando cada uno tiene una estimación, cuándo deberían estar listos (“termina en unos 34 min”). Cuando todo el trabajo de una tarjeta viene de una sola sesión, esa sesión y su proyecto también se nombran ahí, y sus filas los omiten. Haz clic en la parte superior de una tarjeta para plegarla o volver a abrirla; la app lo recuerda en este navegador. Mientras filtras o tienes una etiqueta elegida, no hay nada plegado. Mientras ningún trabajo tenga etiqueta, los trabajos simplemente aparecen en una lista, sin tarjetas por etiqueta.
 
-Cada trabajo es una fila. Su icono indica de qué tipo es (pasa el cursor sobre él para leer **Comando**, **Monitor**, **Subagente de Claude Code**, **Subagente de Hydor**, **Ejecución de experimento** o **Trabajo**), y el punto sobre el icono, su estado. Junto al nombre están las demás etiquetas; pasa el cursor sobre el nombre para ver su comando. Debajo aparecen cómo va, la sesión que lo empezó y su proyecto, cada uno como enlace, y lo último que imprimió.
+Cada trabajo es una fila. Su icono indica de qué tipo es (pasa el cursor sobre él para leer **Comando**, **Monitor**, **Subagente de Claude Code**, **Subagente de Hydor**, **Ejecución de experimento** o **Trabajo**), y el punto sobre el icono, su estado. Junto al nombre están las demás etiquetas; pasa el cursor sobre el nombre para ver su comando. Debajo aparecen cómo va, la sesión que lo empezó y su [proyecto](#see-one-projects-jobs), cada uno como enlace, y lo último que imprimió.
 
 Haz clic en una fila para abrir [el panel del trabajo](#a-jobs-panel-and-stop). Su menú **⋯** tiene **Detalles y salida**, **Abrir sesión** (**Abrir ejecución** para una ejecución de Experimentos), **Editar etiquetas…** y **Detener**.
 
@@ -74,7 +74,7 @@ Algunos comandos nunca terminan por sí solos: un servidor de desarrollo, un ser
 - **No llegó a empezar**, y el motivo, por ejemplo que falló un trabajo al que esperaba;
 - **Terminado**: un trabajo que ya estaba en ejecución cuando se agregó a Jobs ha terminado, y nadie vio si salió bien.
 
-Cuando algo haya fallado, cambia de **Todos** a **Fallido** para ver solo esos. **Quitar de esta lista**, en el menú **⋯** de una fila, quita uno, y **Borrar** los quita todos después de preguntar, incluidos los que oculta una etiqueta o el filtro. Esto solo ordena la lista: tus sesiones y las ejecuciones de Experimentos se conservan.
+Cuando algo haya fallado, cambia de **Todos** a **Fallido** para ver solo esos. **Quitar de esta lista**, en el menú **⋯** de una fila, quita uno, y **Borrar** los quita todos después de preguntar, incluidos los que oculta una etiqueta, el menú de proyectos o el filtro. Esto solo ordena la lista: tus sesiones y las ejecuciones de Experimentos se conservan.
 
 ## Etiquetas
 
@@ -99,9 +99,23 @@ Haz clic en el botón de una etiqueta para ver solo el trabajo que aparece bajo 
 
 La etiqueta que eliges forma parte de la dirección de la página (termina en `?tag=` y el nombre de la etiqueta), así que puedes guardarla en marcadores o enviarla a tu teléfono. Cada botón se guía por la primera etiqueta de cada trabajo; para encontrar un trabajo por otra de sus etiquetas, escribe esa etiqueta en **Filtrar trabajos**.
 
+## Ver los trabajos de un proyecto
+
+El menú de proyectos está junto a **Filtrar trabajos**. Dice **Todos los proyectos**, o el nombre del proyecto que elegiste, con su marca. Ábrelo para elegir:
+
+- **Todos los proyectos**: todos los trabajos;
+- un proyecto que tiene trabajos aquí; el número al lado indica cuántos de ellos están en ejecución o en espera;
+- **Sin proyecto**: los trabajos que no pertenecen a ninguno.
+
+Los recuadros, **En marcha**, **Servidores**, **Terminados** y la cronología muestran entonces solo esos trabajos. Al elegir un proyecto vuelves al botón **Todos**, y los botones y sus números abarcan solo sus trabajos; haz clic en uno para ver esa etiqueta dentro del proyecto. Mientras hay un proyecto elegido, las filas omiten su nombre. El menú aparece cuando algún trabajo pertenece a un proyecto.
+
+El proyecto que eliges también forma parte de la dirección de la página (`?project=` y su identificador, o `?project=none`), así que puedes guardarla en marcadores. Los trabajos de un [grupo](/guide/projects#bring-projects-together-in-a-group) incluyen los de los proyectos que reúne. Mientras un proyecto tiene trabajos en ejecución o en espera, o servidores que siguen en ejecución, su propia página los muestra en [Resumen](/guide/projects#overview).
+
+Un trabajo pertenece al proyecto de su sesión. Cuando no lo hay (su sesión no está en ningún proyecto, o no tiene sesión, como un trabajo que empezaste desde tu propia terminal o una ejecución que empezaste en la página Experimentos), pertenece al proyecto en cuya carpeta se ejecuta. Cuando la carpeta de un proyecto está dentro de la de otro, le corresponde al proyecto interior. Un grupo, y un proyecto cuya carpeta es tu carpeta personal o un disco entero, nunca reciben trabajos de esta forma. El panel de un trabajo indica su **Proyecto**.
+
 ## La vista Cronología
 
-Cambia entre **Lista** y **Cronología** arriba a la derecha; la app recuerda tu elección en este navegador. La cronología dibuja una barra por cada trabajo en ejecución o en espera, a lo largo del reloj, con un punto del color de su etiqueta antes del nombre. Los botones de etiquetas y **Filtrar trabajos** la acotan igual que a la lista:
+Cambia entre **Lista** y **Cronología** arriba a la derecha; la app recuerda tu elección en este navegador. La cronología dibuja una barra por cada trabajo en ejecución o en espera, a lo largo del reloj, con un punto del color de su etiqueta antes del nombre. Los botones de etiquetas, el menú de proyectos y **Filtrar trabajos** la acotan igual que a la lista:
 
 - **Ejecutado hasta ahora** es sólido, y **Estimado** es la parte rayada que sigue;
 - los trabajos **En cola** aparecen con línea discontinua, donde deberían empezar;
@@ -139,6 +153,7 @@ Si no se puede acceder a la app cuando un agente empieza un trabajo, el comando 
 - “Ejecuta la evaluación como un trabajo cuando termine la creación del índice.”
 - “Etiqueta la creación del índice como search-index.”
 - “¿Qué sigue en ejecución para intent-data?”
+- “¿Qué se está ejecutando en mi proyecto Tesis?”
 - “Muestra en Jobs el entrenamiento que empezaste antes.”
 - “Ejecuta estos tres barridos uno a la vez en una cola.”
 - “¿Qué sigue en ejecución y cuándo terminará?”

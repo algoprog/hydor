@@ -4,7 +4,7 @@
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/jobs/tags-test.ts && node dist/dev/tags-test.js
 import assert from 'node:assert/strict';
 import type { JobEntry, JobsList } from '@shared/jobs';
-import { byDay, filterList, filtering, firstTag, groupAtWork, matches, sharedSession, startOfDay, tagChips, tagTone } from './tags';
+import { byDay, filterList, filtering, firstTag, groupAtWork, matches, NO_PROJECT, projectCounts, projectOf, sharedSession, startOfDay, tagChips, tagTone } from './tags';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -151,6 +151,34 @@ const list = (more: Partial<JobsList> = {}): JobsList => ({ running: [], queued:
   assert.equal(byDay([ended(at(15, 0))], NOW)[0].label, 'today');
   assert.equal(byDay([job({ state: 'cancelled', queuedAt: at(13, 10) })], NOW)[0].label, 'yesterday', 'no end: when it was queued');
   assert.deepEqual(byDay([], NOW), []);
+}
+
+// ---- by project
+{
+  const shop = { id: 'sp1', name: 'Shop website' };
+  const thesis = { id: 'sp2', name: 'Thesis' };
+  const fromSession = job({ session: { key: 'claude:a', title: 'Faster product search', project: shop } });
+  const fromFolder = job({ project: thesis });
+  const own = job({ session: { key: 'claude:b', title: 'Outline', project: shop }, project: thesis });
+  const none = job({ name: 'Loose job' });
+  assert.deepEqual(projectOf(fromSession), shop, 'its session’s, when the server says none');
+  assert.deepEqual(projectOf(own), thesis, 'the server’s first');
+  assert.equal(projectOf(none), undefined);
+  assert.ok(filtering({ projects: ['sp1'] }) && filtering({ projects: NO_PROJECT }));
+  assert.ok(matches(fromSession, { projects: ['sp1'] }) && !matches(fromFolder, { projects: ['sp1'] }));
+  assert.ok(matches(fromFolder, { projects: ['sp1', 'sp2'] }), 'a group takes its projects');
+  assert.ok(matches(none, { projects: NO_PROJECT }) && !matches(fromSession, { projects: NO_PROJECT }));
+  assert.ok(matches(fromFolder, { query: 'thesis' }), 'the words look in its project too');
+  assert.ok(!matches(fromSession, { projects: ['sp1'], tag: 'x' }), 'with a tag as well');
+  const l = list({ running: [fromSession, fromFolder], queued: [queued({ project: thesis, estimate: est(HOUR) })], servers: [job({ kind: 'server', project: shop })], ended: [ended(NOW - HOUR, { project: thesis }), ended(NOW - HOUR)] });
+  const c = projectCounts(l);
+  assert.deepEqual(c.projects, [
+    { id: 'sp2', name: 'Thesis', atWork: 2, total: 3 },
+    { id: 'sp1', name: 'Shop website', atWork: 1, total: 2 },
+  ]);
+  assert.deepEqual(c.none, { atWork: 0, total: 1 });
+  const only = filterList(l, { projects: ['sp2'] });
+  assert.deepEqual([only.running.length, only.queued.length, only.servers.length, only.ended.length], [1, 1, 0, 1]);
 }
 
 console.log('ok');

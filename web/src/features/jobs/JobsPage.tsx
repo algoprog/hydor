@@ -1,26 +1,27 @@
 // The Jobs page (/jobs): long work that sessions run in the background. Four tiles say how it stands as a whole, tag
-// chips and a search narrow it, and under them: the work in hand grouped by tag, the servers left running and what
-// finished, by day; or the first of these as a timeline. A job's row opens its panel (details and output), and its menu
-// the way to its session, its tags and Stop. The list is read again as things change (store.ts).
+// chips, a project menu and a search narrow it, and under them: the work in hand grouped by tag, the servers left
+// running and what finished, by day; or the first of these as a timeline. A job's row opens its panel (details and
+// output), and its menu the way to its session, its tags and Stop. The list is read again as things change (store.ts).
 import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { ChartGantt, ChevronDown, ChevronRight, Hourglass, List } from 'lucide-react';
 import { useSearch } from 'wouter';
 import type { JobEntry } from '@shared/jobs';
-import { del, enc, post } from '../../lib/api';
+import { del } from '../../lib/api';
+import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
-import { Button, cx, Empty, Segmented, Throbber, useConfirm } from '../../components/ui';
+import { Button, cx, Empty, Segmented, Throbber } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 import { PageHeader } from '../layout/PageHeader';
-import { JobPanel } from './JobPanel';
-import { JobRow, SessionLinks, type RowActions } from './JobRow';
+import { useSpaces } from '../spaces/state';
+import { useJobActions } from './actions';
+import { JobRow, SessionLinks } from './JobRow';
 import { Overview } from './Overview';
 import { loadJobs, useJobs, useJobsLive, useNow } from './store';
 import { TagDot } from './TagPill';
-import { TagsDialog } from './TagsDialog';
-import { byDay, filtering, filterList, firstTag, groupAtWork, matches, sharedSession, tagChips, type JobFilter, type JobGroup } from './tags';
+import { byDay, filtering, filterList, firstTag, groupAtWork, matches, NO_PROJECT, projectCounts, sharedSession, tagChips, type JobFilter, type JobGroup } from './tags';
 import { Timeline } from './Timeline';
-import { pickTag, Toolbar } from './Toolbar';
-import { countWords, groupDoneWords, waitedBy, waitsFor } from './words';
+import { Toolbar } from './Toolbar';
+import { countWords, groupDoneWords, waitsFor } from './words';
 
 type View = 'list' | 'timeline';
 const VIEW_KEY = 'hydor.jobs.view';
@@ -68,7 +69,7 @@ const Rows = ({ children }: { children: ReactNode }) => <div className="divide-y
 
 /** The header of a group's card: its tag, how much of it runs and waits, the session it all comes from when it is one
  *  (its links stand beside the button that folds the group, never in it), and when it should be done. */
-function GroupHead({ group, now, open, onFold }: { group: JobGroup; now: number; open: boolean; onFold?: () => void }) {
+function GroupHead({ group, now, open, onFold, projectShown }: { group: JobGroup; now: number; open: boolean; onFold?: () => void; projectShown?: boolean }) {
   const done = groupDoneWords(group.doneAt, now);
   const session = sharedSession(group);
   const head = (
@@ -106,7 +107,7 @@ function GroupHead({ group, now, open, onFold }: { group: JobGroup; now: number;
       {session && (
         <span className="flex min-w-0 items-baseline gap-1.5 text-[12px] leading-5 text-fg-3">
           <span aria-hidden>·</span>
-          <SessionLinks session={session} />
+          <SessionLinks session={session} noProject={projectShown} />
         </span>
       )}
       {done && <span className="tnum ml-auto text-[12px] leading-5 text-fg-3">{done}</span>}
@@ -123,19 +124,29 @@ export function JobsPage() {
   const params = new URLSearchParams(useSearch());
   const tag = params.get('tag') || undefined;
   const untagged = !tag && params.get('untagged') === '1';
-  const filter: JobFilter = { tag, untagged, query };
+  const project = params.get('project') || undefined;
+  const spaces = useSpaces();
+  // A group's jobs are those of the projects it brings together too.
+  const members = project && project !== NO_PROJECT ? spaces?.find((s) => s.id === project)?.members : undefined;
+  const projects = useMemo<JobFilter['projects']>(() => (!project ? undefined : project === NO_PROJECT ? NO_PROJECT : [project, ...(members ?? [])]), [project, members]);
+  const filter: JobFilter = { tag, untagged, projects, query };
+  // One project picked (not a group's several): its rows need not say it.
+  const oneProject = !!project && project !== NO_PROJECT && !members?.length;
   const narrowed = filtering(filter);
-  // A tag's or a search's older jobs are among all the finished ones, not only the latest.
+  // A tag's, a project's or a search's older jobs are among all the finished ones, not only the latest.
   useJobsLive(all || narrowed);
   const list = useJobs((s) => s.list);
   const error = useJobs((s) => s.error);
   const now = useNow();
-  const [confirm, confirmNode] = useConfirm();
   const search = useRef<HTMLInputElement>(null);
 
-  const shownList = useMemo(() => (list ? filterList(list, { tag, untagged, query }) : null), [list, tag, untagged, query]);
-  const chips = useMemo(() => (list ? tagChips(list) : null), [list]);
-  const byId = useMemo(() => new Map([...(list?.running ?? []), ...(list?.queued ?? []), ...(list?.servers ?? []), ...(list?.ended ?? [])].map((j) => [j.id, j])), [list]);
+  const shownList = useMemo(() => (list ? filterList(list, { tag, untagged, projects, query }) : null), [list, tag, untagged, projects, query]);
+  // The chips count what the project picked has; the project menu, what each project has.
+  const ofProject = useMemo(() => (list && projects ? filterList(list, { projects }) : list), [list, projects]);
+  const chips = useMemo(() => (ofProject ? tagChips(ofProject) : null), [ofProject]);
+  const byProject = useMemo(() => (list ? projectCounts(list) : null), [list]);
+  // A job named in another row is scrolled to on this page (show, below).
+  const { actions, byId, thenOf, overlays, confirm, closePanel } = useJobActions(list, now, { onShow: (id) => show(id) });
 
   const running = shownList?.running ?? [];
   const queued = shownList?.queued ?? [];
@@ -170,15 +181,8 @@ export function JobsPage() {
 
   const showAllJobs = () => {
     setQuery('');
-    pickTag({});
+    go('/jobs');
   };
-
-  // The job whose panel is open and the one whose tags are changed, as they stand now; each keeps the last seen if it
-  // leaves the list.
-  const [shown, setShown] = useState<JobEntry | null>(null);
-  const showing = shown ? (byId.get(shown.id) ?? shown) : null;
-  const [tagging, setTagging] = useState<JobEntry | null>(null);
-  const retagged = tagging ? (byId.get(tagging.id) ?? tagging) : null;
 
   // A job pointed at from elsewhere ("Waits for …", "Then: …"): whatever hides its row is undone, then it is scrolled to
   // and lit for a moment.
@@ -189,7 +193,7 @@ export function JobsPage() {
   const show = (id: string) => {
     const job = byId.get(id);
     if (!job) return;
-    setShown(null);
+    closePanel();
     if (!matches(job, filter)) showAllJobs();
     const key = firstTag(job) ?? '';
     if (folded.includes(key)) fold(key, false);
@@ -218,33 +222,6 @@ export function JobsPage() {
     requestAnimationFrame(() => finishedAt.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   };
 
-  const stop = async (job: JobEntry) => {
-    const waiting = job.state === 'queued';
-    const others = waitedBy(job, list?.queued ?? []).length > 0;
-    const ok = await confirm({
-      title: waiting ? 'Stop this queued job?' : 'Stop this job?',
-      body: (
-        <>
-          <b translate="no" className="font-medium break-words text-fg">
-            {job.name}
-          </b>
-          <p className="mt-1">{waiting ? 'It will not start.' : 'It stops now and does not finish. What it has done so far stays.'}</p>
-          {others && <p className="mt-1">Jobs that wait for it will not start either.</p>}
-        </>
-      ),
-      confirm: 'Stop job',
-      danger: true,
-    });
-    if (!ok) return;
-    await post(`/api/jobs/${enc(job.id)}/stop`).catch(toastError);
-    await loadJobs();
-  };
-
-  const remove = async (job: JobEntry) => {
-    await del(`/api/jobs/${enc(job.id)}`).catch(toastError);
-    await loadJobs();
-  };
-
   const clear = async () => {
     const ok = await confirm({
       title: 'Clear the finished jobs?',
@@ -258,8 +235,6 @@ export function JobsPage() {
     await loadJobs();
   };
 
-  const actions: RowActions = { onShow: show, onDetails: setShown, onTags: setTagging, onStop: (j) => void stop(j), onRemove: (j) => void remove(j) };
-  const thenOf = (job: JobEntry) => waitedBy(job, list?.queued ?? []);
   const row = (job: JobEntry, grouped?: boolean, sessionShown?: boolean) => (
     <JobRow
       key={job.id}
@@ -270,6 +245,7 @@ export function JobsPage() {
       marked={marked === job.id}
       grouped={grouped}
       sessionShown={sessionShown}
+      projectShown={oneProject}
       actions={actions}
     />
   );
@@ -323,7 +299,17 @@ export function JobsPage() {
             <>
               <div className="flex flex-col gap-3">
                 <Overview list={shownList} now={now} capped={list.ended.length === LATEST_ENDED} onFailed={showFailed} />
-                <Toolbar chips={chips} atWork={list.running.length + list.queued.length} tag={tag} untagged={untagged} query={query} onQuery={setQuery} input={search} />
+                <Toolbar
+                  chips={chips}
+                  projects={byProject!}
+                  atWork={(ofProject?.running.length ?? 0) + (ofProject?.queued.length ?? 0)}
+                  tag={tag}
+                  untagged={untagged}
+                  project={project}
+                  query={query}
+                  onQuery={setQuery}
+                  input={search}
+                />
               </div>
 
               {noMatch ? (
@@ -337,7 +323,7 @@ export function JobsPage() {
                 idle && !narrowed && emptyNow
               )}
 
-              {view === 'timeline' && atWork > 0 && <Timeline list={shownList} now={now} onOpen={setShown} />}
+              {view === 'timeline' && atWork > 0 && <Timeline list={shownList} now={now} onOpen={actions.onDetails} />}
               {view === 'list' && atWork > 0 && (
                 <Section title="At work" count={atWork}>
                   <div className="flex flex-col gap-2.5">
@@ -350,7 +336,7 @@ export function JobsPage() {
                       const shared = heads && !!sharedSession(g);
                       return (
                         <div key={key} className="overflow-hidden rounded-xl border border-line bg-panel">
-                          {heads && <GroupHead group={g} now={now} open={open} onFold={foldable ? () => fold(key, open) : undefined} />}
+                          {heads && <GroupHead group={g} now={now} open={open} onFold={foldable ? () => fold(key, open) : undefined} projectShown={oneProject} />}
                           {open && (
                             <div className="divide-y divide-line">
                               {g.running.map((j) => row(j, heads, shared))}
@@ -425,21 +411,7 @@ export function JobsPage() {
           )}
         </div>
       </div>
-      {showing && (
-        <JobPanel
-          key={showing.id}
-          job={showing}
-          now={now}
-          waits={showing.state === 'queued' ? waitsFor(showing, byId) : (showing.after ?? []).flatMap((id) => byId.get(id) ?? [])}
-          then={thenOf(showing)}
-          onShow={show}
-          onTags={() => setTagging(showing)}
-          onStop={() => void stop(showing)}
-          onClose={() => setShown(null)}
-        />
-      )}
-      {retagged && <TagsDialog key={retagged.id} job={retagged} inUse={list?.tags ?? []} onClose={() => setTagging(null)} />}
-      {confirmNode}
+      {overlays}
     </div>
   );
 }

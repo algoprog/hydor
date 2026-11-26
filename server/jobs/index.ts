@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { commandSig } from '../../shared/job-progress.ts';
-import { JOB_ENDED, JOBS_ENV, normalTags, type JobCounts, type JobEntry, type JobGo, type JobLog, type JobRegister, type JobRegistered, type JobReport, type JobsList, type JobTagsSet } from '../../shared/jobs.ts';
+import { JOB_ENDED, JOBS_ENV, normalTags, type JobCounts, type JobEntry, type JobGo, type JobLog, type JobRegister, type JobRegistered, type JobReport, type JobsList, type JobsQuery, type JobTagsSet } from '../../shared/jobs.ts';
 import { AuthManager, HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { files } from '../experiments/local.ts';
@@ -13,9 +13,11 @@ import { runView } from '../experiments/api.ts';
 import { stopRun } from '../experiments/queue.ts';
 import { getRun, runFolder } from '../experiments/records.ts';
 import type { Deps, Feature } from '../features/types.ts';
+import { allSpaces } from '../spaces/index.ts';
 import { plain, readTail, readTaskLog, taskOutputPath } from '../tasklog.ts';
 import { jobsRunOf, jobsToken, signedIn } from './auth.ts';
 import { cut, Gatherer, sessionHref, sessionInfo, type Observed, type Seen } from './gather.ts';
+import { doneAt, folderProjects, onlyProjects, projectIds, withProject } from './projects.ts';
 import { adopt, checkRunners, logOfJob, pendingDeps, register, report, save, schedule, stopRegistered, waitingWords } from './schedule.ts';
 import { activeRegistered, countTags, endedRows, entryId, forgetPersonTags, forgetSeen, getRegistered, getSeen, hideEnded, historyMs, isEnded, jobKey, jobsSchema, prune, saveSeen, sessionTags, setPersonTags, tagKnown, tagsInUse, withSessionTags, type Registered } from './store.ts';
 import { confidentialSession, HelperTags, helperTagger, type TagSessions } from './tags.ts';
@@ -308,19 +310,18 @@ export function createJobs(o: JobsOptions = {}): Jobs {
     const queued = [...mine.queued, ...seen.queued.map((s) => s.entry)].sort((a, b) => (a.startsAt ?? Infinity) - (b.startsAt ?? Infinity) || (a.queuedAt ?? 0) - (b.queuedAt ?? 0));
     const at = new Set([...live, ...queued].map((e) => e.id));
     const ended = endedRows(d.db, now, limit, at).map((r) => ('job' in r ? registeredEntry(r.job, sessions) : r.entry));
-    // Subagents never say how long they take: the end of everything is told without them.
-    const all = [...running, ...queued].filter((e) => e.kind !== 'subagent' && e.kind !== 'hydor-subagent').map((e) => e.estimate?.endsAt);
-    const allDoneAt = all.length && all.every((t): t is number => t !== undefined && t > now) ? Math.max(...(all as number[])) : undefined;
+    const allDoneAt = doneAt([...running, ...queued], now);
     const of = sessionTags(d.db, now);
-    const tagged = (entries: JobEntry[]) => entries.map((e) => withSessionTags(e, of));
+    const byFolder = folderProjects(allSpaces(d.db));
+    const tagged = (entries: JobEntry[]) => entries.map((e) => withProject(withSessionTags(e, of), byFolder));
     return { running: tagged(running), queued: tagged(queued), servers: tagged(servers), ended: tagged(ended), allDoneAt, tags: tagsInUse(d.db, LISTED_TAGS), at: now };
   }
 
   /** The list for someone who asked for it: sessions with no tags are then put to the helper model, in the background. */
-  function list(limit = 100, now = Date.now()): JobsList {
+  function list(limit = 100, now = Date.now(), project?: string): JobsList {
     const l = gathered(limit, now);
     helperTags.ask([...l.running, ...l.queued, ...l.servers, ...l.ended], now);
-    return l;
+    return project ? onlyProjects(l, projectIds(project, allSpaces(d.db))) : l;
   }
 
   /** One job by its id, wherever it is in the list; also one cleared from the Finished list. */
@@ -330,7 +331,7 @@ export function createJobs(o: JobsOptions = {}): Jobs {
     if (listed) return listed;
     const j = getRegistered(d.db, id);
     const e = j ? registeredEntry(j, new Map()) : getSeen(d.db, id);
-    return e && withSessionTags(e, sessionTags(d.db, Date.now()));
+    return e && withProject(withSessionTags(e, sessionTags(d.db, Date.now())), folderProjects(allSpaces(d.db)));
   }
 
   function mustFind(id: string): JobEntry {
@@ -512,7 +513,7 @@ export function createJobs(o: JobsOptions = {}): Jobs {
     app.post('/agent/jobs', { bodyLimit: 64 * 1024 }, async (req) => registerJob((req.body ?? {}) as Partial<JobRegister>, who(req)));
     app.get('/agent/jobs', async (req) => {
       who(req);
-      return list(limitOf(req));
+      return list(limitOf(req), Date.now(), projectOf(req));
     });
     app.get('/agent/jobs/:id', async (req) => {
       who(req, idOf(req));
@@ -544,8 +545,12 @@ export function createJobs(o: JobsOptions = {}): Jobs {
   }
 
   const limitOf = (req: FastifyRequest) => {
-    const n = Number((req.query as { ended?: string }).ended ?? 100);
+    const n = Number((req.query as JobsQuery).ended ?? 100);
     return Number.isFinite(n) ? Math.min(500, Math.max(0, Math.floor(n))) : 100;
+  };
+  const projectOf = (req: FastifyRequest) => {
+    const p = (req.query as JobsQuery).project;
+    return typeof p === 'string' && p.trim() ? p.trim() : undefined;
   };
 
   return {
@@ -557,7 +562,7 @@ export function createJobs(o: JobsOptions = {}): Jobs {
       helperTags = new HelperTags(d, o.tagSessions ?? helperTagger(d.db), () => d.broadcast({ t: 'jobs', ...counts }));
       d.sessions.jobsAtWork = (key) => bySession.get(key) ?? 0;
       const idOf = (req: FastifyRequest) => (req.params as { id: string }).id;
-      d.app.get('/api/jobs', async (req) => list(limitOf(req)));
+      d.app.get('/api/jobs', async (req) => list(limitOf(req), Date.now(), projectOf(req)));
       d.app.get('/api/jobs/:id/log', async (req) => log(idOf(req)));
       d.app.post('/api/jobs/:id/stop', async (req) => {
         await stopJob(idOf(req));

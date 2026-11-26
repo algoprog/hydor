@@ -101,6 +101,8 @@ export interface JobEntry {
   cwd?: string;
   /** The session that started it (the lead's, for a Hydor subagent), with its title and project when it has one. */
   session?: { key: string; title: string; project?: { id: string; name: string } };
+  /** The project it belongs to: its session's, else the one whose folder it runs in (the innermost). */
+  project?: { id: string; name: string };
   queuedAt?: number;
   startedAt?: number;
   endedAt?: number;
@@ -154,6 +156,12 @@ export interface JobsList {
  *  `{ job: JobEntry }`. */
 export interface JobTagsSet {
   tags: string[];
+}
+
+/** GET /api/jobs?project=<id>: only that project's jobs (a group's: those of the projects it brings together too). */
+export interface JobsQuery {
+  ended?: string;
+  project?: string;
 }
 
 /** The counts the server sends the pages when they change: { t: 'jobs', running, queued } (the rail's badge). */

@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import { normalTag, normalTags, type JobEntry, type JobRegistered, type JobsList } from '../../shared/jobs.ts';
+import type { Space } from '../../shared/spaces.ts';
 import type { BackgroundTask, ServerEvent } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT } from '../config.ts';
@@ -28,6 +29,7 @@ import { startFromPs } from './adopt.ts';
 import { jobsRunOf, jobsToken } from './auth.ts';
 import { isJobTask, kindOf, runsJob } from './gather.ts';
 import { createJobs } from './index.ts';
+import { folderProjects } from './projects.ts';
 import { processAlive } from './schedule.ts';
 import { HELPER_TAG_KEEP_MS, historyMs, KEEP_MS, prune, saveRegistered, sessionTags, setHelperTag, setPersonTags, TAG_KEEP_MS, tagsInUse, type Registered } from './store.ts';
 import { tagPrompt, type TagQuestion, type TagSessions } from './tags.ts';
@@ -566,6 +568,50 @@ test('runs of Experiments, waiting, running and ended', async () => {
   l = await listed();
   assert.equal(l.ended.find((x) => x.id === 'run:r-one')!.state, 'cancelled');
   assert.equal(l.ended.find((x) => x.id === 'run:r-two')!.state, 'failed');
+});
+
+test('the project a folder is in: the innermost, never the home folder’s or a root’s, nor a group’s', () => {
+  const at = (id: string, folder: string, members?: string[]) => ({ id, name: id, folder, ...(members ? { members } : {}) }) as Space;
+  const find = folderProjects([at('home', '/home/x'), at('root', '/'), at('code', '/home/x/code'), at('app', '/home/x/code/app'), at('lab', '/home/x/lab', ['code'])], '/home/x');
+  assert.equal(find('/home/x/notes'), undefined);
+  assert.equal(find('/srv/data'), undefined);
+  assert.equal(find('/home/x/code/src')?.id, 'code');
+  assert.equal(find('/home/x/code')?.id, 'code');
+  assert.equal(find('/home/x/code/app/web')?.id, 'app');
+  assert.equal(find('/home/x/codebase'), undefined);
+  assert.equal(find('/home/x/lab/run'), undefined);
+  assert.equal(find(undefined), undefined);
+});
+
+test('each job’s project: its session’s, else its folder’s; ?project= keeps one project’s, a group’s its projects’', async () => {
+  const evalDir = path.join(tmp, 'eval');
+  fs.mkdirSync(evalDir, { recursive: true });
+  const evals = createSpace(db, { name: 'Eval', folder: evalDir });
+  const group = createSpace(db, { name: 'Lab', folder: fs.mkdtempSync(path.join(tmp, 'lab-')), members: [evals.id] });
+  insertRun(db, { id: 'r-eval', spec: { name: 'held-out', command: 'python eval.py --split test', cwd: path.join(evalDir, 'runs') }, status: 'running' });
+  insertRun(db, { id: 'r-away', spec: { name: 'elsewhere', command: 'python away.py', cwd: os.tmpdir() }, status: 'running' });
+  // The session's project wins over the folder its job runs in.
+  const job = await register('score eval', { cwd: evalDir });
+  try {
+    const l = await listed();
+    const of = (id: string) => [...l.running, ...l.queued].find((x) => x.id === id)?.project;
+    assert.deepEqual(of('run:r-eval'), { id: evals.id, name: 'Eval' });
+    assert.equal(of('run:r-away'), undefined);
+    assert.deepEqual(of(`job:${job.id}`), { id: space.id, name: 'Search' });
+    const ids = async (project: string) => {
+      const p = (await call('GET', `/api/jobs?project=${project}`)).body as JobsList;
+      return [...p.running, ...p.queued, ...p.servers, ...p.ended].map((x) => x.id);
+    };
+    const inEval = await ids(evals.id);
+    assert.ok(inEval.includes('run:r-eval') && !inEval.includes(`job:${job.id}`) && !inEval.includes('run:r-away'), inEval.join());
+    assert.ok((await ids(group.id)).includes('run:r-eval'));
+    const inSearch = await ids(space.id);
+    assert.ok(inSearch.includes(`job:${job.id}`) && !inSearch.includes('run:r-eval'), inSearch.join());
+    assert.deepEqual(await ids('sp-none'), []);
+  } finally {
+    await finish(job.id);
+    for (const id of ['r-eval', 'r-away']) updateRun(db, id, { status: 'done', endedAt: Date.now() });
+  }
 });
 
 test('the pages hear the counts when they change; the list is capped; a week is kept', async () => {

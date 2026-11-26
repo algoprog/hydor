@@ -248,6 +248,20 @@ async function main() {
   }
 }
 
+/** The made-up jobs as the server lists them: each with its project (its session's, the demo's project of that name),
+ * and only one project's when a project's page asks for its own (`?project=`). */
+async function demoJobs(api, list, project) {
+  const ids = new Map((await api('GET', '/api/projects')).spaces.map((s) => [s.name, s.id]));
+  const dress = (j) => {
+    const p = j.session?.project;
+    if (!p) return j;
+    const ref = { id: ids.get(p.name) ?? p.id, name: p.name };
+    return { ...j, session: { ...j.session, project: ref }, project: ref };
+  };
+  const keep = (jobs = []) => jobs.map(dress).filter((j) => !project || j.project?.id === project);
+  return { ...list, running: keep(list.running), queued: keep(list.queued), servers: keep(list.servers), ended: keep(list.ended) };
+}
+
 /** The faked parts: sessions waiting on a card, Claude Code's models, the plans' usage, the inbox (and what waits on you
  * in While you were away), Settings → Models and the models it suggests, Experiments' GPUs, and the jobs in the
  * background of a shot that asks for them. */
@@ -256,7 +270,7 @@ async function route(p, api, fake) {
     if (req.method !== 'GET') return null;
     const u = new URL(req.url);
     // The Jobs page's list (the rail counts what runs in it) and a job's output.
-    if (u.pathname === '/api/jobs') return fake.jobs ? { json: { ...fake.jobs.list, at: Date.now() } } : null;
+    if (u.pathname === '/api/jobs') return fake.jobs ? { json: { ...(await demoJobs(api, fake.jobs.list, u.searchParams.get('project'))), at: Date.now() } } : null;
     if (u.pathname.startsWith('/api/jobs/')) {
       const text = fake.jobs?.logs[decodeURIComponent(u.pathname.slice('/api/jobs/'.length, -'/log'.length))];
       return text ? { json: { text, size: text.length, updatedAt: Date.now() } } : null;

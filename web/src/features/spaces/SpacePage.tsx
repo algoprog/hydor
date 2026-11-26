@@ -1,8 +1,8 @@
 // What a project's details show: its own page in the Projects section (feature.tsx, `page`), or the window over the page
 // elsewhere (ProjectDialog.tsx). At the top, in the project's colour: on its page the arrow back to all projects, its
 // mark, name and what it is about, New session, one menu (open its folder in Files, show only its sessions in the
-// sidebar, share it with people, delete it) and, in the window, Close; its tabs under them. Overview: its sessions, who it is shared
-// with (ShareDialog.tsx) and what every session in it gets (its folder, guidelines, memory, skills and assistant), with a
+// sidebar, share it with people, delete it) and, in the window, Close; its tabs under them. Overview: its jobs at work
+// while there are some (jobs/ProjectJobs.tsx), its sessions, who it is shared with (ShareDialog.tsx) and what every session in it gets (its folder, guidelines, memory, skills and assistant), with a
 // group's projects. Then its files (SpaceFiles: its folder, and the things kept in it), its
 // memory (memory/ProjectMemory: its notes, its wiki memory and its own documents in one list), its skills
 // (SpaceSkills), its agents and its settings. On its page the tab is in the address (replaced, so the browser's Back
@@ -22,6 +22,7 @@ import { tr } from '../../i18n/runtime';
 import { AgentsBoard } from '../assistants/AgentsBoard';
 import { AssistantIcon } from '../assistants/icons';
 import { useAssistantsState } from '../assistants/state';
+import { ProjectJobs } from '../jobs/ProjectJobs';
 import { useKnowledge } from '../knowledge/parts';
 import { BackButton } from '../layout/PageHeader';
 import { ActivityText } from '../sessions/SessionList';
@@ -181,6 +182,14 @@ function OverviewTab({ s, view, keys, memory, onTab }: { s: Space; view?: SpaceV
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0 space-y-5">
+        <ProjectJobs
+          s={s}
+          card={(count, more, body) => (
+            <Card title="Jobs" count={count} action={<CardLink onClick={() => go(`/jobs?project=${enc(s.id)}`)}>{more ? tr(`All ${count}`) : 'All jobs'}</CardLink>}>
+              {body}
+            </Card>
+          )}
+        />
         <Card title="Sessions" count={sessions.length} action={sessions.length > RECENT && <CardLink onClick={() => setAll((x) => !x)}>{all ? 'Show fewer' : tr(`All ${sessions.length}`)}</CardLink>}>
           {sessions.length ? (
             <div className="divide-y divide-line border-t border-line">

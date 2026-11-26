@@ -30048,5 +30048,7 @@
   "in about {0} h {1} min": "约 {0} 小时 {1} 分钟后",
   "jobs::Done": "已完成",
   "Long work your sessions run in the background, sorted by tags: what runs, how long it has left, and what waits for what.": "会话在后台运行的长时间工作，按标签分类：正在运行什么、还要多久，以及哪些在等哪些。",
-  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag filter group organize sort search failed today": "任务 后台 长时间 工作 运行中 排队 已排队 队列 等待 在之后 依赖 逐个 一次一个 进度 百分比 剩余时间 预计 eta 多久 完成 已完成 失败 已停止 时间线 甘特图 gantt 输出 日志 停止 命令 监视器 子智能体 服务器 开发服务器 dev server 构建 训练 索引 下载 job 命令 接管 adopt 标签 tag 筛选 分组 整理 排序 搜索 今天失败"
+  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag filter group organize sort search failed today": "任务 后台 长时间 工作 运行中 排队 已排队 队列 等待 在之后 依赖 逐个 一次一个 进度 百分比 剩余时间 预计 eta 多久 完成 已完成 失败 已停止 时间线 甘特图 gantt 输出 日志 停止 命令 监视器 子智能体 服务器 开发服务器 dev server 构建 训练 索引 下载 job 命令 接管 adopt 标签 tag 筛选 分组 整理 排序 搜索 今天失败",
+  "All jobs": "所有作业",
+  "jobs::No project": "无项目"
 }

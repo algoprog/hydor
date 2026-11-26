@@ -13,6 +13,7 @@ import { go, openProject, openSession } from '../../lib/nav';
 import { useSessions } from '../../lib/store';
 import { LOCALE } from '../../i18n/locale';
 import { TagPills } from './TagPill';
+import { projectOf } from './tags';
 import { endedReason, endedWords, kindLabel, percent, progressText, queuePlace, runClock, startsIn, timeLeft, tookTime, waitingWords, type TimeLeft } from './words';
 
 const ICONS: Record<JobKind, LucideIcon> = { command: SquareTerminal, monitor: Activity, subagent: Bot, 'hydor-subagent': Bot, experiment: FlaskConical, job: Hourglass, server: Server, task: SquareTerminal };
@@ -102,25 +103,27 @@ function Facts({ how, where }: { how: Items; where: Items }) {
   );
 }
 
-/** A session's title and its project, each a link. */
-export function sessionLinks(session: NonNullable<JobEntry['session']>): ReactNode[] {
+/** A session's title and a project (by default, the session's; null: none), each a link; either may be left out. */
+export function sessionLinks(session: JobEntry['session'], project: JobEntry['project'] | null = session?.project): ReactNode[] {
   return [
-    <button type="button" title="Open this session" onClick={() => openSession(session.key)} className={linkCls}>
-      {session.title ? <span translate="no">{session.title}</span> : <span>Session</span>}
-    </button>,
-    session.project && (
-      <button type="button" translate="no" onClick={() => openProject(session.project!.id)} className={linkCls}>
-        {session.project.name}
+    session && (
+      <button type="button" title="Open this session" onClick={() => openSession(session.key)} className={linkCls}>
+        {session.title ? <span translate="no">{session.title}</span> : <span>Session</span>}
+      </button>
+    ),
+    project && (
+      <button type="button" translate="no" onClick={() => openProject(project.id)} className={linkCls}>
+        {project.name}
       </button>
     ),
   ].filter(Boolean);
 }
 
-/** The same, as a line with a dot between them (a group's header). */
-export function SessionLinks({ session }: { session: NonNullable<JobEntry['session']> }) {
+/** The same, as a line with a dot between them (a group's header); `noProject` when the page says the project already. */
+export function SessionLinks({ session, noProject }: { session: NonNullable<JobEntry['session']>; noProject?: boolean }) {
   return (
     <>
-      {sessionLinks(session).map((x, i) => (
+      {sessionLinks(session, noProject ? null : session.project).map((x, i) => (
         <span key={i} className="inline-flex min-w-0 items-baseline gap-1.5">
           {i > 0 && <span aria-hidden>·</span>}
           {x}
@@ -281,6 +284,7 @@ export function JobRow({
   marked,
   grouped,
   sessionShown,
+  projectShown,
   actions,
 }: {
   job: JobEntry;
@@ -295,6 +299,8 @@ export function JobRow({
   grouped?: boolean;
   /** Its group's header names its session (all of the group comes from it). */
   sessionShown?: boolean;
+  /** It is on its project's page, which says the project already. */
+  projectShown?: boolean;
   actions: RowActions;
 }) {
   const kind = useKindLabel(job);
@@ -339,7 +345,7 @@ export function JobRow({
           </div>
           <Facts
             how={standing(job, now, waits, actions.onShow)}
-            where={sessionShown || !session ? [] : sessionLinks(session)}
+            where={sessionShown ? [] : sessionLinks(session, projectShown ? null : projectOf(job))}
           />
           {job.lastLine && (!ended || job.state === 'failed') && (
             <div translate="no" title={job.lastLine} className="mt-0.5 truncate font-mono text-[11.5px] leading-[18px] text-fg-3">
