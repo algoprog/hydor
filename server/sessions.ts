@@ -1498,8 +1498,11 @@ export class SessionManager extends EventEmitter {
         this.emit('live', key, snap.live, snap.overlay);
       }, 400);
     });
-    // Make sure a timeline exists so transcript changes reach subscribers.
-    this.timeline(key).catch(() => {});
+    // Make sure a timeline exists so transcript changes reach subscribers. One read before this (at a restart, while
+    // its still-running program looked like one elsewhere) kept its last turn open: resting, it is closed now.
+    this.timeline(key)
+      .then((tl) => (resting(adapter) ? tl.readMore().then(() => void (resting(adapter) && tl.endTurn())) : undefined))
+      .catch(() => {});
     if (adapter.transcriptPath) this.timelines.get(key)?.setPath(adapter.transcriptPath);
     this.queueSummary(key);
     this.queueAncestors(key);
