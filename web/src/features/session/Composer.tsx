@@ -187,8 +187,9 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const takeover = !!ext && s.agent === 'claude';
   const locked = !!ext && !takeover;
   // Its turn is over but background tasks or subagents it started still run (the header says "Working · 2 in
-  // background"): the ring keeps turning, around Send, since the agent takes messages as usual meanwhile.
-  const activity = activityOf({ ...s, live });
+  // background"): the ring keeps turning, around Send, since the agent takes messages as usual meanwhile. Not for its
+  // jobs alone (the `job` command, runs of Experiments): Stop does not stop those, the Jobs section does.
+  const activity = activityOf({ ...s, live, jobs: undefined });
   const background = !working && !ext && inBackground(activity);
   const [confirm, confirmNode] = useConfirm();
   const cat = useCatalog(s.agent, s.acpAgent);

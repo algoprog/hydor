@@ -92,6 +92,8 @@ Di lo que quieres con palabras sencillas, y el agente hace el resto:
 - **Cuánto debería tardar**: un agente puede dar su propia estimación, que se usa hasta que el progreso del trabajo diga algo más;
 - **Trabajo que ya está en ejecución**: “muestra en Jobs el entrenamiento que iniciaste antes”. El agente lo agrega sin reiniciarlo (`job adopt`); esto no está disponible en Windows. Cuando acaba, dice **Terminado**, ya que nadie puede saber cómo salió.
 
+Mientras un job que inició una sesión siga pendiente o en ejecución (uno que ejecutó con `job`, o una ejecución de Experimentos que inició), esa sesión no ha terminado: su punto sigue “respirando” en azul y su estado dice “Trabajando · 1 en segundo plano”, también después de que su agente se haya detenido. Su aviso de **Terminadas** llega solo cuando el job acaba. El botón Detener junto a su cuadro de mensaje deja estos jobs en marcha: detenlos aquí.
+
 Si no se puede conectar con la app cuando un agente inicia un job, el comando se ejecuta de todos modos; simplemente no aparece aquí.
 
 ## Pídeselo a un agente

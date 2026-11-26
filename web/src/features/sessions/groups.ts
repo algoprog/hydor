@@ -49,11 +49,11 @@ export const GROUP_ROWS = 5;
 /** Active means recent activity, background tasks (agents, commands, monitors) still running, or a session scheduled to resume after a usage limit. */
 export const ACTIVE_MS = 5 * 60_000;
 /**
- * Background tasks or subagents still run: the agent picks up again when they finish, though its transcript may be
- * quiet meanwhile. A Hydor subagent's end changes its parent's summary too, which groups the list again.
+ * Background tasks, subagents or jobs still run: the agent picks up again when they finish, though its transcript may be
+ * quiet meanwhile. A Hydor subagent's end changes its parent's summary too, which groups the list again, as a job's end does.
  */
 export const hasBackgroundWork = (s: SessionSummary) =>
-  !!(s.live && s.live.status !== 'exited' && s.live.status !== 'error' && s.live.backgroundTasks?.length) || !!s.external?.backgroundTasks?.length || !!s.helpers;
+  !!(s.live && s.live.status !== 'exited' && s.live.status !== 'error' && s.live.backgroundTasks?.length) || !!s.external?.backgroundTasks?.length || !!s.helpers || !!s.jobs;
 export const lastActivityAt = (s: SessionSummary) => Math.max(s.updatedAt ?? s.createdAt ?? 0, s.doneAt ?? 0, s.live?.startedAt ?? 0, s.live?.turnStartedAt ?? 0, s.external?.since ?? 0);
 
 /** Whether a space or folder group shows folded: as you left it, else folded (each starts as its heading, and opens when you open it). */

@@ -93,7 +93,7 @@ O ponto de status indica como está uma sessão:
 
 | Ponto | O que significa |
 | --- | --- |
-| Azul, pulsando | Trabalhando: um turno está em execução, ou tarefas em segundo plano estão |
+| Azul, pulsando | Trabalhando: um turno está em execução, ou tarefas em segundo plano ou jobs que ela iniciou estão |
 | Âmbar | Precisa de você: uma aprovação, uma pergunta ou um formulário está esperando |
 | Verde | Pronta: o agente está em execução e aguarda sua próxima mensagem |
 | Cinza | Aberta no VS Code ou em um terminal, e parada lá |
@@ -164,7 +164,7 @@ Ao voltar para o app, você vê em um só lugar o que aconteceu enquanto esteve 
 Aberta, ela mostra até seis linhas, as mais importantes primeiro (**Mostrar … mais** lista o restante):
 
 - **Precisa de você**: aprovações, perguntas, formulários, chamadas retidas na Caixa de saída e qualquer outra coisa esperando por você, como na [caixa de entrada](/guide/inbox). Uma aprovação, uma pergunta, um formulário ou uma chamada retida tem **Responder aqui**, que abre o próprio cartão da caixa de entrada sob a linha; clique em qualquer outra linha para ir até onde ela espera.
-- **Concluído** e **Falhou**: sessões que terminaram desde a sua última visita e que você não abriu desde então, cada uma com o início da última resposta (ou o que deu errado) e os arquivos que ela criou. Clique em um arquivo para abri-lo em Arquivos, ou na linha para abrir a sessão. Uma sessão cujo turno terminou enquanto subagentes ou tarefas em segundo plano que ela iniciou ainda estão em execução não terminou: ela aparece aqui quando eles acabarem.
+- **Concluído** e **Falhou**: sessões que terminaram desde a sua última visita e que você não abriu desde então, cada uma com o início da última resposta (ou o que deu errado) e os arquivos que ela criou. Clique em um arquivo para abri-lo em Arquivos, ou na linha para abrir a sessão. Uma sessão cujo turno terminou enquanto subagentes, tarefas em segundo plano ou jobs que ela iniciou ainda estão em execução não terminou: ela aparece aqui quando eles acabarem.
 - **Executadas sozinhas**: execuções das suas [tarefas agendadas](/guide/tasks), das agendas dos seus agentes e dos seus apps (iniciadas pela página Apps, por um link, pela API ou por um app de chat), cada uma com o resultado (**Concluído**, **Falhou** ou **Nada novo**) e quanto custou. Clique em uma para abrir a sessão em que ela foi executada, ou a execução do app.
 - **Próximas hoje**: as tarefas agendadas previstas para mais tarde hoje, abaixo das linhas.
 

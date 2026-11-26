@@ -93,7 +93,7 @@ Der Statuspunkt zeigt den Zustand der Sitzung:
 
 | Punkt | Bedeutung |
 | --- | --- |
-| Blau, pulsierend | In Arbeit: Ein Durchlauf oder Hintergrundaufgaben laufen |
+| Blau, pulsierend | In Arbeit: Ein Durchlauf oder Hintergrundaufgaben oder Jobs, die sie gestartet hat, laufen |
 | Gelb | Benötigt dich: Freigabe, Frage oder Formular wartet |
 | Grün | Bereit: Der Agent läuft und wartet auf deine nächste Nachricht |
 | Grau | In VS Code oder einem Terminal geöffnet, dort gerade ohne Arbeit |
@@ -164,7 +164,7 @@ Unter dem Nachrichtenfeld und über den Einstiegsideen siehst du nach deiner Rü
 Geöffnet zeigt der Bereich bis zu sechs Einträge, die wichtigsten zuerst. **… weitere anzeigen** öffnet den Rest:
 
 - **Braucht dich**: Freigaben, Fragen, Formulare, im Postausgang zurückgehaltene Aufrufe und weitere Rückfragen wie im [Posteingang](/guide/inbox). Bei Freigaben, Fragen, Formularen und zurückgehaltenen Aufrufen öffnet **Hier antworten** die passende Posteingangskarte unter dem Eintrag. Andere Einträge führen zum jeweiligen Ort.
-- **Abgeschlossen** und **Fehlgeschlagen**: seit dem letzten Besuch beendete und noch nicht erneut geöffnete Sitzungen, jeweils mit dem Anfang der letzten Antwort oder Fehlerbeschreibung und erstellten Dateien. Dateien öffnen sich in Dateien, der Eintrag öffnet die Sitzung. Eine Sitzung, deren Durchlauf endete, während noch von ihr gestartete Subagenten oder Hintergrundaufgaben laufen, ist noch nicht abgeschlossen: Sie erscheint hier, sobald diese enden.
+- **Abgeschlossen** und **Fehlgeschlagen**: seit dem letzten Besuch beendete und noch nicht erneut geöffnete Sitzungen, jeweils mit dem Anfang der letzten Antwort oder Fehlerbeschreibung und erstellten Dateien. Dateien öffnen sich in Dateien, der Eintrag öffnet die Sitzung. Eine Sitzung, deren Durchlauf endete, während noch von ihr gestartete Subagenten, Hintergrundaufgaben oder Jobs laufen, ist noch nicht abgeschlossen: Sie erscheint hier, sobald diese enden.
 - **Automatisch ausgeführt**: Läufe deiner [geplanten Aufgaben](/guide/tasks), Agentenzeitpläne und Apps, die über App-Seite, Link, API oder Chat-App gestartet wurden. Angezeigt werden Ergebnis (**Abgeschlossen**, **Fehlgeschlagen** oder **Nichts Neues**) und Kosten. Ein Klick öffnet die ausführende Sitzung beziehungsweise den App-Lauf.
 - **Heute als Nächstes**: unter den Ereignissen die für heute noch anstehenden Aufgaben.
 

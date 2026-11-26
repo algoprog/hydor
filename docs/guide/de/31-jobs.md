@@ -92,6 +92,8 @@ Sag in einfachen Worten, was du willst, und der Agent erledigt den Rest:
 - **Wie lange es dauern sollte**: Ein Agent kann eine eigene Schätzung angeben, die gilt, bis der Fortschritt des Jobs mehr verrät;
 - **Arbeit, die schon läuft**: „Zeig das Training, das du vorhin gestartet hast, in Jobs an.“ Der Agent fügt es hinzu, ohne es neu zu starten (`job adopt`); unter Windows ist das nicht möglich. Wenn es endet, steht dort **Beendet**, weil niemand sagen kann, wie es ausgegangen ist.
 
+Solange ein Job, den eine Sitzung gestartet hat (mit dem Befehl `job` oder als Lauf von Experimenten), noch wartet oder läuft, ist diese Sitzung nicht fertig: ihr Punkt pulsiert weiter blau, und ihr Status lautet „Arbeitet · 1 im Hintergrund“, auch wenn ihr Agent schon aufgehört hat. Ihre Benachrichtigung **Abgeschlossen** kommt erst, wenn der Job endet. Der Stopp-Button an ihrem Nachrichtenfeld lässt diese Jobs weiterlaufen: Stoppe sie hier.
+
 Wenn die App nicht erreichbar ist, während ein Agent einen Job startet, läuft der Befehl trotzdem; er erscheint dann nur nicht hier.
 
 ## Frag einen Agenten

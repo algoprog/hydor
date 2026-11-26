@@ -469,6 +469,12 @@ export interface SessionSummary {
    * or helpers of their own). Set even when the session's own process has stopped between turns: it is not done while they run.
    */
   helpers?: number;
+  /**
+   * Work it left running in the Jobs section that is not one of its own background tasks: `job` commands it started that
+   * are queued or running (detached, adopted, or outliving its agent's process), and runs of Experiments it started that
+   * wait or run. It is not done while they run either.
+   */
+  jobs?: number;
   archived?: boolean;
   pinned?: boolean;
   createdByApp?: boolean;

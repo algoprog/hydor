@@ -223,6 +223,26 @@ test('finished notice: sent at once with nothing running; held while a Hydor sub
   assert.equal(done(notices), 1);
 });
 
+test('finished notice: held while its jobs wait or run, also once its process ends, and sent when they are over', async () => {
+  const { t, notices, look } = noticing();
+  t.m.statuses.set(KEY, { status: 'working', turnStart: Date.now() - 60_000 });
+  look(summary('idle', { live: { status: 'idle', backgroundTasks: [] }, jobs: 2 }));
+  await sleep(1700);
+  assert.equal(done(notices), 0);
+  assert.ok(t.m.heldDone.has(KEY));
+  // Its process ends: a detached job runs on, and the notice waits for it.
+  look(summary('off', { live: null, jobs: 1 }));
+  assert.ok(t.m.heldDone.has(KEY));
+  look(summary('off', { live: null, jobs: 1 }));
+  await sleep(150);
+  assert.equal(done(notices), 0);
+  // The last job ends with no turn after it.
+  look(summary('off', { live: null }));
+  await sleep(150);
+  assert.equal(done(notices), 1);
+  assert.equal(t.m.heldDone.has(KEY), false);
+});
+
 // ---- watchStatus -> afterTurn ---------------------------------------------------------
 
 test('a quick turn that hit the limit moves the session, once, and forgets the hit', () => {

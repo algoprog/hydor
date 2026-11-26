@@ -66,6 +66,8 @@ export function createJobs(o: JobsOptions = {}): Jobs {
   /** The `job` commands waiting to hear whether to start. */
   const waiters = new Map<string, Set<() => void>>();
   let counts: JobCounts = { running: 0, queued: 0 };
+  /** By session: its jobs and runs of Experiments that wait or run, beside its own background tasks (SessionSummary.jobs). */
+  let bySession = new Map<string, number>();
   let timer: NodeJS.Timeout | null = null;
   let poking: NodeJS.Timeout | null = null;
   let started = false;
@@ -119,6 +121,26 @@ export function createJobs(o: JobsOptions = {}): Jobs {
     watcher.keepOnly(keep);
   }
 
+  /**
+   * What each session still has at work here that its own summary does not count: its registered jobs queued or running
+   * and the runs of Experiments it started that wait or run, less its own background tasks that run one of those jobs
+   * (seen.hidden: those count among its background tasks already). A session whose count changed is listed again, and
+   * so shows Working, or its held "Finished" notice goes out, as its work ends.
+   */
+  function perSession(seen: Observed, jobs: Registered[]) {
+    const next = new Map<string, number>();
+    const add = (key: string | undefined, n: number) => {
+      if (key) next.set(key, (next.get(key) ?? 0) + n);
+    };
+    for (const j of jobs) add(j.session, 1);
+    for (const s of [...seen.running, ...seen.queued]) if (s.entry.kind === 'experiment') add(s.entry.session?.key, 1);
+    for (const w of seen.work) for (const t of w.running) if (seen.hidden.has(`task:${w.key}:${t.id}`) && next.has(w.key)) add(w.key, -1);
+    for (const [k, n] of next) if (n <= 0) next.delete(k);
+    const was = bySession;
+    bySession = next;
+    for (const k of new Set([...was.keys(), ...next.keys()])) if (was.get(k) !== next.get(k)) d.sessions.queueSummary(k);
+  }
+
   function tell(now: JobCounts) {
     if (now.running === counts.running && now.queued === counts.queued) return;
     const idle = !(counts.running + counts.queued);
@@ -144,6 +166,7 @@ export function createJobs(o: JobsOptions = {}): Jobs {
     before = at;
     const jobs = activeRegistered(d.db);
     follow(seen, jobs, now);
+    perSession(seen, jobs);
     // Servers run until stopped: they are not counted with the jobs that run.
     const work = seen.running.filter((s) => s.entry.kind !== 'server').length;
     tell({ running: work + jobs.filter((j) => j.state === 'running').length, queued: seen.queued.length + jobs.filter((j) => j.state === 'queued').length });
@@ -469,6 +492,7 @@ export function createJobs(o: JobsOptions = {}): Jobs {
       d = deps;
       jobsSchema(d.db);
       gather = new Gatherer(d);
+      d.sessions.jobsAtWork = (key) => bySession.get(key) ?? 0;
       const idOf = (req: FastifyRequest) => (req.params as { id: string }).id;
       d.app.get('/api/jobs', async (req) => list(limitOf(req)));
       d.app.get('/api/jobs/:id/log', async (req) => log(idOf(req)));

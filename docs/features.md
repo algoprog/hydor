@@ -54,7 +54,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   header). Open, up to six rows, most important first:
   what waits on you (approvals, questions, forms and calls held in the Outbox answered right there with the Inbox's
   own cards), sessions that finished Done or Failed and that you have not opened since (the start of the last reply or
-  the error, and the files made, each opening in Files; one whose subagents or background tasks still run waits until they end), runs of scheduled tasks, agents' schedules and apps with how
+  the error, and the files made, each opening in Files; one whose subagents, background tasks or jobs still run waits until they end), runs of scheduled tasks, agents' schedules and apps with how
   they went (done, failed, nothing new) and their cost, and what runs next today. It stays folded until you open it,
   and as you left it on each device; Mark all as seen clears it and marks its sessions as opened on every device. Your last visit is kept on
   the server for every device: the end of the last time the app was open, in front and in use for a minute or more
@@ -91,7 +91,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
   after a usage limit stay in Active until that scheduled resume is cleared, and so do sessions whose background
-  agents, commands or monitors, or Hydor subagents, are still running, until those end (a session whose subagents still run shows as working, with no Done marker, and takes messages; so does one whose Hydor subagent's own background tasks or subagents still run). Pinned comes next, then Folders (your own folders for sorting sessions that are in no project; see below), then Projects: a group for each project and each folder you picked
+  agents, commands or monitors, Hydor subagents, or jobs it started (with `job`, or runs of Experiments), are still running, until those end (a session whose subagents still run shows as working, with no Done marker, and takes messages; so does one whose Hydor subagent's own background tasks or subagents still run, and one whose jobs wait or run, also after its agent has stopped). Pinned comes next, then Folders (your own folders for sorting sessions that are in no project; see below), then Projects: a group for each project and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable, and each starting folded (the Active, Pinned, Folders and Projects headings fold too,
   kept on each computer; folded, Active and Pinned show their count and a dot for a finished session). Under Folders and Projects the list is a tree: every heading has its arrow first, a group's sessions are set in under its heading along a thin line, and a folded heading shows how many sessions it holds at its right end; the + on the Projects and Folders headings is always in sight, and a group's ⋯ and pen show over the heading's end when you point at it (always on a touch screen). A line per session, with a pen to
   start a new session there; a project's name opens its details window and the arrow before it folds its sessions; and dragged by their headings into the order you like, the same on every device;
@@ -2103,7 +2103,8 @@ programs shows each program's version and what is out, with Check now, Update no
   started, Ended when nobody saw how). A **Timeline** view draws them along the clock with their dependencies;
   **Output** shows the end of a job's log, and **Stop** ends it after asking. Agents run long work with `job run`
   (`--after` another job, `--queue`, `--eta`), as you ask in plain words, and `job adopt` shows work that is already
-  running without restarting it (not on Windows).
+  running without restarting it (not on Windows). A session whose jobs or runs still wait or run shows as working
+  ("Working · 1 in background"), not Ready, also after its agent has stopped, and its Finished notice waits for them.
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - A message you send shows in the conversation at once, with the agent at work under it (or in the queue, when
   it waits there), before the agent has it, and the box is free for the next; one that does not go through comes

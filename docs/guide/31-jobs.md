@@ -92,6 +92,8 @@ Say what you want in plain words, and the agent does the rest:
 - **How long it should take**: an agent can give its own estimate, which is used until the job's progress says more;
 - **Work already running**: "show the training you started earlier in Jobs". The agent adds it without restarting it (`job adopt`); this is not available on Windows. When it ends, it says **Ended**, as nobody can tell how it went.
 
+While a job that a session started still waits or runs (one it ran with `job`, or a run of Experiments it started), that session is not finished: its dot keeps breathing blue and its status reads "Working · 1 in background", also after its agent has stopped, and its **Finished** notice comes only once the job ends. The Stop button by its message box leaves these jobs running: stop them here.
+
 If the app can't be reached when an agent starts a job, the command runs anyway; it just does not show here.
 
 ## Ask an agent

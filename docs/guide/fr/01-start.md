@@ -93,7 +93,7 @@ Le point d’état indique où en est une session :
 
 | Point | Signification |
 | --- | --- |
-| Bleu, qui respire | En cours de travail : un tour est en cours, ou des tâches en arrière-plan |
+| Bleu, qui respire | En cours de travail : un tour est en cours, ou des tâches en arrière-plan ou des jobs qu’elle a lancés |
 | Orange | Besoin de vous : une approbation, une question ou un formulaire attend |
 | Vert | Prête : l’agent est en cours d’exécution et attend votre prochain message |
 | Gris | Ouverte dans VS Code ou un terminal, et inactive à cet endroit |
@@ -164,7 +164,7 @@ Quand vous revenez dans l’app, vous voyez au même endroit ce qui s’est pass
 Ouvert, il affiche jusqu’à six lignes, les plus importantes d’abord (**Afficher … de plus** liste le reste) :
 
 - **Votre intervention est requise** : approbations, questions, formulaires, appels retenus dans la Boîte d’envoi et tout ce qui attend votre réponse, comme dans la [boîte de réception](/guide/inbox). Une approbation, une question, un formulaire ou un appel retenu a un bouton **Répondre ici**, qui ouvre la carte de la boîte de réception sous la ligne ; cliquez sur toute autre ligne pour aller là où l’élément attend.
-- **Terminé** et **Échec** : sessions terminées depuis votre dernière visite et que vous n’avez pas ouvertes depuis, chacune avec le début de sa dernière réponse (ou ce qui s’est mal passé) et les fichiers qu’elle a créés. Cliquez sur un fichier pour l’ouvrir dans Fichiers, ou sur la ligne pour ouvrir la session. Une session dont le tour s’est achevé alors que des sous-agents ou des tâches en arrière-plan qu’elle a lancés tournent encore n’est pas terminée : elle apparaît ici quand ils ont fini.
+- **Terminé** et **Échec** : sessions terminées depuis votre dernière visite et que vous n’avez pas ouvertes depuis, chacune avec le début de sa dernière réponse (ou ce qui s’est mal passé) et les fichiers qu’elle a créés. Cliquez sur un fichier pour l’ouvrir dans Fichiers, ou sur la ligne pour ouvrir la session. Une session dont le tour s’est achevé alors que des sous-agents, des tâches en arrière-plan ou des jobs qu’elle a lancés tournent encore n’est pas terminée : elle apparaît ici quand ils ont fini.
 - **Exécutées seules** : exécutions de vos [tâches planifiées](/guide/tasks), des plannings de vos agents et de vos apps (lancées depuis la page Apps, un lien, l’API ou une app de discussion), chacune avec son résultat (**Terminé**, **Échec** ou **Rien de nouveau**) et son coût. Cliquez sur une exécution pour ouvrir la session dans laquelle elle s’est déroulée, ou l’exécution de l’app.
 - **Prochaines aujourd’hui** : les tâches planifiées prévues plus tard dans la journée, sous les lignes.
 

@@ -93,7 +93,7 @@ El punto de estado indica cómo va una sesión:
 
 | Punto | Qué significa |
 | --- | --- |
-| Azul, que “respira” | Trabajando: hay un turno en curso, o tareas en segundo plano |
+| Azul, que “respira” | Trabajando: hay un turno en curso, o tareas en segundo plano o jobs que inició |
 | Ámbar | Te necesita: hay una aprobación, una pregunta o un formulario esperando |
 | Verde | Lista: el agente se está ejecutando y espera tu próximo mensaje |
 | Gris | Abierta en VS Code o en una terminal, e inactiva allí |
@@ -164,7 +164,7 @@ Al volver a la app, ves en un solo lugar lo que pasó mientras estabas fuera, de
 Abierto, muestra hasta seis filas, las más importantes primero (**Mostrar … más** muestra el resto):
 
 - **Te necesita**: aprobaciones, preguntas, formularios, llamadas retenidas en la Bandeja de salida y cualquier otra cosa que esté esperándote, como en la [bandeja de entrada](/guide/inbox). Una aprobación, una pregunta, un formulario o una llamada retenida tiene **Responder aquí**, que abre debajo de la fila la propia tarjeta de la bandeja de entrada; haz clic en cualquier otra fila para ir al lugar donde espera.
-- **Hecho** y **Fallido**: sesiones que terminaron desde tu última visita y que no has abierto desde entonces, cada una con el comienzo de su última respuesta (o lo que salió mal) y los archivos que creó. Haz clic en un archivo para abrirlo en Archivos, o en la fila para abrir la sesión. Una sesión cuyo turno terminó mientras los subagentes o las tareas en segundo plano que inició siguen ejecutándose no ha terminado: aparece aquí cuando acaben.
+- **Hecho** y **Fallido**: sesiones que terminaron desde tu última visita y que no has abierto desde entonces, cada una con el comienzo de su última respuesta (o lo que salió mal) y los archivos que creó. Haz clic en un archivo para abrirlo en Archivos, o en la fila para abrir la sesión. Una sesión cuyo turno terminó mientras los subagentes, las tareas en segundo plano o los jobs que inició siguen ejecutándose no ha terminado: aparece aquí cuando acaben.
 - **Se ejecutó sola**: ejecuciones de tus [tareas programadas](/guide/tasks), de las programaciones de tus agentes y de tus apps (iniciadas desde la página Apps, un enlace, la API o una app de chat), cada una con cómo le fue (**Hecho**, **Fallido** o **Nada nuevo**) y cuánto costó. Haz clic en una para abrir la sesión en la que se ejecutó, o la ejecución de la app.
 - **Siguiente hoy**: las tareas programadas que tocan más tarde hoy, debajo de las filas.
 

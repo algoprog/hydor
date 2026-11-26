@@ -104,4 +104,30 @@ test('a session waiting for its project’s memory to be built is working, and s
   assert.equal(activityLabel(activityOf(ses({ live: live('working') }))!), 'Working');
 });
 
+test('jobs it started that wait or run (the `job` command, runs of Experiments) keep a session working, also once its process is gone', () => {
+  // Between turns, its agent idle with no background task of its own: not Ready while its jobs run.
+  const idle = activityOf(ses({ live: live('idle', { backgroundTasks: [] }), jobs: 2 }))!;
+  assert.deepEqual([idle.status, idle.background, idle.agents], ['idle', 2, 0]);
+  assert.equal(inBackground(idle), true);
+  assert.equal(isWorking(idle), true);
+  assert.equal(isBusy(idle), false, 'its turn is over: it takes messages');
+  assert.equal(backgroundLine(idle), 'Working · 2 in background');
+  assert.equal(activityLabel(idle), 'Working · 2 background tasks running');
+  // Counted beside its own background tasks.
+  const both = activityOf(ses({ live: live('idle', { backgroundTasks: [{ kind: 'local_bash' }] }), jobs: 1 }))!;
+  assert.equal(both.background, 2);
+  // Its process ended, or it never had one here (a detached job outlives it).
+  for (const s of [ses({ live: null, jobs: 1 }), ses({ jobs: 1 }), ses({ live: live('exited'), jobs: 1 })]) {
+    const a = activityOf(s)!;
+    assert.deepEqual([a.kind, a.status, a.background], ['app', 'idle', 1]);
+    assert.equal(isWorking(a), true);
+  }
+  // Open in VS Code or a terminal, idle there.
+  const ext = activityOf(ses({ external: { status: 'idle', client: 'VS Code' } as SessionSummary['external'], jobs: 1 }))!;
+  assert.equal(backgroundLine(ext), 'Working in VS Code · 1 in background');
+  // None left: Ready again.
+  assert.equal(activityOf(ses({ live: null, jobs: 0 })), null);
+  assert.equal(isWorking(activityOf(ses({ live: live('idle'), jobs: 0 }))), false);
+});
+
 console.log(`${passed}/${total} passed`);

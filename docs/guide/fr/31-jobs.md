@@ -92,6 +92,8 @@ Dites ce que vous voulez avec des mots simples, et l’agent fait le reste :
 - **La durée prévue** : un agent peut donner sa propre estimation, utilisée jusqu’à ce que la progression du job en dise davantage ;
 - **Les travaux déjà en cours** : « affiche dans Jobs l’entraînement que tu as lancé tout à l’heure ». L’agent l’ajoute sans le redémarrer (`job adopt`) ; ce n’est pas possible sous Windows. Quand il s’achève, il indique **Terminé**, car personne ne peut savoir comment il s’est passé.
 
+Tant qu’un job lancé par une session attend ou tourne (un job lancé avec `job`, ou une exécution d’Expériences qu’elle a lancée), cette session n’est pas terminée : son point reste bleu et pulsant, et son statut affiche « En cours · 1 en arrière-plan », même après l’arrêt de son agent. Sa notification **Terminées** n’arrive qu’une fois le job achevé. Le bouton Arrêter près de sa zone de message laisse ces jobs tourner : arrêtez-les ici.
+
 Si l’app est injoignable au moment où un agent lance un job, la commande s’exécute quand même ; elle n’apparaît simplement pas ici.
 
 ## Demander à un agent

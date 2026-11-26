@@ -7,7 +7,7 @@ export interface Activity {
   status: 'starting' | 'working' | 'waiting' | 'idle' | 'stopping';
   client?: string;
   detail?: string;
-  /** Background tasks still running: commands, monitors, workflows and the program's own subagents. */
+  /** Background tasks still running: commands, monitors, workflows and the program's own subagents, and its jobs (SessionSummary.jobs). */
   background: number;
   /** Of those, how many are the program's own subagents (a Claude Code subagent): they count as subagents, not as background tasks. */
   agents: number;
@@ -36,11 +36,13 @@ export function activityOf(s: SessionSummary | undefined | null): Activity | nul
   if (!s) return null;
   const l = s.live;
   const helpers = s.helpers ?? 0;
-  if (l && l.status !== 'exited' && l.status !== 'error') return { kind: 'app', status: l.status, background: l.backgroundTasks?.length ?? 0, agents: agentsIn(l.backgroundTasks), helpers, ...(l.memory === 'building' ? { memory: true as const } : {}) };
+  // Jobs it started that wait or run (the `job` command, runs of Experiments): background tasks too, also once its process is gone.
+  const jobs = s.jobs ?? 0;
+  if (l && l.status !== 'exited' && l.status !== 'error') return { kind: 'app', status: l.status, background: (l.backgroundTasks?.length ?? 0) + jobs, agents: agentsIn(l.backgroundTasks), helpers, ...(l.memory === 'building' ? { memory: true as const } : {}) };
   const e = s.external;
-  if (e) return { kind: 'external', status: e.status, client: e.client, detail: e.detail, background: e.backgroundTasks?.length ?? 0, agents: agentsIn(e.backgroundTasks), helpers };
-  // Its own process has stopped between turns, but its Hydor subagents still run: it is not done.
-  if (helpers > 0) return { kind: 'app', status: 'idle', background: 0, agents: 0, helpers };
+  if (e) return { kind: 'external', status: e.status, client: e.client, detail: e.detail, background: (e.backgroundTasks?.length ?? 0) + jobs, agents: agentsIn(e.backgroundTasks), helpers };
+  // Its own process has stopped between turns, but its Hydor subagents or its jobs still run: it is not done.
+  if (helpers > 0 || jobs > 0) return { kind: 'app', status: 'idle', background: jobs, agents: 0, helpers };
   return null;
 }
 

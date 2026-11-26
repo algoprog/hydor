@@ -78,7 +78,11 @@ const runs = new Map<string, string>();
 const titles = new Map<string, { title: string; extra?: Record<string, unknown> }>();
 const commands = new Map<string, string>();
 const stopped: string[] = [];
+/** Sessions listed again (queueSummary), as each one's count of jobs at work changed. */
+const relisted: string[] = [];
 const sessions = {
+  jobsAtWork: undefined as undefined | ((key: string) => number),
+  queueSummary: (key: string) => void relisted.push(key),
   backgroundWork: () => [...work.values()],
   summary(key: string) {
     const s = titles.get(key);
@@ -480,6 +484,48 @@ test('a session’s `job run` task is the job, not a task beside it', async () =
   fs.rmSync(path.join(taskFiles, 'lead'), { recursive: true, force: true });
   work.get(KEY)!.ended = [];
   jobs.tick();
+});
+
+test('a session is at work while its jobs and runs wait or run, its own `job run` task counted once', async () => {
+  const at = (key = KEY) => sessions.jobsAtWork!(key);
+  const w = session(KEY, 'Index the corpus', { space: space.id }, { status: 'idle' });
+  jobs.tick();
+  assert.equal(at(), 0);
+  relisted.length = 0;
+  // A job started detached (or adopted, or outliving its agent's process): no background task of the session runs it.
+  const first = await register('Crawl');
+  jobs.tick();
+  assert.equal(at(), 1);
+  assert.ok(relisted.includes(KEY), 'its list entry says so');
+  // One that waits its turn counts too.
+  const second = await register('Index after crawl', { after: [first.id] });
+  jobs.tick();
+  assert.equal(at(), 2);
+  // A `job run` under the session's own background task: that task already counts, so the job does not again.
+  const started = Date.now() - 1000;
+  w.running = [{ id: 'b1', description: 'Train in the background', kind: 'local_bash', status: 'running', startedAt: started, toolUseId: 'use9' }];
+  commands.set('use9', 'job run --name Train -- python train.py');
+  const third = await register('Train');
+  jobs.tick();
+  assert.equal(at(), 2);
+  // A run of Experiments it started, while it waits.
+  insertRun(db, { id: 'r-mine', spec: { name: 'sweep', command: 'python sweep.py', cwd: tmp, gpus: 1 }, status: 'waiting', why: 'Waiting for a free GPU', info: { startedBy: { session: KEY } } });
+  jobs.tick();
+  assert.equal(at(), 3);
+  assert.equal(at('claude:someone-else'), 0);
+  // As each ends, the count goes down, and the session is listed again each time.
+  relisted.length = 0;
+  updateRun(db, 'r-mine', { status: 'stopped', endedAt: Date.now() });
+  await finish(third.id);
+  w.running = [];
+  assert.equal((await call('POST', `/api/jobs/${second.id}/stop`)).status, 200);
+  await finish(first.id);
+  jobs.tick();
+  assert.equal(at(), 0);
+  assert.ok(relisted.includes(KEY), 'listed again once nothing is left');
+  relisted.length = 0;
+  jobs.tick();
+  assert.deepEqual(relisted, [], 'not again while nothing changes');
 });
 
 test('Hydor subagents while they work, and how they ended', async () => {

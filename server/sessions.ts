@@ -625,6 +625,7 @@ export class SessionManager extends EventEmitter {
       programSubagents: this.programCount(r.key) || undefined,
       // Set also while the session's own process is stopped between turns: its helpers' work is not over.
       helpers: helpers.get(r.key)?.size || undefined,
+      jobs: this.jobsAtWork?.(r.key) || undefined,
       external: live ? null : this.externalState(r),
       archived: !!r.archived,
       pinned: !!r.pinned,
@@ -778,6 +779,7 @@ export class SessionManager extends EventEmitter {
     if (this.gates.get(key)?.state === 'building') return true;
     if (l && isRunningStatus(workStatus(l.adapter.state))) return true;
     if (this.runningHelpers().get(key)?.size) return true;
+    if (this.jobsAtWork?.(key)) return true;
     if (l) return false;
     const r = this.row(key);
     const ext = r ? this.externalState(r) : null;
@@ -852,8 +854,8 @@ export class SessionManager extends EventEmitter {
           if (this.signedOutHits.delete(s.key)) this.afterSignOut(s, now);
           // A notice held from an earlier turn goes out at the end of this one, once nothing it started still runs.
           if (prev) this.finishedNotice(s, st, false, now);
-        } else if (prev && st === 'idle' && this.heldDone.has(s.key) && !this.stillAtWork(s)) {
-          // What a held notice waited on ended (its background tasks, its subagents) with no turn after it yet.
+        } else if (prev && (st === 'idle' || st === 'off') && this.heldDone.has(s.key) && !this.stillAtWork(s)) {
+          // What a held notice waited on ended (its background tasks, its subagents, its jobs) with no turn after it yet.
           this.releaseHeld(s.key);
         }
         continue; // the first sighting is only a baseline
@@ -884,8 +886,9 @@ export class SessionManager extends EventEmitter {
       } else if (st === 'error') {
         this.notify({ ...base, kind: 'failed', body: s.live?.error ? s.live.error.slice(0, 200) : 'Stopped with an error' } satisfies NotifyEvent);
       } else if (st === 'off') {
-        // Its process ended, and what it started with it: a notice held for that work no longer comes.
-        this.heldDone.delete(s.key);
+        // Its process ended, and what it started with it: a notice held for that work no longer comes. Its jobs outlive
+        // it: a notice held for them goes out when they end.
+        if (!s.jobs) this.heldDone.delete(s.key);
       }
       // Only the turn's own limit error proves interruption: an account can reach 100% as work finishes.
       const hit = this.limitHits.delete(s.key);
@@ -946,11 +949,12 @@ export class SessionManager extends EventEmitter {
     setTimeout(() => {
       if (at === undefined || this.heldDone.get(key) !== at) return;
       const s = this.summary(key);
-      const st = s ? phaseOf(s) : 'off';
-      if (st === 'off') return void this.heldDone.delete(key);
-      if (st !== 'idle' || this.stillAtWork(s!)) return;
+      if (!s) return void this.heldDone.delete(key);
+      // One whose process ended is still held only for its jobs (watchStatus): it goes out once they end too.
+      const st = phaseOf(s);
+      if ((st !== 'idle' && st !== 'off') || this.stillAtWork(s)) return;
       this.heldDone.delete(key);
-      this.notify({ key, title: s!.title, agent: s!.agent, at: Date.now(), kind: 'done', body: this.lastReply(key) ?? 'Finished' } satisfies NotifyEvent);
+      this.notify({ key, title: s.title, agent: s.agent, at: Date.now(), kind: 'done', body: this.lastReply(key) ?? 'Finished' } satisfies NotifyEvent);
     }, grace);
   }
 
@@ -1074,10 +1078,12 @@ export class SessionManager extends EventEmitter {
 
   /**
    * Whether a session that ended its turn is still at work: background tasks it started still run (commands, monitors,
-   * workflows, its program's own subagents; also those of a session open in VS Code or a terminal), or Hydor subagents it
-   * started are at work (in a turn, or with background tasks of their own). It is woken as each ends: not finished yet.
+   * workflows, its program's own subagents; also those of a session open in VS Code or a terminal), Hydor subagents it
+   * started are at work (in a turn, or with background tasks of their own), or jobs it started wait or run (s.jobs). It is
+   * woken as each of its own ends: not finished yet.
    */
   private stillAtWork(s: SessionSummary): boolean {
+    if (s.jobs) return true;
     const l = s.live && s.live.status !== 'exited' ? s.live : null;
     const tasks = l ? (l.status === 'error' ? [] : l.backgroundTasks) : s.external?.backgroundTasks;
     if ((tasks ?? []).some((t) => t.status === 'running')) return true;
@@ -3390,6 +3396,8 @@ export class SessionManager extends EventEmitter {
 
   /** Set by the scheduler: when a session will be continued after a usage limit. */
   resumeLookup?: (key: string) => number | undefined;
+  /** Set by Jobs (server/jobs): how many jobs a session started wait or run beside its own background tasks (SessionSummary.jobs). */
+  jobsAtWork?: (key: string) => number;
   /** Set by the scheduler: continue this session at `at` (a usage limit stopped it). */
   onLimited?: (key: string, at: number) => void;
 

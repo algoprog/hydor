@@ -93,7 +93,7 @@ The status dot says how a session is doing:
 
 | Dot | What it means |
 | --- | --- |
-| Blue, breathing | Working: a turn is running, or background tasks are |
+| Blue, breathing | Working: a turn is running, or background tasks or jobs it started are |
 | Amber | Needs you: an approval, a question or a form is waiting |
 | Green | Ready: the agent is running and waits for your next message |
 | Grey | Open in VS Code or a terminal, and idle there |
@@ -164,7 +164,7 @@ Coming back to the app, you see in one place what happened while you were away, 
 Open, it shows up to six rows, the most important first (**Show … more** lists the rest):
 
 - **Needs you**: approvals, questions, forms, calls held in the Outbox and anything else waiting on you, as in the [inbox](/guide/inbox). An approval, a question, a form or a held call has **Answer here**, which opens the inbox's own card under the row; click any other row to go where it waits.
-- **Done** and **Failed**: sessions that finished since your last visit and that you have not opened since, each with the start of its last reply (or what went wrong) and the files it made. Click a file to open it in Files, or the row to open the session. A session whose turn ended while subagents or background tasks it started still run has not finished: it shows here once they end.
+- **Done** and **Failed**: sessions that finished since your last visit and that you have not opened since, each with the start of its last reply (or what went wrong) and the files it made. Click a file to open it in Files, or the row to open the session. A session whose turn ended while subagents, background tasks or jobs it started still run has not finished: it shows here once they end.
 - **Ran by itself**: runs of your [scheduled tasks](/guide/tasks), of your agents' schedules and of your apps (started from the Apps page, a link, the API or a chat app), each with how it went (**Done**, **Failed** or **Nothing new**) and what it cost. Click one to open the session it ran in, or the app's run.
 - **Next today**: the scheduled tasks due later today, under the rows.
 
