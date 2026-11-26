@@ -1,6 +1,6 @@
 # Jobs
 
-Jobs shows the long work that your sessions run in the background, all in one place and sorted by tags that say what each piece is part of: builds, training runs, indexing, downloads and subagents. For each one you see how long it has run, how far it has got and roughly how long it has left, what is waiting to start and what it waits for, and how the finished ones ended. You can read a job's output and stop it from there, and you can ask an agent to run one thing after another.
+Jobs shows the long work that your sessions run in the background, all in one place and sorted by tags that say what kind of work each piece is, such as experiments, data collection or builds: training runs, indexing, downloads and subagents. For each one you see how long it has run, how far it has got and roughly how long it has left, what is waiting to start and what it waits for, and how the finished ones ended. You can read a job's output and stop it from there, and you can ask an agent to run one thing after another.
 
 ![The Jobs page: four tiles that sum it up, a chip for each tag, and the jobs at work grouped by tag with their progress and time left](images/jobs.webp)
 
@@ -78,20 +78,33 @@ When something failed, switch from **All** to **Failed** to see only those. **Re
 
 ## Tags
 
-A tag says what a piece of work is part of, such as `intent-data` or `search-index`, so you can see what each thing running is for and look at one piece of work at a time. A job has up to 3, in small letters with hyphens between words: "Intent data" is kept as `intent-data`. The first one says where it is listed.
+A tag says what kind of work a piece of work is, such as `experiments` or `data-collection`, so you can see at a glance what is running and look at one kind of work at a time. Tags never name a project or a topic; your sessions and projects are shown beside each job already. A job has up to 3 tags, in small letters with hyphens between words: "Data collection" is kept as `data-collection`. The first one says where it is listed.
 
-You don't have to tag anything yourself:
+There are nine broad kinds of work, and nearly everything fits one of them:
 
-- agents tag each job they start, and use a tag that is already there whenever the work belongs to it, so one piece of work stays under one name. Name the tag you want and the agent uses it;
-- work with no tags of its own (a session's background commands, its subagents and runs of Experiments, a job started without a tag) takes its session's tag. That is the one you set for the session here; else the tag its jobs of the last week have most often; else one that the [helper model](/settings?s=models&find=Helper%20model) picks for the session, reusing a tag already in use where one fits.
+- `experiments`: training, evaluation, sweeps and benchmarks;
+- `data-collection`: crawling, scraping, downloading, querying services, labelling or generating data;
+- `data-processing`: cleaning, converting, indexing and embedding data;
+- `development`: writing or changing code, documents or translations, and reviewing them;
+- `builds`: building, compiling and packaging;
+- `tests`: test suites, type checks and linting;
+- `deployment`: shipping, releasing and running servers;
+- `analysis`: research, reports, plots and statistics;
+- `maintenance`: backups, clean-up and updates.
 
-The helper model picks in the background, so such a tag can appear a moment after the work does. To pick, it reads the session's title, its project and the names of some of its work. It is never asked about a [confidential session](/guide/sessions#keep-a-session-confidential).
+Each piece of work is tagged on its own: it never takes the tag of its session, so one session's build, its tests and its download each sit under their own kind. You don't have to tag anything yourself:
+
+- the agent that starts a job tags it, and uses a tag that is already in use whenever the work fits it, so the same kind of work stays under one name. Say which tag you want and the agent uses it;
+- a run of [Experiments](/guide/experiments) is always tagged `experiments`;
+- any other work with no tag (a session's background commands, its subagents and servers, a job started without a tag) is tagged by the [helper model](/settings?s=models&find=Helper%20model), which looks at that piece of work's own name, kind and command and picks from the same tags. It does this in the background, so such a tag can appear a moment after the work does. It is never asked about a [confidential session](/guide/sessions#keep-a-session-confidential), and the environment variable `HYDOR_JOBS_TAGGER=0` turns it off.
+
+The broad tags have colours of their own, the same wherever they show.
 
 ### Change tags
 
-Choose **Edit tags…** in a job's **⋯** menu, or click the pencil beside the tags in its panel. Type the tags with commas between them, or click ones under **Tags in use**, then **Save**.
+You can change the tags of any job, whoever tagged it. Choose **Edit tags…** in the job's **⋯** menu, or click the pencil beside the tags in its panel. Type the tags with commas between them, or click ones under **Tags to pick from** (the tags in use, then the broad ones), then **Save**. The dialog says who tagged the job so far: "The agent that started it tagged it.", "You tagged it.", "The helper model tagged it. Change it if it is wrong." or, for a run of Experiments, "Runs of Experiments are tagged experiments."
 
-For work an agent started as a job, these are that job's own tags. For other work they are its session's, so all of that session's work without tags of its own takes them. Save an empty box to remove what you set: the tag is then chosen for you again, as above. Work that belongs to no session can't be tagged, except a job.
+Save an empty box to remove what you set. The job then has no tag of its own, and the helper model may tag it again, as above.
 
 ### See one tag
 
@@ -134,14 +147,14 @@ The panel opens over the right side of the page (the whole screen on a phone). A
 
 ## How agents put work here
 
-You do not need to set anything up. A background task that a session starts shows here by itself. Every session the app starts also has a command called `job`, and agents are told to use it for long work (anything over about ten minutes), so that it shows here with a name, a tag, its progress and its time left (see [Four commands every agent has](/guide/agents#four-commands-every-agent-has)).
+You do not need to set anything up. A background task that a session starts shows here by itself. Every session the app starts also has a command called `job`, and agents are told to use it for long work (anything over about ten minutes), so that it shows here with a name, a tag for its kind of work, its progress and its time left (see [Four commands every agent has](/guide/agents#four-commands-every-agent-has)).
 
 Say what you want in plain words, and the agent does the rest:
 
 - **One after another**: "run the evaluation after the index build finishes". The second job waits for the first, and never starts if the first fails;
 - **One at a time**: "put these sweeps in a queue". Jobs with the same queue name take turns;
 - **How long it should take**: an agent can give its own estimate, which is used until the job's progress says more;
-- **What it is part of**: "tag the index build as search-index". Agents can also list the tags in use and change a job's tags afterwards;
+- **What kind of work it is**: "tag the crawl as data-collection". Agents can also list the tags in use and the broad ones not used yet, and change any job's tags afterwards;
 - **Work already running**: "show the training you started earlier in Jobs". The agent adds it without restarting it (`job adopt`); this is not available on Windows. When it ends, it says **Ended**, as nobody can tell how it went.
 
 While a job that a session started still waits or runs (one it ran with `job`, or a run of Experiments it started), that session is not finished: its dot keeps breathing blue and its status reads "Working · 1 in background", also after its agent has stopped, and its **Finished** notice comes only once the job ends. The Stop button by its message box leaves these jobs running: stop them here.
@@ -151,8 +164,8 @@ If the app can't be reached when an agent starts a job, the command runs anyway;
 ## Ask an agent
 
 - "Run the evaluation as a job after the index build finishes."
-- "Tag the index build as search-index."
-- "What is still running for intent-data?"
+- "Tag the crawl as data-collection."
+- "Show me only the experiments that are running."
 - "What is running in my Thesis project?"
 - "Show the training you started earlier in Jobs."
 - "Run these three sweeps one at a time in a queue."

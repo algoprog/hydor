@@ -7,11 +7,11 @@
 // The server (server/jobs) gathers them, reads how far each has got from its output (shared/job-progress.ts), estimates
 // the time left, keeps what ended for a week, and tells the `job` command when a waiting job may start.
 //
-// Tags sort jobs by what they are part of ("intent-data", "word-suggest"): the agent that runs a job gives it tags
-// (`job run --tag`), reusing the tags of past jobs when the work belongs to one. Work with no tags of its own (a
-// session's background commands, its Hydor subagents and runs of Experiments, a job run without --tag) takes its
-// session's: the one a person set for it on the page, else the tag that session's jobs have most, else one the helper
-// model picked once for that session from the tags in use. The page groups and filters by the first tag.
+// Tags sort jobs by the broad kind of work they are (BROAD_TAGS: experiments, data-collection, builds…), never by
+// project or topic. The agent that runs a job gives it one (`job run --tag`), reusing a tag in use; a person can change
+// any job's on the page. A run of Experiments is always tagged experiments. Any other work with no tag (a session's
+// background commands, subagents, a job run without --tag) is tagged by the helper model, each piece of work by its own
+// name and command, from the same tags. The page groups and filters by the first tag.
 
 /** command: a background shell command; monitor: a watch on a log or a process; subagent: a "<program> subagent"
  *  (Claude Code's, Codex's); hydor-subagent: a session another session started; experiment: a run of Experiments;
@@ -25,6 +25,20 @@ export type JobKind = 'command' | 'monitor' | 'subagent' | 'hydor-subagent' | 'e
 export type JobState = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'cancelled';
 
 export const JOB_ENDED: readonly JobState[] = ['done', 'failed', 'stopped', 'cancelled'];
+
+/** The broad kinds of work that tags name, in the order they are offered, with what each covers. Agents and the helper
+ *  model pick one of these (or another tag in use); a new tag only when none fits, and then as broad as these. */
+export const BROAD_TAGS: readonly { name: string; covers: string }[] = [
+  { name: 'experiments', covers: 'training, evaluation, sweeps, benchmarks' },
+  { name: 'data-collection', covers: 'crawling, scraping, downloading, querying services, labelling or generating data' },
+  { name: 'data-processing', covers: 'cleaning, converting, indexing, embedding data' },
+  { name: 'development', covers: 'writing or changing code, docs or translations, reviewing it' },
+  { name: 'builds', covers: 'building, compiling, packaging' },
+  { name: 'tests', covers: 'test suites, type checks, linting' },
+  { name: 'deployment', covers: 'shipping, releasing, running servers' },
+  { name: 'analysis', covers: 'research, reports, plots, statistics' },
+  { name: 'maintenance', covers: 'backups, clean-up, updates' },
+];
 
 /** How many tags a job may have, and how long each may be. */
 export const MAX_TAGS = 3;
@@ -57,11 +71,14 @@ export function normalTags(given: unknown): string[] {
   return out;
 }
 
-/** A tag in use: how many jobs and sessions it was given to, and when last (kept 180 days after its last use). */
+/** A tag in use: how many jobs it was given to, and when last (kept 180 days after its last use). A broad tag not used
+ *  yet is listed after those in use with `uses: 0` and `lastAt: 0`. */
 export interface JobTag {
   name: string;
   uses: number;
   lastAt: number;
+  /** For a broad tag (BROAD_TAGS), whether in use or not: what it covers, in words ("training, evaluation, sweeps"). */
+  covers?: string;
 }
 
 /** How far a job has got, as last read. */
@@ -131,8 +148,9 @@ export interface JobEntry {
   stoppable?: boolean;
   /** What it is part of ("intent-data"), the first the one it is grouped under; none when neither it nor its session has any. */
   tags?: string[];
-  /** own: given to it (`job run --tag`, or on the page); session: its session's. */
-  tagsFrom?: 'own' | 'session';
+  /** Who tagged it: agent (`job run --tag`, `job tag`), person (on the page), helper (the helper model), kind (a run of
+   *  Experiments, always experiments). */
+  tagsFrom?: 'agent' | 'person' | 'helper' | 'kind';
 }
 
 export interface JobsList {
@@ -146,14 +164,14 @@ export interface JobsList {
   ended: JobEntry[];
   /** When everything running and queued should be done, when each has an estimate. */
   allDoneAt?: number;
-  /** The tags in use, the one used last first (up to 50): what an agent picks from, and the page suggests. */
+  /** The tags in use, the one used last first (up to 50), then the broad tags not used yet: what an agent picks from,
+   *  and the page suggests. */
   tags?: JobTag[];
   at: number;
 }
 
-/** PUT /api/jobs/:id/tags (and /agent/jobs/:id/tags, the `job tag` command): a `job` job's own tags; for other work, its
- *  session's, which all of that session's work without tags of its own takes. An empty list clears them. Returns
- *  `{ job: JobEntry }`. */
+/** PUT /api/jobs/:id/tags (and /agent/jobs/:id/tags, the `job tag` command): that job's tags, whatever kind it is. An
+ *  empty list clears what a person or agent set (the helper model may then tag it again). Returns `{ job: JobEntry }`. */
 export interface JobTagsSet {
   tags: string[];
 }
@@ -208,7 +226,7 @@ export interface JobRegister {
   adoptPid?: number;
   /** `job adopt --log FILE`: the file that process writes its output to, read for its progress and last line. */
   logFile?: string;
-  /** What it is part of (`--tag`, repeatable): kept with normalTags. */
+  /** The kind of work it is (`--tag`, repeatable; one is usual): kept with normalTags. */
   tags?: string[];
 }
 
@@ -221,8 +239,8 @@ export interface JobRegistered {
   waitingFor?: string;
   /** The tags it was given, as kept. */
   tags?: string[];
-  /** When it was given no tags, or one no job had before: the tags in use, the one used last first (up to 12), so the
-   *  command can say them and the agent reuse one (`job tag ID TAG` changes them). */
+  /** When it was given no tags, or one no job had before: the tags in use, the one used last first, then the broad tags
+   *  not used yet (up to 12), so the command can say them and the agent reuse one (`job tag ID TAG` changes them). */
   tagsInUse?: string[];
 }
 

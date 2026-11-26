@@ -3,7 +3,7 @@
 // and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/jobs/tags-test.ts && node dist/dev/tags-test.js
 import assert from 'node:assert/strict';
-import type { JobEntry, JobsList } from '@shared/jobs';
+import { BROAD_TAGS, type JobEntry, type JobsList } from '@shared/jobs';
 import { byDay, filterList, filtering, firstTag, groupAtWork, matches, NO_PROJECT, projectCounts, projectOf, sharedSession, startOfDay, tagChips, tagTone } from './tags';
 
 const MIN = 60_000;
@@ -29,6 +29,9 @@ const list = (more: Partial<JobsList> = {}): JobsList => ({ running: [], queued:
 // ---- colours
 {
   assert.equal(tagTone('checkout'), tagTone('checkout'), 'the same each time');
+  const broad = BROAD_TAGS.map((t) => tagTone(t.name));
+  assert.equal(new Set(broad).size, BROAD_TAGS.length, 'every broad tag a colour of its own');
+  assert.ok(!broad.includes('var(--viz-8)'), 'none red, as failures are');
   const tones = new Set(['checkout', 'search-index', 'thesis', 'word-suggest', 'intent-data', 'docs', 'ranker', 'demo', 'a', 'b'].map(tagTone));
   assert.ok(tones.size > 3, 'different names spread over the colours');
   for (const t of tones) assert.match(t, /^var\(--viz-[1-8]\)$/);

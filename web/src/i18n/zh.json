@@ -30070,5 +30070,13 @@
   "terms: whole numbers only, not “{0}”": "terms：只能是整数，不能是“{0}”",
   "terms: {0} is too large to be exact as a number: give it as text, in quotes": "terms：{0} 太大，无法作为数字精确表示：请用引号括起来，以文本形式提供",
   "when: \"night\" for an evolution that works at night, or leave it out": "when：让演化在夜间进行时填 \"night\"，否则不填",
-  "Running · {0} of {1} tried": "运行中 · 已尝试 {0}/{1}"
+  "Running · {0} of {1} tried": "运行中 · 已尝试 {0}/{1}",
+  "Runs of Experiments are tagged experiments.": "“实验”的运行会被打上 experiments 标签。",
+  "Tags say what kind of work it is, such as experiments or data-collection.": "标签说明这是哪一类工作，例如 experiments 或 data-collection。",
+  "Tags to pick from": "可选标签",
+  "The agent that started it tagged it.": "由启动它的智能体打的标签。",
+  "The helper model tagged it. Change it if it is wrong.": "由辅助模型打的标签。如果不对，可以修改。",
+  "You tagged it.": "由你打的标签。",
+  "Long work your sessions run in the background, sorted by kind of work (experiments, data collection, builds…): what runs, how long it has left, and what waits for what.": "你的会话在后台运行的长时间工作，按工作类型（实验、数据收集、构建…）分类：什么在运行、还需要多久，以及谁在等谁。",
+  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag kind of work experiments data collection processing development builds tests deployment analysis maintenance filter group organize sort search failed today": "任务 后台任务 后台 长时间任务 运行中 排队 队列 等待 等待依赖 依赖 一次一个 进度 百分比 剩余时间 预计时间 预估 ETA 多久完成 完成 失败 已停止 停止 时间线 甘特图 gantt 输出 日志 log 命令 监控 monitors 子智能体 服务器 开发服务器 dev server 构建 build 训练 训练运行 索引 indexing 下载 作业 job 接管 adopt 标签 tags tag 工作类型 实验 数据收集 数据处理 处理 开发 测试 部署 分析 维护 筛选 过滤 分组 整理 排序 搜索 今天失败"
 }

@@ -214,7 +214,7 @@ test('the text names every tool when all pass, and is built from the five parts'
   assert.equal(all.split('\n')[0], SHELL_TOOLS_HEAD);
   assert.deepEqual(all.split('\n').slice(1).map((l) => l.split(':')[0]), ['- waitfor', '- job', '- edits', '- sym NAME...', '- leancheck FILE.lean']);
   assert.match(all, /- waitfor: .*`--log FILE --match` sees only lines written after it starts, unless `--from-start`\./);
-  assert.match(all, /- job: .*\[--tag WORD\].*reusing a tag from `job tags` whenever the work belongs to one/);
+  assert.match(all, /- job: .*\[--tag WORD\].*the broad kind of work it is \(experiments, data-collection, data-processing, development, builds, tests, deployment, analysis, maintenance\), reusing a tag from `job tags`; never a project or topic name/);
   assert.ok(all.length < 2450, `${all.length} characters`);
 });
 

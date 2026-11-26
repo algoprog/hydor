@@ -1,10 +1,25 @@
-// How the Jobs page sorts its jobs by what they are part of: each tag's colour, which jobs the picked tag and the search
+// How the Jobs page sorts its jobs by the kind of work they are: each tag's colour, which jobs the picked tag and the search
 // leave, the chips over the list, the groups of the work in hand and the days of what finished. A job is grouped and
 // filtered under its first tag (shared/jobs.ts). Plain functions, so tests need no page (tags-test.ts).
 import type { JobEntry, JobsList } from '@shared/jobs';
 
-/** A tag's colour, the same wherever it shows: one of the charts' eight, picked by its name. */
+/** The broad tags' own colours (shared/jobs.ts BROAD_TAGS), so the kinds of work keep theirs everywhere and no two of
+ *  them share one; red is left to failures, and maintenance is quiet grey. */
+const BROAD_TONES: Record<string, string> = {
+  experiments: 'var(--viz-1)',
+  'data-collection': 'var(--viz-2)',
+  'data-processing': 'var(--viz-4)',
+  development: 'var(--viz-7)',
+  builds: 'var(--viz-5)',
+  tests: 'var(--viz-3)',
+  deployment: 'var(--viz-6)',
+  analysis: 'var(--tag-cyan)',
+  maintenance: 'var(--fg-3)',
+};
+
+/** A tag's colour, the same wherever it shows: a broad tag's own, else one of the charts' eight, picked by its name. */
 export function tagTone(name: string): string {
+  if (Object.hasOwn(BROAD_TONES, name)) return BROAD_TONES[name];
   let h = 2166136261;
   for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619);
   return `var(--viz-${1 + ((h >>> 0) % 8)})`;

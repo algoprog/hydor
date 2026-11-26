@@ -28219,5 +28219,13 @@
   "terms: whole numbers only, not “{0}”": "terms: somente números inteiros, não “{0}”",
   "terms: {0} is too large to be exact as a number: give it as text, in quotes": "terms: {0} é grande demais para ser exato como número: informe como texto, entre aspas",
   "when: \"night\" for an evolution that works at night, or leave it out": "when: \"night\" para uma evolução que trabalha à noite, ou deixe de fora",
-  "Running · {0} of {1} tried": "Em execução · {0} de {1} tentativas feitas"
+  "Running · {0} of {1} tried": "Em execução · {0} de {1} tentativas feitas",
+  "Runs of Experiments are tagged experiments.": "As execuções de Experimentos recebem a etiqueta experiments.",
+  "Tags say what kind of work it is, such as experiments or data-collection.": "As etiquetas dizem que tipo de trabalho é, como experiments ou data-collection.",
+  "Tags to pick from": "Etiquetas para escolher",
+  "The agent that started it tagged it.": "O agente que iniciou a execução colocou a etiqueta.",
+  "The helper model tagged it. Change it if it is wrong.": "O modelo auxiliar colocou a etiqueta. Mude se estiver errada.",
+  "You tagged it.": "Você colocou a etiqueta.",
+  "Long work your sessions run in the background, sorted by kind of work (experiments, data collection, builds…): what runs, how long it has left, and what waits for what.": "Trabalhos longos que suas sessões executam em segundo plano, organizados por tipo de trabalho (experimentos, coleta de dados, builds…): o que está em execução, quanto tempo falta e o que espera o quê.",
+  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag kind of work experiments data collection processing development builds tests deployment analysis maintenance filter group organize sort search failed today": "tarefas em segundo plano trabalho longo execução em andamento fila na fila aguardando espera depois dependência uma de cada vez progresso porcentagem tempo restante estimativa eta quanto tempo falta concluído finalizado falhou parado linha do tempo gantt saída log parar comandos monitores subagentes servidores servidor de desenvolvimento dev server builds treinamento execuções indexação downloads baixar job jobs comando adotar tags tag tipo de trabalho experimentos coleta de dados processamento desenvolvimento testes implantação deploy análise manutenção filtrar agrupar organizar ordenar buscar pesquisar falhou hoje"
 }

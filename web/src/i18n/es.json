@@ -28218,5 +28218,13 @@
   "terms: whole numbers only, not “{0}”": "terms: solo números enteros, no “{0}”",
   "terms: {0} is too large to be exact as a number: give it as text, in quotes": "terms: {0} es demasiado grande para ser exacto como número: escríbelo como texto, entre comillas",
   "when: \"night\" for an evolution that works at night, or leave it out": "when: \"night\" para una evolución que trabaja de noche, u omítelo",
-  "Running · {0} of {1} tried": "En ejecución · {0} de {1} probados"
+  "Running · {0} of {1} tried": "En ejecución · {0} de {1} probados",
+  "Runs of Experiments are tagged experiments.": "Las ejecuciones de Experimentos se etiquetan como experiments.",
+  "Tags say what kind of work it is, such as experiments or data-collection.": "Las etiquetas indican qué tipo de trabajo es, como experiments o data-collection.",
+  "Tags to pick from": "Etiquetas para elegir",
+  "The agent that started it tagged it.": "Lo etiquetó el agente que lo inició.",
+  "The helper model tagged it. Change it if it is wrong.": "Lo etiquetó el modelo auxiliar. Cámbiala si no es correcta.",
+  "You tagged it.": "Lo etiquetaste tú.",
+  "Long work your sessions run in the background, sorted by kind of work (experiments, data collection, builds…): what runs, how long it has left, and what waits for what.": "Trabajos largos que tus sesiones ejecutan en segundo plano, ordenados por tipo de trabajo (experimentos, recopilación de datos, compilaciones…): qué se está ejecutando, cuánto tiempo le queda y qué espera a qué.",
+  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag kind of work experiments data collection processing development builds tests deployment analysis maintenance filter group organize sort search failed today": "trabajos tareas en segundo plano trabajo largo en ejecución cola en cola esperando espera a después dependencia uno a la vez progreso porcentaje tiempo restante estimación eta cuánto falta terminado finalizado fallido fallido detenido línea de tiempo gantt salida registro log detener comandos monitores subagentes servidores servidor de desarrollo dev server compilaciones builds entrenamiento ejecuciones indexación descargas trabajo job comando adoptar etiquetas etiqueta tipo de trabajo experimentos recopilación de datos procesamiento desarrollo pruebas tests despliegue deploy análisis mantenimiento filtrar agrupar organizar ordenar buscar fallidos hoy"
 }

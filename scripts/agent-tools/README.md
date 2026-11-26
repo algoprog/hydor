@@ -46,17 +46,19 @@ expect it to take (a plain number is minutes), and `--progress REGEX` which line
 like "step 120/500" or "42%". `job list`, `job status ID`, `job wait ID…` and `job stop ID` look after jobs. A job that
 waits for one that failed or was stopped never starts (exit 3).
 
-Tags say what a job is part of ("intent-data", "word-suggest"), and the Jobs section groups and filters by them. Give
-them with `--tag` (repeatable, or split by commas; 3 at most), in a word or two, reusing one already in use when the work
-belongs to it: `job tags` lists them, the one used last first. When a job is given no tag, or a new one, `job run` and
-`job adopt` print one line naming the tags in use. `job tag ID TAG…` changes a job's tags afterwards (with no `TAG` it
-clears them, and the job takes its session's again); for other work of the Jobs section, named by its id, it sets its
-session's tags.
+Tags say what broad kind of work a job is ("experiments", "data-collection", "builds"; never a project or topic), and the
+Jobs section groups and filters by them. Give one with `--tag` (one is usual; repeatable, or split by commas; 3 at most),
+reusing one already in use: `job tags` lists them, the one used last first, then the broad ones not used yet with what
+they cover. A job given no tag is tagged by Hydor's helper model, like each other piece of work that has none. When a job
+is given no tag, or a new one, `job run` and `job adopt` print one line naming the tags in use. `job tag ID TAG…` changes
+the tags of a job, or of any other work of the Jobs section named by its id (a background command, a subagent); with no
+`TAG` it clears them.
 
 ```bash
-job run --name 'Train the classifier' --tag intent-data -- python train.py
+job run --name 'Train the classifier' --tag experiments -- python train.py
+job run --name 'Crawl the archive' --tag data-collection -- python crawl.py
 job tags
-job tag j-1a2b3c word-suggest
+job tag j-1a2b3c data-processing
 ```
 
 Work that is already running (a background command, a `nohup … &`, a service) can be shown without restarting it:
@@ -235,8 +237,9 @@ Shell commands this app adds to your PATH (each has --help):
   waits for it. Run it as a background command when the wait may take more than a few minutes.
 - job: run long work (anything over ~10 minutes) so the user sees it in Hydor's Jobs section with its progress and time
   left: `job run --name 'what it is' [--tag WORD] [--eta 2h] [--after ID|NAME] [--queue NAME] -- cmd args`, as a
-  background command. Tag each job with what it is part of, in a word or two (intent-data, word-suggest), reusing a tag
-  from `job tags` whenever the work belongs to one; a new tag only for new work.
+  background command. Tag each job with the broad kind of work it is (experiments,
+  data-collection, data-processing, development, builds, tests, deployment, analysis, maintenance), reusing a tag from
+  `job tags`; never a project or topic name.
   It waits first for the jobs named in --after to finish and for its turn in its --queue (one job at a time per queue),
   then runs the command and ends with its exit code. Print progress as "step 120/500" or "42%" so the time left can be
   estimated. `job list`, `job wait ID`, `job stop ID`. `job adopt --pid PID --name '…' --log FILE` shows long work

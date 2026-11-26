@@ -17,13 +17,14 @@ Usage:
   job status ID [--json]                     one job
   job wait ID... [--timeout DUR]             block until the jobs end
   job stop ID                                stop a job, or cancel one that waits
-  job tags [--json]                          the tags in use, the one used last first
-  job tag ID [TAG...]                        give a job (or its session) tags; none: clear them
+  job tags [--json]                          the tags in use, the one used last first, then the broad ones not used yet
+  job tag ID [TAG...]                        give a job (or any other work in the list) tags; none: clear them
 
 Options of run:
   --name TEXT           what it is, in a few words (default: the command, cut to 60 characters)
-  --tag TAG             what it is part of, in a word or two (repeatable, or split by commas; 3 at most). Reuse one
-                        from \`job tags\` when the work belongs to it. Without it, it takes its session's tag.
+  --tag TAG             the broad kind of work it is (one is usual; repeatable, or split by commas; 3 at most):
+                        experiments, data-collection, builds… Never a project or topic name. Reuse one from
+                        \`job tags\`. Without it, Hydor's helper model tags the job.
   --eta DUR             how long you expect it to take: 45 (minutes), 90s, 45m, 2h, 1h30m
   --after ID|NAME       start only when that job is done (repeatable; a name means the newest job with it).
                         If it fails or is stopped, this job never starts.
@@ -52,11 +53,12 @@ Exit: run: the command's own (128+signal if killed), 2 not accepted (e.g. no suc
 
 Examples:
   job run --name 'Build the search index' --eta 2h -- python build_index.py --shards 8
-  job run --name 'Train the classifier' --tag intent-data -- python train.py
+  job run --name 'Train the classifier' --tag experiments -- python train.py
+  job run --name 'Crawl the archive' --tag data-collection -- python crawl.py
   job run --name 'Evaluate' --after 'Build the search index' --queue gpu -- 'make eval && make report'
   job adopt --pid 4312 --name 'Crawl the archive' --log crawl.log
   job list
-  job tag j-1a2b intent-data
+  job tag j-1a2b data-processing
   job wait j-1a2b --timeout 1h
 `;
 
@@ -634,22 +636,29 @@ async function cmdStop(o) {
   return 0;
 }
 
+/** What a broad tag covers, shortened for a line: its first two kinds of work ("training, evaluation, …"). */
+function coversShort(covers) {
+  const parts = String(covers).split(',').map((p) => p.trim()).filter(Boolean);
+  return parts.length > 2 ? `${parts.slice(0, 2).join(', ')}, …` : parts.join(', ');
+}
+
 async function cmdTags(o) {
   const data = await ask('GET', '?ended=0');
   const tags = data.tags ?? [];
   if (o.json) { out(JSON.stringify(tags, null, 2)); return 0; }
   if (!tags.length) { out('no tags yet'); return 0; }
   const now = data.at ?? Date.now();
-  out(table(tags.map((t) => [oneLine(t.name), `${t.uses} use${t.uses === 1 ? '' : 's'}, last ${fmtDur(now - t.lastAt)} ago`])));
+  out(table(tags.map((t) => [oneLine(t.name), t.uses > 0
+    ? `${t.uses} use${t.uses === 1 ? '' : 's'}, last ${fmtDur(now - t.lastAt)} ago`
+    : `not used yet${t.covers ? ` (${oneLine(coversShort(t.covers))})` : ''}`])));
   return 0;
 }
 
 async function cmdTag(o) {
   const id = o.ids[0];
   const { job } = await ask('PUT', `/${encodeURIComponent(id)}/tags`, { tags: o.tags });
-  // A `job` job whose own tags were cleared is listed with its session's: those are not its own.
-  const kept = o.tags.length && !(job?.kind === 'job' && job.tagsFrom !== 'own') ? tagList(job ?? {}) : '';
-  out(`job ${oneLine(id)} tags: ${kept || "none (it takes its session's)"}`);
+  // Cleared, it may have none, or the helper model's pick later.
+  out(`job ${oneLine(id)} tags: ${tagList(job ?? {}) || 'none'}`);
   return 0;
 }
 

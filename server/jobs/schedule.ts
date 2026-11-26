@@ -141,7 +141,7 @@ export function adopt(db: DB, b: Partial<JobRegister>, who: { session?: string; 
   if (had) {
     // Adopted again with tags: those are its tags now.
     const tags = tagsOf(b.tags);
-    if (tags) save(db, Object.assign(had, { tags }));
+    if (tags) save(db, Object.assign(had, { tags, tagsBy: 'agent' as const }));
     return had;
   }
   const command = text(b.command, 20_000) || `process ${pid}`;
@@ -165,6 +165,7 @@ export function adopt(db: DB, b: Partial<JobRegister>, who: { session?: string; 
     progressPattern: cleanPattern(b.progress),
     progressTotal: etaOf(b.total),
     tags: tagsOf(b.tags),
+    tagsBy: tagsOf(b.tags) ? 'agent' : undefined,
     session: who.session,
     runId: who.runId,
     adopted: true,
@@ -203,6 +204,7 @@ export function register(db: DB, b: Partial<JobRegister>, who: { session?: strin
     progressPattern: cleanPattern(b.progress),
     progressTotal: etaOf(b.total),
     tags: tagsOf(b.tags),
+    tagsBy: tagsOf(b.tags) ? 'agent' : undefined,
     session: who.session,
     runId: who.runId,
     queuedAt: now,

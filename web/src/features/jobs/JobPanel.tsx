@@ -8,7 +8,7 @@ import { api, enc } from '../../lib/api';
 import { openProject, openSession } from '../../lib/nav';
 import { CopyButton } from '../../components/Markdown';
 import { Button, cx, IconButton, Sheet, Throbber } from '../../components/ui';
-import { fullDate, JobDot, JobIcon, JobLinks, linkCls, openJob, openWords, taggable, toneState, useKindLabel } from './JobRow';
+import { fullDate, JobDot, JobIcon, JobLinks, linkCls, openJob, openWords, toneState, useKindLabel } from './JobRow';
 import { TagPills } from './TagPill';
 import { projectOf } from './tags';
 import { allDoneWords, endedReason, progressText, percent, queuePlace, runClock, startsIn, stateWords, timeLeft, tookTime, waitingWords } from './words';
@@ -265,16 +265,13 @@ export function JobPanel({
               <X size={17} />
             </IconButton>
           </div>
-          {(taggable(job) || link || (live && job.stoppable)) && (
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 pl-[30px]">
-              {taggable(job) && (
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  {tags.length ? <TagPills tags={tags} /> : <span className="text-[12px] text-fg-3">No tags</span>}
-                  <IconButton size="sm" label="Edit tags" onClick={onTags}>
-                    <Pencil size={13} />
-                  </IconButton>
-                </div>
-              )}
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 pl-[30px]">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                {tags.length ? <TagPills tags={tags} /> : <span className="text-[12px] text-fg-3">No tags</span>}
+                <IconButton size="sm" label="Edit tags" onClick={onTags}>
+                  <Pencil size={13} />
+                </IconButton>
+              </div>
               <span className="flex-1" />
               <div className="flex items-center gap-1.5">
                 {link && (
@@ -288,8 +285,7 @@ export function JobPanel({
                   </Button>
                 )}
               </div>
-            </div>
-          )}
+          </div>
         </div>
         <div className={cx('min-h-0 overflow-y-auto px-4 py-3', started ? 'max-h-[55%] shrink-0' : 'shrink')}>
           <Details job={job} now={now} waits={waits} then={then} onShow={onShow} />

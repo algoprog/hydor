@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { normalTag, normalTags, type JobEntry, type JobRegistered, type JobsList } from '../../shared/jobs.ts';
+import { BROAD_TAGS, normalTag, normalTags, type JobEntry, type JobRegistered, type JobsList } from '../../shared/jobs.ts';
 import type { Space } from '../../shared/spaces.ts';
 import type { BackgroundTask, ServerEvent } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
@@ -31,8 +31,8 @@ import { isJobTask, kindOf, runsJob } from './gather.ts';
 import { createJobs } from './index.ts';
 import { folderProjects } from './projects.ts';
 import { processAlive } from './schedule.ts';
-import { HELPER_TAG_KEEP_MS, historyMs, KEEP_MS, prune, saveRegistered, sessionTags, setHelperTag, setPersonTags, TAG_KEEP_MS, tagsInUse, type Registered } from './store.ts';
-import { tagPrompt, type TagQuestion, type TagSessions } from './tags.ts';
+import { historyMs, ITEM_TAG_KEEP_MS, KEEP_MS, prune, saveRegistered, setHelperTag, setItemTags, TAG_KEEP_MS, tagsInUse, type Registered } from './store.ts';
+import { tagPrompt, type TagQuestion, type TagWork } from './tags.ts';
 import { estimateRunning } from './watch.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -122,8 +122,8 @@ http.setErrorHandler((err: Error & { statusCode?: number }, _req, reply) => {
 const deps = { app: http, db, sessions: sessions as any, scheduler: null as any, models: null as any, broadcast: (e: ServerEvent) => void told.push(e), toSubscribers: () => {}, publicBase: () => 'http://test.local' } as Deps;
 // A stand-in for the helper model, which no test may ask: what it was asked, and what it says (nothing, unless a test says).
 const asked: TagQuestion[] = [];
-let answer: TagSessions = async (q) => q.sessions.map(() => null);
-const jobs = createJobs({ pollMs: 400, killMs: 300, tagSessions: (q) => (asked.push(q), answer(q)) });
+let answer: TagWork = async (q) => q.items.map(() => null);
+const jobs = createJobs({ pollMs: 400, killMs: 300, tagWork: (q) => (asked.push(q), answer(q)) });
 jobs.routes!(deps);
 await http.ready();
 
@@ -802,13 +802,14 @@ test('the `job` command itself, against these routes', async () => {
 
 // ---- tags -------------------------------------------------------------------------------------------------------------------
 
-const clearTags = () => db.exec('delete from bg_job_tags; delete from bg_job_session_tags');
+const clearTags = () => db.exec('delete from bg_job_tags; delete from bg_job_item_tags');
 const put = (id: string, tags: string[]) => call('PUT', `/api/jobs/${encodeURIComponent(id)}/tags`, { tags });
 const every = (l: JobsList) => [...l.running, ...l.queued, ...l.servers, ...l.ended];
 const find = async (id: string) => every(await listed()).find((e) => e.id === id)!;
 const tagsOf = (e: JobEntry) => [e.tags, e.tagsFrom];
 const task = (id: string, o: Partial<BackgroundTask> = {}): BackgroundTask => ({ id, description: `Work ${id}`, kind: 'local_bash', status: 'running', startedAt: Date.now() - 1000, ...o });
-const use = (name: string) => tagsInUse(db, 100).find((t) => t.name === name)?.uses;
+const use = (name: string) => tagsInUse(db, 100).find((t) => t.name === name)?.uses || undefined;
+const BROAD = BROAD_TAGS.map((t) => t.name);
 
 test('tags are kept lower case, hyphened, three at most, in any script', () => {
   assert.equal(normalTag('  Intent data '), 'intent-data');
@@ -823,121 +824,137 @@ test('tags are kept lower case, hyphened, three at most, in any script', () => {
   assert.deepEqual(normalTags(undefined), []);
 });
 
-test('a job’s own tags: kept, and the tags in use named when it got none or a new one', async () => {
+test('a job’s own tags, by an agent or a person; the tags in use named when it got none or a new one', async () => {
   clearTags();
   const first = await register('tag one', { tags: ['Intent Data, UI'] });
-  assert.deepEqual([first.tags, first.tagsInUse], [['intent-data', 'ui'], []], 'new, and no others yet');
-  assert.deepEqual(tagsOf(await find(`job:${first.id}`)), [['intent-data', 'ui'], 'own']);
+  assert.deepEqual([first.tags, first.tagsInUse], [['intent-data', 'ui'], BROAD], 'new, and no others in use yet: the broad ones');
+  assert.deepEqual(tagsOf(await find(`job:${first.id}`)), [['intent-data', 'ui'], 'agent']);
   await sleep(5);
   const second = await register('tag two', { tags: ['ui'] });
   assert.deepEqual([second.tags, second.tagsInUse], [['ui'], undefined], 'in use already: nothing to say');
+  const broad = await register('tag broad', { tags: ['Builds'] });
+  assert.deepEqual([broad.tags, broad.tagsInUse], [['builds'], undefined], 'a broad tag is known even while unused');
   await sleep(5);
+  const rest = BROAD.filter((t) => t !== 'builds');
   const third = await register('tag three', { tags: ['checkout'] });
-  assert.deepEqual([third.tags, third.tagsInUse], [['checkout'], ['ui', 'intent-data']], 'the one used last first, without its own');
+  assert.deepEqual([third.tags, third.tagsInUse], [['checkout'], ['builds', 'ui', 'intent-data', ...rest].slice(0, 12)], 'the one used last first, then the broad ones, without its own');
   const bare = await register('tag none');
-  assert.deepEqual([bare.tags, bare.tagsInUse], [undefined, ['checkout', 'ui', 'intent-data']]);
+  assert.deepEqual([bare.tags, bare.tagsInUse], [undefined, ['checkout', 'builds', 'ui', 'intent-data', ...rest].slice(0, 12)]);
+  // Tags in use, the one used last first, then the broad ones not used yet in their order, with what each covers.
   const l = await listed();
-  assert.deepEqual(l.tags!.map((t) => [t.name, t.uses]), [['checkout', 1], ['ui', 2], ['intent-data', 1]]);
-  assert.ok(l.tags!.every((t) => Math.abs(t.lastAt - Date.now()) < 5000));
+  const unused = BROAD_TAGS.filter((t) => t.name !== 'builds');
+  assert.deepEqual(l.tags!.map((t) => [t.name, t.uses]), [['checkout', 1], ['builds', 1], ['ui', 2], ['intent-data', 1], ...unused.map((t) => [t.name, 0])]);
+  assert.ok(l.tags!.slice(0, 4).every((t) => Math.abs(t.lastAt - Date.now()) < 5000));
+  assert.deepEqual(l.tags!.slice(4).map((t) => [t.lastAt, t.covers]), unused.map((t) => [0, t.covers]));
+  assert.equal(l.tags!.find((t) => t.name === 'builds')!.covers, BROAD_TAGS.find((t) => t.name === 'builds')!.covers, 'a broad tag in use says what it covers too');
+  assert.equal(l.tags!.find((t) => t.name === 'checkout')!.covers, undefined);
   await finish(first.id);
-  assert.deepEqual(tagsOf(await find(`job:${first.id}`)), [['intent-data', 'ui'], 'own'], 'ended ones too');
-  for (const j of [second, third, bare]) await finish(j.id);
+  assert.deepEqual(tagsOf(await find(`job:${first.id}`)), [['intent-data', 'ui'], 'agent'], 'ended ones too');
+  // A person on the page, or an agent with `job tag`, changes them; clearing leaves the job with none.
+  const set = await put(`job:${bare.id}`, ['Tests']);
+  assert.deepEqual(tagsOf(set.body.job), [['tests'], 'person']);
+  assert.deepEqual(tagsOf(await find(`job:${bare.id}`)), [['tests'], 'person']);
+  const viaAgent = await call('PUT', `/agent/jobs/${bare.id}/tags`, { tags: ['analysis'] }, bearer());
+  assert.deepEqual(tagsOf(viaAgent.body.job), [['analysis'], 'agent']);
+  assert.deepEqual(tagsOf((await put(`job:${bare.id}`, [])).body.job), [undefined, undefined]);
+  assert.equal((await call('PUT', `/agent/jobs/${bare.id}/tags`, { tags: ['x'] }, {})).status, 401);
+  assert.equal((await put('job:j-ffffff', ['x'])).status, 404);
+  assert.equal((await call('PUT', `/api/jobs/job%3A${bare.id}/tags`, {})).status, 400, 'no list is not an empty one');
+  for (const j of [second, broad, third, bare]) await finish(j.id);
   // Twelve are named at most.
-  setPersonTags(db, 'claude:nobody', ['x'], Date.now());
   for (let i = 0; i < 14; i++) await finish((await register(`many ${i}`, { tags: [`t${i}`] })).id);
   const many = await register('tag many');
   assert.equal(many.tagsInUse!.length, 12);
   await finish(many.id);
-  // A tag not given for 180 days is forgotten; a session's tags: the helper's after 60 days, a person's after 180.
-  setHelperTag(db, 'claude:helped', 'ui', Date.now());
-  const kept = () => (db.prepare('select session from bg_job_session_tags order by session').all() as { session: string }[]).map((r) => r.session);
-  prune(db, Date.now() + HELPER_TAG_KEEP_MS + 1000);
-  assert.deepEqual(kept(), ['claude:nobody']);
-  assert.ok(tagsInUse(db, 100).length > 0);
+  // A tag not given for 180 days is forgotten; the tags kept for one entry, after 8 days.
+  setItemTags(db, 'task:claude:old:t1', ['ui'], 'person', Date.now());
+  setHelperTag(db, 'task:claude:old:t2', 'ui', Date.now());
+  const kept = () => (db.prepare('select id from bg_job_item_tags order by id').all() as { id: string }[]).map((r) => r.id);
+  prune(db, Date.now() + ITEM_TAG_KEEP_MS - 1000);
+  assert.deepEqual(kept(), ['task:claude:old:t1', 'task:claude:old:t2']);
+  prune(db, Date.now() + ITEM_TAG_KEEP_MS + 1000);
+  assert.deepEqual(kept(), []);
+  assert.ok(tagsInUse(db, 100).some((t) => t.uses > 0));
   prune(db, Date.now() + TAG_KEEP_MS + 1000);
-  assert.deepEqual([kept(), tagsInUse(db, 100)], [[], []]);
+  assert.deepEqual(tagsInUse(db, 100).map((t) => [t.name, t.uses]), BROAD.map((t) => [t, 0]), 'only the broad ones, unused, are left');
+  assert.deepEqual(db.prepare(`select name from sqlite_master where name = 'bg_job_session_tags'`).all(), [], 'the session tags of the first version are gone');
 });
 
-test('work without tags of its own takes its session’s: what most of its jobs have', async () => {
+test('each piece of work has its own tags: a task, a subagent, a server; its session’s do not pass on', async () => {
   clearTags();
   const key = 'claude:tagged';
   const run = '111122223333';
   runs.set(run, key);
   const w = session(key, 'Collect intent data');
-  const mine = (name: string, o: Record<string, unknown> = {}) => {
-    const runner = proc();
-    return call('POST', '/agent/jobs', { name, command: `make ${name}`, cwd: tmp, pid: runner.pid, ...o }, bearer(run)).then((r) => r.body as JobRegistered);
-  };
-  const done = (id: string) => call('POST', `/agent/jobs/${id}`, { state: 'done', exitCode: 0 }, bearer(run));
-  w.running = [task('s1'), task('srv', { description: 'Serve', toolUseId: 'serve1' })];
+  w.running = [task('s1'), task('srv', { description: 'Serve', toolUseId: 'serve1' }), task('s2')];
   commands.set('serve1', 'npm run dev');
-  assert.equal((await find(`task:${key}:s1`)).tags, undefined);
-  // A task that ended before any job was tagged: its stored entry keeps no tags, and gets them when listed.
   w.ended = [task('e1', { status: 'completed', endedAt: Date.now() })];
   jobs.tick();
-  const one = await mine('alpha-1', { tags: ['alpha'] });
-  await sleep(5);
-  const two = await mine('beta-1', { tags: ['beta', 'alpha'] });
-  const bare = await mine('untagged');
-  assert.deepEqual(sessionTags(db, Date.now()).get(key), ['beta'], 'as many of each: the newest job’s');
-  await sleep(5);
-  const three = await mine('alpha-2', { tags: ['alpha'] });
-  assert.deepEqual(sessionTags(db, Date.now()).get(key), ['alpha'], 'the one most have first');
+  const mine = await register('mine', { tags: ['analysis'] });
+  assert.equal((await find(`task:${key}:s1`)).tags, undefined, 'a job with tags does not tag the other work of its session');
+  // A person on the page, on a task and on a server; an agent on another; each by who did it.
+  told.length = 0;
+  const set = await put(`task:${key}:s1`, ['Tests', 'ui']);
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  assert.deepEqual(tagsOf(set.body.job), [['tests', 'ui'], 'person']);
+  assert.ok(told.some((e) => e.t === 'jobs'), 'open pages reload');
+  assert.deepEqual(tagsOf((await put(`task:${key}:srv`, ['Deployment'])).body.job), [['deployment'], 'person']);
+  const viaAgent = await call('PUT', `/agent/jobs/${encodeURIComponent(`task:${key}:s2`)}/tags`, { tags: ['Builds'] }, bearer(run));
+  assert.deepEqual(tagsOf(viaAgent.body.job), [['builds'], 'agent']);
   const l = await listed();
   assert.ok(l.servers.some((e) => e.id === `task:${key}:srv`));
-  for (const id of [`task:${key}:s1`, `task:${key}:srv`, `task:${key}:e1`, `job:${bare.id}`]) assert.deepEqual(tagsOf(every(l).find((e) => e.id === id)!), [['alpha'], 'session'], id);
-  assert.deepEqual(tagsOf(every(l).find((e) => e.id === `job:${two.id}`)!), [['beta', 'alpha'], 'own']);
+  assert.deepEqual(tagsOf(every(l).find((e) => e.id === `task:${key}:s1`)!), [['tests', 'ui'], 'person']);
+  assert.deepEqual(tagsOf(every(l).find((e) => e.id === `task:${key}:srv`)!), [['deployment'], 'person']);
+  assert.deepEqual(tagsOf(every(l).find((e) => e.id === `task:${key}:s2`)!), [['builds'], 'agent']);
+  assert.deepEqual(tagsOf(every(l).find((e) => e.id === `job:${mine.id}`)!), [['analysis'], 'agent'], 'its own stay');
+  assert.equal(every(l).find((e) => e.id === `task:${key}:e1`)!.tags, undefined);
+  assert.deepEqual([use('tests'), use('ui'), use('deployment'), use('builds')], [1, 1, 1, 1]);
+  // One that ended keeps them; its stored entry holds none, they are kept beside it.
+  assert.deepEqual(tagsOf((await put(`task:${key}:e1`, ['maintenance'])).body.job), [['maintenance'], 'person']);
   const stored = db.prepare('select data from bg_jobs where id = ?').get(`task:${key}:e1`) as { data: string };
-  assert.ok(!stored.data.includes('tags'), 'derived tags are not stored');
-  // A job's own, then cleared: its session's again.
-  assert.deepEqual(tagsOf((await put(`job:${bare.id}`, ['Gamma'])).body.job), [['gamma'], 'own']);
-  assert.deepEqual(tagsOf(await find(`job:${bare.id}`)), [['gamma'], 'own']);
-  assert.deepEqual(tagsOf((await put(`job:${bare.id}`, [])).body.job), [['alpha'], 'session']);
-  // A person's tags for the session, set on one of its tasks (a server too), go over what its jobs have.
-  told.length = 0;
-  const set = await put(`task:${key}:srv`, ['Delta', 'ui']);
-  assert.equal(set.status, 200, JSON.stringify(set.body));
-  assert.deepEqual(tagsOf(set.body.job), [['delta', 'ui'], 'session']);
-  assert.ok(told.some((e) => e.t === 'jobs'), 'open pages reload');
-  assert.deepEqual([use('delta'), use('ui'), use('gamma')], [1, 1, 1]);
-  assert.deepEqual(tagsOf(await find(`task:${key}:s1`)), [['delta', 'ui'], 'session']);
-  assert.deepEqual(tagsOf(await find(`job:${two.id}`)), [['beta', 'alpha'], 'own'], 'its own stay');
-  setHelperTag(db, key, 'epsilon', Date.now());
-  assert.deepEqual(sessionTags(db, Date.now()).get(key), ['delta', 'ui'], 'the helper never writes over a person’s');
-  // The `job tag` command's route; cleared, the jobs' count again.
-  const viaAgent = await call('PUT', `/agent/jobs/${three.id}/tags`, { tags: ['zeta'] }, bearer(run));
-  assert.deepEqual(tagsOf(viaAgent.body.job), [['zeta'], 'own']);
-  assert.deepEqual(tagsOf((await put(`task:${key}:s1`, [])).body.job), [['zeta'], 'session'], 'one each: the newest job’s');
-  assert.equal((await call('PUT', `/agent/jobs/${three.id}/tags`, { tags: ['x'] }, {})).status, 401);
-  assert.equal((await put('job:j-ffffff', ['x'])).status, 404);
-  assert.equal((await call('PUT', `/api/jobs/job%3A${one.id}/tags`, {})).status, 400, 'no list is not an empty one');
-  // A Hydor subagent takes its lead's, and tagging it tags the lead.
+  assert.ok(!stored.data.includes('maintenance'), 'resolved tags are not stored with the entry');
+  assert.deepEqual(tagsOf(await find(`task:${key}:e1`)), [['maintenance'], 'person']);
+  // A Hydor subagent has its own, not its lead's.
   session('claude:tagged-child', 'Helper', { parent: key }, { status: 'working', turnStartedAt: Date.now() });
-  assert.deepEqual(tagsOf(await find('child:claude:tagged-child')), [['zeta'], 'session']);
-  await put('child:claude:tagged-child', ['eta']);
-  assert.deepEqual(sessionTags(db, Date.now()).get(key), ['eta']);
-  for (const j of [one, two, bare, three]) await done(j.id);
+  assert.equal((await find('child:claude:tagged-child')).tags, undefined);
+  assert.deepEqual(tagsOf((await put('child:claude:tagged-child', ['development'])).body.job), [['development'], 'person']);
+  assert.deepEqual(tagsOf(await find(`task:${key}:s1`)), [['tests', 'ui'], 'person'], 'the lead’s work stays as it was');
+  assert.deepEqual(tagsOf(await find('child:claude:tagged-child')), [['development'], 'person']);
+  // Cleared, it has none (the helper model may tag it again later).
+  assert.deepEqual(tagsOf((await put(`task:${key}:s1`, [])).body.job), [undefined, undefined]);
+  assert.equal((await call('PUT', `/api/jobs/task%3A${key}%3As1/tags`, { tags: 'ui' })).status, 400);
+  await finish(mine.id);
   work.delete('claude:tagged-child');
   work.delete(key);
   jobs.tick();
 });
 
-test('what belongs to no session cannot be tagged; a job of none still can', async () => {
+test('a run of Experiments is tagged experiments, and is never asked about; a person can change it', async () => {
   insertRun(db, { id: 'r-alone', spec: { name: 'alone', command: 'python x.py', cwd: tmp }, status: 'running' });
-  const r = await put('run:r-alone', ['x']);
-  assert.deepEqual([r.status, r.body], [409, { error: 'It belongs to no session, so it cannot be tagged' }]);
+  asked.length = 0;
+  assert.deepEqual(tagsOf(await find('run:r-alone')), [['experiments'], 'kind']);
+  await sleep(30);
+  assert.ok(!asked.some((q) => q.items.some((i) => i.name === 'alone')), 'the helper model is not asked about it');
+  assert.equal(use('experiments'), undefined, 'a kind’s tag is not a count');
+  const r = await put('run:r-alone', ['evaluation-runs']);
+  assert.deepEqual([r.status, tagsOf(r.body.job)], [200, [['evaluation-runs'], 'person']]);
+  assert.deepEqual(tagsOf((await put('run:r-alone', [])).body.job), [['experiments'], 'kind']);
   updateRun(db, 'r-alone', { status: 'done', endedAt: Date.now() });
+  assert.deepEqual(tagsOf(await find('run:r-alone')), [['experiments'], 'kind'], 'ended too');
+});
+
+test('a job of no session can be tagged; a confidential session’s tags stay out of the ones in use', async () => {
   const cli = { authorization: `Bearer ${createAccessToken(db, 'The command line again').token}` };
   const shell = proc();
   const own = (await call('POST', '/agent/jobs', { name: 'by hand', command: 'true', cwd: tmp, pid: shell.pid }, cli)).body as JobRegistered;
-  assert.deepEqual(tagsOf((await put(`job:${own.id}`, ['by-hand'])).body.job), [['by-hand'], 'own']);
+  assert.deepEqual(tagsOf((await put(`job:${own.id}`, ['by-hand'])).body.job), [['by-hand'], 'person']);
   await call('POST', `/agent/jobs/${own.id}`, { state: 'done', exitCode: 0 }, cli);
-  // A confidential session's tags stay out of the ones in use, which others are told.
   session('custom:secret', 'Secret work', { confidential: true });
   const hidden = (await call('POST', '/agent/jobs', { name: 'quiet', command: 'true', cwd: tmp, pid: shell.pid, session: 'custom:secret', tags: ['secret-name'] }, cli)).body as JobRegistered;
   assert.deepEqual(hidden.tags, ['secret-name']);
   assert.equal(use('secret-name'), undefined);
   await call('POST', `/agent/jobs/${hidden.id}`, { state: 'done', exitCode: 0 }, cli);
+  work.delete('custom:secret');
 });
 
 test('adopting with tags, and again with others', async () => {
@@ -947,43 +964,63 @@ test('adopting with tags, and again with others', async () => {
   const again = await adoptIt(p.pid!, { tags: ['archive'] });
   assert.deepEqual([again.body.id, again.body.tags], [a.body.id, ['archive']]);
   assert.deepEqual((await adoptIt(p.pid!)).body.tags, ['archive'], 'none given: they stay');
-  assert.deepEqual(tagsOf(await entry(a.body.id)), [['archive'], 'own']);
+  assert.deepEqual(tagsOf(await entry(a.body.id)), [['archive'], 'agent']);
   await kill(p);
   jobs.tick();
 });
 
-test('sessions with no tags are put to the helper model: once, in one call, when the work is listed', async () => {
-  // Whatever earlier tests left is asked about first, so that only these two are new.
+test('work with no tags is put to the helper model, each piece by itself: one call, when the work is listed', async () => {
+  // Whatever earlier tests left is asked about first, so that only these are new.
   await listed();
   await sleep(20);
   clearTags();
   await finish((await register('seed', { tags: ['word-suggest'] })).id);
   asked.length = 0;
   const a = session('claude:ask-a', 'Fix the checkout page', { space: space.id });
-  const b = session('claude:ask-b', 'Train the suggester');
-  session('custom:ask-secret', 'Private numbers', { confidential: true }, { running: [task('p1')] });
-  a.running = [task('a1', { description: 'Run the page tests' }), task('a2', { description: 'Watch the build' })];
-  b.running = [task('b1')];
+  session('custom:ask-secret', 'Private numbers', { confidential: true }, { running: [task('p1', { description: 'Private job' })] });
+  const long = `python ${'x'.repeat(300)}`;
+  commands.set('longcmd', long);
+  a.running = [
+    task('a1', { description: 'Run the page tests' }),
+    task('a2', { description: 'Train the page ranker', toolUseId: 'longcmd' }),
+    task('a3', { description: 'Watch the build', kind: 'monitor' }),
+  ];
   jobs.tick();
   assert.equal(asked.length, 0, 'never from a look of its own');
-  answer = async (q) => q.sessions.map((s) => (s.title === 'Fix the checkout page' ? 'Check Out' : s.title === 'Train the suggester' ? 'word-suggest' : null));
+  const say: Record<string, string> = { 'Run the page tests': 'Tests', 'Train the page ranker': 'experiments', 'Watch the build': 'A New Kind!' };
+  answer = async (q) => q.items.map((i) => say[i.name] ?? null);
   told.length = 0;
   const first = await listed();
   assert.equal(first.running.find((e) => e.id === 'task:claude:ask-a:a1')!.tags, undefined, 'the list does not wait for it');
-  await until(() => !!sessionTags(db, Date.now()).get('claude:ask-b'), 'the picks');
+  await until(() => !!use('tests'), 'the picks');
   assert.equal(asked.length, 1);
   const q = asked[0];
-  assert.deepEqual(q.sessions.find((s) => s.title === 'Fix the checkout page'), { title: 'Fix the checkout page', project: 'Search', work: ['Run the page tests', 'Watch the build'] });
-  assert.ok(!q.sessions.some((s) => s.title === 'Private numbers'), 'nothing of a confidential session is sent');
-  assert.deepEqual(q.tags, [{ name: 'word-suggest', uses: 1 }]);
-  assert.match(tagPrompt(q), /- word-suggest \(1\)[^]*\d\. Fix the checkout page\n {3}project: Search\n {3}work: Run the page tests \| Watch the build/);
+  assert.deepEqual(q.items.map((i) => i.name).sort(), ['Run the page tests', 'Train the page ranker', 'Watch the build']);
+  const item = (n: string) => q.items.find((i) => i.name === n)!;
+  assert.deepEqual(item('Run the page tests'), { name: 'Run the page tests', kind: 'command', session: 'Fix the checkout page' });
+  assert.equal(item('Watch the build').kind, 'monitor');
+  assert.equal(item('Train the page ranker').command, `${long.slice(0, 199)}…`, 'a command is cut to 200 characters');
+  assert.ok(!q.items.some((i) => i.name === 'Private job'), 'nothing of a confidential session is sent');
+  assert.ok(!q.items.some((i) => i.name === 'seed'), 'work that has tags is not asked about');
+  // The vocabulary: those in use with how often, then every broad one with what it covers.
+  assert.deepEqual(q.tags[0], { name: 'word-suggest', uses: 1 });
+  assert.deepEqual(q.tags.slice(1), BROAD_TAGS.map((t) => ({ name: t.name, uses: 0, covers: t.covers })));
+  const prompt = tagPrompt(q);
+  assert.match(prompt, /- word-suggest \(1\)[^]*- experiments: training, evaluation, sweeps, benchmarks[^]*1\. Run the page tests \(command\)\n {3}session: Fix the checkout page/);
+  assert.match(prompt, /2\. Train the page ranker \(command\)\n {3}command: python x+…/);
+  assert.match(prompt, /broad kind of work[^]*Never a project, product, topic or session name/);
   assert.ok(told.some((e) => e.t === 'jobs'), 'the page is told to reload');
-  assert.deepEqual(tagsOf(await find('task:claude:ask-a:a1')), [['check-out'], 'session']);
-  assert.deepEqual(tagsOf(await find('task:claude:ask-b:b1')), [['word-suggest'], 'session']);
-  assert.deepEqual([use('check-out'), use('word-suggest')], [1, 2]);
-  assert.equal(asked.length, 1, 'a tagged session is not asked about again, nor one asked in the last day');
+  // Two pieces of one session get different picks, normalized, and counted.
+  assert.deepEqual(tagsOf(await find('task:claude:ask-a:a1')), [['tests'], 'helper']);
+  assert.deepEqual(tagsOf(await find('task:claude:ask-a:a2')), [['experiments'], 'helper']);
+  assert.deepEqual(tagsOf(await find('task:claude:ask-a:a3')), [['a-new-kind'], 'helper']);
+  assert.deepEqual([use('tests'), use('experiments'), use('a-new-kind')], [1, 1, 1]);
+  assert.equal(asked.length, 1, 'tagged work is not asked about again, nor work asked about in the last day');
+  // A person's tag stands over a pick.
+  await put('task:claude:ask-a:a1', ['maintenance']);
+  assert.deepEqual(tagsOf(await find('task:claude:ask-a:a1')), [['maintenance'], 'person']);
 
-  // A failure is one line, throws nothing, and waits a day.
+  // A failure is one line, throws nothing, and waits a day for that work.
   session('claude:ask-c', 'Something else', {}, { running: [task('c1')] });
   answer = async () => {
     throw new Error('no model\nanswers');
@@ -999,7 +1036,7 @@ test('sessions with no tags are put to the helper model: once, in one call, when
   }
   assert.deepEqual(said, ['[jobs] tagging: no model answers']);
   assert.equal(asked.length, 2);
-  assert.deepEqual(asked[1].sessions.map((s) => s.title), ['Something else']);
+  assert.deepEqual(asked[1].items.map((i) => i.name), ['Work c1']);
   await listed();
   assert.equal(asked.length, 2, 'not asked again the same day');
 
@@ -1009,25 +1046,28 @@ test('sessions with no tags are put to the helper model: once, in one call, when
   const tomorrow = Date.now() + 25 * 3600_000;
   jobs.list(100, tomorrow);
   assert.equal(asked.length, 3);
-  assert.deepEqual(asked[2].sessions.map((s) => s.title), ['Something else']);
+  assert.ok(asked[2].items.some((i) => i.name === 'Work c1'));
   session('claude:ask-d', 'Newer', {}, { running: [task('d1')] });
   await listed();
   assert.equal(asked.length, 3, 'none while one is under way');
   await put('task:claude:ask-c:c1', ['mine']);
-  reply(asked[2].sessions.map(() => 'theirs'));
+  reply(asked[2].items.map(() => 'theirs'));
   await sleep(20);
-  assert.deepEqual(sessionTags(db, Date.now()).get('claude:ask-c'), ['mine']);
+  answer = async (x) => x.items.map(() => null);
+  assert.deepEqual(tagsOf(await find('task:claude:ask-c:c1')), [['mine'], 'person']);
+  assert.equal(asked.length, 4, 'what waited is asked about at the next look');
+  assert.deepEqual(asked[3].items.map((i) => i.name), ['Work d1']);
 
   // Turned off by the environment.
-  answer = async (x) => x.sessions.map(() => null);
+  session('claude:ask-e', 'Newest', {}, { running: [task('e1')] });
   process.env.HYDOR_JOBS_TAGGER = '0';
   await listed();
-  assert.equal(asked.length, 3);
+  assert.equal(asked.length, 4);
   delete process.env.HYDOR_JOBS_TAGGER;
   await listed();
-  assert.equal(asked.length, 4);
-  assert.deepEqual(asked[3].sessions.map((s) => s.title), ['Newer']);
-  for (const k of ['claude:ask-a', 'claude:ask-b', 'custom:ask-secret', 'claude:ask-c', 'claude:ask-d']) work.delete(k);
+  assert.equal(asked.length, 5);
+  assert.deepEqual(asked[4].items.map((i) => i.name), ['Work e1']);
+  for (const k of ['claude:ask-a', 'custom:ask-secret', 'claude:ask-c', 'claude:ask-d', 'claude:ask-e']) work.delete(k);
   jobs.tick();
 });
 

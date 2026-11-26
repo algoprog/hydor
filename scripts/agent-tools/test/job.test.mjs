@@ -548,12 +548,30 @@ test('registration: one line says a new tag, or that none was given, with the ta
   assert.deepEqual(await said({ tags: ['intent-data'] }), [], 'a tag already in use needs no word');
 });
 
-test('tags: the tags in use, one a line, with how often and how long ago', async () => {
-  const tags = [{ name: 'intent-data', uses: 12, lastAt: now - 2 * 3600_000 }, { name: 'ui', uses: 1, lastAt: now - 90_000 }];
+test('tags: the tags in use, one a line, with how often and how long ago; the broad ones not used yet say what they cover', async () => {
+  const tags = [
+    { name: 'intent-data', uses: 12, lastAt: now - 2 * 3600_000 },
+    { name: 'ui', uses: 1, lastAt: now - 90_000 },
+    { name: 'experiments', uses: 0, lastAt: 0, covers: 'training, evaluation, sweeps, benchmarks' },
+    { name: 'builds', uses: 0, lastAt: 0, covers: 'building, compiling, packaging' },
+    { name: 'deployment', uses: 0, lastAt: 0, covers: 'shipping' },
+    { name: 'tests', uses: 0, lastAt: 0 },
+  ];
   const a = await app({ list: [200, { at: now, running: [], queued: [], ended: [], tags }] });
   const r = await run(['tags'], { env: a.env });
   assert.equal(r.code, 0, r.stderr);
-  assert.equal(r.stdout, 'intent-data  12 uses, last 2h00m ago\nui           1 use, last 1m30s ago\n');
+  assert.equal(
+    r.stdout,
+    [
+      'intent-data  12 uses, last 2h00m ago',
+      'ui           1 use, last 1m30s ago',
+      'experiments  not used yet (training, evaluation, …)',
+      'builds       not used yet (building, compiling, …)',
+      'deployment   not used yet (shipping)',
+      'tests        not used yet',
+      '',
+    ].join('\n'),
+  );
   assert.equal(a.seen[0].query, '?ended=0');
   assert.deepEqual(JSON.parse((await run(['tags', '--json'], { env: a.env })).stdout), tags);
   assert.equal((await run(['tags'], { env: (await app()).env })).stdout, 'no tags yet\n');
@@ -562,12 +580,12 @@ test('tags: the tags in use, one a line, with how often and how long ago', async
   assert.equal((await run(['tags', 'x'], { env: a.env })).code, 64);
 });
 
-test('tag: puts a job\'s tags, or clears them; a refusal is said', async () => {
+test('tag: puts the tags of a job or of any other work, or clears them; a refusal is said', async () => {
   const a = await app({
     tag: (r) => {
-      if (r.id === 'j-9') return [409, { error: 'It belongs to no session, so it cannot be tagged' }];
+      if (r.id === 'j-9') return [404, { error: 'There is no such job' }];
       const own = r.body.tags.length > 0;
-      return [200, { job: entry(`job:${r.id}`, 'running', { tags: own ? r.body.tags.map((t) => t.toLowerCase()) : ['the-sessions'], tagsFrom: own ? 'own' : 'session' }) }];
+      return [200, { job: entry(`job:${r.id}`, 'running', own ? { tags: r.body.tags.map((t) => t.toLowerCase()), tagsFrom: 'agent' } : {}) }];
     },
   });
   const r = await run(['tag', 'j-1', 'Intent-Data', 'ui,checkout'], { env: a.env });
@@ -575,21 +593,21 @@ test('tag: puts a job\'s tags, or clears them; a refusal is said', async () => {
   assert.equal(r.stdout, 'job j-1 tags: intent-data, ui, checkout\n');
   assert.deepEqual([a.seen[0].method, a.seen[0].id, a.seen[0].body], ['PUT', 'j-1', { tags: ['Intent-Data', 'ui', 'checkout'] }]);
   const cleared = await run(['tag', 'j-1'], { env: a.env });
-  assert.equal(cleared.stdout, "job j-1 tags: none (it takes its session's)\n");
+  assert.equal(cleared.stdout, 'job j-1 tags: none\n');
   assert.deepEqual(a.seen[1].body, { tags: [] });
   const refused = await run(['tag', 'j-9', 'x'], { env: a.env });
   assert.equal(refused.code, 2);
-  assert.equal(refused.stderr, 'job: It belongs to no session, so it cannot be tagged\n');
+  assert.equal(refused.stderr, 'job: There is no such job\n');
   assert.equal((await run(['tag', 'j-1', 'x'])).code, 3);
   assert.equal((await run(['tag'], { env: a.env })).code, 64);
-  // Work that is not a `job` job is tagged through its session.
-  const task = await app({ tag: [200, { job: { id: 'task:claude:k:b1', kind: 'command', state: 'running', name: 'x', tags: ['ui'], tagsFrom: 'session' } }] });
-  assert.equal((await run(['tag', 'task:claude:k:b1', 'ui'], { env: task.env })).stdout, 'job task:claude:k:b1 tags: ui\n');
+  // Any other work of a session is tagged on its own; cleared, the helper model's pick may be there at once.
+  const task = await app({ tag: [200, { job: { id: 'task:claude:k:b1', kind: 'command', state: 'running', name: 'x', tags: ['tests'], tagsFrom: 'helper' } }] });
+  assert.equal((await run(['tag', 'task:claude:k:b1', 'tests'], { env: task.env })).stdout, 'job task:claude:k:b1 tags: tests\n');
   assert.equal(task.seen[0].id, 'task:claude:k:b1');
 });
 
 test('list and status show the tags', async () => {
-  const j = entry('job:j-1', 'running', { startedAt: now - 1000, tags: ['intent-data', 'ui'], tagsFrom: 'own' });
+  const j = entry('job:j-1', 'running', { startedAt: now - 1000, tags: ['intent-data', 'ui'], tagsFrom: 'agent' });
   const a = await app({ list: [200, { at: now, running: [j, entry('job:j-2', 'running')], queued: [], ended: [] }], job: [200, { job: j }] });
   const list = await run(['list'], { env: a.env });
   assert.match(list.stdout, /^job:j-1 +running +Job job:j-1 \[intent-data, ui\] +- /m);

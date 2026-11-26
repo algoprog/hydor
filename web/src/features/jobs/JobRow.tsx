@@ -56,8 +56,6 @@ export const openWords = (job: JobEntry): string => (job.kind === 'experiment' ?
 
 export const isEnded = (job: JobEntry): boolean => job.state !== 'running' && job.state !== 'queued';
 
-/** Whether tags can be given to it: a job of the `job` command, or work of a session (whose tags it then sets). */
-export const taggable = (job: JobEntry): boolean => job.id.startsWith('job:') || !!job.session;
 
 export const linkCls = 'min-w-0 truncate rounded text-left hover:text-fg hover:underline';
 
@@ -250,11 +248,9 @@ function RowMenu({ job, actions }: { job: JobEntry; actions: RowActions }) {
             {openWords(job)}
           </MenuItem>
         )}
-        {taggable(job) && (
-          <MenuItem icon={<Tag size={15} />} onClick={pick(() => actions.onTags(job))}>
-            Edit tags…
-          </MenuItem>
-        )}
+        <MenuItem icon={<Tag size={15} />} onClick={pick(() => actions.onTags(job))}>
+          Edit tags…
+        </MenuItem>
         {!ended && job.stoppable && (
           <>
             <MenuSep />

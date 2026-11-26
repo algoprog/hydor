@@ -53,6 +53,8 @@
   --viz-6: #008300;
   --viz-7: #6250d6;
   --viz-8: #e34948;
+  /* A cyan apart from the charts' palette: the Jobs page's tag for analysis (web/src/features/jobs/tags.ts). */
+  --tag-cyan: #0b8aa6;
   --viz-grid: #ebe8e1;
   --viz-axis: #c9c2b3;
   --status-good: #0ca30c;
@@ -119,6 +121,7 @@
   --viz-6: #008300;
   --viz-7: #9085e9;
   --viz-8: #e66767;
+  --tag-cyan: #4fc6e0;
   --viz-grid: #171a20;
   --viz-axis: #303643;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55);

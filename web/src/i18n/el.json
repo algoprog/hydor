@@ -30072,5 +30072,13 @@
   "terms: whole numbers only, not “{0}”": "terms: μόνο ακέραιοι αριθμοί, όχι «{0}»",
   "terms: {0} is too large to be exact as a number: give it as text, in quotes": "terms: το {0} είναι πολύ μεγάλο για να είναι ακριβές ως αριθμός: δώστε το ως κείμενο, σε εισαγωγικά",
   "when: \"night\" for an evolution that works at night, or leave it out": "when: \"night\" για μια εξέλιξη που δουλεύει τη νύχτα, ή παραλείψτε το",
-  "Running · {0} of {1} tried": "Εκτελείται · Δοκιμάστηκαν {0} από {1}"
+  "Running · {0} of {1} tried": "Εκτελείται · Δοκιμάστηκαν {0} από {1}",
+  "Runs of Experiments are tagged experiments.": "Οι εκτελέσεις των Πειραμάτων επισημαίνονται με την ετικέτα experiments.",
+  "Tags say what kind of work it is, such as experiments or data-collection.": "Οι ετικέτες δείχνουν το είδος της εργασίας, όπως experiments ή data-collection.",
+  "Tags to pick from": "Ετικέτες προς επιλογή",
+  "The agent that started it tagged it.": "Ο πράκτορας που την ξεκίνησε της έβαλε ετικέτα.",
+  "The helper model tagged it. Change it if it is wrong.": "Το βοηθητικό μοντέλο της έβαλε ετικέτα. Αλλάξτε την αν είναι λάθος.",
+  "You tagged it.": "Της βάλατε ετικέτα εσείς.",
+  "Long work your sessions run in the background, sorted by kind of work (experiments, data collection, builds…): what runs, how long it has left, and what waits for what.": "Μεγάλες εργασίες που εκτελούν οι συνεδρίες σας στο παρασκήνιο, ταξινομημένες ανά είδος (πειράματα, συλλογή δεδομένων, builds…): τι εκτελείται, πόσος χρόνος απομένει και τι περιμένει ποιο.",
+  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag kind of work experiments data collection processing development builds tests deployment analysis maintenance filter group organize sort search failed today": "εργασίες παρασκηνίου jobs background tasks μεγάλη διάρκεια εκτέλεση τρέχει σε αναμονή ουρά αναμονή περιμένει μετά από εξάρτηση ένα τη φορά πρόοδος ποσοστό υπόλοιπος χρόνος εκτίμηση eta πόσο ακόμα ολοκληρώθηκε τελείωσε απέτυχε διακόπηκε χρονολόγιο timeline gantt έξοδος αρχείο καταγραφής log διακοπή εντολές monitors υποπράκτορες subagents διακομιστές server dev server builds εκπαίδευση training runs ευρετηρίαση indexing λήψεις downloads job εντολή command υιοθέτηση adopt ετικέτες ετικέτα tags tag είδος εργασίας πειράματα συλλογή δεδομένων επεξεργασία ανάπτυξη δοκιμές tests ανάπτυξη εφαρμογής deployment ανάλυση συντήρηση φίλτρο ομαδοποίηση οργάνωση ταξινόμηση αναζήτηση απέτυχαν σήμερα"
 }

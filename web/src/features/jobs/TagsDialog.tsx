@@ -1,5 +1,5 @@
-// A job's tags, changed: typed with commas between them, or picked from those in use. A `job` job keeps its own; for
-// other work they are its session's.
+// A job's tags, changed: typed with commas between them, or picked from those in use and the broad ones (shared/jobs.ts
+// BROAD_TAGS). Tags name the kind of work; the dialog says who tagged it so far.
 import { useState } from 'react';
 import { MAX_TAGS, normalTags, type JobEntry, type JobTag, type JobTagsSet } from '@shared/jobs';
 import { enc, put } from '../../lib/api';
@@ -8,6 +8,14 @@ import { Button, Dialog, inputCls } from '../../components/ui';
 import { Chip } from '../spaces/memory/ui';
 import { loadJobs } from './store';
 import { TagDot } from './TagPill';
+
+/** Who tagged it, said under the field. */
+const BY: Record<string, string> = {
+  agent: 'The agent that started it tagged it.',
+  person: 'You tagged it.',
+  helper: 'The helper model tagged it. Change it if it is wrong.',
+  kind: 'Runs of Experiments are tagged experiments.',
+};
 
 /** How many of the tags in use are offered. */
 const OFFERED = 16;
@@ -19,7 +27,7 @@ export function TagsDialog({ job, inUse, onClose }: { job: JobEntry; inUse: JobT
   const [text, setText] = useState(() => (job.tags ?? []).join(', '));
   const [saving, setSaving] = useState(false);
   const picked = typed(text);
-  const own = job.tagsFrom === 'own' || job.id.startsWith('job:');
+  const by = BY[job.tagsFrom ?? ''];
 
   const toggle = (name: string) => setText((picked.includes(name) ? picked.filter((t) => t !== name) : [...picked, name]).join(', '));
 
@@ -74,7 +82,7 @@ export function TagsDialog({ job, inUse, onClose }: { job: JobEntry; inUse: JobT
       <p className={picked.length > MAX_TAGS ? 'mt-1.5 text-[12px] text-warn' : 'mt-1.5 text-[12px] text-fg-3'}>Up to 3 tags. The first one says where it is listed.</p>
       {inUse.length > 0 && (
         <div className="mt-3">
-          <div className="mb-1.5 text-[11.5px] font-medium text-fg-3">Tags in use</div>
+          <div className="mb-1.5 text-[11.5px] font-medium text-fg-3">Tags to pick from</div>
           <div className="flex flex-wrap gap-1.5">
             {inUse.slice(0, OFFERED).map((t) => (
               <Chip key={t.name} small on={picked.includes(t.name)} onClick={() => toggle(t.name)}>
@@ -86,7 +94,8 @@ export function TagsDialog({ job, inUse, onClose }: { job: JobEntry; inUse: JobT
         </div>
       )}
       <p className="mt-4 text-[12.5px] leading-relaxed text-fg-3">
-        {own ? "These tags are this job's own." : "These tags are its session's: they apply to all of that session's work without tags of its own."}
+        <span>Tags say what kind of work it is, such as experiments or data-collection.</span>
+        {by && <span> {by}</span>}
       </p>
     </Dialog>
   );

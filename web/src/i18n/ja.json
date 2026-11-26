@@ -28219,5 +28219,13 @@
   "terms: whole numbers only, not “{0}”": "terms：整数のみ指定できます（「{0}」は使えません）",
   "terms: {0} is too large to be exact as a number: give it as text, in quotes": "terms：{0}は大きすぎて数値のままでは正確に扱えません。引用符で囲んでテキストとして指定してください",
   "when: \"night\" for an evolution that works at night, or leave it out": "when：夜間に進化を実行する場合は\"night\"、それ以外は省略します",
-  "Running · {0} of {1} tried": "実行中 · {1}件中{0}件を試行"
+  "Running · {0} of {1} tried": "実行中 · {1}件中{0}件を試行",
+  "Runs of Experiments are tagged experiments.": "実験の実行には「experiments」タグが付きます。",
+  "Tags say what kind of work it is, such as experiments or data-collection.": "タグは、実験やデータ収集（data-collection）など、作業の種類を表します。",
+  "Tags to pick from": "選べるタグ",
+  "The agent that started it tagged it.": "開始したエージェントがタグを付けました。",
+  "The helper model tagged it. Change it if it is wrong.": "補助モデルがタグを付けました。間違っている場合は変更してください。",
+  "You tagged it.": "タグはあなたが付けました。",
+  "Long work your sessions run in the background, sorted by kind of work (experiments, data collection, builds…): what runs, how long it has left, and what waits for what.": "セッションがバックグラウンドで実行する長時間の作業を、種類（実験、データ収集、ビルドなど）ごとに表示します。何が実行中か、あとどれくらいかかるか、何が何を待っているかが分かります。",
+  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag kind of work experiments data collection processing development builds tests deployment analysis maintenance filter group organize sort search failed today": "ジョブ バックグラウンド タスク 長時間 作業 実行中 キュー 待機 待ち 順番 依存 1つずつ 進捗 パーセント 残り時間 見積もり 予想 ETA いつ終わる 完了 失敗 停止 タイムライン ガントチャート ガント 出力 ログ コマンド モニター サブエージェント サーバー 開発サーバー ビルド トレーニング 学習 実行 インデックス作成 ダウンロード 引き継ぐ タグ 種類 実験 データ収集 処理 開発 テスト デプロイ 分析 メンテナンス フィルタ グループ 整理 並べ替え 検索 今日の失敗 jobs background tasks queue eta timeline gantt log subagents"
 }

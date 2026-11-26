@@ -88,8 +88,9 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   what ended for a week. The `job` command registers its work with the app, with an address and a token every session's
   environment holds, waits while the jobs it depends on and its queue say so, then runs the command itself; without the
   app it just runs it.
-  The work is sorted by tags: a job's own (`job run --tag`), else its session's, which is the one a person set, else the
-  one its jobs have most, else one the helper model picks (`server/jobs/tags.ts`, never for a confidential session).
+  The work is sorted by tags, each piece of work tagged on its own, with the broad kind of work it is (experiments,
+  builds…): the one an agent gave (`job run --tag`) or a person set, else experiments for a run of Experiments, else one
+  the helper model picks for it (`server/jobs/tags.ts`, never for work of a confidential session).
 - **Proofs are checked by Lean.** When you agree, the app sets up Lean in `lean/` in its data folder (or uses your own,
   from your PATH), and Mathlib as one shared project there. Agents' tools and `leancheck` share one checker
   (`scripts/agent-tools/lib/lean/`). Its verdict does not trust what the checked file can change: the file is compiled,

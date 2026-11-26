@@ -28852,5 +28852,13 @@
   "terms: whole numbers only, not “{0}”": "terms: nur ganze Zahlen, nicht „{0}“",
   "terms: {0} is too large to be exact as a number: give it as text, in quotes": "terms: {0} ist zu groß, um als Zahl exakt zu sein: Gib den Wert als Text in Anführungszeichen an",
   "when: \"night\" for an evolution that works at night, or leave it out": "when: \"night\" für eine Evolution, die nachts arbeitet, oder weglassen",
-  "Running · {0} of {1} tried": "Läuft · {0} von {1} ausprobiert"
+  "Running · {0} of {1} tried": "Läuft · {0} von {1} ausprobiert",
+  "Runs of Experiments are tagged experiments.": "Ausführungen von Experimenten werden mit „experiments“ getaggt.",
+  "Tags say what kind of work it is, such as experiments or data-collection.": "Tags zeigen, um welche Art von Arbeit es sich handelt, zum Beispiel „experiments“ oder „data-collection“.",
+  "Tags to pick from": "Tags zur Auswahl",
+  "The agent that started it tagged it.": "Der Agent, der es gestartet hat, hat es getaggt.",
+  "The helper model tagged it. Change it if it is wrong.": "Das Hilfsmodell hat es getaggt. Ändere es, falls es nicht passt.",
+  "You tagged it.": "Du hast es getaggt.",
+  "Long work your sessions run in the background, sorted by kind of work (experiments, data collection, builds…): what runs, how long it has left, and what waits for what.": "Lange Arbeiten, die deine Sitzungen im Hintergrund ausführen, nach Art sortiert (Experimente, Datenerfassung, Builds …): was läuft, wie lange es noch dauert und was auf was wartet.",
+  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag kind of work experiments data collection processing development builds tests deployment analysis maintenance filter group organize sort search failed today": "jobs aufgaben hintergrund hintergrundaufgaben lange arbeit läuft laufend warteschlange wartet wartet auf danach abhängigkeit eine nach der anderen fortschritt prozent restzeit schätzung eta wie lange noch fertig abgeschlossen fehlgeschlagen gestoppt zeitachse timeline gantt ausgabe log stoppen befehle monitore subagents subagenten server dev-server builds training indexierung downloads job befehl übernehmen tags tag art der arbeit experimente datenerfassung datensammlung verarbeitung entwicklung tests deployment analyse wartung filtern gruppieren organisieren sortieren suchen heute"
 }

@@ -345,8 +345,8 @@ On a Mac, the app puts the command on your PATH by itself.
 
 **For researchers and engineers**
 
-- **Jobs** shows the long work running in the background, organized by tags the agents pick for what each piece is
-  part of, with its progress and time left, what is queued and what waits for what; agents can run one job after
+- **Jobs** shows the long work running in the background, organized by tags that name the kind of work (experiments,
+  data-collection, builds…), with its progress and time left, what is queued and what waits for what; agents can run one job after
   another ([jobs](docs/guide/31-jobs.md)).
 - A paper radar and a check before you submit, experiments that wait for a free GPU, failed CI runs looked into,
   issues triaged, and large changes made by a team of agents ([researchers](docs/guide/25-researchers.md),

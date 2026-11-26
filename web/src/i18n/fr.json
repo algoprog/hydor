@@ -28218,5 +28218,13 @@
   "terms: whole numbers only, not “{0}”": "terms : uniquement des nombres entiers, pas « {0} »",
   "terms: {0} is too large to be exact as a number: give it as text, in quotes": "terms : {0} est trop grand pour être exact en tant que nombre : donnez-le sous forme de texte, entre guillemets",
   "when: \"night\" for an evolution that works at night, or leave it out": "when : \"night\" pour une évolution qui travaille la nuit, ou omettez-le",
-  "Running · {0} of {1} tried": "En cours · {0} sur {1} essayés"
+  "Running · {0} of {1} tried": "En cours · {0} sur {1} essayés",
+  "Runs of Experiments are tagged experiments.": "Les exécutions d’Expériences reçoivent le tag experiments.",
+  "Tags say what kind of work it is, such as experiments or data-collection.": "Les tags indiquent le type de travail, par exemple experiments ou data-collection.",
+  "Tags to pick from": "Tags au choix",
+  "The agent that started it tagged it.": "L’agent qui l’a démarrée lui a attribué ce tag.",
+  "The helper model tagged it. Change it if it is wrong.": "Le modèle d’appoint lui a attribué ce tag. Modifiez-le s’il est incorrect.",
+  "You tagged it.": "Vous lui avez attribué ce tag.",
+  "Long work your sessions run in the background, sorted by kind of work (experiments, data collection, builds…): what runs, how long it has left, and what waits for what.": "Travaux longs que vos sessions exécutent en arrière-plan, classés par type de travail (expériences, collecte de données, builds…) : ce qui tourne, le temps restant et ce qui attend quoi.",
+  "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt tags tag kind of work experiments data collection processing development builds tests deployment analysis maintenance filter group organize sort search failed today": "tâches de fond travaux en arrière-plan longs en cours exécution file d’attente en attente attend après dépendance un à la fois progression pourcentage temps restant estimation durée combien de temps jusqu’à la fin terminé échoué arrêté chronologie gantt sortie journal arrêter commandes moniteurs sous-agents serveurs serveur de développement dev server builds build entraînement indexation téléchargements job tâche commande adopter étiquettes étiquette tag type de travail expériences collecte de données traitement développement tests déploiement analyse maintenance filtrer grouper organiser trier rechercher échoués aujourd’hui jobs background tasks"
 }

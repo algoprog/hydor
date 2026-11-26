@@ -242,7 +242,7 @@ agents that speak ACP and take MCP servers.
   agent follows the new ones from the next message. CLAUDE.md and AGENTS.md still work, and can be edited there too.
 - **Commands in every agent's shell** (`leancheck`, which says whether a Lean file's proofs hold, is a fifth: For researchers, below): `waitfor` (wait for a long job in one call: a program, a file, a line in a
   log, a web address, a Slurm job, a systemd unit (Linux only) or a command, stopping at the first crash line, with the end of the log
-  shown), `job` (long work that shows in Jobs with its progress and time left, tagged with what it is part of, after other jobs or in a queue, and
+  shown), `job` (long work that shows in Jobs with its progress and time left, tagged with the kind of work it is, after other jobs or in a queue, and
   `job adopt` for work already running), `edits` (several exact search-and-replace edits across files in one atomic call, printing the changed lines)
   and `sym` (a definition with its whole body and exact line range, its references, or a file's declarations, in
   TypeScript, JavaScript, Python and Rust). Claude Code, Codex, Custom and the other agents find them on their PATH and
@@ -2124,10 +2124,11 @@ programs shows each program's version and what is out, with Check now, Update no
   days under a heading for each day (Done, Failed with the exit code, Stopped, Never started, Ended when nobody saw
   how), with **All** or **Failed** and **Clear**. A **Timeline** view draws them along the clock with their
   dependencies, narrowed the same way, and **Stop** ends a job after asking.
-  Agents tag each job (`job run --tag`), reusing the tags in use (`job tags` lists them, `job tag` changes a job's):
-  up to 3, in lower case with hyphens, the first the one it is grouped under. Work with no tags of its own takes its
-  session's: the one you set on the page, else the tag its jobs have most, else one the helper model picks for the
-  session (never for a confidential one). Agents run long work with `job run` (`--after` another job, `--queue`,
+  Tags name the broad kind of work (experiments, data-collection, builds…), each piece of work tagged on its own. Agents
+  tag each job (`job run --tag`), reusing the tags in use (`job tags` lists them, then the broad ones not used yet;
+  `job tag` changes the tags of any work): up to 3, in lower case with hyphens, the first the one it is grouped under.
+  A run of Experiments is always tagged experiments; other work with no tag gets one the helper model picks for it
+  (never for work of a confidential session). Agents run long work with `job run` (`--after` another job, `--queue`,
   `--eta`), as you ask in plain words, and `job adopt` shows work that is already running without restarting it (not
   on Windows). A session whose jobs or runs still wait or run shows as working ("Working · 1 in background"), not
   Ready, also after its agent has stopped, and its Finished notice waits for them.
