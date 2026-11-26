@@ -701,6 +701,8 @@ export interface CellNumber {
   bold: boolean;
   /** A significance mark beside it (†, ‡, *). */
   marked: boolean;
+  /** That mark is a double dagger (Experiments' mark for significantly worse). */
+  double: boolean;
   /** Written as a percentage. */
   percent: boolean;
   /** The whole cell is maths ($…$). */
@@ -739,6 +741,7 @@ export function cellNumber(c: TabCell): CellNumber | null {
     to: c.from + num.index + num[0].length,
     bold,
     marked,
+    double: /\\(ddag|ddagger)\b|‡/.test(raw),
     percent,
     math: /^\$[\s\S]*\$$/.test(raw.trim()),
   };

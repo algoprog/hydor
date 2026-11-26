@@ -2,11 +2,12 @@
 // value; the runs of a row are seeds, averaged (mean ± std, n). Each column is a metric: the best row in bold, and
 // each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired
 // over seeds when the rows share seeds, else Welch's t-test), Holm-corrected across the rows, a dagger on the
-// cells that are significantly better. Written as LaTeX (booktabs, with the marker line the pre-submission check
+// cells that are significantly better and a double dagger on those significantly worse. Seeds that barely change a
+// number (one side's standard deviation next to nothing) give no test over seeds, and a note says so. Written as LaTeX (booktabs, with the marker line the pre-submission check
 // finds), Markdown and CSV. Also: placing a table in a LaTeX file, replacing the one it made before.
 import fs from 'node:fs';
 import path from 'node:path';
-import { TABLE_MARK, type ResultsCell, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord } from '../../shared/experiments.ts';
+import { seedsFlatNote, TABLE_MARK, type ResultsCell, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord } from '../../shared/experiments.ts';
 import { looseObject } from './metrics.ts';
 import { holm, mean, pairedBootstrap, pairedT, std, welch } from './stats.ts';
 
@@ -148,6 +149,18 @@ function test(spec: ResultsTableSpec, c: ResultsColumn, row: Row, base: Row, sco
   return { p: welch(a, b).p, how: `Welch's t-test over ${Math.min(a.length, b.length) === Math.max(a.length, b.length) ? a.length : `${Math.min(a.length, b.length)}–${Math.max(a.length, b.length)}`} seeds` };
 }
 
+/** Under this share of the mean's size, a standard deviation over seeds is next to no spread. */
+const FLAT = 1e-3;
+
+/**
+ * Whether a row's runs give next to the same number for every seed: exactly equal, or a standard deviation below a
+ * thousandth of the mean's size. A test over seeds then says how stable training is, not whether a difference holds.
+ */
+function barelyVaries(row: Row, c: ResultsColumn): boolean {
+  const vs = row.runs.map((r) => valueOf(r, c)).filter((v): v is number => v !== undefined);
+  return vs.length > 1 && (vs.every((v) => v === vs[0]) || std(vs) < FLAT * Math.abs(mean(vs)));
+}
+
 /** Decimals for a column: as asked, else by the size of its numbers. */
 function digitsOf(c: ResultsColumn, cells: ResultsCell[]): number {
   if (c.digits !== undefined) return Math.min(Math.max(Math.round(c.digits), 0), 8);
@@ -169,6 +182,8 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
   if (spec.baseline && base && base.key !== spec.baseline) notes.push(`There is no row “${spec.baseline}”: the first row is the baseline.`);
   const alpha = spec.alpha && spec.alpha > 0 && spec.alpha < 1 ? spec.alpha : 0.05;
   const tests: string[] = [];
+  /** The comparisons left untested because the seeds barely change the number. */
+  const flat: string[] = [];
   // Cells, column by column (the best, the tests and Holm's correction are within a column).
   const grid: ResultsCell[][] = rows.map(() => []);
   cols.forEach((c, ci) => {
@@ -186,6 +201,10 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
       const ps = rows.map((row, ri) => {
         if (row === base || cells[ri].mean === null || cells[rows.indexOf(base)].mean === null) return null;
         const t = test(spec, c, row, base, o.scores);
+        if (/ seeds$/.test(t.how) && (barelyVaries(row, c) || barelyVaries(base, c))) {
+          flat.push(`${row.label}, ${colLabel(c)}`);
+          return null;
+        }
         if (t.how) hows.add(t.how);
         cells[ri].p = t.p;
         return t.p;
@@ -196,12 +215,17 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
         if (row === base || ps[ri] === null) return;
         cells[ri].pAdj = adj[ri];
         const better = c.better === 'min' ? cells[ri].mean! < bm : cells[ri].mean! > bm;
-        cells[ri].significant = adj[ri] !== null && adj[ri]! < alpha && better;
+        const worse = c.better === 'min' ? cells[ri].mean! > bm : cells[ri].mean! < bm;
+        const apart = adj[ri] !== null && adj[ri]! < alpha;
+        cells[ri].significant = apart && better;
+        if (adj[ri] !== null) cells[ri].verdict = apart && better ? 'better' : apart && worse ? 'worse' : 'same';
       });
       tests[ci] = [...hows].join('; ');
     } else tests[ci] = '';
     cells.forEach((x, ri) => (grid[ri][ci] = x));
   });
+  const seedsNote = flat.length ? seedsFlatNote(flat.join('; ')) : '';
+  if (seedsNote) notes.push(seedsNote);
   const madeAt = o.at ?? Date.now();
   const table: ResultsTable = {
     id: o.id,
@@ -216,25 +240,32 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
   };
   const words = describe(table, base?.label, alpha);
   if (words.dagger) table.footnote = words.dagger;
-  table.latex = latexOf(table, words);
-  table.markdown = markdownOf(table, words);
+  // In what is copied out too, as a comment that does not show: one line, so the marker stays near its tabular.
+  const comment = seedsNote.replace(/\s+/g, ' ');
+  table.latex = latexOf(table, words, comment);
+  table.markdown = markdownOf(table, words, comment);
   table.csv = csvOf(table);
   return table;
 }
 
 // ---- writing it out --------------------------------------------------------------------------------------------
 
-/** What the caption and the footnote say: how the cells read, and what a dagger means. */
+/** A caption of the writer's own that already says what the numbers are. */
+const SAYS_SPREAD = /\bmean\s*(?:±|\$\\pm\$|\\pm|\+\/-|\+-|and)\s*(?:the\s+)?(?:std|standard\s+(?:deviation|error)|s\.?d\.?\b)/i;
+
+/** What the caption and the footnote say: how the cells read, and what the daggers mean. */
 function describe(t: ResultsTable, baseLabel: string | undefined, alpha: number): { cells: string; dagger?: string } {
   const ns = t.rows.flatMap((r) => r.cells.map((c) => c.n)).filter((n) => n > 0);
   const lo = Math.min(...ns);
   const hi = Math.max(...ns);
-  const cells = !ns.length ? '' : hi <= 1 ? 'The best in bold.' : `Mean ± standard deviation over ${lo === hi ? hi : `${lo}–${hi}`} seeds; the best in bold.`;
+  const said = SAYS_SPREAD.test(t.spec.caption ?? '');
+  const cells = !ns.length ? '' : hi <= 1 || said ? 'The best in bold.' : `Mean ± standard deviation over ${lo === hi ? hi : `${lo}–${hi}`} seeds; the best in bold.`;
   const any = t.rows.some((r) => r.cells.some((c) => c.p !== undefined && c.p !== null));
   if (!any || !baseLabel) return { cells };
   const how = [...new Set((t.tests ?? []).filter(Boolean).flatMap((h) => h.split('; ')))].join('; ');
   const corr = t.spec.correction === 'none' ? '' : ', Holm-corrected';
-  return { cells, dagger: `† Better than ${baseLabel} at p < ${alpha} (${how}${corr}).` };
+  const worse = t.rows.some((r) => r.cells.some((c) => c.verdict === 'worse'));
+  return { cells, dagger: `† Better than ${baseLabel} at p < ${alpha} (${how}${corr}).${worse ? ` ‡ Worse than ${baseLabel}, by the same test.` : ''}` };
 }
 
 const texEscape = (s: string) =>
@@ -249,6 +280,7 @@ const texWords = (s: string) =>
     .replace(/±/g, '$\\pm$')
     .replace(/–/g, '--')
     .replace(/†/g, '$^\\dagger$')
+    .replace(/‡/g, '$^\\ddagger$')
     .replace(/p < /g, '$p < ')
     .replace(/(\$p < [\d.]+)/g, '$1$')
     .replace(/t-test/g, '$t$-test');
@@ -259,8 +291,8 @@ function cellText(x: ResultsCell, d: number, kind: 'tex' | 'md'): string {
   if (x.mean === null) return kind === 'tex' ? '--' : '–';
   const m = x.mean.toFixed(d);
   const sd = x.n > 1 && x.std !== null && x.std !== undefined ? x.std.toFixed(d) : null;
-  if (kind === 'tex') return `${x.best ? `\\textbf{${m}}` : m}${sd ? ` $\\pm$ ${sd}` : ''}${x.significant ? '$^\\dagger$' : ''}`;
-  return `${x.best ? `**${m}**` : m}${sd ? ` ± ${sd}` : ''}${x.significant ? ' †' : ''}`;
+  if (kind === 'tex') return `${x.best ? `\\textbf{${m}}` : m}${sd ? ` $\\pm$ ${sd}` : ''}${x.significant ? '$^\\dagger$' : x.verdict === 'worse' ? '$^\\ddagger$' : ''}`;
+  return `${x.best ? `**${m}**` : m}${sd ? ` ± ${sd}` : ''}${x.significant ? ' †' : x.verdict === 'worse' ? ' ‡' : ''}`;
 }
 
 const slug = (s: string) =>
@@ -270,7 +302,7 @@ const slug = (s: string) =>
     .replace(/^-|-$/g, '')
     .slice(0, 40) || 'results';
 
-function latexOf(t: ResultsTable, words: { cells: string; dagger?: string }): string {
+function latexOf(t: ResultsTable, words: { cells: string; dagger?: string }, comment: string): string {
   const cols = t.spec.columns.filter((c) => c.metric?.trim());
   const by = t.spec.rows?.startsWith('param:') ? t.spec.rows.slice(6) : null;
   const digits = cols.map((c, ci) =>
@@ -288,6 +320,7 @@ function latexOf(t: ResultsTable, words: { cells: string; dagger?: string }): st
     `\\caption{${texWords(caption)}}`,
     `\\label{tab:${slug(t.spec.group ?? t.spec.caption ?? 'results')}}`,
     TABLE_MARK(t.id),
+    ...(comment ? [`% ${comment}`] : []),
     `\\begin{tabular}{l${'c'.repeat(cols.length)}}`,
     '\\toprule',
     `${head} \\\\`,
@@ -299,7 +332,7 @@ function latexOf(t: ResultsTable, words: { cells: string; dagger?: string }): st
   ].join('\n');
 }
 
-function markdownOf(t: ResultsTable, words: { cells: string; dagger?: string }): string {
+function markdownOf(t: ResultsTable, words: { cells: string; dagger?: string }, comment: string): string {
   const cols = t.spec.columns.filter((c) => c.metric?.trim());
   const by = t.spec.rows?.startsWith('param:') ? t.spec.rows.slice(6) : null;
   const digits = cols.map((c, ci) =>
@@ -315,7 +348,8 @@ function markdownOf(t: ResultsTable, words: { cells: string; dagger?: string }):
     ...t.rows.map((r) => `| ${[pipe(r.label), ...r.cells.map((x, ci) => cellText(x, digits[ci], 'md'))].join(' | ')} |`),
   ];
   const foot = [t.spec.caption?.trim(), words.cells, words.dagger].filter(Boolean).join(' ');
-  return foot ? `${lines.join('\n')}\n\n${foot}` : lines.join('\n');
+  const shown = foot ? `${lines.join('\n')}\n\n${foot}` : lines.join('\n');
+  return comment ? `${shown}\n\n<!-- ${comment.replace(/--+/g, '—')} -->` : shown;
 }
 
 function csvOf(t: ResultsTable): string {
@@ -324,8 +358,8 @@ function csvOf(t: ResultsTable): string {
     const s = v === null || v === undefined ? '' : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const head = ['row', 'label', ...cols.flatMap((c) => ['mean', 'std', 'n', 'p', 'p_holm', 'significant'].map((x) => `${c.metric}_${x}`))];
-  const rows = t.rows.map((r) => [r.key, r.label, ...r.cells.flatMap((x) => [x.mean, x.std, x.n, x.p, x.pAdj, x.significant === undefined ? '' : x.significant ? 'yes' : 'no'])]);
+  const head = ['row', 'label', ...cols.flatMap((c) => ['mean', 'std', 'n', 'p', 'p_holm', 'significant', 'verdict'].map((x) => `${c.metric}_${x}`))];
+  const rows = t.rows.map((r) => [r.key, r.label, ...r.cells.flatMap((x) => [x.mean, x.std, x.n, x.p, x.pAdj, x.significant === undefined ? '' : x.significant ? 'yes' : 'no', x.verdict])]);
   return [head, ...rows].map((r) => r.map(q).join(',')).join('\n') + '\n';
 }
 

@@ -273,11 +273,11 @@ Os agentes podem iniciar uma busca, com a sua aprovação em um cartão, e acomp
 - **Testar contra a linha de base**: **Escolher por mim** (pareado sobre os exemplos quando as execuções guardaram pontuações por exemplo; senão, pareado sobre os seeds quando as execuções das linhas compartilham os seeds; senão, teste t de Welch sobre os seeds), **Teste t de Welch sobre os seeds**, **Teste t pareado (por seed ou por exemplo)**, **Bootstrap pareado sobre os exemplos** ou **Sem teste**.
 - **Legenda**.
 
-Cada célula é a média ± o desvio padrão sobre as execuções da linha (seus seeds); o melhor de cada coluna fica em negrito; uma adaga (†) marca uma célula melhor que a linha de base com p < 0,05, após a correção de Holm por testar várias linhas. Passe o mouse sobre uma célula para ver os valores p. Uma linha sob a tabela diz qual teste foi feito e o que ficou de fora (execuções que não terminaram, ou sem essas métricas).
+Cada célula é a média ± o desvio padrão sobre as execuções da linha (seus seeds); o melhor de cada coluna fica em negrito; uma adaga (†) marca uma célula melhor que a linha de base com p < 0,05, após a correção de Holm por testar várias linhas, e uma adaga dupla (‡), uma que é pior. Quando os seeds quase não mudam um número (ele sai igual, ou quase, em todos os seeds) e as execuções não guardaram pontuações por exemplo, essa comparação fica sem marca: uma nota abaixo da tabela diz que um teste sobre os seeds informa pouco e que convém comparar por exemplo. Passe o mouse sobre uma célula para ver os valores p. Uma linha sob a tabela diz qual teste foi feito e o que ficou de fora (execuções que não terminaram, ou sem essas métricas).
 
 Depois:
 
-- **Copiar LaTeX**: uma `table` com as linhas do booktabs (adicione `\usepackage{booktabs}` ao seu preâmbulo), o melhor em `\textbf`, `$\pm$` e adagas, e uma legenda que diz como as células devem ser lidas.
+- **Copiar LaTeX**: uma `table` com as linhas do booktabs (adicione `\usepackage{booktabs}` ao seu preâmbulo), o melhor em `\textbf`, `$\pm$`, adagas e adagas duplas, e uma legenda que diz como as células devem ser lidas.
 - **Copiar Markdown** e **Baixar CSV** (a média de cada métrica, o desvio padrão, o número de execuções e os valores p).
 - **Colocar em um documento LaTeX**: escolha um dos seus documentos LaTeX (guardados nos arquivos de um projeto, ou com a conversa dele) e depois um dos arquivos dele. A tabela vai antes de `\end{document}` (ou no fim de um arquivo sem ele), ou no lugar da tabela que ela fez ali antes, mantendo a sua própria legenda e o seu label. Ela é salva como uma nova versão do documento, como as suas próprias edições.
 

@@ -82,7 +82,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   time and a reviewer reads the whole change: only then is the goal reached, and the agent cannot end it. How much it
   asks (Works on its own, Asks at turning points, Asks every round) with a clock (10 minutes, or waits) before it goes on with its pick, and the rounds a new goal gets: what every new goal starts from is set in Settings → Capabilities → Goals;
   you steer at any time with messages, Pause (after the round that runs has been checked) and Resume, **Add a rule…**, **Change the checks…** and your say on a round
-  (**Keep anyway…**, **Undo**, **Another way from here**). A bar above the message box shows the checks and the
+  (**Keep anyway…**, **Undo**, **Another way from here**). The rounds show as a list or as a **Map**: the kept rounds as one line, each undone round hanging off the round it started from, the round at work and the goal at the end; a round is told what was already tried and undone from where it starts. A bar above the message box shows the checks and the
   rounds, a card asks the questions and shows the report, a goal that stopped at a limit can be given more (it goes on when no limit is hit any more), it never sits at work
   silently (a queue on hold, a turn cut by a restart or a usage limit, commands left running each have a reason or carry
   on), and the messages of the loop show as quiet rows. From a terminal, `hydor sessions goal <session>` shows the goal (its state, round, checks, spending against its limits, an open question with its ways numbered, and the report once it is over) and sets one with words; `--start` presses Start, `--answer 1,3` (with `--other` and `--note`) and `--wait` answer or hold a question, `--more rounds=8,usd=5,minutes=60` changes the limits (it gives a goal that stopped at one more), `--rule` adds a rule, and `--pause`, `--resume` and `--clear` steer it. A `/goal` typed in Claude Code or Codex is still that program's own, simpler goal, and a session cannot have both. A session that leads a swarm can have a goal: each round is then the whole swarm's work (its members go at what does not hold yet in the lead's folder, the round is over when all of them have finished, and the checks judge that folder), and the money and time are the team's. A campaign, a deep research and an arena match do not go with a goal (turning one on while the goal runs, or stopped at a limit, is refused). A money or time limit in the middle of a round stops the session's Hydor subagents with its agent, and one still at work is named in the report. Stop by the message box stops the agent and its subagents and pauses the goal, and what its subagents still report after a stop or a pause waits in the session's queue until the goal goes on.
@@ -1766,7 +1766,8 @@ agents that speak ACP and take MCP servers.
   stall, a crash or divergence, and tells you or acts within your rules. Sweep hyperparameters (every combination or a
   random sample, losing runs stopped early; a sweep is one experiment, and its notice opens its Hyperparameters tab),
   and make **results tables** (mean ± std over seeds, the best in bold, paired or Welch tests with Holm's correction as
-  daggers) as LaTeX, Markdown or CSV, or straight into a LaTeX document you kept. Agents use it with experiment_run,
+  daggers, a double dagger where worse, and a note instead where the seeds barely change a number) as LaTeX, Markdown
+  or CSV, or straight into a LaTeX document you kept. Agents use it with experiment_run,
   experiment_sweep, experiment_list, experiment_get, experiment_stop, experiment_table and experiment_describe. The
   first time you open the page, a short tour for people new to it explains what an experiment and a run are and lights
   each part in turn (New run, the queue and GPUs, experiments by category, following a run live, comparing runs and
@@ -1820,8 +1821,10 @@ agents that speak ACP and take MCP servers.
   and carries on after a restart. Agents start one only with your yes on a card (evolve_start, evolve_get).
 - **Proofs checked with Lean** (Settings → General → **Lean (proof checker)**; the LaTeX editor's Tools → **Check a
   proof…** and **Formalise in Lean…**): Lean 4 is a proof checker, and a proof it accepts is correct. The app uses your
-  own Lean or sets one up in its own folder when you agree (about 620 MB to download), with Mathlib as a second, larger
-  step. Agents check a file or a snippet (lean_check), search the library (lean_search: Loogle and LeanSearch) and
+  own Lean or sets one up in its own folder when you agree (about 620 MB to download, 3 GB unpacked), with Mathlib as a
+  second step (about 600 MB to download, 8 GB unpacked). A Lean project of your own that uses Mathlib is not run until
+  its own copy is fetched, so that no check downloads it unasked or builds it from source.
+  Agents check a file or a snippet (lean_check), search the library (lean_search: Loogle and LeanSearch) and
   give a verdict you can rely on (lean_verify, and the `leancheck` command for a goal's check): no errors, no gaps
   marked `sorry`, the standard axioms only, with every declaration replayed through Lean's kernel, so the usual ways
   of faking a proof are refused. The lean-proofs skill has agents agree the formal statement with you before proving

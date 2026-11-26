@@ -168,6 +168,8 @@ export interface ResultsCell {
   best?: boolean;
   /** Better than the baseline at the level asked for (after the correction). */
   significant?: boolean;
+  /** How it stands against the baseline by the test, in the direction the metric is better in; absent: not tested. */
+  verdict?: 'better' | 'worse' | 'same';
   p?: number | null;
   /** After the correction. */
   pAdj?: number | null;
@@ -181,9 +183,9 @@ export interface ResultsTable {
   markdown: string;
   csv: string;
   madeAt: number;
-  /** What the daggers mean, in words (as the LaTeX caption and the Markdown footnote say it). */
+  /** What the marks († better, ‡ worse) mean, in words (as the LaTeX caption and the Markdown footnote say it). */
   footnote?: string;
-  /** What to know about it: runs left out, a test that could not be made. */
+  /** What to know about it: runs left out, a test that could not be made, comparisons the seeds say little of. */
   notes?: string[];
   /** Each column's test as made: "Welch's t-test over 3 seeds", "paired t-test over 200 examples"… */
   tests?: string[];
@@ -317,6 +319,9 @@ const LOWER = /loss|error|perplexity|regret|latency|distance|rmse|(^|[^a-z])(err
 export function betterOf(metric: string, told?: Record<string, 'max' | 'min'>): 'max' | 'min' {
   return told?.[metric] ?? (LOWER.test(metric) ? 'min' : 'max');
 }
+
+/** The note for comparisons not tested over seeds, since the seeds barely change the number; `where`: which ones. */
+export const seedsFlatNote = (where: string) => `${where}: The seeds barely change this number, so a test over seeds says little: compare per example (give the runs a scores file)`;
 
 /** The marker line above a results table's tabular in a LaTeX document, so its numbers can be checked again. */
 export const TABLE_MARK = (id: string) => `% hydor:table ${id}`;

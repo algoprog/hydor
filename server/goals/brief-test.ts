@@ -11,7 +11,7 @@
 //   DATA_DIR=/tmp/hydor-test-goal-brief PRICES_URL= node dist/dev/brief-test.js
 import assert from 'node:assert/strict';
 import { goalMessageOf, type GoalCheck, type GoalResult, type GoalRound, type GoalState } from '../../shared/goals.ts';
-import { askMessage, DETAIL_ALL, DETAIL_EACH, draftMessage, draftNotes, GOAL_FOOT, MEMBERS_NAMED, reminderMessage, RESTARTED, restartedMessage, roundMessage, scoresNote, whereItStands } from './brief.ts';
+import { askMessage, DEAD_ENDS, DETAIL_ALL, DETAIL_EACH, draftMessage, draftNotes, GOAL_FOOT, MEMBERS_NAMED, reminderMessage, RESTARTED, restartedMessage, roundMessage, scoresNote, whereItStands } from './brief.ts';
 import { checkItem } from './review.ts';
 
 let passed = 0;
@@ -76,6 +76,53 @@ test('the reminder: still no checks, propose now, or the app proposes a reviewer
   assert.match(m, /call goal_propose now/);
   assert.match(m, /a reviewer reads the change against the goal/);
   assert.match(m, /The goal: “Ship it”/);
+});
+
+test('the round: the dead ends from where it starts are named, so none is walked into twice', () => {
+  const rs = [res('c1', true), res('c2', true), res('c3', false, { value: 365 }), res('c4', false)];
+  const g = goal({
+    rounds: [
+      round(0, rs, 'start'),
+      round(1, rs, 'kept', { parent: 0 }),
+      round(2, rs, 'undone', { parent: 1, way: 'Cache the whole cart', why: 'Stale prices' }),
+      round(3, rs, 'kept', { parent: 1, way: 'Index the order lines' }),
+      round(4, rs, 'undone', { parent: 3, did: 'Added a second cache. Then more.', why: 'No gain' }),
+      round(5, rs, 'undone', { parent: 3, way: 'Rewrite in Rust', why: 'Tests failed', reason: 'Too much', by: 'you' }),
+    ],
+    best: 3,
+  });
+  const m = roundMessage(g, { n: 6, parent: 3 });
+  assert.ok(
+    m.includes('From here (after round 3), these were tried and undone; do not try them again:\n- Round 4: Added a second cache. (undone: No gain)\n- Round 5: Rewrite in Rust (undone: Too much)\n\n'),
+    m,
+  );
+  assert.doesNotMatch(m, /Cache the whole cart/, 'a dead end from another round is not from here');
+  assert.ok(m.indexOf('Last round:') < m.indexOf('From here'), 'after how the last round ended');
+  // Another way from here on round 1: what Last round lists after it is not listed a second time.
+  const back = roundMessage({ ...g, best: 1 }, { n: 6, parent: 1, from: 1 });
+  assert.equal(back.match(/Cache the whole cart/g)!.length, 1);
+  assert.doesNotMatch(back, /From here/);
+  // A goal stored before rounds recorded where they started: read from the outcomes.
+  const old = goal({ rounds: [round(0, rs, 'start'), round(1, rs, 'kept'), round(2, rs, 'undone', { way: 'Cache the whole cart' })], best: 1 });
+  assert.match(roundMessage(old, { n: 3, parent: 1 }), /From here \(after round 1\), .*\n- Round 2: Cache the whole cart \(undone\)/);
+  // From the start, and nothing without a dead end.
+  const first = goal({ rounds: [round(0, rs, 'start'), round(1, rs, 'undone', { parent: 0, way: 'Guess' })] });
+  assert.match(roundMessage(first, { n: 2, parent: 0 }), /From here \(the start\), /);
+  assert.doesNotMatch(roundMessage(g, { n: 6, parent: 5 }), /From here/);
+});
+
+test('the dead ends stay within the message’s room: the newest few, each cut short, taken from what the failing checks said', () => {
+  const long = 'x'.repeat(DETAIL_EACH * 2);
+  const rs = [res('c1', false, { detail: long }), res('c2', false, { detail: long }), res('c3', false, { value: 910, detail: long }), res('c4', false, { detail: long })];
+  const rounds = [round(0, rs, 'start'), ...Array.from({ length: 20 }, (_, i) => round(i + 1, rs, 'undone', { parent: 0, way: `Way ${i + 1} ${long}`, why: long }))];
+  const g = goal({ rounds });
+  // The same message without them (no parent given): with them it is no longer.
+  const without = roundMessage(g, { n: 21 });
+  const m = roundMessage(g, { n: 21, parent: 0 });
+  assert.equal(m.match(/^- Round /gm)!.length, DEAD_ENDS);
+  assert.doesNotMatch(m, /- Round 14:/);
+  assert.match(m, /- Round 20: Way 20 /);
+  assert.ok(m.length <= without.length + 2, `${m.length} against ${without.length}`);
 });
 
 test('the round: its parts in order', () => {

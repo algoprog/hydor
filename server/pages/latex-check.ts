@@ -1191,12 +1191,14 @@ async function checkMarked(c: Ctx, src: TexSource, t: Tabular) {
       if (!x.n || !y?.n) continue;
       const now = Math.round(y.n.value * 10 ** x.n.digits) / 10 ** x.n.digits;
       const head = clip(texPlain(a.header[x.cell.col] ?? '') || `column ${x.cell.col + 1}`, 24);
+      // A mark that now says otherwise. A worse mark (‡) the paper never had is no wrong number: it claimed nothing.
+      const mark = x.n.marked !== y.n.marked ? x.n.marked || !y.n.double : x.n.marked && x.n.double !== y.n.double;
       if (Math.abs(now - x.n.value) > 1e-9) {
         count++;
         changed.push(`“${clip(r.label, 24)}”, ${head}: ${x.n.value.toFixed(x.n.digits)} in the paper, ${now.toFixed(x.n.digits)} now`);
-      } else if (x.n.marked !== y.n.marked) {
+      } else if (mark) {
         count++;
-        changed.push(`“${clip(r.label, 24)}”, ${head}: its significance mark is ${y.n.marked ? 'missing' : 'no longer earned'}`);
+        changed.push(`“${clip(r.label, 24)}”, ${head}: its significance mark is ${!y.n.marked ? 'no longer earned' : x.n.marked ? 'not the one its runs give now' : 'missing'}`);
       }
     }
   });

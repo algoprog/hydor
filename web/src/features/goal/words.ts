@@ -1,7 +1,7 @@
 // The words of goal mode: where a goal stands, how a round ended, what a check shows, the clock of a question, the labels of
 // its buttons, durations and money. Pure, so a test can read them (words-test.ts); the screens only draw them. Words are the
 // ones of the specification's section 2: Goal, Done when, check, holds, round, way, Kept, Undone, Best so far, Its pick, From you.
-import { holding, meets, numeric, scoreTarget, standing, type GoalAsks, type GoalLimits, type GoalCheck, type GoalResult, type GoalRound, type GoalScoring, type GoalSettings, type GoalState, type GoalStatus } from '@shared/goals';
+import { holding, meets, numeric, roundParents, scoreTarget, standing, type GoalAsks, type GoalLimits, type GoalCheck, type GoalResult, type GoalRound, type GoalScoring, type GoalSettings, type GoalState, type GoalStatus } from '@shared/goals';
 import type { SessionSummary } from '@shared/types';
 import { duration, usd } from '../../lib/format';
 
@@ -292,31 +292,62 @@ export function goLabel(ticked: number): string {
 
 // ---- rounds ----------------------------------------------------------------------------------------------------------------
 
-/** The round the files stood at when this one began: the latest kept (or left as it is) round before it, else the start. */
+/** The round whose files this one started from (roundParents); nothing for the start. */
 export function before(g: Pick<GoalState, 'rounds'>, r: GoalRound): GoalRound | undefined {
-  let prev: GoalRound | undefined;
-  for (const x of g.rounds) {
-    if (x.n >= r.n) break;
-    if (x.outcome === 'start' || x.outcome === 'kept' || x.outcome === 'stays') prev = x;
-  }
-  return prev;
+  const n = roundParents(g.rounds).get(r.n);
+  return n == null ? undefined : g.rounds.find((x) => x.n === n);
 }
 
-/** The biggest move of a measured check in a round, as "Relevance 0.61 → 0.68"; nothing when none moved. */
-export function biggestMove(g: Pick<GoalState, 'rounds' | 'contract'>, r: GoalRound): string | undefined {
+/**
+ * The round an undone round's files went back to: where it started from. One you undid yourself (it was kept) went back
+ * to the latest round kept before it, which after Another way from here need not be the one it started from.
+ */
+export function wentBackTo(g: Pick<GoalState, 'rounds'>, r: GoalRound): GoalRound | undefined {
+  if (r.by !== 'you') return before(g, r);
+  return g.rounds.filter((x) => x.n < r.n && (x.outcome === 'kept' || x.outcome === 'start')).at(-1);
+}
+
+/** The measured check that moved most in a round, against where the round started: its name, and its value before and after. */
+export function moveOf(g: Pick<GoalState, 'rounds' | 'contract'>, r: GoalRound): { name: string; from: string; to: string } | undefined {
   const was = before(g, r);
   if (!was) return undefined;
-  let best: { text: string; size: number } | undefined;
+  let best: { name: string; from: string; to: string; size: number } | undefined;
   for (const c of g.contract.checks) {
     if (!numeric(c)) continue;
     const a = was.results.find((x) => x.id === c.id)?.value;
     const b = r.results.find((x) => x.id === c.id)?.value;
     if (a == null || b == null || a === b) continue;
     const size = Math.abs(b - a) / Math.max(Math.abs(a), 1e-9);
-    const name = shortLabel(c);
-    if (!best || size > best.size) best = { size, text: `${name} ${fixed(a, placesOf(c, a, b))} → ${valueText(c, b, a)}` };
+    if (!best || size > best.size) best = { size, name: shortLabel(c), from: fixed(a, placesOf(c, a, b)), to: valueText(c, b, a) };
   }
-  return best?.text;
+  return best && { name: best.name, from: best.from, to: best.to };
+}
+
+/** The biggest move of a measured check in a round, as "Relevance 0.61 → 0.68"; nothing when none moved. */
+export function biggestMove(g: Pick<GoalState, 'rounds' | 'contract'>, r: GoalRound): string | undefined {
+  const m = moveOf(g, r);
+  return m && `${m.name} ${m.from} → ${m.to}`;
+}
+
+/** Why a round was not kept, in a word or two, for its box on the map. */
+export function shortWhy(g: Pick<GoalState, 'rounds'>, r: GoalRound): string {
+  if (r.by === 'you') return 'Undone by you';
+  if (/^Stopped at the limit/.test(r.why ?? '')) return 'Cut short';
+  if (r.cause === 'protected') return 'Protected files';
+  if (r.cause === 'rule') return 'Broke a rule';
+  if (r.cause === 'broke' || roundBroke(g, r)) return 'Broke a check';
+  if (r.cause === 'behind') return 'Fell behind';
+  if (r.cause === 'none' || /no gain/i.test(r.why ?? '')) return 'No gain';
+  return r.outcome === 'stays' ? 'Left as it is' : 'Undone';
+}
+
+/** A few words of a longer text, cut between words: for a box on the map. */
+export function fewWords(text: string, max = 19): string {
+  const t = text.trim().replace(/\s+/g, ' ').replace(/[.!?:;,]+$/, '');
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max + 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max / 2 ? cut.slice(0, space) : t.slice(0, max)).replace(/[\s.!?:;,(–—-]+$/, '')}…`;
 }
 
 /** What a round's row says it changed: the biggest move of a measured check, else why it ended as it did. */

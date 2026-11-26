@@ -273,11 +273,11 @@ Los agentes pueden empezar una con tu sí en una tarjeta y leer cómo va. No pue
 - **Prueba frente a la referencia**: **Elegir por mí** (pareada sobre ejemplos cuando las ejecuciones guardaron puntuaciones por ejemplo; si no, pareada sobre semillas cuando las ejecuciones de las filas comparten sus semillas; si no, la prueba t de Welch sobre semillas), **Prueba t de Welch sobre semillas**, **Prueba t pareada (por semilla o por ejemplo)**, **Bootstrap pareado sobre ejemplos** o **Sin prueba**.
 - **Leyenda**.
 
-Cada celda es la media ± la desviación estándar sobre las ejecuciones de la fila (sus semillas); lo mejor de cada columna va en negrita; una daga (†) marca una celda que es mejor que la referencia con p < 0,05, tras la corrección de Holm por probar varias filas. Pasa el cursor sobre una celda para ver sus valores p. Una línea bajo la tabla dice qué prueba se hizo y qué se dejó fuera (ejecuciones que no han terminado o sin estas métricas).
+Cada celda es la media ± la desviación estándar sobre las ejecuciones de la fila (sus semillas); lo mejor de cada columna va en negrita; una daga (†) marca una celda que es mejor que la referencia con p < 0,05, tras la corrección de Holm por probar varias filas, y una doble daga (‡) una que es peor. Cuando las semillas apenas cambian un número (sale igual, o casi, con todas las semillas) y las ejecuciones no guardaron puntuaciones por ejemplo, esa comparación no recibe marca: una nota bajo la tabla dice que una prueba sobre semillas dice poco y que conviene comparar ejemplo por ejemplo. Pasa el cursor sobre una celda para ver sus valores p. Una línea bajo la tabla dice qué prueba se hizo y qué se dejó fuera (ejecuciones que no han terminado o sin estas métricas).
 
 Después:
 
-- **Copiar LaTeX**: una `table` con las reglas de booktabs (añade `\usepackage{booktabs}` a tu preámbulo), lo mejor en `\textbf`, `$\pm$` y dagas, y una leyenda que dice cómo se leen las celdas.
+- **Copiar LaTeX**: una `table` con las reglas de booktabs (añade `\usepackage{booktabs}` a tu preámbulo), lo mejor en `\textbf`, `$\pm$`, dagas y dobles dagas, y una leyenda que dice cómo se leen las celdas.
 - **Copiar Markdown** y **Descargar CSV** (la media de cada métrica, la desviación estándar, el número de ejecuciones y los valores p).
 - **Incluirla en un documento LaTeX**: elige uno de tus documentos LaTeX (guardado en los archivos de un proyecto o con su conversación) y luego uno de sus archivos. La tabla va antes de `\end{document}` (o al final de un archivo que no lo tenga), o en lugar de la tabla que se creó allí antes, conservando tu propia leyenda y etiqueta. Se guarda como una versión nueva del documento, igual que tus propias ediciones.
 

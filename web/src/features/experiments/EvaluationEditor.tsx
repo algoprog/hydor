@@ -4,7 +4,7 @@
 // folders; a change that seals again asks first. New also offers to have an agent set it up.
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, Cpu, FlaskConical, Gauge, Lock, Plus, Sparkles, X } from 'lucide-react';
-import type { Evaluation } from '@shared/evaluations';
+import { TEST_READABLE, type Evaluation } from '@shared/evaluations';
 import { api, enc, post, put } from '../../lib/api';
 import { toast, useApp } from '../../lib/store';
 import { FolderPicker } from '../../components/FolderPicker';
@@ -219,6 +219,25 @@ export function EvaluationEditor({ open, evaluation, section, onClose, onSaved }
         .catch(() => {});
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Whether the held-out folder as typed is one agents in the project can read: the server knows the project.
+  const [heldRead, setHeldRead] = useState(false);
+  const heldOut = form.heldOut.trim();
+  const folder = form.cwd.trim();
+  useEffect(() => {
+    setHeldRead(false);
+    if (!open || !heldOut || !folder) return;
+    let on = true;
+    const t = setTimeout(() => {
+      api<{ testReadable?: boolean }>(`/api/experiments/evaluations/suggest?cwd=${enc(folder)}&heldOut=${enc(heldOut)}`)
+        .then((r) => on && setHeldRead(!!r.testReadable))
+        .catch(() => {});
+    }, 300);
+    return () => {
+      on = false;
+      clearTimeout(t);
+    };
+  }, [open, folder, heldOut]);
+
   const set = (p: Partial<Form>) => {
     setForm((f) => ({ ...f, ...p }));
     setError(null);
@@ -325,6 +344,7 @@ export function EvaluationEditor({ open, evaluation, section, onClose, onSaved }
             <span className="mb-1 block text-fg-2">Held-out folder</span>
             <FolderPicker value={form.heldOut} onChange={(heldOut) => set({ heldOut })} />
             <p className="mt-1 text-[12px] leading-relaxed text-fg-3">A folder outside the project that only the final test gets: agents working in the project do not see it there. Your command finds it as $HYDOR_HELD_OUT.</p>
+            {!!form.finalCommand.trim() && (!heldOut || heldRead) && <p className="mt-1 text-[12px] leading-relaxed text-fg-3">{TEST_READABLE}</p>}
           </div>
         </div>
       );

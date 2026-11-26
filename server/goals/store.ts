@@ -16,6 +16,13 @@ export interface GoalPrivate {
   roundStartedAt?: number;
   /** The way the round in progress follows. */
   way?: string;
+  /** The round whose files the round in progress started from (GoalRound.parent). */
+  parent?: number;
+  /**
+   * The round a limit stopped midway whose work is still in the folder, though it is not the best: the next round starts
+   * from it. Gone once a round is kept or a say of the person's puts the files somewhere else.
+   */
+  halfIn?: number;
   /** In a git folder without checkpoints: its commit when the goal was set, to show a reviewer what changed since. */
   baseCommit?: string;
   /** When the loop's last message went out: a turn that ended before it is not the agent's answer to it. */
@@ -260,7 +267,9 @@ export function goalUpdated(db: DB, key: string): number {
  */
 export function publicGoal(g: StoredGoal | null, now = Date.now()): GoalState | null {
   if (!g) return null;
-  const { _: loop, ...out } = g;
+  const { _: loop, ...rest } = g;
+  // Where the round in progress started from, for the map: the loop's own to keep, the screens' to draw.
+  const out = rest.round != null && loop?.parent != null ? { ...rest, roundParent: loop.parent } : rest;
   return loop?.activeSince != null ? { ...out, activeMs: out.activeMs + Math.max(0, now - loop.activeSince) } : out;
 }
 

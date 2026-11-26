@@ -82,6 +82,8 @@ export function stripLean(text: string): string;
 export function scanLean(text: string): { sorries: Spot[]; imports: string[]; theorems: (Spot & { name: string })[]; skipsKernel: boolean };
 export function needsMathlib(imports: string[]): boolean;
 export function findProject(file: string): string | null;
+/** Why a file of a project that uses Mathlib is not run (its built files are missing), or null. */
+export function unfetchedMathlib(root: string, imports: string[]): string | null;
 export function readMessages(stdout: string, stderr?: string): { errors: Message[]; warnings: Message[]; info: Message[]; sorryWarnings: Spot[]; count: number };
 export class LeanProblem extends Error {
   constructor(message: string, kind: string);

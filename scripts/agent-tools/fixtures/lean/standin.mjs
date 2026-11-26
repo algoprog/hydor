@@ -130,19 +130,26 @@ function lake(argv) {
     return lean([...more, file]);
   }
   const fail = (what) => (process.env.STANDIN_FAIL ?? (fs.existsSync(path.join(ROOT, 'fail')) ? fs.readFileSync(path.join(ROOT, 'fail'), 'utf8') : '')) === what;
-  if (command === 'update') {
-    console.log('info: mathlib: cloning https://github.com/leanprover-community/mathlib4.git');
-    if (fail('update')) return console.error('error: external command git exited with code 128\nfatal: unable to access the repository'), 1;
-    fs.mkdirSync(path.join(root, '.lake', 'packages', 'mathlib'), { recursive: true });
-    return 0;
-  }
-  if (command === 'exe' && rest.join(' ') === 'cache get') {
-    console.log('Attempting to download 6000 file(s) from leanprover-community/mathlib4 cache');
+  const cacheGet = () => {
+    console.log('Current branch: HEAD\nUsing cache from origin: (some leanprover-community/mathlib4)');
+    console.log('Attempting to download 9117 file(s) from leanprover-community/mathlib4 cache at https://cache.mathlib.org/mathlib4-master');
     if (process.env.MATHLIB_CACHE_DIR) fs.mkdirSync(process.env.MATHLIB_CACHE_DIR, { recursive: true });
     if (fail('cache')) return console.error('error: some files were not downloaded'), 1;
+    process.stdout.write('Downloaded: 5120 file(s) [attempted 5120/9117 = 56%, 1897 KB/s]\rDownloaded: 9117 file(s) [attempted 9117/9117 = 100%, 812 KB/s]\r\n');
+    console.log('Decompressed 9117 file(s)');
     fs.writeFileSync(path.join(root, '.lake', 'packages', 'mathlib', 'built'), '');
     return 0;
+  };
+  if (command === 'update') {
+    console.log(`info: ${path.basename(root)}: no previous manifest, creating one from scratch\ninfo: mathlib: materializing new dependency`);
+    console.log("info: mathlib: fetching revision 'stable' from https://github.com/leanprover-community/mathlib4.git");
+    if (fail('update')) return console.error('error: external command git exited with code 128\nfatal: unable to access the repository'), 1;
+    fs.mkdirSync(path.join(root, '.lake', 'packages', 'mathlib'), { recursive: true });
+    console.log('info: toolchain not updated; already up-to-date\ninfo: mathlib: running post-update hooks');
+    // Mathlib's hook: the built files are fetched here too, unless told not to.
+    return process.env.MATHLIB_NO_CACHE_ON_UPDATE === '1' ? 0 : cacheGet();
   }
+  if (command === 'exe' && rest.join(' ') === 'cache get') return cacheGet();
   return console.error(`error: unknown command ${argv.join(' ')}`), 1;
 }
 

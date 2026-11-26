@@ -24,6 +24,7 @@ import {
   setBaseline,
   startScore,
   stopScore,
+  testReadable,
   updateEvaluation,
 } from './evaluations.ts';
 import { config } from '../config.ts';
@@ -45,9 +46,13 @@ const personOnly = (req: FastifyRequest, why: string) => {
   if (isInternal(req)) throw new HttpError(403, why);
 };
 
-/** An evaluation as this caller may see it: where the held-out data is stays between you and the app. */
+/**
+ * An evaluation as this caller may see it, saying when its final test's data stays readable to agents; where the
+ * held-out data is stays between you and the app.
+ */
 function shown<T extends Evaluation>(req: FastifyRequest, ev: T): T {
-  return isInternal(req) && ev.final?.heldOut ? { ...ev, final: { command: ev.final.command } } : ev;
+  const said = ev.final && testReadable(ev.cwd, ev.final.heldOut) ? { ...ev, testReadable: true } : ev;
+  return isInternal(req) && ev.final?.heldOut ? { ...said, final: { command: ev.final.command } } : said;
 }
 
 export function evaluationRoutes(d: Deps) {
@@ -73,7 +78,10 @@ export function evaluationRoutes(d: Deps) {
   app.get('/api/experiments/evaluations/suggest', async (req) => {
     const cwd = folderOf(Q(req).cwd);
     if (!cwd) throw new HttpError(400, 'Which folder does the evaluation run in?');
-    return { suggestions: await suggestProtected(cwd.replace(/^~(?=$|\/)/, config.home), Q(req).command ?? '') };
+    const folder = cwd.replace(/^~(?=$|\/)/, config.home);
+    // With a held-out folder, whether the final test's data would stay readable to agents with it.
+    const held = folderOf(Q(req).heldOut);
+    return { suggestions: await suggestProtected(folder, Q(req).command ?? ''), ...(held ? { testReadable: testReadable(folder, held) } : {}) };
   });
   app.get('/api/experiments/evaluations/:id', async (req) => {
     const ev = await checkHome(d, idOf(req));

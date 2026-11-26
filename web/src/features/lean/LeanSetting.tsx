@@ -48,7 +48,7 @@ export function LeanSetting() {
     if (!s) return;
     const ok = await confirm({
       title: 'Add Mathlib?',
-      body: `Mathlib is the library most mathematics needs. It is a large download of several GB, about ${size(s.mathlibSizeMb)} on this computer once it is there, and it takes a while.${s.own ? ' Your own Lean gets the version Mathlib asks for, as any Mathlib project would.' : ''}`,
+      body: `Mathlib is the library most mathematics needs. It is a download of about ${size(s.mathlibDownloadMb)}, about ${size(s.mathlibSizeMb)} on this computer once it is there, and it takes a few minutes.${s.own ? ' Your own Lean gets the version Mathlib asks for, as any Mathlib project would.' : ''}`,
       confirm: 'Add Mathlib',
     });
     if (ok) await setUp(true);
@@ -84,7 +84,7 @@ export function LeanSetting() {
       icon={<Sigma size={16} />}
       label="Lean (proof checker)"
       hint="Lets agents check mathematical proofs: a proof Lean accepts is correct"
-      info="Your own Lean is used if you have one, and never changed. Otherwise the app keeps its own, apart from the rest of your computer. Mathlib, the library most mathematics needs, is a second, much larger download. A project that asks for another version of Lean downloads that version the first time."
+      info="Your own Lean is used if you have one, and never changed. Otherwise the app keeps its own, apart from the rest of your computer. Mathlib, the library most mathematics needs, is a second step that takes much more disk space. A project that asks for another version of Lean downloads that version the first time."
       control={
         !s ? (
           <Throbber className="text-fg-3" />

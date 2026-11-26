@@ -373,6 +373,20 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
   ok(ours.value === 0.455 && ours.bold && ours.marked && ag.rows[1].cells[1].n?.value === 0.412 && !ag.rows[1].cells[1].n?.marked, 'its cells: the mean, bold, the dagger');
   useRecords({ recomputeTable: (_db, id) => (id === 'tmq3x9b2c4' ? { ...newer, id, latex: aTable } : null), listRuns: () => [] });
   ok(!(await check(ad, 'other')).findings.some((f) => f.id.startsWith('numbers:stale') || f.id.startsWith('numbers:bold')), 'the same as its runs give now: nothing to say');
+  // The worse mark and the note on seeds Experiments writes: read as it is, the same as its runs give.
+  const marked = aTable.replace('% hydor:table tmq3x9b2c4', '% hydor:table tmq3x9b2c4\n% Ours, latency: The seeds barely change this number, so a test over seeds says little: compare per example (give the runs a scores file)').replace('30.1 $\\pm$ 1.2', '30.1 $\\pm$ 1.2$^\\ddagger$');
+  const md = doc(`\\documentclass{article}\\begin{document}\n${marked}\n\\end{document}\n`);
+  const mt = tabularsIn(texSources(md)[0])[0];
+  const slow = gridOf(mt).rows[2].cells[2].n!;
+  ok(mt.marker === 'tmq3x9b2c4' && slow.value === 30.1 && slow.marked && slow.double && !gridOf(mt).rows[2].cells[1].n!.double, 'the marker past the note on seeds, and the worse mark');
+  const says = async (paper: typeof md, now: string) => {
+    useRecords({ recomputeTable: () => ({ ...newer, id: 'tmq3x9b2c4', latex: now }), listRuns: () => [] });
+    return (await check(paper, 'other')).findings.find((f) => f.id.startsWith('numbers:stale'));
+  };
+  ok(!(await says(md, marked)), 'the same, note and worse mark: nothing to say');
+  ok(!(await says(ad, marked)), 'a table from before the worse mark is not stale for lacking it');
+  ok(/its significance mark is no longer earned/.test((await says(md, aTable))?.detail ?? ''), 'a worse mark its runs no longer give');
+  ok(/not the one its runs give now/.test((await says(md, marked.replace('1.2$^\\ddagger$', '1.2$^\\dagger$')))?.detail ?? ''), 'worse in the paper, better now');
   useRecords({ recomputeTable: () => null, listRuns: () => [] });
   const st2 = await check(d, 'other');
   ok(has(st2, 'numbers:gone:tmq3x9a1f2')?.level === 'info' && has(st2, 'numbers:noruns')?.level === 'info', 'no runs: said as information, never as an error');

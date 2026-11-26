@@ -1,6 +1,7 @@
 // Development only (main.tsx loads it for /goal-preview in a dev server, never in a build): every sample goal
 // (samples.ts) drawn in the dock as it shows above the message box, without the server. ?s=<sample id> picks one,
-// ?rounds=1 opens the rounds, ?more=1 opens Give it more (on the limit sample), ?open=<n> opens that round's row, ?change=1 the
+// ?rounds=1 opens the rounds, ?map=1 shows them as the map (?map=0 as the list; without it, as last chosen), ?more=1 opens
+// Give it more (on the limit sample), ?open=<n> opens that round's row (on the map: its box), ?change=1 the
 // agreement's fields (Change…; a score check's evaluations are asked of the server, so they show only beside one), ?light=1 the light theme,
 // ?helpers=2&swarm=1 shows a lead whose own turn has ended while 2 members are at work (the working-swarm sample does by itself), ?bare=1 leaves out the list of samples and ?zoom=0.8 draws smaller (for pictures of one state).
 import { useEffect } from 'react';
@@ -41,11 +42,15 @@ export default function GoalPreview() {
       if (q.get('change')) [...document.querySelectorAll('button')].find((b) => b.textContent === 'Change…')?.click();
       if (q.get('rounds')) [...document.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Rounds ·'))?.click();
       const open = q.get('open');
-      if (open)
-        setTimeout(() => {
-          const rows = [...document.querySelectorAll('li > button[aria-expanded]')] as HTMLButtonElement[];
-          rows[Number(open)]?.click();
-        }, 50);
+      const map = q.get('map');
+      setTimeout(() => {
+        if (map) [...document.querySelectorAll<HTMLButtonElement>('button[data-seg]')].find((b) => b.dataset.seg === (map === '1' ? 'map' : 'list'))?.click();
+        if (open)
+          setTimeout(() => {
+            const rows = [...document.querySelectorAll('li > button[aria-expanded]')] as HTMLButtonElement[];
+            (document.querySelector<HTMLButtonElement>(`button[data-round="${Number(open)}"]`) ?? rows[Number(open)])?.click();
+          }, 50);
+      }, 50);
     }, 100);
     return () => clearTimeout(t);
   }, []);

@@ -7,7 +7,11 @@
 // installed there with ELAN_HOME): the verdict on true, false, unfinished and cheating proofs, a Lake project,
 // snippets, the app's sandbox where this computer has one, lean_search against the live services, Mathlib's step with
 // real Lake and a stand-in Mathlib repository, and the app's own set-up with elan's real installer (the trial's
-// toolchain linked in, so it is not downloaded again). Nothing here downloads Mathlib.
+// toolchain linked in, so it is not downloaded again).
+//
+// With LIVE_MATHLIB=1 and a real Mathlib set up by the app (LEAN_MATHLIB_DIR names its <data folder>/lean): checks and
+// verdicts on proofs that need Mathlib, leancheck, the sandbox, and a project whose Mathlib is not fetched. They only
+// read that folder; skipped when there is none. Nothing here downloads Mathlib.
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/lean/lean-test.ts && DATA_DIR=/tmp/hydor-test-lean node dist/dev/lean-test.js
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -15,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { appPaths, findLean, run, scanLean, stripLean, verifyFile } from '../../scripts/agent-tools/lib/lean/core.mjs';
+import { appPaths, findLean, mathlibDir, run, scanLean, stripLean, unfetchedMathlib, verifyFile } from '../../scripts/agent-tools/lib/lean/core.mjs';
 import type { LeanState } from '../../shared/lean.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import { netCutAvailable, sandboxAvailable } from '../agent/sandbox.ts';
@@ -185,8 +189,7 @@ test('state: none, with the size and whether this computer can set it up; every 
   world('none');
   const s = leanState();
   assert.deepEqual({ ready: s.ready, own: s.own, installing: s.installing, canInstall: s.canInstall, mathlib: s.mathlib }, { ready: false, own: false, installing: false, canInstall: true, mathlib: 'none' });
-  assert.equal(s.sizeMb, 620);
-  assert.ok(s.mathlibSizeMb > 1000);
+  assert.deepEqual([s.sizeMb, s.mathlibDownloadMb, s.mathlibSizeMb], [620, 600, 7500]);
   for (const [name, args] of [['lean_check', { code: 'example : True := trivial' }], ['lean_verify', { file: 'x.lean' }], ['lean_search', { query: 'add_comm' }]] as const) {
     const r = await call(name, args);
     assert.equal(r.text, NOT_SET_UP, name);
@@ -266,13 +269,17 @@ test('a set-up that fails says why with its last lines; one removed half-way sto
 
 test('Mathlib: a second step with real commands injected, checked before it is ready, its download cache removed', async () => {
   const ran: string[] = [];
+  const steps: string[] = [];
   const { dir } = world('mathlib', {
     run: async (cmd, args, o) => {
       ran.push(`${path.basename(cmd)} ${args.join(' ')}`);
-      return run(cmd, args, o);
+      return run(cmd, args, { ...o, onLine: (l) => (o.onLine?.(l), steps.push(leanState().step ?? '')) });
     },
   });
   await setupLean({ mathlib: true });
+  // Mathlib would fetch its built files at the end of `lake update`: they come in the step that says so.
+  assert.ok(!steps.some((s) => s.startsWith('Getting Mathlib’s source') && /Downloaded:/.test(s)), 'nothing is downloaded under the source step');
+  assert.ok(steps.includes('Downloading Mathlib’s built files (about 500 MB): Downloaded: 9117 file(s) [attempted 9117/9117 = 100%, 812 KB/s]'), steps.join('\n'));
   const s = leanState();
   assert.equal(s.error, undefined);
   assert.deepEqual({ ready: s.ready, mathlib: s.mathlib }, { ready: true, mathlib: 'ready' });
@@ -284,21 +291,29 @@ test('Mathlib: a second step with real commands injected, checked before it is r
   // A snippet that imports Mathlib is checked with Mathlib's search path.
   const r = await call('lean_check', { code: 'import Mathlib.Tactic\n\ntheorem t : True := trivial\n' });
   assert.equal(r.data.ok, true, r.text);
-  // Mathlib alone removed: Lean stays.
+  // Mathlib alone removed: Lean stays. Its 150,000 files go while the app carries on: not ready from the first moment.
+  const going = removeLean({ mathlib: true });
+  assert.equal(leanState().mathlib, 'none');
+  assert.ok(fs.existsSync(p.mathlib), 'removing does not hold the app up');
+  // Added again meanwhile: it waits for the removal, then sets it up whole.
+  const again = setupLean({ mathlib: true });
+  await Promise.all([going, again]);
+  assert.deepEqual({ mathlib: leanState().mathlib, error: leanState().error }, { mathlib: 'ready', error: undefined });
   await removeLean({ mathlib: true });
+  assert.equal(fs.existsSync(p.mathlib), false);
   assert.deepEqual({ ready: leanState().ready, mathlib: leanState().mathlib }, { ready: true, mathlib: 'none' });
   // A step that fails: Lean stays ready, Mathlib not, with why.
   fs.writeFileSync(path.join(p.elan, 'fail'), 'cache');
   await setupLean({ mathlib: true });
   const failed = leanState();
   assert.deepEqual({ ready: failed.ready, mathlib: failed.mathlib }, { ready: true, mathlib: 'none' });
-  assert.match(failed.error!, /^Downloading Mathlib’s built files \(several GB\) failed: [\s\S]*some files were not downloaded/);
+  assert.match(failed.error!, /^Downloading Mathlib’s built files \(about 500 MB\) failed: [\s\S]*some files were not downloaded/);
 });
 
 test('Mathlib: too little disk, or no git, is refused in words', async () => {
   world('smalldisk', { path: ownPath(), freeDiskMb: () => 3000 });
   await setupLean({ mathlib: true });
-  assert.equal(leanState().error, 'Not enough disk space: 2.9 GB free, and Mathlib needs about 12.0 GB.');
+  assert.equal(leanState().error, 'Not enough disk space: 2.9 GB free, and Mathlib needs about 10.0 GB.');
   assert.equal(leanState().mathlib, 'none');
   const onlyLean = path.join(tmp, 'nogit-bin');
   world('nogit', { path: standIns(onlyLean) });
@@ -340,7 +355,7 @@ test('lean_check: a snippet (nothing left behind), Mathlib not set up said with 
   assert.equal(r.data.ok, true, r.text);
   const m = await call('lean_check', { code: 'import Mathlib.Tactic\nexample : True := trivial' });
   assert.equal(m.error, true);
-  assert.match(m.text, /^This imports Mathlib, which is not set up: add it in Settings → General → Lean \(proof checker\) → Add Mathlib \(several gigabytes\), or ask with lean_setup \{ mathlib: true \}\.$/);
+  assert.match(m.text, /^This imports Mathlib, which is not set up: add it in Settings → General → Lean \(proof checker\) → Add Mathlib \(about 8 GB on disk\), or ask with lean_setup \{ mathlib: true \}\.$/);
   assert.equal(mine().length, before, 'the scratch folders go');
   // In a Lake project, through lake: its build's own messages name their files.
   put('proj/lakefile.toml', 'name = "p"\n');
@@ -349,6 +364,61 @@ test('lean_check: a snippet (nothing left behind), Mathlib not set up said with 
   assert.equal(b.data.ok, false);
   assert.deepEqual(b.data.errors[0], { line: 1, column: 25, file: 'Broken.lean', message: 'Type mismatch\n  rfl\nhas type\n  ?m.8 = ?m.8\nbut is expected to have type\n  1 = 2' });
   assert.equal(b.data.errors.length, 1);
+});
+
+test('a project that uses Mathlib is not run until its built files are there: no silent download, no build from source', async () => {
+  world('unfetched', { path: ownPath() });
+  // As `lake new … math` writes it, and as Lake writes the manifest.
+  const toml = 'name = "ownproj"\ndefaultTargets = ["Ownproj"]\n\n[leanOptions]\nrelaxedAutoImplicit = false\n\n[[require]]\nname = "mathlib"\nscope = "leanprover-community"\nrev = "v4.36.0"\n\n[[lean_lib]]\nname = "Ownproj"\n';
+  const manifest = JSON.stringify({ version: '1.3.0', packagesDir: '.lake/packages', packages: [{ url: 'https://github.com/leanprover-community/mathlib4', type: 'git', name: 'mathlib', rev: 'fc4f59e577feb1a4956671bc04ac18aaaf8cd842' }], name: 'ownproj', lakeDir: '.lake' });
+  put('own/lakefile.toml', toml);
+  put('own/Ownproj/Basic.lean', 'import Mathlib\n\ntheorem t : True := trivial\n');
+  put('own/Ownproj/Plain.lean', 'theorem plain : True := trivial\n');
+  boxed.length = 0;
+  // No manifest: Lake would download all of it for any file.
+  for (const file of ['own/Ownproj/Basic.lean', 'own/Ownproj/Plain.lean']) {
+    const r = await call('lean_check', { file });
+    assert.equal(r.error, true, r.text);
+    assert.match(r.text, /^This Lean project \(.*own\) uses Mathlib, and its libraries are not fetched yet, so nothing was run: .* Run `lake exe cache get` in that folder first \(it needs the network; about 600 MB to download the first time, and about 8 GB in the project/);
+  }
+  assert.match((await call('lean_verify', { file: 'own/Ownproj/Basic.lean' })).text, /nothing was run/);
+  assert.equal(boxed.length, 0, 'neither lake nor lean was started');
+  // Cloned: a manifest, nothing fetched. A file that needs no Mathlib runs; one that does, through the project's own files too, does not.
+  put('own/lake-manifest.json', manifest);
+  assert.equal((await call('lean_check', { file: 'own/Ownproj/Plain.lean' })).data.ok, true);
+  assert.match((await call('lean_check', { file: 'own/Ownproj/Basic.lean' })).text, /and Mathlib is not built in it yet, so nothing was run/);
+  put('own/Ownproj/Part.lean', 'import Mathlib.Tactic.Linarith\n');
+  put('own/Ownproj/Uses.lean', 'import Ownproj.Part\nimport Std.Data.HashMap\n\ntheorem u : True := trivial\n');
+  assert.match((await call('lean_check', { file: 'own/Ownproj/Uses.lean' })).text, /and Mathlib\.Tactic\.Linarith is not built in it yet/);
+  const lc = spawnSync(process.execPath, [path.join(APP_ROOT, 'scripts/agent-tools/bin/leancheck'), 'Ownproj/Uses.lean'], { cwd: path.join(work, 'own'), encoding: 'utf8', env: { PATH: ownPath(), HOME: tmp } });
+  assert.equal(lc.status, 2, lc.stdout);
+  assert.match(lc.stderr, /^leancheck: This Lean project .* nothing was run/);
+  // Only what is imported has to be there (as `lake exe cache get <modules>` leaves it).
+  const built = 'own/.lake/packages/mathlib/.lake/build/lib/lean';
+  put(`${built}/Mathlib/Tactic/Linarith.olean`, '');
+  assert.match((await call('lean_check', { file: 'own/Ownproj/Basic.lean' })).text, /and Mathlib is not built in it yet/);
+  assert.equal(unfetchedMathlib(path.join(work, 'own'), ['Ownproj.Part']), null);
+  // Another library's module may import Mathlib: its build has to be there.
+  assert.equal(unfetchedMathlib(path.join(work, 'own'), ['SomeDependency.Basic']), null);
+  put(`${built}/Mathlib.olean`, '');
+  assert.equal(unfetchedMathlib(path.join(work, 'own'), ['Mathlib']), null);
+  // With Mathlib's source there, a misspelled module is left to Lean to report; one it has but has not built is not.
+  put('own/.lake/packages/mathlib/Mathlib/Order/Basic.lean', '');
+  assert.equal(unfetchedMathlib(path.join(work, 'own'), ['Mathlib.Ordr.Basic']), null);
+  assert.match(unfetchedMathlib(path.join(work, 'own'), ['Mathlib.Order.Basic'])!, /Mathlib\.Order\.Basic is not built/);
+  // A lakefile.lean, a source folder of its own, and a project that does not use Mathlib.
+  put('lk/lakefile.lean', 'import Lake\nopen Lake DSL\n\npackage lk where\n  srcDir := "src"\n\nrequire "leanprover-community" / "mathlib" @ git "v4.36.0"\n');
+  assert.match(unfetchedMathlib(path.join(work, 'lk'), [])!, /its libraries are not fetched yet/);
+  put('lk/lake-manifest.json', manifest);
+  put('lk/src/Deep.lean', 'import Mathlib.Order.Basic\n');
+  assert.match(unfetchedMathlib(path.join(work, 'lk'), ['Deep'])!, /Mathlib\.Order\.Basic is not built/);
+  assert.match(unfetchedMathlib(path.join(work, 'lk'), ['SomeDependency.Basic'])!, /it is not built in it yet/);
+  put('old/lakefile.lean', 'require mathlib from git\n  "https://github.com/leanprover-community/mathlib4"\n');
+  assert.match(unfetchedMathlib(path.join(work, 'old'), [])!, /not fetched yet/);
+  put('none/lakefile.lean', '-- require mathlib from git "x"\nrequire mathlibExtras from git "y"\n');
+  assert.equal(unfetchedMathlib(path.join(work, 'none'), ['Mathlib']), null);
+  put('none2/lakefile.toml', 'name = "mathlib"\n\n[[lean_lib]]\nname = "Mathlib"\n');
+  assert.equal(unfetchedMathlib(path.join(work, 'none2'), ['Mathlib.Order.Basic']), null, 'Mathlib’s own repository');
 });
 
 test('lean_check: the time limit stops it, as does the agent giving up; Plan mode does not run it; a confidential one without a sandbox neither', async () => {
@@ -528,7 +598,7 @@ test('lean_setup: the person is asked on a card with the size first; no keeps it
   assert.equal(fs.existsSync(dir), false, 'nothing is downloaded');
   assert.equal(cards[0].title, 'Set up Lean and Mathlib?');
   assert.match(cards[0].detail!, /about \*\*620 MB\*\*/);
-  assert.match(cards[0].detail!, /\*\*several GB\*\* more \(about 6 GB on disk\)/);
+  assert.match(cards[0].detail!, /downloads about \*\*600 MB\*\* more and takes about \*\*8 GB\*\* on disk once unpacked\. It takes a few minutes\./);
   assert.deepEqual(cards[0].options.map((o) => o.label), ['Set up', 'Don’t']);
   // Full access asks too: it is a download.
   session.mode = 'bypassPermissions';
@@ -779,6 +849,77 @@ if (LIVE) {
       process.env.ELAN_HOME = elan;
     }
   });
+}
+
+// ---- the real Mathlib ---------------------------------------------------------------------------------------------
+
+const REAL_LEAN = path.resolve(process.env.LEAN_MATHLIB_DIR || path.join(tmp, 'no-mathlib'));
+
+if (process.env.LIVE_MATHLIB === '1' && !mathlibDir(REAL_LEAN)) console.log('LIVE_MATHLIB: skipped, no Mathlib in LEAN_MATHLIB_DIR (the <data folder>/lean the app set up)');
+else if (process.env.LIVE_MATHLIB === '1') {
+  const home = path.join(tmp, 'mathlib-home');
+  fs.mkdirSync(home, { recursive: true });
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: home };
+  /** The real folder for one test only: what comes after (the last removal) must never see it. */
+  const real = async (fn: () => Promise<void>) => {
+    world('mathlib-real', { dir: () => REAL_LEAN, env: () => env });
+    try {
+      await fn();
+    } finally {
+      world('after-mathlib');
+    }
+  };
+  const lc = (file: string) => spawnSync(process.execPath, [path.join(APP_ROOT, 'scripts/agent-tools/bin/leancheck'), file], { cwd: work, encoding: 'utf8', env: { ...env, HYDOR_LEAN_DIR: REAL_LEAN } });
+  const good = 'import Mathlib\n\nnamespace Trial\ntheorem sqrt_two_irrational : Irrational (Real.sqrt 2) := irrational_sqrt_two\ntheorem below (x y : ℝ) (h : x ≤ y) : x - 1 < y := by linarith\nexample : (3 : ℝ) / 4 + 1 / 4 = 1 := by norm_num\nend Trial\n';
+
+  test('LIVE_MATHLIB: checks and verdicts on proofs that need Mathlib, and leancheck’s exit codes', () =>
+    real(async () => {
+      assert.equal(leanState().mathlib, 'ready');
+      put('MGood.lean', good);
+      const ok = await call('lean_check', { file: 'MGood.lean' });
+      console.log(`     check: ${ok.data?.seconds} s`);
+      assert.equal(ok.data.ok, true, ok.text);
+      const snippet = await call('lean_check', { code: good });
+      assert.equal(snippet.data.ok, true, snippet.text);
+      const bad = await call('lean_check', { code: 'import Mathlib\n\ntheorem wrong_sum : (2 : ℝ) + 2 = 5 := by norm_num\n\ntheorem wrong_lt (x : ℝ) : x < x := by\n  linarith\n' });
+      assert.equal(bad.data.ok, false);
+      assert.deepEqual(bad.data.errors.map((e: any) => [e.line, e.message.split('\n')[0]]), [[3, 'unsolved goals'], [6, 'linarith failed to find a contradiction']]);
+      const v = await call('lean_verify', { file: 'MGood.lean' });
+      console.log(`     verify: ${v.data?.seconds} s`);
+      assert.equal(v.data.ok, true, v.text);
+      assert.deepEqual(v.data.theorems.map((t: any) => [t.name, t.axioms]), ['Trial.sqrt_two_irrational', 'Trial.below'].map((n) => [n, ['Classical.choice', 'Quot.sound', 'propext']]));
+      put('MGap.lean', 'import Mathlib\n\ntheorem am_gm (x y : ℝ) : 2 * x * y ≤ x ^ 2 + y ^ 2 := by\n  sorry\n');
+      assert.equal((await call('lean_verify', { file: 'MGap.lean' })).data.why, 'it still has 1 gap marked sorry');
+      put('MAxiom.lean', 'import Mathlib\n\naxiom wishful : ∀ x : ℝ, x < x\n\ntheorem all_below (x : ℝ) : x < x := wishful x\n');
+      assert.equal((await call('lean_verify', { file: 'MAxiom.lean' })).data.why, 'theorem all_below leans on an axiom that is not standard: wishful');
+      assert.deepEqual(['MGood.lean', 'MGap.lean', 'MAxiom.lean'].map((f) => lc(f).status), [0, 1, 1]);
+    }));
+
+  test('LIVE_MATHLIB: in the app’s sandbox, Mathlib’s folder read-only, a check writes nothing there', () =>
+    real(async () => {
+      const box = sandboxAvailable();
+      if (box?.kind !== 'bwrap') return void console.log('     no bubblewrap here: skipped');
+      setLeanSandboxForTests(async () => (command) => ({ cmd: box.bin, args: ['--bind', '/', '/', '--dev-bind', '/dev', '/dev', '--proc', '/proc', '--ro-bind', REAL_LEAN, REAL_LEAN, '--unshare-net', '--die-with-parent', '/bin/bash', '-c', command] }));
+      try {
+        const r = await call('lean_check', { code: good });
+        console.log(`     sandboxed check: ${r.data?.seconds} s`);
+        assert.equal(r.data.ok, true, r.text);
+        put('MBoxed.lean', good);
+        const v = await call('lean_verify', { file: 'MBoxed.lean' });
+        assert.equal(v.data.ok, true, v.text);
+      } finally {
+        setLeanSandboxForTests(noting);
+      }
+    }));
+
+  test('LIVE_MATHLIB: a project whose Mathlib is not fetched is refused and nothing is written in it', () =>
+    real(async () => {
+      put('mproj/lakefile.toml', 'name = "mproj"\n\n[[require]]\nname = "mathlib"\nscope = "leanprover-community"\nrev = "v4.36.0"\n');
+      put('mproj/A.lean', 'import Mathlib\n');
+      const r = await call('lean_check', { file: 'mproj/A.lean' });
+      assert.match(r.text, /nothing was run/);
+      assert.deepEqual(fs.readdirSync(path.join(work, 'mproj')).sort(), ['A.lean', 'lakefile.toml']);
+    }));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -18,6 +18,7 @@ import type { DB } from '../db.ts';
 import { agentBaseEnv } from '../env.ts';
 import type { Deps } from '../features/types.ts';
 import { git } from '../git.ts';
+import { repoRoot } from '../memory/store.ts';
 import { captureGit, localShell } from './capture.ts';
 import { parseLine } from './metrics.ts';
 import { cleanJob, depsOf, ended, stopRun, submit, tellRuns, tick } from './queue.ts';
@@ -117,6 +118,17 @@ function cleanEntry(raw: unknown, cwd: string): string {
     throw new HttpError(400, `“${String(raw).slice(0, 80)}” is not a file or folder inside the evaluation’s folder: write it from there, like eval.py or data/test/`);
   if (!p.endsWith('/') && !p.includes('*') && isFolder(path.join(cwd, p))) return `${p}/`;
   return p;
+}
+
+/**
+ * Whether a final test's data is where agents working in the project can read it: no folder held out for it, or one
+ * inside the project (the evaluation folder's git repository, its worktrees too).
+ */
+export function testReadable(cwd: string, heldOut: string | undefined): boolean {
+  if (!heldOut?.trim()) return true;
+  const dir = real(path.resolve(expandHome(heldOut.trim())));
+  const project = repoRoot(cwd) ?? path.resolve(cwd);
+  return inside(dir, real(project)) || repoRoot(dir) === project;
 }
 
 /** An evaluation as given, checked and tidied. */

@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkFile, LeanProblem, NEEDS_MATHLIB, needsMathlib, scanLean, verifyFile, type CheckOptions, type Lean, type Shell } from '../../scripts/agent-tools/lib/lean/core.mjs';
-import { LEAN_SIZE_MB, MATHLIB_SIZE_MB, type LeanState } from '../../shared/lean.ts';
+import { LEAN_SIZE_MB, type LeanState } from '../../shared/lean.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import { sandboxShell } from '../agent/sandbox.ts';
 import { modeFamily, neverAsks } from '../children/modes.ts';
@@ -101,7 +101,7 @@ const problem = (e: unknown): ToolOutput => failed(e instanceof LeanProblem ? e.
 const CHECK: RunTool = {
   name: 'lean_check',
   description:
-    'Check Lean 4 code: give a file (in a Lake project its imports are built first) or a snippet (code). Returns { ok, errors, warnings, info, sorries, seconds }: positions as Lean gives them (line from 1, column from 0), the goals of "unsolved goals" whole, and info for what #check, trace_state, exact? and apply? say. ok means it compiles, which with sorries is not a proof: lean_verify gives the verdict. A snippet that imports Mathlib needs Mathlib set up (lean_setup { mathlib: true }).',
+    'Check Lean 4 code: give a file (in a Lake project its imports are built first) or a snippet (code). Returns { ok, errors, warnings, info, sorries, seconds }: positions as Lean gives them (line from 1, column from 0), the goals of "unsolved goals" whole, and info for what #check, trace_state, exact? and apply? say. ok means it compiles, which with sorries is not a proof: lean_verify gives the verdict. A snippet that imports Mathlib needs Mathlib set up (lean_setup { mathlib: true }). A Lake project of its own that requires Mathlib keeps its own copy: until that is fetched (`lake exe cache get` in the project, about 8 GB) nothing in it is run, and the answer says so.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -189,7 +189,7 @@ function cardWords(s: LeanState, wantMathlib: boolean): { title: string; detail:
     parts.push(
       `**Lean** is a proof checker: a proof it accepts is correct. Setting it up downloads about **${LEAN_SIZE_MB} MB** (about 3 GB once unpacked) into this app’s own folder. Nothing else on your computer is changed. A project that asks for another version of Lean downloads that version the first time.`,
     );
-  if (wantMathlib) parts.push(`**Mathlib**, the library most mathematics needs, is **several GB** more (about ${gbWords(MATHLIB_SIZE_MB)} on disk) and takes a while.${s.own ? ' Your own Lean gets the version Mathlib asks for, as any Mathlib project would.' : ''}`);
+  if (wantMathlib) parts.push(`**Mathlib**, the library most mathematics needs, downloads about **${s.mathlibDownloadMb} MB** more and takes about **${gbWords(s.mathlibSizeMb)}** on disk once unpacked. It takes a few minutes.${s.own ? ' Your own Lean gets the version Mathlib asks for, as any Mathlib project would.' : ''}`);
   return { title: s.ready ? 'Add Mathlib to Lean?' : wantMathlib ? 'Set up Lean and Mathlib?' : 'Set up Lean, the proof checker?', detail: parts.join('\n\n') };
 }
 
@@ -198,7 +198,7 @@ const stateWords = (s: LeanState) => ({ ready: s.ready, version: s.version, math
 const SETUP: RunTool = {
   name: 'lean_setup',
   description:
-    'Ask the user to set up Lean (the proof checker) on this computer, on a card that says the download’s size first; with mathlib: true, to add Mathlib too (several GB). The set-up runs in the background: this returns how it stands, and calling it again reports progress. Use it when another Lean tool says Lean or Mathlib is not set up.',
+    'Ask the user to set up Lean (the proof checker) on this computer, on a card that says the download’s size first; with mathlib: true, to add Mathlib too (about 600 MB to download, 8 GB on disk). The set-up runs in the background: this returns how it stands, and calling it again reports progress. Use it when another Lean tool says Lean or Mathlib is not set up.',
   inputSchema: { type: 'object', properties: { mathlib: { type: 'boolean', description: 'Also add Mathlib, which most mathematics needs.' } } },
   async run(a, ctx) {
     const wantMathlib = a.mathlib === true;

@@ -284,6 +284,68 @@ export function findProject(file) {
   }
 }
 
+// ---- a project's own Mathlib --------------------------------------------------------------------------------------
+
+/** Modules that come with Lean itself. */
+const CORE_LIBS = /^(Init|Std|Lean|Lake)(\.|$)/;
+
+const textOf = (file) => {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+};
+
+/** Whether a project's lakefile requires Mathlib itself. */
+function asksForMathlib(toml, lean) {
+  const inToml = (toml ?? '').split(/^[ \t]*(?=\[)/m).some((s) => s.startsWith('[[require]]') && /^[ \t]*name[ \t]*=[ \t]*["']mathlib["']/m.test(s));
+  const inLean = /^[ \t]*require[ \t]+(?:(?:"[^"\n]*"|«[^»\n]*»|[\w-]+)[ \t]*\/[ \t]*)?(?:"mathlib"|«mathlib»|mathlib(?![\w-]))/m.test((lean ?? '').replace(/--.*$/gm, ''));
+  return inToml || inLean;
+}
+
+/**
+ * Why a file of a project that uses Mathlib is not run: Lake would first fetch what is missing, without a word (a
+ * project with no manifest yet downloads and unpacks several GB) or compile Mathlib from source, for hours. Null when
+ * what the file needs is there, or the project does not use Mathlib.
+ */
+export function unfetchedMathlib(root, imports) {
+  let manifest = null;
+  try {
+    manifest = JSON.parse(textOf(path.join(root, 'lake-manifest.json')));
+  } catch {}
+  const listed = manifest?.packages?.find((p) => p?.name === 'mathlib');
+  const toml = textOf(path.join(root, 'lakefile.toml'));
+  const lakefile = textOf(path.join(root, 'lakefile.lean'));
+  if (!listed && !asksForMathlib(toml, lakefile)) return null;
+  const dir = listed?.type === 'path' ? path.resolve(root, listed.dir) : path.resolve(root, manifest?.packagesDir ?? '.lake/packages', 'mathlib');
+  const built = [path.join(dir, '.lake', 'build', 'lib', 'lean'), path.join(dir, '.lake', 'build', 'lib')];
+  const why = (what) =>
+    `This Lean project (${root}) uses Mathlib, and ${what}, so nothing was run: Lean would download it as it went, or compile Mathlib from source, which takes hours. Run \`lake exe cache get\` in that folder first (it needs the network; about 600 MB to download the first time, and about 8 GB in the project, which keeps its own copy of Mathlib), then check again.`;
+  // Never updated: Lake would download everything for any file, whatever it imports.
+  if (!listed && !fs.existsSync(dir)) return why('its libraries are not fetched yet');
+  const sources = [root, ...[...`${toml}\n${lakefile}`.matchAll(/\bsrcDir[ \t]*:?=[ \t]*["']([^"'\n]+)["']/g)].map((m) => path.resolve(root, m[1]))];
+  const seen = new Set();
+  const todo = [...imports];
+  while (todo.length) {
+    const mod = todo.pop();
+    if (seen.has(mod)) continue;
+    seen.add(mod);
+    const rel = mod.replace(/[«»]/g, '').split('.').join(path.sep);
+    if (/^Mathlib(\.|$)/.test(mod)) {
+      // A module Mathlib's fetched source does not have (a misspelled import) is Lean's to report.
+      const known = !fs.existsSync(path.join(dir, 'Mathlib')) || fs.existsSync(path.join(dir, `${rel}.lean`));
+      if (known && !built.some((d) => fs.existsSync(path.join(d, `${rel}.olean`)))) return why(`${mod} is not built in it yet`);
+    } else if (!MATHLIB_LIBS.test(mod) && !CORE_LIBS.test(mod)) {
+      // The project's own file, whose imports count too; else another library's, which may import Mathlib.
+      const own = sources.map((s) => textOf(path.join(s, `${rel}.lean`))).find((t) => t != null);
+      if (own != null) todo.push(...scanLean(own).imports);
+      else if (!built.some((d) => fs.existsSync(path.join(d, 'Mathlib')))) return why('it is not built in it yet');
+    }
+  }
+  return null;
+}
+
 // ---- Lean's messages ----------------------------------------------------------------------------------------------
 
 const MESSAGE_MAX = 2000;
@@ -362,7 +424,7 @@ export class LeanProblem extends Error {
   }
 }
 
-export const NEEDS_MATHLIB = 'This imports Mathlib, which is not set up: add it in Settings → General → Lean (proof checker) → Add Mathlib (several gigabytes), or ask with lean_setup { mathlib: true }.';
+export const NEEDS_MATHLIB = 'This imports Mathlib, which is not set up: add it in Settings → General → Lean (proof checker) → Add Mathlib (about 8 GB on disk), or ask with lean_setup { mathlib: true }.';
 
 /** The environment `lake env` gives (the project's search paths and toolchain), read with our own Node.js. */
 async function lakeEnv(lean, root, o) {
@@ -379,6 +441,8 @@ async function lakeEnv(lean, root, o) {
  */
 async function plan(lean, file, scan, o) {
   const root = o.snippet ? null : findProject(file);
+  const unfetched = root && unfetchedMathlib(root, scan.imports);
+  if (unfetched) throw new LeanProblem(unfetched, 'mathlib');
   if (root) return { root, run: (extra) => ({ cmd: lean.lake, args: ['lean', path.relative(root, file), '--', '--json', ...extra], cwd: root, env: lean.env }), env: () => lakeEnv(lean, root, o) };
   const dir = path.dirname(file);
   if (needsMathlib(scan.imports)) {

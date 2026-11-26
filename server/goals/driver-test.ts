@@ -608,6 +608,8 @@ test('where nothing can be undone, a round that is no better stays, and is where
   assert.equal(g.rounds[1].why, 'No gain');
   assert.equal(g.rounds[1].cause, 'none');
   assert.equal(g.best, 1);
+  assert.equal(g.rounds[1].parent, 0);
+  assert.equal(publicGoal(g)!.roundParent, 1, 'a round left as it is: the next starts from its files');
   assert.equal(file(PLAIN, 'readme.md'), 'hi\n', 'nothing was put back');
   assert.match(last(N), /Last round: not better, and it stays/);
   await rejects(act(N, { action: 'round', n: 1, do: 'undo' }), 409, /worktree/);
@@ -737,13 +739,78 @@ test('I3: Give it more after a limit that stopped a round midway goes on from th
   await act(L2, { action: 'change', contract: { limits: { rounds: 8, usd: 50 } } });
   assert.equal(goal(L2).status, 'working');
   assert.equal(goal(L2).round, 2);
+  assert.equal(goal(L2).rounds[1].parent, 0, 'the half round recorded where it started');
+  assert.equal(publicGoal(goal(L2))!.roundParent, 1, 'the next starts from the files the half round left, though the best is the start');
   assert.match(last(L2), /Last round: not kept, and its files were not put back\. Stopped at the limit midway\./);
   assert.equal(file(w.path, 'score.txt'), '7\n', 'the files as the half round left them');
   await turn(L2);
   assert.equal(goal(L2).rounds.at(-1)!.outcome, 'kept', 'the half round’s work, judged now');
   assert.equal(goal(L2).rounds.at(-1)!.results.find((r) => r.id === 'c2')!.value, 7);
+  assert.equal(goal(L2).rounds.at(-1)!.parent, 1);
+  assert.equal(publicGoal(goal(L2))!.roundParent, 2, 'a kept round: from the best again');
   db.prepare('delete from sessions where key = ?').run(L2);
   await act(L2, { action: 'stop' });
+});
+
+test('each round records the round whose files it started from: after a kept round, an undone one, Another way from here and Undo', async () => {
+  const P = 'claude:goal-parents';
+  const w = worktree();
+  sessions.add(P, { cwd: w.path, worktree: w });
+  await agreed(P, { settings: { asks: 'own' } });
+  const from = () => publicGoal(goal(P))!.roundParent;
+  const score = (n: number) => turn(P, () => write(w.path, 'score.txt', `${n}\n`));
+  assert.equal(from(), 0, 'round 1 starts from the start');
+  await score(5); // 1: kept
+  assert.equal(from(), 1);
+  assert.doesNotMatch(last(P), /From here/);
+  await score(2); // 2: undone
+  assert.equal(goal(P).rounds[2].outcome, 'undone');
+  assert.equal(from(), 1, 'after an undone round: from the best again');
+  assert.match(last(P), /From here \(after round 1\), these were tried and undone; do not try them again:\n- Round 2: no report of what it did \(undone: Score fell far behind its best \(5 → 2\)\)/);
+  await score(7); // 3: kept
+  assert.equal(from(), 3);
+  assert.doesNotMatch(last(P), /From here/, 'nothing was tried from round 3 yet');
+  // Another way from here on round 1 (round 4, left unchecked, is dropped): the next one starts from round 1.
+  await stopAgent(P);
+  await act(P, { action: 'round', n: 1, do: 'from' });
+  await act(P, { action: 'resume' });
+  assert.equal(goal(P).round, 4);
+  assert.equal(from(), 1);
+  assert.equal(file(w.path, 'score.txt'), '5\n');
+  assert.equal(last(P).match(/Round 2:/g)!.length, 1, 'what Last round lists is not listed again');
+  await score(8); // 4: kept
+  assert.deepEqual(goal(P).rounds.map((r) => r.parent), [undefined, 0, 1, 1, 1]);
+  assert.equal(from(), 4);
+  // Undo: the files go back to the round kept before it, and the next round starts from there.
+  await stopAgent(P);
+  await act(P, { action: 'round', n: 4, do: 'undo', reason: 'Not that' });
+  await act(P, { action: 'resume' });
+  assert.equal(file(w.path, 'score.txt'), '7\n');
+  assert.equal(from(), 3);
+  await score(3); // 5: undone, from 3
+  assert.equal(goal(P).rounds.at(-1)!.parent, 3);
+  assert.match(last(P), /From here \(after round 3\), these were tried and undone; do not try them again:\n- Round 5: /);
+  assert.equal(publicGoal(goal(P))!.rounds.at(-1)!.parent, 3, 'the screens get it');
+  await act(P, { action: 'stop' });
+  await act(P, { action: 'stop' });
+});
+
+test('a say that puts the files back leaves the half round a limit cut behind: the next round starts from where they are', async () => {
+  const L3 = 'claude:goal-limit-back';
+  const w = worktree();
+  sessions.add(L3, { cwd: w.path, worktree: w });
+  await agreed(L3, { limits: { rounds: 8, usd: 1 }, settings: { asks: 'own' } });
+  sessions.all.get(L3)!.live = 'working';
+  write(w.path, 'score.txt', '7\n');
+  db.prepare("insert into sessions (key, agent, id, path, cost_usd) values (?, 'claude', ?, '/nowhere', 2.5) on conflict(key) do update set cost_usd = excluded.cost_usd").run(L3, L3);
+  await tick(deps);
+  assert.equal(goal(L3).status, 'limit');
+  await act(L3, { action: 'round', n: 0, do: 'keep' });
+  await act(L3, { action: 'change', contract: { limits: { rounds: 8, usd: 50 } } });
+  assert.equal(goal(L3).round, 2);
+  assert.equal(publicGoal(goal(L3))!.roundParent, 0);
+  db.prepare('delete from sessions where key = ?').run(L3);
+  await act(L3, { action: 'stop' });
 });
 
 test('a limit of time while a round runs', async () => {

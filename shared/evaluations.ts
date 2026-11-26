@@ -41,6 +41,9 @@ export interface SealState {
   more?: number;
 }
 
+/** Said wherever a final test's data is not hidden from agents (none held out, or held out inside the project). */
+export const TEST_READABLE = 'The test data stays readable to agents working in the project. A folder outside the project, given as the held-out folder, hides it.';
+
 export interface Evaluation extends EvalSpec {
   id: string;
   createdAt: number;
@@ -53,6 +56,8 @@ export interface Evaluation extends EvalSpec {
   baseline?: string;
   /** How often the final test has run under this seal. */
   finals: number;
+  /** It has a final test whose data agents working in the project can read (TEST_READABLE); as the routes give it. */
+  testReadable?: boolean;
 }
 
 /** An evaluation as the list gives it. */

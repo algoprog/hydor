@@ -484,6 +484,18 @@ for (const [f, { skip, only, skipFunctions, lowered, extra }] of Object.entries(
     if (inLowered && line === '}') inLowered = false;
   }
 }
+// The line under a results table as the page shows it: what its daggers mean (describe in server/experiments/tables.ts), with
+// each test as it was made. Built from values, so each reading is written out here.
+for (const s of [
+  '† Better than {0} at p < {1} ({2}).',
+  '† Better than {0} at p < {1} ({2}). ‡ Worse than {3}, by the same test.',
+  '{0}, Holm-corrected',
+  'paired t-test over {0} seeds',
+  'paired t-test over {0} examples',
+  'paired bootstrap over {0} examples',
+  "Welch's t-test over {0} seeds",
+])
+  add(s, 'server/experiments/tables.ts');
 // The names and lines of what ships, and of the choices the server offers (permission modes, the buttons of an approval).
 const NAMED = ['assistants/builtins', 'apps/templates', 'apps/templates-more', 'apps/templates-research', 'apps/templates-papers', 'apps/templates-lab', 'apps/explore', 'apps/draft', 'apps/screens', 'pages/latex-check', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api', 'automations/account-watch'];
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {

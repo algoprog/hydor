@@ -241,6 +241,33 @@ test('goal: with no words the app’s goal is shown (state, round, checks, spend
   assert.match((await run(fakeConn(routes()).conn, ['sessions', 'goal', 'Write'])).out, /has no goal/);
 });
 
+test('goal: the rounds, a line each, and a round that did not start from the one before it says from which', async () => {
+  const round = (n: number, outcome: string, o: Record<string, unknown> = {}) => ({ n, results: [], score: 0, outcome, way: `Way ${n}`, ...o });
+  const rounds = [
+    round(0, 'start', { way: undefined }),
+    round(1, 'kept', { parent: 0 }),
+    round(2, 'undone', { parent: 1 }),
+    round(3, 'kept', { parent: 1 }),
+    round(4, 'undone', { parent: 3, by: 'you' }),
+    round(5, 'kept', { parent: 0, by: 'you' }),
+  ];
+  const g = appGoal({ rounds, round: 6, roundParent: 3, status: 'working', question: undefined });
+  const r = await run(fakeConn(routes({ [`GET /api/goals/${encodeURIComponent(a.key)}`]: { goal: g } })).conn, ['sessions', 'goal', 'fix the login']);
+  assert.match(r.out, /✓ 1\. kept: Way 1$/m);
+  assert.match(r.out, /· 2\. undone: Way 2$/m);
+  assert.match(r.out, /✓ 3\. kept, from round 1: Way 3$/m);
+  assert.match(r.out, /· 4\. undone by you: Way 4$/m);
+  assert.match(r.out, /✓ 5\. kept by you, from the start: Way 5$/m);
+  assert.match(r.out, /● 6\. not checked yet, from round 3$/m);
+  // A goal stored before rounds recorded where they started: read from the outcomes. Only the latest twelve are listed.
+  const old = Array.from({ length: 15 }, (_, n) => round(n, n === 0 ? 'start' : n === 13 ? 'undone' : 'kept'));
+  const g2 = appGoal({ rounds: old, round: undefined, status: 'stopped', question: undefined });
+  const r2 = await run(fakeConn(routes({ [`GET /api/goals/${encodeURIComponent(a.key)}`]: { goal: g2 } })).conn, ['sessions', 'goal', 'fix the login']);
+  assert.match(r2.out, /… 2 earlier \(--json has them all\)/);
+  assert.doesNotMatch(r2.out, / 2\. kept/);
+  assert.match(r2.out, /14\. kept, from round 12: Way 14$/m);
+});
+
 test('goal: --start, --answer, --other, --note, --wait, --more, --rule are one action each, with their request bodies', async () => {
   const t = fakeConn(routes({ [path(a, '/goal')]: { goal: { status: 'working' } } }));
   const body = () => t.calls.at(-1)!.body;

@@ -1,7 +1,7 @@
 // `hydor sessions <verb>`: what the sidebar and a session's menu do. With no verb, `hydor sessions` lists as it always
 // has (the command's own code in commands.ts); `show`, `send` and `stop` stay top-level commands too. Naming a session:
 // its id or the start of it as `hydor sessions` shows it, its full key, or its title (any case, when only one fits).
-import type { GoalCheck, GoalResult, GoalState, GoalStatus } from '../../../shared/goals.ts';
+import { roundParents, type GoalCheck, type GoalResult, type GoalRound, type GoalState, type GoalStatus } from '../../../shared/goals.ts';
 import type { SessionSummary, LiveState } from '../../../shared/types.ts';
 import { usd } from '../../goals/verdict.ts';
 import { enc } from '../client.ts';
@@ -90,6 +90,30 @@ function checkLine(ctx: Pick<Ctx, 'look'>, c: GoalCheck, r: GoalResult | undefin
   return `${r?.holds ? mark(p, 'done') : mark(p, 'off')} ${c.label}: ${state}${more ? ` (${more})` : ''}`;
 }
 
+/** How many rounds `hydor sessions goal` lists, the latest; --json has them all. */
+const ROUNDS_LISTED = 12;
+
+const roundEnded = (r: GoalRound) => (r.outcome === 'kept' ? (r.by === 'you' ? 'kept by you' : 'kept') : r.outcome === 'undone' ? (r.by === 'you' ? 'undone by you' : 'undone') : 'left as it is');
+
+/**
+ * The rounds, a line each: how it ended and what it tried. A round that did not start from the files of the round before
+ * it (that one was undone, or the person went another way from an earlier one) says which round's it started from.
+ */
+function roundLines(ctx: Pick<Ctx, 'look'>, g: GoalState): string[] {
+  const { p } = ctx.look;
+  const parents = roundParents(g.rounds);
+  const from = (n: number, parent: number | undefined) => (parent == null || parent === n - 1 ? '' : parent ? `, from round ${parent}` : ', from the start');
+  const ran = g.rounds.filter((r) => r.n > 0);
+  const lines = ran.map((r) => {
+    const what = (r.way || r.did?.split(/(?<=[.!?])\s/)[0] || '').replace(/\s+/g, ' ');
+    return `  ${r.outcome === 'kept' ? mark(p, 'done') : mark(p, 'off')} ${r.n}. ${roundEnded(r)}${from(r.n, parents.get(r.n))}${what ? `: ${truncate(what, 80)}` : ''}`;
+  });
+  // The round in progress, with where it started.
+  if (g.round != null && !ran.some((r) => r.n === g.round)) lines.push(`  ${mark(p, 'busy')} ${g.round}. not checked yet${from(g.round, g.roundParent)}`);
+  const earlier = lines.length - ROUNDS_LISTED;
+  return earlier > 0 ? [`  … ${earlier} earlier (--json has them all)`, ...lines.slice(-ROUNDS_LISTED)] : lines;
+}
+
 /** The app's goal in words: its state, round, checks, spending against its limits, an open question, and its report once it is over. */
 export function goalLines(ctx: Pick<Ctx, 'look'>, g: GoalState, now = Date.now()): string[] {
   const l = g.contract.limits;
@@ -107,6 +131,8 @@ export function goalLines(ctx: Pick<Ctx, 'look'>, g: GoalState, now = Date.now()
   if (g.contract.checks.length) {
     out.push('', ctx.look.p.dim('Checks'), ...g.contract.checks.map((c) => `  ${checkLine(ctx, c, latest?.results.find((r) => r.id === c.id))}`));
   }
+  const rounds = roundLines(ctx, g);
+  if (rounds.length) out.push('', ctx.look.p.dim('Rounds'), ...rounds);
   const q = g.question;
   if (q) {
     out.push('', ctx.look.p.dim('Question'), `  ${q.question}`);
@@ -327,7 +353,7 @@ export const sessions: Area = {
         resume: { type: 'boolean', desc: 'Go on with a paused goal' },
       },
       summary: 'Show, set, steer or clear a session’s goal',
-      help: 'A goal is what the agent keeps working towards, round after round, until checks you agree hold: say what “done” looks like. The agent first proposes the checks and the app measures where things stand; nothing starts before you press Start: --start does that here, as the button does in the app. With no words and no flag the command shows the goal: its state, the round, each check and whether it holds, what it has spent against its limits, a question that waits (its ways numbered from 1, the agent’s pick marked) and, once it is over, its report. One action a call: --answer 1,3 takes those ways in that order (--other adds a way of your own, --note a word for the agent), --wait holds the question instead of letting the agent’s pick go ahead, --more rounds=8,usd=5,minutes=60 changes the limits (what “Give it more…” does when it stopped at one), --rule adds a rule for every round, and --pause, --resume and --clear steer it. It keeps an agent working (and spending) until its checks hold or a limit is reached, so it is set only when you give the words. The app’s refusals (a goal not in a state for it) are printed as they are.',
+      help: 'A goal is what the agent keeps working towards, round after round, until checks you agree hold: say what “done” looks like. The agent first proposes the checks and the app measures where things stand; nothing starts before you press Start: --start does that here, as the button does in the app. With no words and no flag the command shows the goal: its state, the round, each check and whether it holds, the latest rounds (a line each, with the round it started from where that is not the one before it), what it has spent against its limits, a question that waits (its ways numbered from 1, the agent’s pick marked) and, once it is over, its report. One action a call: --answer 1,3 takes those ways in that order (--other adds a way of your own, --note a word for the agent), --wait holds the question instead of letting the agent’s pick go ahead, --more rounds=8,usd=5,minutes=60 changes the limits (what “Give it more…” does when it stopped at one), --rule adds a rule for every round, and --pause, --resume and --clear steer it. It keeps an agent working (and spending) until its checks hold or a limit is reached, so it is set only when you give the words. The app’s refusals (a goal not in a state for it) are printed as they are.',
       examples: [
         'hydor sessions goal 3f9a',
         'hydor sessions goal 3f9a "all tests pass and the PR is open"',

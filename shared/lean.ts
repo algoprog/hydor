@@ -3,8 +3,13 @@
 
 /** About what setting Lean up downloads, in MB (Lean 4.36 for Linux, macOS or Windows: 610 to 650; about 3.2 GB once unpacked). */
 export const LEAN_SIZE_MB = 620;
-/** About what Mathlib, the library most mathematics needs, takes on disk with its built files, in MB. */
-export const MATHLIB_SIZE_MB = 6000;
+/**
+ * About what adding Mathlib, the library most mathematics needs, downloads, in MB: its built files (9,117 of them,
+ * 480 MB) and the source it and its libraries are fetched from (Mathlib of Lean 4.36).
+ */
+export const MATHLIB_DOWNLOAD_MB = 600;
+/** About what it takes on disk once unpacked, in MB (measured: 7.8 GB). */
+export const MATHLIB_SIZE_MB = 7500;
 
 export interface LeanState {
   /** `lake` and `lean` are there to use: yours, or the app's own. */
@@ -25,6 +30,9 @@ export interface LeanState {
   /** About how much setting Lean up downloads, in MB. */
   sizeMb: number;
   mathlib: 'none' | 'installing' | 'ready';
+  /** About how much adding Mathlib downloads, in MB. */
+  mathlibDownloadMb: number;
+  /** About what Mathlib takes on disk, in MB. */
   mathlibSizeMb: number;
 }
 

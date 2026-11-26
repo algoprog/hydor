@@ -51,7 +51,7 @@ Each finding has:
 - **A statement**: the hypothesis or claim, in one sentence.
 - **A verdict**: **Supported**, **Refuted**, **Unclear**, or **Open** (stated, not tested yet).
 - **What was learned**: a sentence or two with the numbers, where it holds, or why it failed.
-- **Evidence**, at most 12 pieces: runs, scores and results tables of [Experiments](/guide/experiments), commits, files, papers and sessions. A number in what was learned needs the run, score or table it comes from, or the finding is refused.
+- **Evidence**, at most 12 pieces: runs, scores and results tables of [Experiments](/guide/experiments), commits, files, papers and sessions. A measured number in what was learned (a score, a gain, a share) needs the run, score or table it comes from, or, when it is what a paper reports, that paper; otherwise the finding is refused. Numbers in names (BM25, nDCG@10), years and counts such as 3 seeds are not measured numbers.
 
 **Agents record them.** In a project, agents are told to look at its findings before they propose or start an experiment, and to record one after each result, also when it did not work or was unclear. The [Research sprint](/guide/researchers#research-sprint) records one for each of its hypotheses, and **Try to break it** records its verdict on the claim. **Dead ends are kept on purpose**: the tidy-up never merges, sums up, moves or removes a finding (nor does building a wiki from the project's history read them), and a finding is never suggested for removal because no agent needed it lately. Two findings that disagree are both kept, until a later one replaces the other: the new one says what it replaces, and the old one leaves the list but stays in its history.
 

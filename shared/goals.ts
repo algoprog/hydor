@@ -144,6 +144,11 @@ export type GoalOutcome = 'start' | 'kept' | 'undone' | 'stays';
 export interface GoalRound {
   /** 0 is the start; rounds count from 1. */
   n: number;
+  /**
+   * The round whose files this one started from, by its number (0 is the start), written when the round starts. The
+   * start has none, and neither have the rounds of goals stored before this: read it through roundParents().
+   */
+  parent?: number;
   startedAt: number;
   endedAt: number;
   /** What the agent said it did, and what it thinks remains (goal_report). */
@@ -249,6 +254,8 @@ export interface GoalState {
   best?: number;
   /** The round in progress (the next number), while one runs. */
   round?: number;
+  /** The round whose files the round in progress started from (GoalRound.parent of it, once it is recorded). */
+  roundParent?: number;
   /**
    * Pause was pressed while a round ran: that round is finished and checked as any round (kept, undone or left as it
    * is), and then the goal pauses. Resume meanwhile takes the pause back, and the goal carries straight on.
@@ -334,6 +341,21 @@ export function closeness(c: GoalCheck, r: { holds: boolean; value?: number }, s
   if (!gap) return 0;
   const done = (r.value - start) / gap;
   return Math.max(0, Math.min(0.99, done));
+}
+
+/**
+ * The round each round started from, by number (the start, round 0, has none): what the round recorded (parent), else,
+ * for a goal stored before rounds did, what its outcomes say — the latest round before it whose files stayed (the start,
+ * kept, left as it is). Undone rounds leave no files behind, so none of them is ever read as a parent from outcomes.
+ */
+export function roundParents(rounds: readonly Pick<GoalRound, 'n' | 'outcome' | 'parent'>[]): Map<number, number> {
+  const out = new Map<number, number>();
+  let stayed = 0;
+  for (const r of [...rounds].sort((a, b) => a.n - b.n)) {
+    if (r.n > 0) out.set(r.n, r.parent != null && r.parent >= 0 && r.parent < r.n ? r.parent : stayed);
+    if (r.outcome !== 'undone') stayed = r.n;
+  }
+  return out;
 }
 
 /** A value of a measured check at the start of the goal (round 0). */

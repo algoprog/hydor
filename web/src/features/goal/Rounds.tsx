@@ -1,17 +1,41 @@
-// The rounds of a goal as a list: the start ("Where things stand") and every round since, each with what it did, what it
-// changed, how it ended and what it cost. A row opens to what the agent reported, each check's result and why it ended as
-// it did, and — where rounds can be undone — Your say: keep it anyway, undo it, or go another way from it.
+// The rounds of a goal as a list or as a map (RoundsMap.tsx), as you left it for this session on this device. The list:
+// the start ("Where things stand") and every round since, each with what it did, what it changed, how it ended and what
+// it cost. A row of the list, or a box of the map, opens to what the agent reported, each check's result and why it ended
+// as it did, and — where rounds can be undone — Your say: keep it anyway, undo it, or go another way from it.
 import { useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CircleAlert, Circle, Undo2, X } from 'lucide-react';
 import { meets, numeric, tally, type GoalCheck, type GoalRound, type GoalState } from '@shared/goals';
-import { Badge, Button, cx, inputCls } from '../../components/ui';
+import { Badge, Button, cx, inputCls, Segmented } from '../../components/ui';
+import { RoundsMap } from './RoundsMap';
 import { say } from './Say';
 import { useAct } from './state';
-import { before, busy, changeText, outcomeLabel, membersText, pauseWait, resultText, roundBroke, roundCost, roundName, scoringWords, shortLabel, sinceTitle, startResultText, valueText } from './words';
+import { busy, changeText, outcomeLabel, membersText, pauseWait, resultText, roundBroke, roundCost, roundName, scoringWords, shortLabel, sinceTitle, startResultText, valueText, wentBackTo } from './words';
 
 const ROWS_SHOWN = 8;
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+type View = 'list' | 'map';
+/** The sessions whose rounds you look at as a map, on this device: the latest hundred. */
+const MAPPED = 'wa.goalMap';
+
+function mapped(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(MAPPED) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function keepView(key: string, view: View) {
+  const rest = mapped().filter((x) => x !== key);
+  try {
+    localStorage.setItem(MAPPED, JSON.stringify(view === 'map' ? [...rest, key].slice(-100) : rest));
+  } catch {
+    // Storage full or off: it stays as chosen until the page goes.
+  }
+}
 
 function Marker({ g, r }: { g: GoalState; r: GoalRound }) {
   const cls = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full';
@@ -117,10 +141,10 @@ function SayPanel({ g, r, what, onClose }: { g: GoalState; r: GoalRound; what: '
   );
 }
 
-function Detail({ g, r }: { g: GoalState; r: GoalRound }) {
+function Detail({ g, r, className = 'border-t border-line bg-bg-1/40 sm:pl-12' }: { g: GoalState; r: GoalRound; className?: string }) {
   const [panel, setPanel] = useState<'keep' | 'undo' | 'from' | null>(null);
   const wait = busy(g.status);
-  const was = before(g, r);
+  const was = wentBackTo(g, r);
   const res = (c: GoalCheck) => r.results.find((x) => x.id === c.id);
   const sayBtn = (what: 'keep' | 'undo' | 'from', label: string) => (
     <span title={wait ? pauseWait(g) : undefined}>
@@ -130,7 +154,7 @@ function Detail({ g, r }: { g: GoalState; r: GoalRound }) {
     </span>
   );
   return (
-    <div className="space-y-2 border-t border-line bg-bg-1/40 px-4 py-3 text-[13px] sm:pl-12">
+    <div className={cx('space-y-2 px-4 py-3 text-[13px]', className)}>
       {r.did && (
         <p translate="no" className="leading-snug text-fg-2">
           {r.did}
@@ -249,24 +273,71 @@ function Running({ g }: { g: GoalState }) {
   );
 }
 
+/** The round tapped on the map, under it: which one and how it ended, and what its row in the list opens to. */
+function Picked({ g, r }: { g: GoalState; r: GoalRound }) {
+  return (
+    <div className="max-h-[min(240px,26dvh)] overflow-y-auto border-t border-line bg-bg-1/40">
+      <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
+        <span className="text-[13.5px] font-semibold">{r.n === 0 ? <>Where things stand</> : <>Round {r.n}</>}</span>
+        {outcomeLabel(r) && <Chip g={g} r={r} />}
+        {g.best === r.n && r.n > 0 && <Badge>Best so far</Badge>}
+        {r.n > 0 && <span className="ml-auto text-[11.5px] text-fg-3 tnum">{[roundCost(r), membersText(r)].filter(Boolean).join(' · ')}</span>}
+      </div>
+      {r.way && (
+        <p translate="no" className="px-4 pt-1 text-[13px] font-medium">
+          {r.way}
+        </p>
+      )}
+      <Detail key={r.n} g={g} r={r} className="" />
+    </div>
+  );
+}
+
 export function Rounds({ g, onClose, className }: { g: GoalState; onClose: () => void; className?: string }) {
   const [open, setOpen] = useState<number | null>(null);
+  const [view, setView] = useState<View>(() => (mapped().includes(g.key) ? 'map' : 'list'));
   const t = tally(g);
+  const picked = g.rounds.find((r) => r.n === open);
+  const show = (v: View) => {
+    setView(v);
+    keepView(g.key, v);
+  };
   return (
     <div className={cx('anim-expand overflow-hidden rounded-2xl border border-line bg-panel', className)}>
-      <button type="button" onClick={onClose} aria-label="Close the rounds" className="flex w-full items-center gap-2 px-4 py-2 text-left text-[13px] hover:bg-bg-2/60">
-        <ChevronDown size={14} className="shrink-0 text-fg-3" />
-        <span className="font-medium">Rounds</span>
-        <span className="text-fg-3">
-          {t.kept} kept · {t.undone} undone
+      <div className="flex items-center gap-2 pr-2">
+        <button type="button" onClick={onClose} aria-label="Close the rounds" className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-4 text-left text-[13px] hover:bg-bg-2/60">
+          <ChevronDown size={14} className="shrink-0 text-fg-3" />
+          <span className="font-medium">Rounds</span>
+          <span className="min-w-0 truncate text-fg-3">
+            {t.kept} kept · {t.undone} undone
+          </span>
+        </button>
+        {/* "Map" of the rounds, not of places: its own part for the translations. */}
+        <span data-i18n="goalmap" className="shrink-0 py-1">
+          <Segmented<View>
+            size="sm"
+            value={view}
+            onChange={show}
+            options={[
+              { value: 'list', label: 'List' },
+              { value: 'map', label: 'Map' },
+            ]}
+          />
         </span>
-      </button>
-      <ul className={cx('divide-y divide-line/60 border-t border-line', g.rounds.length > ROWS_SHOWN && 'max-h-[320px] overflow-y-auto')}>
-        {g.rounds.map((r) => (
-          <Row key={r.n} g={g} r={r} open={open === r.n} toggle={() => setOpen(open === r.n ? null : r.n)} />
-        ))}
-        <Running g={g} />
-      </ul>
+      </div>
+      {view === 'map' ? (
+        <>
+          <RoundsMap g={g} open={open} onOpen={setOpen} />
+          {picked && <Picked g={g} r={picked} />}
+        </>
+      ) : (
+        <ul className={cx('divide-y divide-line/60 border-t border-line', g.rounds.length > ROWS_SHOWN && 'max-h-[320px] overflow-y-auto')}>
+          {g.rounds.map((r) => (
+            <Row key={r.n} g={g} r={r} open={open === r.n} toggle={() => setOpen(open === r.n ? null : r.n)} />
+          ))}
+          <Running g={g} />
+        </ul>
+      )}
     </div>
   );
 }

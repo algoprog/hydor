@@ -22,7 +22,8 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { ruleFor } from '../guide/api.ts';
 import { internalHeaders } from '../internal.ts';
-import { allowedFolder, changesOf, check, cleanSpec, createEvaluation, getEvaluation, getScore, limits, listScores, resumeScores, rootFor, startScore, updateEvaluation, verdictOf, waitScore } from './evaluations.ts';
+import { allowedFolder, changesOf, check, cleanSpec, createEvaluation, getEvaluation, getScore, limits, listScores, resumeScores, rootFor, startScore, testReadable, updateEvaluation, verdictOf, waitScore } from './evaluations.ts';
+import { TEST_READABLE } from '../../shared/evaluations.ts';
 import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
 import { forgetNotices, setSettings, submit, tick, cleanJob, useDeps } from './queue.ts';
@@ -796,6 +797,7 @@ test('evaluation_score asks as experiment_run does, scores the session’s folde
   assert.equal(s.status, 'done', s.why);
   near(s.mean, 0.92);
   assert.equal(s.against.verdict, 'better');
+  assert.equal(s.noBaseline, undefined, 'there is a baseline');
   assert.equal(s.folder, work);
   assert.equal(s.runs.length, 3);
   assert.match(s.page, /^\/experiments\?evaluation=e/);
@@ -838,6 +840,9 @@ test('evaluation_propose asks the person on a card with every field, and creates
   sessions.answer = 'accept';
   const yes = await tool('evaluation_propose', args);
   assert.equal(yes.json.created, true, yes.text);
+  assert.deepEqual(yes.json.finalTest, { set: true, runs: 0, command: 'sh score.sh --final' }, 'the answer echoes the final test’s command');
+  // Held out outside the project: nothing to say about it.
+  assert.ok(!card.detail!.includes(TEST_READABLE) && !yes.json.note);
   assert.equal(count(), before + 1);
   assert.equal(getEvaluation(db, yes.json.id)!.seal.n, 1);
   assert.match((await tool('evaluation_propose', { ...args, protect: ['nothing'] })).text, /Nothing in the folder matches/);
@@ -845,6 +850,39 @@ test('evaluation_propose asks the person on a card with every field, and creates
   assert.match((await tool('evaluation_propose', args)).text, /only reads/);
   sessions.mode = 'default';
   await call('DELETE', `/api/experiments/evaluations/${yes.json.id}`);
+});
+
+test('a final test whose data agents can read is said to be so: on the card, in the answer, on the page and as it is typed', async () => {
+  const project = path.join(tmp, 'readable');
+  write(path.join(project, 'scorer', 'score.sh'), 'echo err=0.1\n');
+  write(path.join(project, 'data', 'test.txt'), 'x\n');
+  gitIn(project, 'init', '-q', '-b', 'main');
+  const cwd = path.join(project, 'scorer');
+  assert.equal(testReadable(cwd, undefined), true);
+  assert.equal(testReadable(cwd, path.join(project, 'data')), true, 'beside the evaluation’s folder, still in the project');
+  assert.equal(testReadable(cwd, held), false);
+  assert.equal(testReadable(work, repo), true, 'a worktree’s project is its repository');
+  const args = { name: 'Readable', cwd, command: 'sh score.sh', metric: 'err', better: 'lower', protect: ['score.sh'], gpus: 0, why: 'It is the number.' };
+  sessions.answer = 'accept';
+  for (const final of [{ command: 'sh score.sh --final' }, { command: 'sh score.sh --final', heldOut: path.join(project, 'data') }]) {
+    const made = await tool('evaluation_propose', { ...args, final });
+    assert.equal(made.json.created, true, made.text);
+    assert.ok(sessions.cards.at(-1)!.detail!.includes(TEST_READABLE), 'on the card');
+    assert.equal(made.json.note, TEST_READABLE);
+    assert.equal(made.json.finalTest.command, 'sh score.sh --final');
+    for (const agent of [false, true]) assert.equal((await call('GET', `/api/experiments/evaluations/${made.json.id}`, undefined, agent)).body.evaluation.testReadable, true);
+    await call('DELETE', `/api/experiments/evaluations/${made.json.id}`);
+  }
+  const none = await tool('evaluation_propose', args);
+  assert.ok(!sessions.cards.at(-1)!.detail!.includes(TEST_READABLE) && !none.json.note, 'no final test, nothing to say');
+  assert.deepEqual(none.json.finalTest, { set: false, runs: 0 });
+  // A score with no baseline says so, and whose it is to measure; evaluation_get says the same of the baseline.
+  const s = (await tool('evaluation_score', { id: none.json.id, cwd, wait: 1 })).json;
+  assert.equal(s.noBaseline, `There is no baseline yet, so the score is not compared with one: only the person measures it, on the evaluation’s page (/experiments?evaluation=${none.json.id}).`);
+  assert.match(experimentTools(ctx({})).find((t) => t.name === 'evaluation_get')!.description, /it is theirs to measure, not yours/);
+  await call('DELETE', `/api/experiments/evaluations/${none.json.id}`);
+  const typed = async (h: string) => (await call('GET', `/api/experiments/evaluations/suggest?cwd=${encodeURIComponent(cwd)}&heldOut=${encodeURIComponent(h)}`)).body.testReadable;
+  assert.deepEqual([await typed(path.join(project, 'data')), await typed(held)], [true, false]);
 });
 
 test('steps may read and score, a confidential session may only read, and agents are told', async () => {

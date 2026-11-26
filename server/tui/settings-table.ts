@@ -202,7 +202,7 @@ row('general', 'Add Mathlib', 'action', {
   states: ['added', 'not added'],
   read: { endpoint: '/api/lean', pick: (d) => d.mathlib === 'ready' },
   act: {
-    question: 'Add Mathlib to Lean (several GB, about 6 GB once it is there; Lean is set up first if it is not)?',
+    question: 'Add Mathlib to Lean (a download of about 600 MB, about 8 GB once unpacked; Lean is set up first if it is not)?',
     run: async (api) => {
       await api('POST', '/api/lean/setup', { mathlib: true });
       return ['Adding Mathlib in the background; hydor settings get general.add-mathlib says when it is there.'];

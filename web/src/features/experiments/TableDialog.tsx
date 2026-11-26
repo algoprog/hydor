@@ -25,7 +25,7 @@ export interface TableStart {
   table?: ResultsTable;
 }
 
-/** The table as it reads: mean ± std, the best in bold, a dagger where it is significantly better. */
+/** The table as it reads: mean ± std, the best in bold, a dagger where it is significantly better, a double one where worse. */
 function Preview({ t }: { t: ResultsTable }) {
   const cols = t.spec.columns;
   const digits = (ci: number) => {
@@ -64,6 +64,7 @@ function Preview({ t }: { t: ResultsTable }) {
                         <span className={x.best ? 'font-bold' : ''}>{x.mean.toFixed(digits(ci))}</span>
                         {x.n > 1 && x.std != null && <span className="text-fg-3"> ± {x.std.toFixed(digits(ci))}</span>}
                         {x.significant && <span className="text-accent"> †</span>}
+                        {x.verdict === 'worse' && <span className="text-warn"> ‡</span>}
                       </>
                     )}
                   </td>

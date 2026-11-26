@@ -756,7 +756,10 @@ async function unfinished(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, w: Worktre
   if (m.by === 'undo' && m.record) {
     const r: GoalRound = { ...m.record, outcome: 'stays', why: [m.record.why && bare(m.record.why), `Putting its files back did not finish${why ? ` (${why})` : ''}`].filter(Boolean).join('. ') };
     f.rounds = [...f.rounds.filter((x) => x.n !== r.n), r].sort((x, y) => x.n - y.n);
-    if (r.results.length) f.best = r.n;
+    if (r.results.length) {
+      f.best = r.n;
+      f._.halfIn = undefined;
+    }
     if (f.round === r.n) {
       f.round = undefined;
       f._.report = undefined;
@@ -1096,6 +1099,7 @@ function atLimit(d: Deps, g: StoredGoal, reason: string) {
   if (mid != null) {
     const half: GoalRound = {
       n: mid,
+      ...(g._.parent != null ? { parent: g._.parent } : {}),
       startedAt: g._.roundStartedAt ?? Date.now(),
       endedAt: Date.now(),
       ...(g._.report?.did ? { did: g._.report.did } : {}),
@@ -1108,6 +1112,7 @@ function atLimit(d: Deps, g: StoredGoal, reason: string) {
       usd: 0,
     };
     g.rounds = [...g.rounds.filter((r) => r.n !== mid), half];
+    g._.halfIn = mid;
     g._.report = undefined;
     g._.way = undefined;
     g._.roundBase = undefined;
@@ -1358,7 +1363,11 @@ async function startRound(d: Deps, g: StoredGoal, o: { changeApproach?: boolean 
   const since = g.rounds.filter((r) => r.n > (g._.askedAfter ?? 0));
   // Every check holds and something is left to put right: it says so first, as long as they all still hold where the files stand.
   const fix = g._.fix && allButYouHold(g.contract.checks, standing(g)) ? g._.fix : undefined;
-  const text = roundMessage(g, { n, way, note: g._.note, from: g._.from, changeApproach: o.changeApproach || g._.changeApproach || stalled(since), fix, ...(crew ? { swarm: { members: crew } } : {}) });
+  // Whose files it starts from: the best round's (Keep anyway, Undo and Another way from here make theirs the best), or
+  // those of a round a limit stopped midway, whose work is still in the folder.
+  const parent = g._.halfIn ?? g.best ?? 0;
+  g._.parent = parent;
+  const text = roundMessage(g, { n, parent, way, note: g._.note, from: g._.from, changeApproach: o.changeApproach || g._.changeApproach || stalled(since), fix, ...(crew ? { swarm: { members: crew } } : {}) });
   g._.note = undefined;
   g._.from = undefined;
   g._.changeApproach = undefined;
@@ -1843,6 +1852,7 @@ async function checkStep(d: Deps, key: string) {
   const spent = spentNow(d, key);
   const record: GoalRound = {
     n,
+    ...(g._.parent != null ? { parent: g._.parent } : {}),
     startedAt: g._.roundStartedAt ?? Date.now(),
     endedAt: Date.now(),
     ...(g._.report?.did ? { did: g._.report.did } : {}),
@@ -1886,7 +1896,10 @@ async function checkStep(d: Deps, key: string) {
   // The round's checkpoint: the safety one when it was undone (all that was in the folder: Keep anyway brings it back).
   const round: GoalRound = { ...record, outcome, ...(notUndone ? { why: [record.why && bare(record.why), `It was not undone: ${notUndone}`].filter(Boolean).join('. ') } : {}), ...(saved || ckpt ? { checkpoint: saved ?? ckpt } : {}) };
   g.rounds = [...g.rounds.filter((r) => r.n !== n), round];
-  if (outcome !== 'undone') g.best = n;
+  if (outcome !== 'undone') {
+    g.best = n;
+    g._.halfIn = undefined;
+  }
   g.round = undefined;
   g._.report = undefined;
   g._.way = undefined;
@@ -2704,6 +2717,8 @@ async function sayOnRound(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAc
       else f.best = rr.n;
       if (a.do === 'from') f._.from = rr.n;
     }
+    // The files stand where the say put them: no round cut midway is in the folder any more.
+    f._.halfIn = undefined;
     // An open question is withdrawn, and a round left unchecked (paused midway) is dropped: the files moved under them.
     f.question = undefined;
     f._.ask = undefined;

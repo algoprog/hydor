@@ -540,9 +540,64 @@ test('a results table: mean ± std, the best in bold, Welch with Holm against sc
   assert.ok(t.markdown.includes('| ours | **83.37** ± 0.25 † | **0.453** ± 0.015 † |'), t.markdown);
   assert.ok(t.markdown.endsWith("† Better than base at p < 0.05 (Welch's t-test over 3 seeds, Holm-corrected)."));
   const csv = t.csv.split('\n');
-  assert.equal(csv[0], 'row,label,acc_mean,acc_std,acc_n,acc_p,acc_p_holm,acc_significant,loss_mean,loss_std,loss_n,loss_p,loss_p_holm,loss_significant');
+  assert.equal(csv[0], 'row,label,acc_mean,acc_std,acc_n,acc_p,acc_p_holm,acc_significant,acc_verdict,loss_mean,loss_std,loss_n,loss_p,loss_p_holm,loss_significant,loss_verdict');
+  assert.deepEqual([ours.cells[0].verdict, other.cells[0].verdict, base.cells[0].verdict], ['better', 'same', undefined]);
   assert.ok(csv[2].startsWith('ours,ours,83.3666666666666'), csv[2]);
   assert.deepEqual(tableMarks(`a\n% hydor:table tabc1234\nb\n  % hydor:table tx9\n`), ['tabc1234']);
+});
+
+test('worse than the baseline is marked apart from no difference, and the caption says the mark once', () => {
+  const mk = (id: string, group: string, seed: number, acc: number, loss: number) => ({ id, status: 'done', createdAt: seed, command: 'x', cwd: tmp, group, seed, metrics: { last: { acc, loss } } }) as RunRecord;
+  const runs = [80, 81, 82].flatMap((v, i) => [mk(`wb${i}`, 'base', i, v, 1 + i / 10), mk(`wu${i}`, 'up', i, v + 5 + i / 10, 0.2 + i / 20), mk(`wd${i}`, 'down', i, v - 5 - i / 10, 3 + i / 9), mk(`we${i}`, 'even', i, v + (i - 1) / 2, 1 + (2 - i) / 10)]);
+  const t = makeTable({ runs: runs.map((r) => r.id), columns: [{ metric: 'acc', better: 'max' }, { metric: 'loss', better: 'min' }], test: 'welch', correction: 'none', baseline: 'base', caption: 'Accuracy and loss, mean ± std over seeds 1-3.' }, runs, { id: 'tworse01', scores: () => null });
+  const wide = makeTable({ runs: runs.map((r) => r.id), columns: [{ metric: 'acc', better: 'max' }], test: 'paired', baseline: 'base', correction: 'none' }, runs, { id: 'tworse02', scores: () => null });
+  assert.deepEqual(['up', 'down', 'even'].map((k) => wide.rows.find((r) => r.key === k)!.cells[0].verdict), ['better', 'worse', 'same']);
+  assert.ok(wide.latex.includes('$^\\dagger$ \\\\') && wide.latex.includes('$^\\ddagger$ \\\\'), wide.latex);
+  assert.match(wide.latex, /\$\^\\ddagger\$ Worse than base, by the same test\./);
+  assert.match(wide.markdown, /\| down \|[^\n]* ‡ \|/);
+  assert.ok(wide.footnote!.endsWith('‡ Worse than base, by the same test.'));
+  assert.match(wide.csv, /\ndown,down,[^\n]*,no,worse\n/);
+  assert.match(wide.csv, /\nup,up,[^\n]*,yes,better\n/);
+  assert.match(wide.csv, /\neven,even,[^\n]*,no,same\n/);
+  // Where lower is better, lower is the better verdict.
+  assert.equal(t.rows.find((r) => r.key === 'down')!.cells[1].verdict, 'worse');
+  assert.equal(t.rows.find((r) => r.key === 'up')!.cells[1].verdict, 'better');
+  // The writer's caption already says what the numbers are: not said twice.
+  assert.equal(/\\caption\{[^\n]*/.exec(t.latex)![0].match(/mean/gi)!.length, 1, t.latex);
+  assert.equal(t.markdown.match(/mean|Mean/g)!.length, 1, t.markdown);
+  assert.match(t.markdown, /over seeds 1-3\. The best in bold\./);
+});
+
+test('seeds that barely change a number are not tested over seeds, and the table says why; per example they are', () => {
+  // As a real trial had it: one side comes out the same for every seed, the other varies a little.
+  const note = 'BM25, nDCG@10: The seeds barely change this number, so a test over seeds says little: compare per example (give the runs a scores file)';
+  const mk = (id: string, group: string, seed: number, ndcg: number, scores?: boolean) => ({ id, status: 'done', createdAt: seed, command: 'x', cwd: tmp, group, seed, metrics: { last: { ndcg } }, ...(scores ? { scores: true, folder: `/${id}` } : {}) }) as RunRecord;
+  const values = { counts: [0.9027, 0.9014, 0.8987], BM25: [0.9696, 0.9696, 0.9696000000000001] };
+  const runs = (scores: boolean) => Object.entries(values).flatMap(([g, vs]) => vs.map((v, i) => mk(`${g}${i}`, g, i, v, scores)));
+  const spec = { columns: [{ metric: 'ndcg', better: 'max' as const, label: 'nDCG@10' }], baseline: 'counts' };
+  for (const test of [undefined, 'welch', 'paired'] as const) {
+    const t = makeTable({ ...spec, test }, runs(false), { id: 'tflat001', scores: () => null });
+    const cell = t.rows.find((r) => r.key === 'BM25')!.cells[0];
+    assert.deepEqual([cell.p, cell.pAdj, cell.significant, cell.verdict, cell.best], [undefined, undefined, undefined, undefined, true], String(test));
+    assert.deepEqual(t.notes, [note]);
+    assert.equal(t.footnote, undefined);
+    assert.ok(!t.latex.includes('dagger') && !t.markdown.includes('†'));
+    assert.ok(t.latex.includes(`% hydor:table tflat001\n% ${note}\n\\begin{tabular}`), t.latex);
+    assert.ok(t.markdown.endsWith(`<!-- ${note} -->`), t.markdown);
+    // Put into a paper and made again, the comment stays one line under its marker.
+    const placed = insertTable(insertTable('\\end{document}', t).text, t);
+    assert.equal(placed.text.split(note).length, 2);
+  }
+  // Under a thousandth of the mean is next to nothing too; more is a spread a test can use.
+  const near = (spread: number) => makeTable(spec, [0, 1, 2].flatMap((i) => [mk(`c${i}`, 'counts', i, 0.9 + i * 0.01), mk(`n${i}`, 'BM25', i, 0.95 + (i - 1) * spread)]), { id: 'tflat002', scores: () => null });
+  assert.equal(near(0.0005).rows[1].cells[0].verdict, undefined);
+  assert.ok(near(0.003).rows[1].cells[0].verdict);
+  // With per-example scores the test is over examples, as before, and marked.
+  const per = (r: RunRecord) => new Map([['ndcg', new Map([0, 1, 2, 3, 4, 5].map((k) => [`q${k}`, r.group === 'BM25' ? 0.9 + k / 100 : 0.8 + k / 90]))]]);
+  const e = makeTable(spec, runs(true), { id: 'tflat003', scores: per });
+  assert.deepEqual(e.tests, ['paired t-test over 6 examples']);
+  assert.equal(e.rows.find((r) => r.key === 'BM25')!.cells[0].verdict, 'better');
+  assert.equal(e.notes, undefined);
 });
 
 test('tests pick themselves: paired over seeds when the rows share seeds, over examples when runs kept scores', () => {

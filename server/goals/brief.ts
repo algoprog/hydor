@@ -2,13 +2,15 @@
 // out the checks), the reminder when it did not, the message that starts each round, and the one that asks which way
 // next. Each starts with goalHead(…) on its own line, which the conversation draws as one slim row, and ends by saying
 // the app sent it. brief-test.ts checks every rule.
-import { goalHead, goalMessageOf, numeric, standing, targetText, type GoalCheck, type GoalResult, type GoalRound, type GoalState, type GoalWay } from '../../shared/goals.ts';
+import { goalHead, goalMessageOf, numeric, roundParents, standing, targetText, type GoalCheck, type GoalResult, type GoalRound, type GoalState, type GoalWay } from '../../shared/goals.ts';
 import { num } from './verdict.ts';
 
 export const GOAL_FOOT = '(This message is from the app’s goal loop, not typed by the user.)';
 /** At most this much of one check's output, and of all of them, in a round message. */
 export const DETAIL_EACH = 1200;
 export const DETAIL_ALL = 4000;
+/** At most this many of the dead ends from where a round starts are named, the newest; their room comes out of DETAIL_ALL. */
+export const DEAD_ENDS = 6;
 
 const quote = (s: string) => s.trim().replace(/\n{3,}/g, '\n\n');
 const end = (s: string, n: number) => (s.length > n ? `…${s.slice(-(n - 1))}` : s);
@@ -77,13 +79,12 @@ export function scoresNote(g: Pick<GoalState, 'contract' | 'rounds' | 'best'>): 
   ].join('\n');
 }
 
-/** Holds and Not yet, as the files stand, and the detail of each check that does not hold. */
-export function whereItStands(g: Pick<GoalState, 'contract' | 'rounds' | 'best'>): { holds: string[]; notYet: string[]; details: string[] } {
+/** Holds and Not yet, as the files stand, and the detail of each check that does not hold (`room` characters of it at most). */
+export function whereItStands(g: Pick<GoalState, 'contract' | 'rounds' | 'best'>, room = DETAIL_ALL): { holds: string[]; notYet: string[]; details: string[] } {
   const res = standing(g);
   const holds: string[] = [];
   const notYet: string[] = [];
   const details: string[] = [];
-  let room = DETAIL_ALL;
   for (const c of g.contract.checks) {
     const r = res.find((x) => x.id === c.id);
     if (r?.holds) {
@@ -102,8 +103,8 @@ export function whereItStands(g: Pick<GoalState, 'contract' | 'rounds' | 'best'>
 }
 
 /** Where things stand, in the order a message gives it: Holds and Not yet, then (for a round) what failing checks said, and what was dropped. */
-function standingParts(g: Pick<GoalState, 'contract' | 'rounds' | 'best' | 'dropped'>) {
-  const w = whereItStands(g);
+function standingParts(g: Pick<GoalState, 'contract' | 'rounds' | 'best' | 'dropped'>, room?: number) {
+  const w = whereItStands(g, room);
   return {
     holds: [w.holds.length ? `Holds: ${w.holds.join('; ')}` : 'Holds: nothing yet', w.notYet.length ? `Not yet: ${w.notYet.join('; ')}` : ''].filter(Boolean).join('\n'),
     details: w.details.length ? `What the checks that do not hold said (the end of each):\n${w.details.join('\n\n')}` : '',
@@ -128,24 +129,42 @@ function lastRound(g: Pick<GoalState, 'rounds' | 'best'> & { undo?: boolean }): 
 }
 
 /** A round in a line: what it tried (its way, else the first sentence of what it did) and how it ended. */
-function triedLine(r: GoalRound): string {
+function triedLine(r: GoalRound, max = { what: 300, why: 200 }): string {
   const what = r.way ?? (r.did ? r.did.split(/(?<=[.!?])\s/)[0] : 'no report of what it did');
   const ended = r.outcome === 'kept' ? 'kept' : r.outcome === 'stays' ? 'not better' : 'undone';
   const why = r.reason ?? r.why;
-  return `- Round ${r.n}: ${end1(what, 300)} (${ended}${why ? `: ${end1(why, 200)}` : ''})`;
+  return `- Round ${r.n}: ${end1(what, max.what)} (${ended}${why ? `: ${end1(why, max.why)}` : ''})`;
 }
 const end1 = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+/** How many of the rounds after the one the person went back to "Last round:" lists (wentBack). */
+const WENT_BACK = 8;
+
+/**
+ * The dead ends from where this round starts: the rounds that started from the same round (`parent`, 0 the start) and
+ * were undone, so that it does not walk into one of them again. Those "Last round:" lists already (after the person
+ * went another way) are left out.
+ */
+function deadEnds(g: Pick<GoalState, 'rounds'>, parent: number | undefined, from: number | undefined): string {
+  if (parent == null) return '';
+  const parents = roundParents(g.rounds);
+  const said = new Set(from != null ? g.rounds.filter((r) => r.n > from).slice(-WENT_BACK).map((r) => r.n) : []);
+  const ends = g.rounds.filter((r) => r.n > 0 && r.outcome === 'undone' && parents.get(r.n) === parent && !said.has(r.n)).slice(-DEAD_ENDS);
+  if (!ends.length) return '';
+  const at = parent ? `after round ${parent}` : 'the start';
+  return `From here (${at}), these were tried and undone; do not try them again:\n${ends.map((r) => triedLine(r, { what: 160, why: 120 })).join('\n')}`;
+}
 
 /**
  * "Last round:" when the person took the files back to round `from` to go on from there another way: where the files
  * stand and why, and what the rounds after it tried, so that the next one does not try it again.
  */
 function wentBack(g: Pick<GoalState, 'rounds'>, from: number): string {
-  const after = g.rounds.filter((r) => r.n > from).slice(-8);
+  const after = g.rounds.filter((r) => r.n > from).slice(-WENT_BACK);
   const at = from ? `round ${from}` : 'the start';
   const head = `Last round: the user took the files back to ${at}, to go on from there another way: the files stand as they were ${from ? `after round ${from}` : 'at the start'}.`;
   if (!after.length) return `${head} Go another way from there.`;
-  return `${head} What the rounds after it tried (go another way, do not repeat these):\n${after.map(triedLine).join('\n')}`;
+  return `${head} What the rounds after it tried (go another way, do not repeat these):\n${after.map((r) => triedLine(r)).join('\n')}`;
 }
 
 /** What is left to put right once every check holds: what the final check found, or a check of the person's they say does not hold yet. */
@@ -164,6 +183,8 @@ const wayText = (w: GoalWay) => `${w.name}${w.why ? ` (${w.why})` : ''}${w.expec
 export interface RoundBrief {
   /** The round's number, and of how many. */
   n: number;
+  /** The round whose files it starts from (0 is the start): what was tried from there and undone is named. */
+  parent?: number;
   /** The way to follow this round (taken off `next`). */
   way?: GoalWay;
   /** The person's note with their last answer. */
@@ -204,13 +225,16 @@ function swarmClose(g: Pick<GoalState, 'rounds'>, team: NonNullable<RoundBrief['
 export function roundMessage(g: Pick<GoalState, 'contract' | 'rounds' | 'best' | 'dropped' | 'rules'> & { undo?: boolean }, o: RoundBrief): string {
   const user = [...g.rules.map((r) => `- ${r.text}`), o.note?.trim() ? `- ${o.note.trim()}` : ''].filter(Boolean);
   const fromUser = join([user.length ? `From the user (follow these first):\n${user.join('\n')}` : '', o.way ? `The way to follow this round: ${wayText(o.way)}` : '']);
-  const st = standingParts(g);
+  const ends = deadEnds(g, o.parent, o.from);
+  // The dead ends take their room from what the failing checks said, so the message grows no longer than it could before.
+  const st = standingParts(g, Math.max(0, DETAIL_ALL - ends.length));
   return join([
     goalHead(`round ${o.n} of ${g.contract.limits.rounds}`),
     `The goal: “${quote(g.contract.objective)}”`,
     o.fix ? fixText(o.fix) : '',
     st.holds,
     o.from != null ? wentBack(g, o.from) : lastRound(g),
+    ends,
     scoresNote(g),
     st.details,
     st.dropped,

@@ -97,6 +97,7 @@ going until the proof holds.
 - Names and signatures change between Mathlib versions: check a name with `#check` here rather
   than trusting memory.
 - `decide` fails or runs for ages on large numbers; do not reach for `native_decide` instead.
-- A first build of a project can take long: in a terminal, `lake exe cache get` (Mathlib
-  projects), then `lake build`.
+- A project that requires Mathlib is not checked until its own copy is there: in a terminal in
+  the project, `lake exe cache get` (it needs the network and about 8 GB; tell the person first).
+  A first `lake build` of a project's own files can take long too.
 - Keep the file Lean checks and the file you report the same: verify after the last edit.

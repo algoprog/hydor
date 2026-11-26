@@ -9,14 +9,14 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { appEnv, appPaths, findLean, lastLines, mathlibDir, onPath, run, type Lean, type Ran, type RunOptions } from '../../scripts/agent-tools/lib/lean/core.mjs';
-import { LEAN_SIZE_MB, MATHLIB_SIZE_MB, type LeanState } from '../../shared/lean.ts';
+import { LEAN_SIZE_MB, MATHLIB_DOWNLOAD_MB, MATHLIB_SIZE_MB, type LeanState } from '../../shared/lean.ts';
 import { config } from '../config.ts';
 import { agentBaseEnv } from '../env.ts';
 import { WIN } from '../platform.ts';
 
-/** Free disk needed: the toolchain's download and its 3.2 GB unpacked; Mathlib's source, built files and their download. */
+/** Free disk needed: the toolchain's download and its 3.2 GB unpacked; Mathlib's source, built files (7.5 GB) and their download. */
 const DISK_MB = 5 * 1024;
-const MATHLIB_DISK_MB = 12 * 1024;
+const MATHLIB_DISK_MB = 10 * 1024;
 
 const ELAN_SCRIPT = WIN ? 'https://elan.lean-lang.org/elan-init.ps1' : 'https://elan.lean-lang.org/elan-init.sh';
 const MATHLIB_REPO = 'https://github.com/leanprover-community/mathlib4.git';
@@ -121,6 +121,7 @@ export function leanState(): LeanState {
     ...(can.why ? { why: can.why } : {}),
     sizeMb: LEAN_SIZE_MB,
     mathlib: doingMathlib ? 'installing' : l && mathlib() ? 'ready' : 'none',
+    mathlibDownloadMb: MATHLIB_DOWNLOAD_MB,
     mathlibSizeMb: MATHLIB_SIZE_MB,
   };
 }
@@ -195,8 +196,9 @@ async function installMathlib() {
   // Mathlib's own cache of downloads goes in the app's folder, not your home folder.
   const env = { ...l.env, MATHLIB_CACHE_DIR: p.mathlibCache };
   const at = { env, cwd: p.mathlib };
-  await doing('Getting Mathlib’s source', l.lake, ['update'], { ...at, minutes: 60 });
-  await doing('Downloading Mathlib’s built files (several GB)', l.lake, ['exe', 'cache', 'get'], { ...at, minutes: 180 });
+  // Mathlib would fetch its built files at the end of `lake update`: left to the next step, which says what it does.
+  await doing('Getting Mathlib’s source', l.lake, ['update'], { ...at, env: { ...env, MATHLIB_NO_CACHE_ON_UPDATE: '1' }, minutes: 60 });
+  await doing('Downloading Mathlib’s built files (about 500 MB)', l.lake, ['exe', 'cache', 'get'], { ...at, minutes: 180 });
   fs.writeFileSync(path.join(p.mathlib, 'Probe.lean'), PROBE);
   await doing('Checking that Mathlib works', l.lake, ['lean', 'Probe.lean'], { ...at, minutes: 20 });
   fs.writeFileSync(p.mathlibMarker, `${toolchain}\n`);
@@ -223,6 +225,8 @@ export function setupLean(o: { mathlib?: boolean } = {}): Promise<void> {
   const removed = life.signal;
   settingUp = (async () => {
     try {
+      // What is still being removed goes first.
+      await removing;
       fs.mkdirSync(world.dir(), { recursive: true });
       if (needsLean) await installLean();
       if (alsoMathlib && !removed.aborted) {
@@ -246,20 +250,31 @@ async function stopSetup() {
   if (settingUp) await settingUp.catch(() => {});
 }
 
-/** Removes the app's own Lean and Mathlib (or Mathlib alone), stopping a set-up first. Your own Lean stays as it is. */
+/** Done once what is being removed is gone. */
+let removing: Promise<unknown> = Promise.resolve();
+
+/**
+ * Removes the app's own Lean and Mathlib (or Mathlib alone), stopping a set-up first. Your own Lean stays as it is.
+ * Mathlib is some 150,000 files: they go in the background of the app, which answers meanwhile.
+ */
 export async function removeLean(o: { mathlib?: boolean } = {}): Promise<void> {
   const dir = world.dir();
   const p = appPaths(dir);
-  const gone = (f: string) => fs.rmSync(f, { recursive: true, force: true });
+  const gone = async (...paths: string[]) => {
+    // The markers first: it is not ready from this moment.
+    for (const m of [p.mathlibMarker, ...(o.mathlib ? [] : [p.marker])]) fs.rmSync(m, { force: true });
+    const going = Promise.all(paths.map((f) => fs.promises.rm(f, { recursive: true, force: true, maxRetries: 3 })));
+    removing = Promise.allSettled([removing, going]);
+    await going;
+  };
   if (o.mathlib) {
     // Stops Mathlib's step, or takes it off what is being set up; Lean's own set-up goes on.
     if (settingUp && phase === 'mathlib') await stopSetup();
     else alsoMathlib = false;
-    gone(p.mathlib);
-    gone(p.mathlibCache);
+    await gone(p.mathlib, p.mathlibCache);
   } else {
     await stopSetup();
-    gone(dir);
+    await gone(dir);
   }
   lastError = undefined;
   own = null;

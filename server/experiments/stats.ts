@@ -5,9 +5,9 @@
 
 export const mean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
 
-/** The sample standard deviation (n − 1); 0 for a single value. */
+/** The sample standard deviation (n − 1); 0 for a single value, and for values that are all the same (not the rounding of their mean). */
 export function std(xs: number[]): number {
-  if (xs.length < 2) return 0;
+  if (xs.length < 2 || xs.every((x) => x === xs[0])) return 0;
   const m = mean(xs);
   return Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1));
 }

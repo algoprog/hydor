@@ -106,6 +106,53 @@ function history(t0: number, undo: boolean): GoalRound[] {
   ];
 }
 
+/**
+ * The rounds of a goal that took more than one way, for the map: 3 undone (from 2), 4 kept, then two dead ends from 4
+ * (5 and 6), Another way from here on round 2 (7, a line of its own), a dead end from 7, and 9 the best. Where rounds
+ * cannot be undone there is no going back: those not kept are left as they are, and each round starts where the last
+ * one left the files.
+ */
+function branched(t0: number, undo: boolean): GoalRound[] {
+  const out = undo ? ('undone' as const) : ('stays' as const);
+  const from = (n: number, parent: number) => (undo ? parent : n - 1);
+  const [start, one, two, three, four, five, six] = history(t0, undo);
+  return [
+    start,
+    { ...one, parent: 0 },
+    { ...two, parent: 1 },
+    { ...three, parent: from(3, 2) },
+    { ...four, parent: from(4, 2) },
+    { ...five, parent: from(5, 4) },
+    { ...six, parent: from(6, 4) },
+    round(7, 64, 6, { parent: from(7, 2), rel: 0.77, speed: 352, way: 'Keyword and vector search, fused', did: 'Fused keyword and vector results.', usd: 0.58 }, t0),
+    round(8, 71, 7, { parent: from(8, 7), rel: 0.78, speed: 520, way: 'Rewrite queries with a small model first', did: 'Rewrote the query before the search.', outcome: out, cause: 'behind', why: 'Speed fell far behind its best (352 → 520 ms)', usd: 0.5 }, t0),
+    round(9, 79, 8, { parent: from(9, 7), rel: 0.79, speed: 224, way: 'Cache the vectors of frequent queries', did: 'Cached the vectors of frequent queries.', usd: 0.55 }, t0),
+  ];
+}
+
+/** Thirty rounds, the default limit: every third not kept, and twice Another way from an earlier round. */
+function long(t0: number, undo: boolean): GoalRound[] {
+  const out = [round(0, 2, 2, { rel: 0.61, speed: 340, outcome: 'start', usd: 0.08 }, t0)];
+  let best = 0;
+  for (let n = 1; n <= 30; n++) {
+    if (undo && n === 12) best = 5;
+    if (undo && n === 23) best = 17;
+    const kept = n % 3 !== 0 && n % 7 !== 0;
+    const rel = Math.round((0.61 + n * 0.006) * 100) / 100;
+    out.push(
+      round(
+        n,
+        2 + n * 6,
+        6,
+        { parent: best, rel, speed: 340 - n * 4, way: `Try ${['field weights', 'a synonym list', 'a smaller index', 'query expansion', 'a re-ranker'][n % 5]}`, ...(kept ? {} : { outcome: undo ? ('undone' as const) : ('stays' as const), cause: 'none' as const, why: 'No gain' }) },
+        t0,
+      ),
+    );
+    if (kept || !undo) best = n;
+  }
+  return out;
+}
+
 const way = (name: string, why: string, expects: string, cost: string): GoalWay => ({ name, why, expects, cost });
 
 export const WAYS: GoalWay[] = [
@@ -404,6 +451,77 @@ export function samples(now = Date.now()): GoalSample[] {
           final: g.rounds.at(-1)!.results,
           finals: [{ evaluation: 'ev1', name: 'Search relevance' }],
         };
+      }),
+    );
+    // The map of attempts, in each state the dock has: dead ends, and a line of its own after Another way from here.
+    const tried = branched(t0, undo);
+    const mapRun = (g: GoalState) => {
+      midRun(g);
+      g.rounds = tried;
+      g.best = 9;
+      g.spentUsd = 4.7;
+      g.activeMs = 77 * MIN;
+    };
+    const atWork = (g: GoalState) => {
+      g.round = 10;
+      g.roundParent = 9;
+    };
+    out.push(
+      mk('map-working', 'Map: working', undo, (g) => {
+        mapRun(g);
+        atWork(g);
+      }),
+      mk('map-checking', 'Map: checking', undo, (g) => {
+        mapRun(g);
+        atWork(g);
+        g.status = 'checking';
+      }),
+      mk('map-asking', 'Map: asking', undo, (g) => {
+        mapRun(g);
+        g.status = 'asking';
+        g.question = asked(now, { context: 'Best so far is round 9: Relevance 0.79 (needs 0.80), Speed 224 ms (needs 200).' });
+      }),
+      // Right after Another way from here on round 2 (only where rounds can be undone): the next round goes on from
+      // there, in a line of its own.
+      ...(undo
+        ? [
+            mk('map-from', 'Map: another way from here, the round at work', undo, (g) => {
+              mapRun(g);
+              g.rounds = tried.slice(0, 7);
+              g.best = 2;
+              g.round = 7;
+              g.roundParent = 2;
+            }),
+          ]
+        : []),
+      mk('map-reached', 'Map: reached', undo, (g) => {
+        mapRun(g);
+        const last = round(10, 84, 5, { parent: 9, rel: 0.82, speed: 187, way: 'Smaller vectors for the cache', did: 'Stored the cached vectors at half the size.', usd: 0.4 }, t0);
+        g.rounds = [...tried, last];
+        g.best = 10;
+        g.status = 'reached';
+        g.spentUsd = 5.1;
+        g.activeMs = 82 * MIN;
+        g.endedAt = now - MIN;
+        g.report = { summary: 'All 5 checks hold in the last round, and again in a final check on a clean copy.', final: last.results };
+      }),
+      mk('map-limit', 'Map: stopped at a limit', undo, (g) => {
+        mapRun(g);
+        g.contract = { ...g.contract, limits: { ...g.contract.limits, rounds: 9 } };
+        g.status = 'limit';
+        g.reason = 'It ran its 9 rounds';
+        g.endedAt = now - MIN;
+        g.report = { summary: 'Relevance 0.79 and Speed 224 ms: both still just short.' };
+      }),
+      mk('map-long', 'Map: thirty rounds', undo, (g) => {
+        mapRun(g);
+        g.rounds = long(t0, undo);
+        g.best = undo ? 29 : 30;
+        g.contract = { ...g.contract, limits: { ...g.contract.limits, rounds: 30 } };
+        g.status = 'limit';
+        g.reason = 'It ran its 30 rounds';
+        g.endedAt = now - MIN;
+        g.report = { summary: 'It ran its 30 rounds.' };
       }),
     );
   }

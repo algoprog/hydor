@@ -273,11 +273,11 @@ Agents can start one with your yes on a card, and read how it goes. They cannot 
 - **Test against the baseline**: **Pick for me** (paired over examples when the runs kept per-example scores, else paired over seeds when the rows' runs share their seeds, else Welch's t-test over seeds), **Welch’s t-test over seeds**, **Paired t-test (by seed or by example)**, **Paired bootstrap over examples** or **No test**.
 - **Caption**.
 
-Each cell is the mean ± the standard deviation over the row's runs (its seeds); the best of each column is in bold; a dagger (†) marks a cell that is better than the baseline at p < 0.05, after Holm's correction for testing several rows. Hover over a cell for its p-values. A line under the table says which test was made, and what was left out (runs that have not ended, or without these metrics).
+Each cell is the mean ± the standard deviation over the row's runs (its seeds); the best of each column is in bold; a dagger (†) marks a cell that is better than the baseline at p < 0.05, after Holm's correction for testing several rows, and a double dagger (‡) one that is worse. When the seeds barely change a number (it comes out the same, or almost, for every seed) and the runs kept no per-example scores, that comparison gets no mark: a note under the table says a test over seeds says little, and to compare per example. Hover over a cell for its p-values. A line under the table says which test was made, and what was left out (runs that have not ended, or without these metrics).
 
 Then:
 
-- **Copy LaTeX**: a `table` with booktabs' rules (add `\usepackage{booktabs}` to your preamble), the best in `\textbf`, `$\pm$` and daggers, and a caption that says how the cells read.
+- **Copy LaTeX**: a `table` with booktabs' rules (add `\usepackage{booktabs}` to your preamble), the best in `\textbf`, `$\pm$`, daggers and double daggers, and a caption that says how the cells read.
 - **Copy Markdown** and **Download CSV** (each metric's mean, standard deviation, number of runs and p-values).
 - **Put it in a LaTeX document**: pick one of your LaTeX documents (kept in a project's files, or with its conversation), then one of its files. The table goes before `\end{document}` (or at the end of a file without it), or in place of the table it made there before, keeping your own caption and label. It is saved as a new version of the document, as your own edits are.
 

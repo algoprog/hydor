@@ -17,7 +17,7 @@ import { vaultTables } from '../connections/vault.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import { forgetAll } from '../apps/sturdy.ts';
 import { research } from './index.ts';
-import { fallbackQueries, JUDGE_SYSTEM, judgePrompt, mergeCandidates, priorDeps, priorWork, QUERIES_SYSTEM, setPriorDepsForTests, writeQueries, type Candidate, type PriorDeps } from './prior-work.ts';
+import { fallbackQueries, JUDGE_SYSTEM, judgePrompt, mergeCandidates, pickJudged, priorDeps, priorWork, QUERIES_SYSTEM, setPriorDepsForTests, writeQueries, type Candidate, type PriorDeps } from './prior-work.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -52,6 +52,7 @@ interface P {
   oa?: string;
   s2?: string;
   related?: string[];
+  cited?: number;
 }
 
 const SAME: P = { title: 'Short-to-long curriculum learning for dense retrieval', abstract: 'We train a dense retriever with a curriculum from short queries to long queries, ordering examples by query length.', year: 2023, arxiv: '2301.00001', authors: ['First Author', 'Second Author', 'Third Author', 'Fourth Author'] };
@@ -81,7 +82,7 @@ const openAlex = (list: P[]) =>
       authorships: (p.authors ?? []).map((a) => ({ author: { display_name: a } })),
       primary_location: { source: p.venue ? { display_name: p.venue } : null, landing_page_url: p.arxiv ? `https://arxiv.org/abs/${p.arxiv}` : null },
       abstract_inverted_index: inverted(p.abstract),
-      cited_by_count: 3,
+      cited_by_count: p.cited ?? 3,
       related_works: (p.related ?? []).map((w) => `https://openalex.org/${w}`),
     })),
   });
@@ -124,12 +125,12 @@ const titlesIn = (prompt: string) => [...prompt.matchAll(/<paper n="(\d+)">\nTit
 const judging = (relations: Record<string, string>, extra: Record<string, unknown> = {}) => (prompt: string) =>
   JSON.stringify({ papers: titlesIn(prompt).map((p) => ({ n: p.n, relation: relations[p.title] ?? 'unrelated', same: `Both are what paper ${p.n} is about.`, differs: 'The order differs.' })), summary: 'Curricula for rankers exist. None of these orders them by query length.', ...extra });
 const askOf =
-  (answers: (string | ((prompt: string) => string) | Error)[], queries: string[] | Error = QUERIES): PriorDeps['ask'] =>
+  (answers: (string | ((prompt: string) => string) | Error)[], queries: string[] | Error = QUERIES, named: { name?: string; origin?: string } = {}): PriorDeps['ask'] =>
   async (q) => {
     model.push(q);
     if (q.system === QUERIES_SYSTEM) {
       if (queries instanceof Error) throw queries;
-      return `Here they are:\n${JSON.stringify({ queries })}`;
+      return `Here they are:\n${JSON.stringify({ queries, ...named })}`;
     }
     const a = answers.shift() ?? new Error('no more answers');
     if (a instanceof Error) throw a;
@@ -144,6 +145,92 @@ function stand(w: World, answers: Parameters<typeof askOf>[0], queries?: string[
 }
 
 const WORLD: World = { arxiv: [SAME, NEAR], openalex: [CLOSE, { ...SAME, doi: '10.1000/short.long', venue: 'ACL' }, FAR], s2: [{ ...SAME, title: 'Short-to-Long Curriculum Learning for Dense Retrieval.' }, CLOSE] };
+
+// ---- the trial: whether BM25 is new -----------------------------------------------------------------------------
+
+const BM25_IDEA =
+  'Rank documents for a query by weighting query term matches with inverse document frequency and normalising term frequency by document length (the BM25 scoring function), instead of summing raw term counts. The claim is that this is a new way of ranking.';
+/** The work that introduced it: a short abstract, many citations. */
+const FOUNDING: P = { title: 'The Probabilistic Relevance Framework: BM25 and Beyond', abstract: 'A framework for retrieval.', year: 2009, doi: '10.1561/1500000019', venue: 'Foundations and Trends in Information Retrieval', cited: 8174 };
+/** A self-published review that says the idea's own words back, and a paper from 1986. */
+const UPLOAD: P = { title: 'From TF-IDF to BM25: term weighting with inverse document frequency and document length', abstract: 'Rank documents for a query by weighting query term matches with inverse document frequency and normalising term frequency by document length, instead of raw term counts: the BM25 scoring function.', year: 2026, doi: '10.5281/zenodo.18358873', venue: 'Zenodo (CERN European Organization for Nuclear Research)', cited: 0 };
+const OLDER: P = { title: 'An experimental study of factors important in document ranking', abstract: 'Documents are ranked for a query with inverse document frequency weighting of term matches and term frequency normalised by document length.', year: 1986, doi: '10.1145/253168.253206', venue: 'SIGIR', cited: 90 };
+/** Enough papers nearer in words than the founding one to fill the judge's fifteen places without it. */
+const CROWD: P[] = Array.from({ length: 24 }, (_, i) => ({ title: `Term weighting study ${i + 1}`, abstract: 'Rank documents for a query by weighting query term matches with inverse document frequency, normalising term frequency by document length.', year: 2015, doi: `10.1000/crowd.${i}`, venue: 'SIGIR', cited: 2 }));
+const BM25_WORLD: World = { openalex: [UPLOAD, OLDER, ...CROWD, FOUNDING], arxiv: [], s2: [] };
+const NAMED = { name: 'BM25', origin: 'BM25 introduced Okapi' };
+
+test('the trial: the method’s name and its source are searched for, and the founding paper is judged and given above the upload', async () => {
+  const w = await writeQueries({ idea: BM25_IDEA }, { ...stand({}, []), ask: askOf([], QUERIES, NAMED) });
+  assert.equal(w.name, 'BM25');
+  assert.deepEqual(w.queries.slice(0, 3), ['BM25', 'BM25 introduced Okapi', QUERIES[0]]);
+  assert.equal(w.queries.length, 8, 'no more searches than before');
+  const noOrigin = await writeQueries({ idea: BM25_IDEA }, { ...stand({}, []), ask: askOf([], QUERIES, { name: 'BM25' }) });
+  assert.deepEqual(noOrigin.queries.slice(0, 2), ['BM25', 'BM25 original paper']);
+  assert.equal((await writeQueries({ idea: IDEA }, stand({}, []))).name, undefined);
+  assert.match(QUERIES_SYSTEM, /"name": the method’s usual name alone/);
+  assert.match(QUERIES_SYSTEM, /the work that introduced it: its name with "original paper" or "introduced", or with its first authors’ names/);
+  assert.match(JUDGE_SYSTEM, /a much-cited paper whose title names the method in the idea is likely the source of that method, even when its abstract is short or missing/);
+
+  const all = { [FOUNDING.title]: 'same', [UPLOAD.title]: 'same', [OLDER.title]: 'same', ...Object.fromEntries(CROWD.map((p) => [p.title, 'related'])) };
+  const d = { ...stand(BM25_WORLD, []), ask: askOf([judging(all)], QUERIES, NAMED) };
+  const r = await priorWork({ idea: BM25_IDEA, field: 'information retrieval' }, d);
+  assert.equal(r.verdict, 'known');
+  assert.ok(asked.some((u) => u.includes('/works?search=BM25&')), 'the name alone is searched');
+  const prompt = model.at(-1)!.prompt;
+  assert.equal(titlesIn(prompt).length, 15);
+  assert.ok(titlesIn(prompt).some((p) => p.title === FOUNDING.title), 'a short abstract does not keep the founding paper from the judge');
+  assert.match(prompt, /Title: The Probabilistic Relevance Framework: BM25 and Beyond\nYear: 2009\nVenue: [^\n]*\nCited by: 8174\n/);
+  const places = r.closest.map((p) => p.title);
+  assert.equal(places[0], FOUNDING.title, places.join(' | '));
+  assert.equal(places[1], OLDER.title, 'then the cited ones by nearness');
+  const upload = places.indexOf(UPLOAD.title);
+  assert.ok(upload < 0 || upload > places.indexOf(OLDER.title), 'the upload stands below the cited ones');
+  // Without a model to name it, the citations still count, and nothing breaks.
+  const plain = await priorWork({ idea: BM25_IDEA }, stand(BM25_WORLD, [judging(all)]));
+  assert.equal(plain.verdict, 'known');
+});
+
+test('among papers of one relation: the much-cited first, an upload or a record with no venue never above a cited paper; the relation comes before all', async () => {
+  const paper = (title: string, o: Partial<P>): P => ({ title, abstract: BM25_IDEA, year: 2020, doi: `10.1000/${title.replace(/\W+/g, '.')}`, venue: 'SIGIR', cited: 0, ...o });
+  const list = [
+    paper('Zenodo upload', { venue: 'Zenodo (CERN European Organization for Nuclear Research)', doi: '10.5281/zenodo.1' }),
+    paper('ResearchGate upload', { venue: 'ResearchGate', cited: 4 }),
+    paper('SSRN preprint', { venue: 'SSRN Electronic Journal', doi: '10.2139/ssrn.1' }),
+    paper('No venue', { venue: undefined, cited: 2 }),
+    paper('Cited a little', { cited: 5 }),
+    paper('Cited much', { cited: 400 }),
+    paper('Cited most', { cited: 900 }),
+    paper('Another relation entirely', { cited: 5000 }),
+  ];
+  const r = await priorWork({ idea: BM25_IDEA, limit: 8 }, stand({ openalex: list, arxiv: [], s2: [] }, [judging({ ...Object.fromEntries(list.map((p) => [p.title, 'same'])), 'Another relation entirely': 'related' })]));
+  const got = r.closest.map((p) => p.title);
+  assert.deepEqual(got.slice(0, 3), ['Cited most', 'Cited much', 'Cited a little']);
+  assert.deepEqual(got.slice(3, 7).sort(), ['No venue', 'ResearchGate upload', 'SSRN preprint', 'Zenodo upload']);
+  assert.equal(got[7], 'Another relation entirely');
+  // The same paper found in a repository and where it was published is the published one.
+  const [one] = mergeCandidates([
+    { title: 'The same paper twice over', abstract: '', authors: [], url: 'https://example.org/a', venue: 'Zenodo' },
+    { title: 'The same paper twice over', abstract: '', authors: [], url: 'https://example.org/b', venue: 'SIGIR' },
+  ]);
+  assert.equal(one.venue, 'SIGIR');
+});
+
+test('which fifteen are judged: nearness with a little for citations, and a method’s much-cited sources whatever their nearness', () => {
+  const c = (title: string, citations = 0): Candidate => ({ title, abstract: '', authors: [], url: 'https://example.org/x', citations });
+  const near = Array.from({ length: 20 }, (_, i) => c(`Near ${i}`));
+  const founding = c('Okapi BM25 and beyond', 8000);
+  const cited = c('A cited classic', 3000);
+  const scores = new Map<Candidate, number>([...near.map((x, i) => [x, 0.6 - i * 0.001] as const), [founding, 0.05], [cited, 0.5]]);
+  const all = [...near, founding, cited];
+  const named = pickJudged(all, scores, 'BM25');
+  assert.equal(named.length, 15);
+  assert.ok(named.includes(founding) && named.includes(cited));
+  assert.equal(named[0], cited, '0.5 and its citations stand above 0.6 uncited');
+  assert.ok(!pickJudged(all, scores, undefined).includes(founding), 'without a name, nearness and citations alone');
+  assert.ok(!pickJudged(all, scores, 'BM2').includes(founding), 'the name as a word of its own');
+  assert.deepEqual(pickJudged(all, scores, 'BM25'), named, 'the same every time');
+});
 
 // ---- the stages -------------------------------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@
 // refuses), or it is an agent on call, whose rules the user gave.
 import crypto from 'node:crypto';
 import path from 'node:path';
-import type { EvalScore, EvalSpec, Evaluation } from '../../shared/evaluations.ts';
+import { TEST_READABLE, type EvalScore, type EvalSpec, type Evaluation } from '../../shared/evaluations.ts';
 import { ACTIVE, type RunRecord, type RunStatus } from '../../shared/experiments.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
@@ -14,7 +14,7 @@ import { config } from '../config.ts';
 import type { RunCtx, RunTool, ToolOutput } from '../features/types.ts';
 import { confirmChange, modeOf } from '../guide/api.ts';
 import { makeTable, runView, startSweep } from './api.ts';
-import { allowedFolder, ChangedError, check, cleanSpec, createEvaluation, evaluationsFor, getEvaluation, getScore, listed, listScores, measure, mustEvaluation, rootFor, startScore, waitScore } from './evaluations.ts';
+import { allowedFolder, ChangedError, check, cleanSpec, createEvaluation, evaluationsFor, getEvaluation, getScore, listed, listScores, measure, mustEvaluation, rootFor, startScore, testReadable, waitScore } from './evaluations.ts';
 import type { Candidate, Evolution } from '../../shared/evolve.ts';
 import { candidateDetail, candidatesOf, checkEvolveSpec, EVOLVE, listEvolutions, mustEvolution, startEvolution } from './evolve.ts';
 import { cleanJob, onCallSession, placesLine, runAgain, stopRun, submit, waitRuns, whereWords } from './queue.ts';
@@ -310,7 +310,7 @@ const STOP: RunTool = {
 const TABLE: RunTool = {
   name: 'experiment_table',
   description:
-    'Make a results table from runs of Experiments: a row per experiment (group) or per value of a setting ("param:lr"), the runs of a row averaged over seeds (mean ± std), the best of each column in bold, each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired over seeds when they share seeds, else Welch’s t-test; Holm-corrected), † on significant cells. Returns it as LaTeX (booktabs, with a “% hydor:table <id>” line that lets the numbers be checked again later: keep it), Markdown and CSV.',
+    'Make a results table from runs of Experiments: a row per experiment (group) or per value of a setting ("param:lr"), the runs of a row averaged over seeds (mean ± std), the best of each column in bold, each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired over seeds when they share seeds, else Welch’s t-test; Holm-corrected), † on cells significantly better than the baseline and ‡ on those significantly worse (each tested cell has verdict: "better", "worse" or "same"). When the seeds barely change a number and there are no per-example scores, it is not tested and the table’s notes say so: give the runs a scoresFile. Returns it as LaTeX (booktabs, with a “% hydor:table <id>” line that lets the numbers be checked again later: keep it), Markdown and CSV.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -415,7 +415,7 @@ const EVAL_GET: RunTool = {
   name: 'evaluation_get',
   annotations: { readOnlyHint: true },
   description:
-    'Read a project’s evaluations (Experiments → Evaluations): one scoring command and one number, sealed so every run is scored the same way. Gives, for the folder (yours unless cwd says another): each evaluation’s id, name, command, metric, which way is better, seeds, the files it protects, whether they are as sealed there (sealed: { ok, changed }), its baseline, its 5 latest scores (mean, std, against the baseline, folder, branch, when) and whether it has a final test (never that test’s numbers). With score, that score.',
+    'Read a project’s evaluations (Experiments → Evaluations): one scoring command and one number, sealed so every run is scored the same way. Gives, for the folder (yours unless cwd says another): each evaluation’s id, name, command, metric, which way is better, seeds, the files it protects, whether they are as sealed there (sealed: { ok, changed }), its baseline (null until the person measures it on the evaluation’s page: it is theirs to measure, not yours), its 5 latest scores (mean, std, against the baseline, folder, branch, when) and whether it has a final test (never that test’s numbers). With score, that score.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -498,6 +498,7 @@ const EVAL_SCORE: RunTool = {
         runs: s.runs,
         ...(s.lent ? { lent: s.lent } : {}),
         page: evalPage(ev.id, s.id),
+        ...(listed(db, mustEvaluation(db, ev.id)).baselineScore ? {} : { noBaseline: `There is no baseline yet, so the score is not compared with one: only the person measures it, on the evaluation’s page (${evalPage(ev.id)}).` }),
         ...(over ? {} : { note: `Still ${s.status}: read it later with evaluation_get, score "${s.id}".` }),
       });
     } catch (e) {
@@ -534,7 +535,7 @@ function proposalWords(spec: EvalSpec, sealed: { files: number; bytes: number },
     `**Protected** (no score while these differ from how they are sealed):\n\n${spec.protect.map((p) => `- ${code(p)}`).join('\n')}`,
     `**Sealed now:** ${sealed.files} file${sealed.files === 1 ? '' : 's'}, ${size(sealed.bytes)}`,
     spec.final
-      ? `**Final test** (only you run it):\n\n${fenced(spec.final.command)}\n\n**Held-out data:** ${spec.final.heldOut ? code(spec.final.heldOut) : 'none'}`
+      ? `**Final test** (only you run it):\n\n${fenced(spec.final.command)}\n\n**Held-out data:** ${spec.final.heldOut ? code(spec.final.heldOut) : 'none'}${testReadable(spec.cwd, spec.final.heldOut) ? `\n\n${TEST_READABLE}` : ''}`
       : '**Final test:** none',
     `**Each run asks for:** ${asks.length ? asks.join(', ') : 'what a run asks for by default (a GPU when this computer has one)'}`,
     `**Why the agent proposes it:**\n\n${why
@@ -580,7 +581,7 @@ const EVAL_PROPOSE: RunTool = {
       const no = await confirmChange(ctx, { title: `Create and seal the evaluation “${spec.name}”?`, detail, level: 'ask', label: 'Create and seal' });
       if (no) return failed(no);
       const ev = await createEvaluation(ctx.deps, spec);
-      return json({ created: true, id: ev.id, name: ev.name, folder: ev.cwd, command: ev.command, metric: ev.metric, better: ev.better, seeds: ev.seeds, protect: ev.protect, seal: ev.seal, finalTest: { set: !!ev.final, runs: 0 }, page: evalPage(ev.id) });
+      return json({ created: true, id: ev.id, name: ev.name, folder: ev.cwd, command: ev.command, metric: ev.metric, better: ev.better, seeds: ev.seeds, protect: ev.protect, seal: ev.seal, finalTest: { set: !!ev.final, runs: 0, ...(ev.final ? { command: ev.final.command } : {}) }, ...(ev.final && testReadable(ev.cwd, ev.final.heldOut) ? { note: TEST_READABLE } : {}), page: evalPage(ev.id) });
     } catch (e) {
       return failed(e);
     }

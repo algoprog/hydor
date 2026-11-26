@@ -25,7 +25,7 @@ export interface PriorWork {
   verdict: PriorVerdict;
   /** Two or three sentences: what exists, what does not seem to. */
   summary: string;
-  /** The nearest first, at most 8. */
+  /** By relation, the much-cited first among those of one relation; at most 8. */
   closest: PriorPaper[];
   searched: { queries: string[]; sources: string[]; candidates: number };
   /** Always says that finding nothing is not proof that it is new. */

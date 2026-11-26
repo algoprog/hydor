@@ -4,7 +4,7 @@
 // an evolution.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, FlaskConical, Lock, MoreHorizontal, Pencil, Play, Sprout, Trash2 } from 'lucide-react';
-import type { EvalRestored, EvalScore, Evaluation } from '@shared/evaluations';
+import { TEST_READABLE, type EvalRestored, type EvalScore, type Evaluation } from '@shared/evaluations';
 import { ApiError, del, post, put } from '../../lib/api';
 import { folderName } from '../../lib/folderNames';
 import { go, sessionPath } from '../../lib/nav';
@@ -483,6 +483,7 @@ function Tiles({ data, onMeasure, onFinal, onAddFinal, onOpenRun, busy }: { data
             )}
           </>
         )}
+        {ev.testReadable && <Sub>{TEST_READABLE}</Sub>}
       </Tile>
     </div>
   );
