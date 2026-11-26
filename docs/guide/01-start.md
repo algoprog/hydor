@@ -87,7 +87,7 @@ Each row shows the agent's icon with a status dot, the session's title, and a se
 - a target: the session has a goal;
 - a pin: it is pinned (in the **Pinned** group, which says so, there is none).
 
-While Custom works or starts, its working indicator uses the Hydor loading animation (water rising and falling in its Ω) instead of a rotating agent icon. Loading marks sit vertically centred beside their text.
+While Custom works or starts, its working indicator uses the Hydor loading animation (a stream of bright water running through its Ω) instead of a rotating agent icon. Loading marks sit vertically centred beside their text.
 
 The status dot says how a session is doing:
 

@@ -87,7 +87,7 @@ Cada linha mostra o ícone do agente com um ponto de status, o título da sessã
 - um alvo: a sessão tem uma meta;
 - um alfinete: ela está fixada (no grupo **Fixados**, que já indica isso, não aparece).
 
-Enquanto o Custom trabalha ou inicia, o indicador de atividade dele usa a animação de carregamento do Hydor (água subindo e descendo no Ω) em vez de um ícone de agente giratório. As marcas de carregamento ficam centralizadas na vertical ao lado do texto.
+Enquanto o Custom trabalha ou inicia, o indicador de atividade dele usa a animação de carregamento do Hydor (um fluxo de água brilhante percorrendo o Ω) em vez de um ícone de agente giratório. As marcas de carregamento ficam centralizadas na vertical ao lado do texto.
 
 O ponto de status indica como está uma sessão:
 

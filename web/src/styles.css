@@ -347,10 +347,13 @@ html {
   animation: fade-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* Loading: the app's mark at work (Throbber), whole from the first frame so even a short load shows it:
-   water rises and falls in the Ω, its surface a wave moving along. Custom's icon does the same while it works.
-   The water is a mask (WaterOmega in Logo.tsx): .water-level sets its height in the mark's 512 units (84 is
-   full, 420 empty) and .water-flow moves the wave by one wavelength (180). */
+/* Loading: the app's mark at work (Throbber, and Custom's icon while it works), from the first frame so even a short
+   load shows it: the Ω dims to a bed and a stream of bright water runs through it, foot to foot (CurrentOmega in
+   Logo.tsx; the logo's Ω does the same while the app starts or updates). The stream is a dash on the Ω's path, whose
+   length counts as 100: .current-run moves its tail along the path, slowly then fast (current-pos), while its length
+   swells to 40 and falls back (current-len), so it spurts out of one foot, stretches round the bowl and gathers into
+   the other; .current-fade hides it at the two ends, where it is a dot. .current-late is the paler stream a moment
+   behind. They start part way in, the stream already out. */
 .throbber {
   display: inline-block;
   width: 1em;
@@ -361,27 +364,49 @@ html {
   flex-shrink: 0;
   overflow: visible;
 }
-.water-level {
-  transform: translateY(84px);
+.current-run {
+  stroke-dasharray: 0 200;
+  animation:
+    current-len 1.7s linear -0.4s infinite,
+    current-pos 1.7s cubic-bezier(0.4, 0, 0.75, 0.45) -0.4s infinite;
 }
-.throbber-water {
-  animation: water-ebb 1.8s ease-in-out infinite;
+.current-fade {
+  animation: current-fade 1.7s linear -0.4s infinite;
 }
-.throbber-water .water-flow {
-  animation: water-flow 1.1s linear infinite;
+.current-late,
+.current-late .current-run {
+  animation-delay: -0.3s;
 }
-@keyframes water-ebb {
-  0%,
-  100% {
-    transform: translateY(336px);
+/* Custom's icon: the Ω dims as its work starts and is whole again when it ends. */
+.current-bed {
+  transition: opacity 240ms ease;
+}
+@keyframes current-len {
+  0% {
+    stroke-dasharray: 0 200;
+    animation-timing-function: ease-out;
   }
   50% {
-    transform: translateY(176px);
+    stroke-dasharray: 40 200;
+    animation-timing-function: ease-in;
+  }
+  100% {
+    stroke-dasharray: 0 200;
   }
 }
-@keyframes water-flow {
+@keyframes current-pos {
   to {
-    transform: translateX(-180px);
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes current-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  9%,
+  90% {
+    opacity: 1;
   }
 }
 @keyframes throb-glow {
@@ -1647,8 +1672,8 @@ html[data-motion='full'] .anim-modal-soft {
 
 /* The desktop app installing a new version (UpdateScreen.tsx): the loading logo of index.html #boot, played again. The
    app clears to the page colour (as lib/boot.ts clears it, reversed) and the logo comes in as its exit played
-   backwards; the words follow, and the sea under them rises slowly. The water runs under every Motion setting, as the
-   throbber does (it is work in progress): only the system's Reduce motion stops it. */
+   backwards; the words follow, and the sea under them rises slowly. The stream in its Ω is the throbber's (.current-run),
+   which runs under every Motion setting (it is work in progress): only the system's Reduce motion stops it. */
 html:not([data-motion=off]) .update-screen {
   animation: overlay-in 420ms ease-out both;
 }
@@ -1665,55 +1690,10 @@ html:not([data-motion=off]) .update-mark {
 html:not([data-motion=off]) .update-words {
   animation: overlay-in 500ms ease-out 650ms both;
 }
-.update-fill {
-  transform: translateY(112px);
-  animation: update-fill 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards;
-}
-.update-ebb {
-  animation: update-ebb 3.2s ease-in-out 1.9s infinite;
-}
-.update-bob {
-  animation: update-bob 2.6s ease-in-out infinite;
-}
-.update-swell {
-  animation: update-swell 1.5s linear infinite;
-}
-@keyframes update-fill {
-  to {
-    transform: translateY(8px);
-  }
-}
-@keyframes update-ebb {
-  50% {
-    transform: translateY(12px);
-  }
-}
-@keyframes update-bob {
-  50% {
-    transform: translateY(4px);
-  }
-}
-@keyframes update-swell {
-  to {
-    transform: translateX(-36px);
-  }
-}
 .update-screen .tour-sea-waves {
   transition-duration: 18s;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
-@media (prefers-reduced-motion: reduce) {
-  .update-fill {
-    transform: translateY(8px);
-    animation: none !important;
-  }
-  .update-ebb,
-  .update-bob,
-  .update-swell {
-    animation: none !important;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1723,11 +1703,13 @@ html:not([data-motion=off]) .update-words {
     transition-duration: 1ms !important;
   }
 }
+/* No stream: the Ω stands whole in the sea's colours, and a loader glows slowly instead. */
 @media (prefers-reduced-motion: reduce) {
-  .throbber-water,
-  .water-flow {
-    animation: none !important;
-    transform: none;
+  .current {
+    display: none;
+  }
+  .current-bed {
+    opacity: 1 !important;
   }
   .throbber {
     animation: throb-glow 1.6s ease-in-out infinite !important;

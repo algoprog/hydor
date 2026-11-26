@@ -1,14 +1,14 @@
 import { useId } from 'react';
 import type { Agent } from '@shared/types';
-import { MARK_BOX, WaterOmega } from './Logo';
+import { CurrentOmega, MARK_BOX } from './Logo';
 import { cx } from './ui';
 
-/** Custom, the app's own agent: the app's mark without its tile, the Ω full of water; it ebbs and flows while it works. */
+/** Custom, the app's own agent: the app's mark without its tile, the Ω in the sea's colours; a stream runs through it while it works. */
 function CustomMark({ size, className, working }: { size: number; className?: string; working?: boolean }) {
   const id = useId();
   return (
     <svg width={size} height={size} viewBox={MARK_BOX} className={cx('shrink-0 text-fg-2', className)} aria-label="Custom" role="img">
-      <WaterOmega id={id} water={working ? 'throbber-water' : undefined} />
+      <CurrentOmega id={id} running={working} />
     </svg>
   );
 }

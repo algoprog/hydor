@@ -1,6 +1,6 @@
 import { clsx } from 'clsx';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { MARK_BOX, WaterOmega } from './Logo';
+import { CurrentOmega, MARK_BOX } from './Logo';
 import {
   createContext,
   forwardRef,
@@ -69,13 +69,13 @@ export const IconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTM
   },
 );
 
-/** Loading: the app's mark at work, whole from the first frame: water rises and falls in the Ω, its surface a
- * moving wave. As tall as the text around it unless given a size (in px, for a page that is loading). */
+/** Loading: the app's mark at work, from the first frame: a stream of bright water runs through the Ω, foot to
+ * foot. As tall as the text around it unless given a size (in px, for a page that is loading). */
 export function Throbber({ className, size }: { className?: string; size?: number }) {
   const id = useId();
   return (
     <svg viewBox={MARK_BOX} className={cx('throbber', className)} style={size ? { width: size, height: size } : undefined} aria-hidden>
-      <WaterOmega id={id} water="throbber-water" />
+      <CurrentOmega id={id} running />
     </svg>
   );
 }

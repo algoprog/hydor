@@ -1,7 +1,7 @@
 // The desktop app installing its new version: the whole window is the logo and its rising water until the window
 // closes and opens again on the new version. It reads as the app's own start (index.html #boot) played backwards and
-// then forwards: the page colour clears over the app, the logo comes in exactly where the loading logo stands, its Ω
-// fills with water that keeps moving, and the reopened window starts on that same logo, so the change is not seen.
+// then forwards: the page colour clears over the app, the logo comes in exactly where the loading logo stands, a stream
+// of water running through its Ω, and the reopened window starts on that same logo, so the change is not seen.
 // If the install fails, the app starts the same server again and the window stays open: the screen goes when the
 // socket is back (and says what went wrong); if the app never began installing, it goes after a minute and a half.
 import { useEffect, useId, useRef, useState } from 'react';
@@ -11,6 +11,9 @@ import { api } from '../lib/api';
 import { machineId } from '../lib/machine';
 import { inDesktopApp } from '../lib/notify';
 import { toast, useApp, type Bootstrap } from '../lib/store';
+
+/** The wordmark's Ω (components/Logo.tsx), as index.html #boot draws it. */
+const OMEGA_D = 'M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92';
 
 /** How long the screen waits for the app to begin installing (the socket to drop) before it gives the window back. */
 const GIVE_UP_MS = 90_000;
@@ -80,6 +83,9 @@ function Screen({ to, deb, risen }: { to?: string; deb: boolean; risen: boolean 
   const clip = `${id}c`;
   const mask = `${id}m`;
   const sea = `${id}s`;
+  const glow = `${id}g`;
+  // The loader's stream (styles.css, .current-run), on the wordmark's Ω.
+  const stream = { d: OMEGA_D, pathLength: 100, stroke: `url(#${sea})`, strokeLinecap: 'round' as const, className: 'current-run' };
   return (
     <div className="update-screen fixed inset-0 grid place-items-center overflow-hidden bg-bg text-fg" style={{ zIndex: 2147483000 }} role="status" aria-live="polite">
       <Sea level={risen ? 1 : 0} />
@@ -91,30 +97,36 @@ function Screen({ to, deb, risen }: { to?: string; deb: boolean; risen: boolean 
               <rect x="-10" y="0" width="542" height="100" />
             </clipPath>
             <mask id={mask} maskUnits="userSpaceOnUse" x="-10" y="-10" width="116" height="120">
-              <path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" stroke="#fff" strokeWidth="10" />
+              <path d={OMEGA_D} stroke="#fff" strokeWidth="10" />
             </mask>
-            <linearGradient id={sea} gradientUnits="userSpaceOnUse" x1="0" y1="-4" x2="0" y2="96">
+            <linearGradient id={sea} gradientUnits="userSpaceOnUse" x1="6" y1="0" x2="90" y2="96">
               <stop offset="0" style={{ stopColor: 'var(--water-1)' }} />
-              <stop offset="0.55" style={{ stopColor: 'var(--water-2)' }} />
+              <stop offset="0.5" style={{ stopColor: 'var(--water-2)' }} />
               <stop offset="1" style={{ stopColor: 'var(--water-3)' }} />
             </linearGradient>
+            <filter id={glow} x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="4.4" />
+            </filter>
           </defs>
+          {/* The stream's glow, under the letters and outside their clip, which would cut it at their height. */}
+          <g transform="translate(324 0)" className="current">
+            <g className="current-fade">
+              <path {...stream} filter={`url(#${glow})`} opacity={0.75} />
+            </g>
+          </g>
           <g clipPath={`url(#${clip})`}>
             <path d="M5 0V100M61 0V100M5 50H61" stroke="currentColor" />
             <path transform="translate(104 0)" d="M-1 -6L35 52L71 -6M35 52V100" stroke="currentColor" />
             <path transform="translate(212 0)" d="M5 0V100M5 5H30A39 45 0 0 1 30 95H5" stroke="currentColor" />
             <g transform="translate(324 0)">
-              <path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" style={{ stroke: 'var(--water-ink)' }} opacity={0.3} />
-              <g mask={`url(#${mask})`}>
-                <g className="update-fill">
-                  <g className="update-ebb">
-                    <g className="update-bob">
-                      <g className="update-swell">
-                        <path d="M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 V130 H-72 Z" fill={`url(#${sea})`} stroke="none" />
-                        <path d="M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0" stroke="#fff" strokeWidth={5} opacity={0.85} />
-                      </g>
-                    </g>
-                  </g>
+              <path className="current-bed" d={OMEGA_D} style={{ stroke: 'var(--water-ink)', opacity: 0.3 }} />
+              <g className="current" mask={`url(#${mask})`}>
+                <g className="current-fade current-late">
+                  <path {...stream} opacity={0.4} />
+                </g>
+                <g className="current-fade">
+                  <path {...stream} />
+                  <path {...stream} stroke="#fff" strokeWidth={2} opacity={0.5} />
                 </g>
               </g>
             </g>

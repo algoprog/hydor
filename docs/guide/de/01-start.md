@@ -87,7 +87,7 @@ Jede Zeile zeigt das Symbol des Agenten mit einem Statuspunkt, den Titel der Sit
 - Ein Zielsymbol zeigt ein gesetztes Ziel.
 - eine Stecknadel: Die Sitzung ist angepinnt (in der Gruppe **Angepinnt**, die das schon sagt, gibt es keine).
 
-Beim Start und während der Arbeit verwendet Custom die Hydor-Ladeanimation mit steigendem und fallendem Wasser im Ω statt eines rotierenden Agentensymbols. Ladeanzeigen sind neben ihrem Text vertikal zentriert.
+Beim Start und während der Arbeit verwendet Custom die Hydor-Ladeanimation mit einem hellen Wasserstrom, der durch das Ω fließt, statt eines rotierenden Agentensymbols. Ladeanzeigen sind neben ihrem Text vertikal zentriert.
 
 Der Statuspunkt zeigt den Zustand der Sitzung:
 

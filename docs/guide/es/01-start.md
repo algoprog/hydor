@@ -87,7 +87,7 @@ Cada fila muestra el icono del agente con un punto de estado, el título de la s
 - una diana: la sesión tiene un objetivo;
 - una chincheta: está fijada (en el grupo **Fijadas**, que ya lo indica, no aparece).
 
-Mientras Custom trabaja o arranca, su indicador de actividad usa la animación de carga de Hydor (agua que sube y baja en su Ω) en lugar de un icono de agente que gira. Las marcas de carga quedan centradas verticalmente junto a su texto.
+Mientras Custom trabaja o arranca, su indicador de actividad usa la animación de carga de Hydor (una corriente de agua brillante que recorre su Ω) en lugar de un icono de agente que gira. Las marcas de carga quedan centradas verticalmente junto a su texto.
 
 El punto de estado indica cómo va una sesión:
 

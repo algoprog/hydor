@@ -1904,7 +1904,7 @@ agents that speak ACP and take MCP servers.
 
 OpenRouter session costs and token usage show above the message box without a spending cap. Charges come from OpenRouter automatically, with its generation records and catalog prices as fallbacks; its catalog also supplies Usage estimates, so no manual prices are required.
 
-Custom is the app's own agent, for models beyond Claude Code's and Codex's, and for theirs too: it also runs the models of your Claude and ChatGPT plans. Its working and starting indicators use the Hydor loading animation (water rising and falling in its Ω), vertically centred beside their text. It works like them: it reads,
+Custom is the app's own agent, for models beyond Claude Code's and Codex's, and for theirs too: it also runs the models of your Claude and ChatGPT plans. Its working and starting indicators use the Hydor loading animation (a stream of bright water running through its Ω), vertically centred beside their text. It works like them: it reads,
 edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
 Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context. In Auto mode routine steps go ahead and a quick check asks you
@@ -2381,7 +2381,7 @@ programs shows each program's version and what is out, with Check now, Update no
   off, as when the computer sleeps, carries on from where it stopped, and one that gets nowhere tries again an hour
   later), say so (a notification, and a note in every open page that counts down a minute, with Restart now and Later,
   which puts it off for 4 hours; Restart to Update in the icon's menu), and swap it in with agents carrying on: while
-  it installs, the window shows only the Hydor logo with water rising in its Ω and "Updating to Hydor …", until it
+  it installs, the window shows only the Hydor logo with a stream of water running through its Ω and "Updating to Hydor …", until it
   closes and opens again on the new version, on the same logo. A Mac app and an AppImage go back to the version before if the
   new one does not start; on Windows the new version's installer runs without its window; the .deb installs once you
   give your password.
@@ -2394,9 +2394,9 @@ programs shows each program's version and what is out, with Check now, Update no
   System. It is not in the web app, and not for the files of another machine (its pages, or a link someone shared).
 - On Windows the server runs as it does elsewhere: agents' commands in Git for Windows' bash, terminals the app keeps
   itself (Windows has no tmux), and each version run from a copy of its own so agents carry on through updates.
-- While the app loads, in a browser or while a desktop app starts, its logo shows, HYDΩR with water rising in the Ω
-  and a wave moving across it. The moment the app has something to show it is there under the logo, which fades away as
-  its water drains and the screen clears; with reduced motion it simply goes.
+- While the app loads, in a browser or while a desktop app starts, its logo shows, HYDΩR with a stream of bright
+  water running through the Ω. The moment the app has something to show it is there under the logo, which fades away as
+  the Ω lights up whole and the screen clears; with reduced motion it simply goes.
 - Computer use in the desktop apps, on a Mac, on Windows, and on Linux with an X11 desktop (Settings → Computer use,
   off at first): agents see the computer's screen and use its mouse and keyboard in any app (screenshots of the main
   display at about 1280 pixels, clicks, drags, scrolls, typing in any language and on any keyboard layout, keys and
@@ -2425,7 +2425,7 @@ programs shows each program's version and what is out, with Check now, Update no
   draws its check. Five things bend the old rule that what you open shows at once, in Full only: the
   sidebar slides as you hide or show it, the Browser's right column and the Files page's Ask panel slide in and out, pages cross-fade (not to or from the Browser),
   the theme blends when you switch between light and dark, and windows come in over a page that dims behind them (a dialog or window rises a little as it grows to its size, and on a phone rises from the bottom edge like a sheet; a side panel slides in from the right; the search box and the picture and video viewer fade in quickly; all close at once). On a phone, the slides of the sidebar and columns and the page cross-fades don't play, but windows still rise from the bottom. Calm keeps all but those five; Off keeps only work in
-  progress moving (the throbber's water, the dots of sessions at work). Nothing delays content, and nothing repeats but work in progress.
+  progress moving (the loader's stream of water, the dots of sessions at work). Nothing delays content, and nothing repeats but work in progress.
 - The rail's icons (a tooltip names each, with its shortcut): Sessions (shows or hides the sidebar, or goes back to the session you had open), then the sections (Browser, which is in the desktop app only, Projects, Files, Agents, Apps, Git, Experiments), right under them Inbox (with a count of what waits on you) and Search, and below, after some space, Usage, System, Settings and Help. The current page's icon is lit, with a bar of the accent colour beside it. Each group stays in the order you drag it into, as sessions do, the same on every device (Inbox and Search stay right under the sections; a tool a newer version brings, such as Files, takes its usual place among its own group in an order you set, right before the next tool of its group that follows it in the usual order (else right after the one before it, as Git after Apps), not the end); a phone has no rail, and its drawer holds them in one grid (hold one a moment to pick it up; the drawer's header has the Inbox). On a computer, right-click an icon for Back to the usual order. The sessions' sidebar shows on the start page and in a session only; Apps, Agents, Help and Settings have a column of the same kind (logo, their list, Hide), and the Browser draws one of its own. The rail shows the offline mark when no column does. Sessions are found with the search box, not a field in the sidebar.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search on the rail finds pages,
   every setting, sessions (by title, folder, first message and the agent they started as, archived ones too, marked Archived) and what was said in them, memory notes, projects, apps, scheduled tasks, assistants,

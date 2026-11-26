@@ -87,7 +87,7 @@ Chaque ligne montre l’icône de l’agent avec un point d’état, le titre de
 - une cible : la session a un objectif ;
 - une épingle : elle est épinglée (dans le groupe **Épinglées**, qui le précise déjà, il n’y en a pas).
 
-Quand Custom travaille ou démarre, son indicateur d’activité utilise l’animation de chargement de Hydor (de l’eau qui monte et descend dans son Ω) au lieu d’une icône d’agent qui tourne. Les repères de chargement sont centrés verticalement à côté de leur texte.
+Quand Custom travaille ou démarre, son indicateur d’activité utilise l’animation de chargement de Hydor (un flot d’eau lumineuse qui parcourt son Ω) au lieu d’une icône d’agent qui tourne. Les repères de chargement sont centrés verticalement à côté de leur texte.
 
 Le point d’état indique où en est une session :
 

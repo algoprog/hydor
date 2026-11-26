@@ -1,11 +1,11 @@
-// The logo shown while the page loads (index.html #boot: HYDΩR, its Ω filling with water). The moment the app has
-// something of its own to show, the app is there in full under the logo, which no longer takes a click or a key; the
-// logo swells a little and fades as its water drains, while the page colour around it clears. With Reduce motion, it
-// goes at once.
+// The logo shown while the page loads (index.html #boot: HYDΩR, a stream of bright water running through its Ω). The
+// moment the app has something of its own to show, the app is there in full under the logo, which no longer takes a
+// click or a key; the logo swells a little and fades as its stream runs out and its Ω stands whole, while the page
+// colour around it clears. With Reduce motion, it goes at once.
 
 const CLEAR_MS = 420;
 const FADE_MS = 360;
-const DRAIN_MS = 460;
+const WHOLE_MS = 460;
 
 export function endBoot() {
   const boot = document.getElementById('boot');
@@ -52,22 +52,16 @@ export function endBoot() {
   requestAnimationFrame(wait);
 }
 
-/** The page colour clearing, and the logo swelling a little as it fades and its water drains: the animations. */
+/** The page colour clearing, and the logo swelling a little as it fades, its stream running out: the animations. */
 function fadeOut(logo: SVGSVGElement, sky: HTMLElement): Animation[] {
   const run = (el: Element, frames: Keyframe[], duration: number, easing: string) => el.animate(frames, { duration, easing, fill: 'forwards' });
   const out = [
     run(sky, [{ opacity: 0.99 }, { opacity: 0 }], CLEAR_MS, 'ease-out'),
     run(logo, [{ transform: 'none', opacity: 1 }, { transform: 'scale(1.06)', opacity: 0 }], FADE_MS, 'ease-in'),
   ];
-  // The water drains from where it has risen to, its waves held still, and the Ω is whole again.
-  const water = logo.querySelector<SVGGElement>('.boot-fill');
-  if (water) {
-    const level = getComputedStyle(water).transform;
-    water.style.animation = 'none';
-    for (const g of water.querySelectorAll<SVGGElement>('g')) g.style.animationPlayState = 'paused';
-    out.push(run(water, [{ transform: level }, { transform: 'translateY(112px)' }], DRAIN_MS, 'cubic-bezier(0.55, 0, 0.75, 0.25)'));
-  }
+  // The stream runs out (its glow too, a group of its own under the letters), and the Ω is whole again.
+  for (const stream of logo.querySelectorAll('.boot-current')) out.push(run(stream, [{ opacity: 1 }, { opacity: 0 }], WHOLE_MS / 2, 'ease-out'));
   const omega = logo.querySelector('.boot-omega');
-  if (omega) out.push(run(omega, [{ opacity: 0.3 }, { opacity: 1 }], DRAIN_MS, 'ease'));
+  if (omega) out.push(run(omega, [{ opacity: 0.3 }, { opacity: 1 }], WHOLE_MS, 'ease'));
   return out;
 }

@@ -2,9 +2,6 @@
 // lib/theme.ts writes what to paint; until it has, the mode alone (from the saved UI state) decides.
 (function () {
   var root = document.documentElement;
-  // In the Mac app this page follows its own starting page, where the water has already risen in the logo's Ω
-  // (index.html #boot): it stays full rather than rising again.
-  if (/HydorMac\//.test(navigator.userAgent)) root.classList.add('boot-full');
   // How much moves (Settings → General → Appearance → Motion): the stylesheet's motion block reads it from <html>.
   try {
     var m = JSON.parse(localStorage.getItem('wa.ui.v1') || '{}').motion;

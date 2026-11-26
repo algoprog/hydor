@@ -24,9 +24,6 @@ export const MARK_STROKE = 34;
 /** The Ω without a tile, cropped close (the throbber, Custom's icon). */
 export const MARK_BOX = '92 92 328 328';
 
-/** A wave's surface along y = 0 (one wavelength is 180), and the water below it: the water in the Ω. */
-const WAVE = 'M-360 0 q45 -18 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 V600 H-360 Z';
-
 /** The sea, turquoise to Aegean blue, over the Ω (512 units): the theme's (--water-1 to 3), or always the bright one. */
 export function WaterGradient({ id, bright }: { id: string; bright?: boolean }) {
   const c = bright ? ['#5eead4', '#38bdf8', '#60a5fa'] : ['var(--water-1)', 'var(--water-2)', 'var(--water-3)'];
@@ -108,23 +105,49 @@ export function Wordmark({ height = 16, className, tide }: { height?: number; cl
 }
 
 /**
- * The Ω with water in it. The empty Ω shows faintly in the text's colour; the water is the sea gradient below a
- * wave, and `water` (a class) says how it moves: none (full and still), `throbber-water`, `hero-water`. Inside an
- * <svg> whose viewBox is in 512 units.
+ * The Ω at rest and at work (the throbber, Custom's icon). At rest it stands whole in the sea's colours. At work
+ * (`running`) it dims to a bed and a stream of bright water runs through it, foot to foot: it spurts out of one foot,
+ * stretches round the bowl and gathers into the other, a paler stream a moment behind it and a soft glow around it
+ * (styles.css, "Loading"). The streams keep to the letter's shape (the mask); the glow does not. Inside an <svg> whose
+ * viewBox is in 512 units.
  */
-export function WaterOmega({ id, water, bright }: { id: string; water?: string; bright?: boolean }) {
+export function CurrentOmega({ id, running }: { id: string; running?: boolean }) {
+  const sea = `url(#${id}w)`;
+  const omega = { d: OMEGA, fill: 'none', strokeWidth: MARK_STROKE };
+  const stream = { ...omega, pathLength: 100, stroke: sea, strokeLinecap: 'round' as const, className: 'current-run' };
   return (
     <>
       <defs>
-        <WaterGradient id={`${id}w`} bright={bright} />
-        <mask id={`${id}m`} maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-          <g className={water ? `water-level ${water}` : 'water-level'}>
-            <path className="water-flow" d={WAVE} fill="#fff" />
-          </g>
-        </mask>
+        <WaterGradient id={`${id}w`} />
+        {running && (
+          <>
+            <mask id={`${id}m`} maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+              <path {...omega} stroke="#fff" />
+            </mask>
+            <filter id={`${id}f`} x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="15" />
+            </filter>
+          </>
+        )}
       </defs>
-      <path d={OMEGA} fill="none" stroke="currentColor" strokeWidth={MARK_STROKE} opacity={0.26} />
-      <path d={OMEGA} fill="none" stroke={`url(#${id}w)`} strokeWidth={MARK_STROKE} mask={`url(#${id}m)`} />
+      {running && <path {...omega} stroke="currentColor" opacity={0.12} />}
+      <path {...omega} className="current-bed" stroke={sea} style={{ opacity: running ? 0.2 : 1 }} />
+      {running && (
+        <g className="current">
+          <g className="current-fade">
+            <path {...stream} filter={`url(#${id}f)`} opacity={0.75} />
+          </g>
+          <g mask={`url(#${id}m)`}>
+            <g className="current-fade current-late">
+              <path {...stream} opacity={0.4} />
+            </g>
+            <g className="current-fade">
+              <path {...stream} />
+              <path {...stream} stroke="#fff" strokeWidth={7} opacity={0.5} />
+            </g>
+          </g>
+        </g>
+      )}
     </>
   );
 }
