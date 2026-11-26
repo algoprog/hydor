@@ -8,7 +8,7 @@ import { go } from '../../../lib/nav';
 import { toastError, useTimeline } from '../../../lib/store';
 import { busy, useLoaded, webAppPath } from '../api';
 import { useChecks } from '../Checks';
-import { latestWebApp } from '../side.ts';
+import { latestWebApp } from '../sideTarget.ts';
 import { DockView } from './DockView';
 import { checkedLine, fixAllMessage, stripOf } from './plain';
 

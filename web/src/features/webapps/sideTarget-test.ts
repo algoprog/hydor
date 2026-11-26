@@ -2,7 +2,7 @@
 // again after the page is loaded again, unless the person closed that one (the next call is a new thing to show).
 import assert from 'node:assert/strict';
 import type { TimelineItem } from '@shared/types';
-import { latestWebApp, webAppOf, webSideTarget } from './side.ts';
+import { latestWebApp, webAppOf, webSideTarget } from './sideTarget.ts';
 
 const A = '0123456789abcdef';
 const B = 'fedcba9876543210';

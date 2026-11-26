@@ -14,7 +14,7 @@ import { Preview } from './Preview';
 import { SideTry } from './simple/SideTry';
 import { shortState } from './simple/plain';
 import { useBeingMade } from './simple/sessions';
-import { latestWebApp, webAppOf, webSideTarget } from './side.ts';
+import { latestWebApp, webAppOf, webSideTarget } from './sideTarget.ts';
 import { keysCardOf } from '@shared/keys';
 import { KeysCard } from '../connections/KeysCard';
 import { StatusLabel } from './StatusLabel';

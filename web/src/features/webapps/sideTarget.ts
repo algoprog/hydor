@@ -1,5 +1,5 @@
 // What decides which web app is beside a session's conversation, without drawing anything: read from the conversation's own record (its tool
-// calls), so it is there after a page reload, unless the person closed it. Pure, so a script tests it (side-test.ts).
+// calls), so it is there after a page reload, unless the person closed it. Pure, so a script tests it (sideTarget-test.ts).
 import type { TimelineItem } from '@shared/types';
 
 /** What a webapp_* call said about the app: the id the tools end their answer with ("[web app <id>]"). */

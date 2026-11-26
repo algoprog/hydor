@@ -1,8 +1,10 @@
 // Checks for the release notes (CHANGELOG.md, shown in the app): the version in package.json has its notes,
-// first; the versions go newest first, each with a date and a line that sums it up; and the reading of them.
+// first; the versions go newest first, each with a date and a line that sums it up; and the reading of them. Also what a
+// release needs to build on every system: no two files whose names differ only by upper and lower case.
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/releases/releases-test.ts && node dist/dev/releases-test.js
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { compareVersions, parseReleases } from '../../shared/releases.ts';
@@ -38,6 +40,26 @@ test('reading them: headings, dates, the first paragraph, versions compared as n
   );
   assert.match(r[0].notes, /- a\n- b$/);
   assert.ok(compareVersions('0.10.0', '0.9.2') > 0 && compareVersions('0.6.1', '0.6.1') === 0 && compareVersions('0.6.0', '0.6.1') < 0);
+});
+
+test('no two files differ only by upper and lower case: a Mac and Windows read one for the other, and the desktop apps do not build', () => {
+  let files: string[];
+  try {
+    files = execFileSync('git', ['ls-files'], { cwd: APP_ROOT, encoding: 'utf8', maxBuffer: 1 << 26 }).split('\n').filter(Boolean);
+  } catch {
+    return; // not a checkout: nothing to list
+  }
+  // An import names a module without its ending, so Side.tsx and side.ts are one name to it where case is ignored.
+  const ending = /\.(tsx?|mts|cts|jsx?|mjs|cjs)$/;
+  const byName = new Map<string, string>();
+  const alike: string[] = [];
+  for (const f of files) {
+    const name = ending.test(f) ? f.replace(ending, '') : `${f}\u0000`;
+    const was = byName.get(name.toLowerCase());
+    if (was !== undefined && was !== name) alike.push(`${was.replace('\u0000', '')} and ${f}`);
+    else byName.set(name.toLowerCase(), name);
+  }
+  assert.deepEqual(alike, [], 'rename one of each pair');
 });
 
 for (const [name, fn] of tests) {
