@@ -38,8 +38,11 @@ Say the stage as you save a step (`webapp_steps {action: "save", message, stage}
 "just build it", make the calls yourself and say what you assumed.
 
 1. **Brief.** Settle what it is for, who uses it, what it keeps and who may see what. Show the sketch (`app_sketch`,
-   kind `web`) and wait. At most three questions, only those that change the app, each with a few choices. When they say
-   build, write it to `docs/brief.md`.
+   kind `web`) and wait. At most three questions, only those that change the app, each with a few choices. A choice
+   that brings in an outside service with a key of its own (mail sent out, payments, texts) says so in its words, and
+   the one you assume needs none where the app works without it. When they say build, write it to `docs/brief.md`.
+   A site that keeps nothing and no one signs in to (a portfolio, a personal page, an event page) is not a web app:
+   static pages in the folder, published with `publish_site` at a public link, with no server, no sign-in and no key.
 2. **Design.** Write two or three directions as static pages of the app's own first screen (`design/<name>.html`: one
    file each, inline CSS, made-up content, `prefers-color-scheme` for dark and light, fine at 390 px). Not three apps.
    `webapp_choose {shape: "designs", stage: "design", designs: [{id, name, line, page}]}`; keep the pick in one

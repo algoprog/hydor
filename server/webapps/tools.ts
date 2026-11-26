@@ -363,7 +363,7 @@ function webappToolList(ctx: RunCtx): RunTool[] {
           if (r.content.kind === "you") return text(JSON.stringify({ status: "answered", kind: "yours to decide", said: "They left it to you: pick the kind that fits what they said, say which in a line, then give the sketch." }, null, 1));
           const picked = kinds.kinds.find((x) => x.id === String(r.content.kind ?? ""));
           if (!picked) return text(JSON.stringify({ status: "answered", kind: "other", said: "It is something else: ask what they have in mind in a line if you cannot tell, then give the sketch." }, null, 1));
-          return text(JSON.stringify({ status: "answered", kind: picked.name, id: picked.id, needs: picked.needs, said: `They picked “${picked.name}”: go on with the sketch (app_sketch with kind "web", type "${picked.id}").` }, null, 1));
+          return text(JSON.stringify({ status: "answered", kind: picked.name, id: picked.id, needs: picked.needs, said: `They picked “${picked.name}”: go on with the sketch (app_sketch with kind "web", type "${picked.id}").${picked.builder ? ` ${picked.builder}` : ""}` }, null, 1));
         } catch (e) {
           return text((e as Error).message, true);
         }

@@ -11,7 +11,14 @@ export const KINDS: readonly WebKind[] = [
   { id: "agent-app", name: "An app with agents at work", who: "For work Hydor’s agents do for the people who use it: they ask a question, watch it being worked on, and keep the answers.", needs: ["An agent app of yours", "A form and the answer as it comes", "A list of what was found"], agent: true },
   { id: "content-site", name: "Content site: blog, docs, changelog", who: "For writing that people read: a blog, a help centre and a list of what changed, written as plain text files.", needs: ["Pages from text files", "Search", "A feed to follow"] },
   { id: "ai-app", name: "AI app: chat and answers over your data", who: "For a product that answers questions from your own documents and data, with the sources shown.", needs: ["Your documents", "A model, within a daily cap", "Search by meaning", "Sources with each answer"] },
-  { id: "portfolio", name: "Portfolio or personal site", who: "For showing your work and being easy to reach: a few pages and a contact form.", needs: ["A few pages", "Pictures of your work", "A contact form"] },
+  {
+    id: "portfolio",
+    name: "Portfolio or personal site",
+    who: "For showing your work and being easy to reach: a few pages at a link of their own, with nothing to rent or set up.",
+    needs: ["A few pages", "Pictures of your work", "A link to write to you"],
+    builder:
+      "Unless they ask for more, it is a static site: pages, pictures and styles in this folder (an index.html with relative paths), published with publish_site at a public link. It needs no sign-in, nothing kept, no server and no key, so it has no hydor.json; people write to them from an email link and the links to their profiles. Look at its pages on a phone and a computer before you publish. A contact form whose messages are kept in an inbox is what would make it a web app: offer it in the sketch only as a choice that says so (visitors reach it only on a server they rent, and sending each message on by email needs a key from a mail service).",
+  },
   { id: "directory", name: "Directory with search", who: "For listing places, people or things that others can search, filter, see on a map and review.", needs: ["Listings and categories", "Search and filters", "A map", "Reviews and moderation"] },
   { id: "store", name: "Online store", who: "For selling products or downloads, with a cart, orders and discount codes.", needs: ["Products", "A cart and orders", "Payments", "Mail for receipts"] },
   { id: "booking", name: "Booking and scheduling", who: "For a service people book by the hour or the day, with the times you are free and reminders.", needs: ["Services and free times", "Time zones", "Reminders by mail", "A calendar feed"] },
@@ -64,7 +71,7 @@ export function webKindNote(raw: unknown, at: StartPlace, agent?: StartAgentApp 
   const name = clean(r.name, 80);
   const line = clean(r.line, 400);
   const typed = [name ? `the name they gave it: “${name}”` : "", line ? `what they said it is for: “${line}”` : ""].filter(Boolean).join("; ");
-  const what = agent ? agentWords(agent, at.page) : kind ? `They chose the idea “${kind.name}”. Such an app usually needs: ${kind.needs.join(", ")}. It is an idea to start from, not a template.` : "They picked no idea from the list: they have something else in mind.";
+  const what = agent ? agentWords(agent, at.page) : kind ? `They chose the idea “${kind.name}”. Such an app usually needs: ${kind.needs.join(", ")}. It is an idea to start from, not a template.${kind.builder ? ` ${kind.builder}` : ""}` : "They picked no idea from the list: they have something else in mind.";
   const where = at.app
     ? `A web app is made for it already (id ${at.app.id}), and its folder, this session's working folder, is where you build: do not make another.`
     : "No web app is made for it yet: make one with webapp_new and build in the folder it gives.";

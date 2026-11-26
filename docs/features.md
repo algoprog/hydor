@@ -842,7 +842,10 @@ agents that speak ACP and take MCP servers.
   usually needs (a landing page with a waitlist, an internal tool, a SaaS, an app with agents at work, a content site, an
   AI app, a portfolio, a directory, a shop, booking, courses, a marketplace, a community, a real-time app), **Something
   else**, and the small tool an agent runs with no pages of its own under them (**Describe it to an agent**, **Start from
-  scratch**, **Install from a file**). They are ideas, not templates: every one can be started. Choosing one opens a short
+  scratch**, **Install from a file**). They are ideas, not templates: every one can be started. A portfolio or personal
+  site that keeps nothing is made as static pages published at a link of their own (no server, no sign-in, no keys); a
+  contact form that keeps messages is what would make it a web app. In the sketch, a choice that brings in an outside
+  service with a key of its own (mail sent out, payments, texts) says so. Choosing one opens a short
   sheet (the app's name and what it is for) whose **Start** makes the app (a folder, a git repository, a project and its
   card) and opens the App builder's conversation in that folder, already knowing the idea and your words. An agent asked
   for an app without a kind can put the same ideas in the conversation (`webapp_kinds`). Route: `GET /api/webapps/kinds`.

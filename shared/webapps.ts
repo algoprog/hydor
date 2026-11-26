@@ -500,6 +500,8 @@ export interface WebKind {
   needs: string[];
   /** An agent app with pages of its own. */
   agent?: boolean;
+  /** What the App builder is told of this kind beyond its needs (not shown to the person). */
+  builder?: string;
 }
 
 /** GET /api/webapps/kinds */

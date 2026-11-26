@@ -335,7 +335,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
           assumed: { type: 'array', items: { type: 'string' }, description: 'What you assumed, each in a short line ("Forecasts for the next 7 days").' },
           questions: {
             type: 'array',
-            description: 'At most three questions whose answers change the design, each with its likely answers to click (the first is what you assumed).',
+            description: 'At most three questions whose answers change the design, each with its likely answers to click (the first is what you assumed). A choice that brings in an outside service with a key of its own (mail sent out, payments, texts, sign-in with another account) says so in its words ("…and sent to your email: needs a key from a mail service"); assume the one that needs none, where the app works without it.',
             items: { type: 'object', properties: { ask: { type: 'string' }, choices: { type: 'array', items: { type: 'string' } } }, required: ['ask', 'choices'] },
           },
         },

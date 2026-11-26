@@ -30009,5 +30009,7 @@
   "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt": "jobs εργασίες παρασκηνίου μακρά δουλειά σε εκτέλεση σε ουρά αναμονή περιμένει μετά από εξάρτηση μία τη φορά πρόοδος ποσοστό χρόνος που απομένει εκτίμηση eta πόση ώρα μέχρι να τελειώσει ολοκληρώθηκε απέτυχε διακόπηκε χρονολόγιο gantt έξοδος αρχείο καταγραφής log διακοπή εντολές monitors υποπράκτορες servers διακομιστές dev server builds εκπαίδευση training ευρετηρίαση indexing λήψεις downloads εργασία job εντολή υιοθέτηση adopt",
   "{0} cannot be read as a log": "Το {0} δεν μπορεί να διαβαστεί ως αρχείο καταγραφής",
   "jobs::Done": "Ολοκληρώθηκε",
-  "There is no session {0}": "Δεν υπάρχει η συνεδρία {0}"
+  "There is no session {0}": "Δεν υπάρχει η συνεδρία {0}",
+  "For showing your work and being easy to reach: a few pages at a link of their own, with nothing to rent or set up.": "Για να δείχνετε τη δουλειά σας και να σας βρίσκουν εύκολα: λίγες σελίδες σε δικό τους σύνδεσμο, χωρίς τίποτα για ενοικίαση ή ρύθμιση.",
+  "A link to write to you": "Ένας σύνδεσμος για να σας γράφουν"
 }

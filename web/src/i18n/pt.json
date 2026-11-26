@@ -28155,5 +28155,7 @@
   "Which process should be adopted?": "Qual processo deve ser adotado?",
   "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt": "jobs tarefas em segundo plano background trabalho demorado em execução na fila esperando aguardando depois de dependência um por vez progresso porcentagem tempo restante estimativa eta quanto tempo até terminar concluído falhou parado linha do tempo gantt saída log parar comandos monitores subagentes servidores servidor de desenvolvimento dev server compilações builds treinamentos execuções indexação downloads job comando adotar",
   "{0} cannot be read as a log": "Não é possível ler {0} como um log",
-  "There is no session {0}": "Não há nenhuma sessão {0}"
+  "There is no session {0}": "Não há nenhuma sessão {0}",
+  "For showing your work and being easy to reach: a few pages at a link of their own, with nothing to rent or set up.": "Para mostrar seu trabalho e ser fácil de encontrar para contato: algumas páginas num link próprio, sem nada para alugar ou configurar.",
+  "A link to write to you": "Um link para escreverem para você"
 }
