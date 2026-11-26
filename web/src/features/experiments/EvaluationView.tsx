@@ -36,7 +36,7 @@ import { ChangesDialog, FinalDialog, FolderDialog, type ChangesAsk } from './Eva
 import type { EditorSection } from './EvaluationEditor';
 import { evolutionPath, useEvolutions, type ListedEvolution } from './evolveApi';
 import { EvolveDialog } from './EvolveDialog';
-import { evolveTitle, isGoing, rowWords } from './evolveWords';
+import { evolveTitle, isGoing, rowWords, waitsWords } from './evolveWords';
 import { agoWords, fullDate } from './Sidebar';
 
 export interface EvaluationViewProps {
@@ -526,7 +526,7 @@ function Evolutions({ evolutions }: { evolutions: ListedEvolution[] }) {
                   {evolveTitle(e)}
                 </span>
                 <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-2">
-                  {isGoing(e) && <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
+                  {isGoing(e) && <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${waitsWords(e) ? 'bg-fg-3' : 'bg-accent'}`} />}
                   <span className="tnum min-w-0">
                     <span>{words.text}</span>
                     {words.standing && (

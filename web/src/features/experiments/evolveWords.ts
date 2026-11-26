@@ -7,6 +7,7 @@ import type { Evaluation } from '@shared/evaluations';
 import { LOCALE } from '../../i18n/locale';
 import { num, took } from './api';
 import { meanStd, small, type Standing } from './evalWords';
+import { nightStatus, nightStatusPlain, saidByStatus } from './nightWords';
 
 export const EVOLVE_ABOUT = 'Hydor tries many small changes to the files you name, scores each with the evaluation, and keeps the best. Your own files are not touched.';
 export const TAKE_ABOUT = 'This makes a branch in your repository with this version. The files you have checked out are not touched.';
@@ -42,11 +43,11 @@ export function doneWords(why: string | undefined): string {
   return 'Done';
 }
 
-/** The time it has been working, with what passed since it was read while it still works. */
-export const workedMs = (e: Pick<Evolution, 'activeMs' | 'status'>, readAt: number, now = Date.now()) => e.activeMs + (e.status === 'running' ? Math.max(0, now - readAt) : 0);
+/** The time it has been working, with what passed since it was read while it still works (not while it waits for the night). */
+export const workedMs = (e: Pick<Evolution, 'activeMs' | 'status' | 'waits'>, readAt: number, now = Date.now()) => e.activeMs + (e.status === 'running' && !e.waits ? Math.max(0, now - readAt) : 0);
 
 export interface StateLine {
-  tone: 'going' | 'paused' | 'done' | 'stopped' | 'failed';
+  tone: 'going' | 'waiting' | 'paused' | 'done' | 'stopped' | 'failed';
   /** The parts of the line, joined with " · ". */
   parts: string[];
   /** Why it was paused by the app or failed, as the server says it. */
@@ -55,6 +56,9 @@ export interface StateLine {
 
 /** The line under its title. `ms`: the time it has worked. */
 export function stateLine(e: Evolution, ms: number): StateLine {
+  // A night evolution by day, in the words a night run waits with (the whole reason when there is no night to name).
+  if (e.waits && (e.status === 'starting' || e.status === 'running'))
+    return { tone: 'waiting', parts: [saidByStatus(e.waits) ? nightStatus(e.waits) : e.waits, ...(e.status === 'running' ? [triedWords(e), ...(e.failed ? [failedWords(e.failed)] : [])] : [])] };
   if (e.status === 'starting') return { tone: 'going', parts: ['Starting', 'scoring the start first'] };
   if (e.status === 'running') return { tone: 'going', parts: ['Running', triedWords(e), ...(e.failed ? [failedWords(e.failed)] : []), took(ms)] };
   if (e.status === 'paused') return { tone: 'paused', parts: ['Paused'], ...(e.why ? { why: e.why } : {}) };
@@ -72,11 +76,18 @@ export function gainStanding(gain: number | undefined, start?: number): Standing
   return gain > 0 ? { tone: 'better', long: `${by} better than the start`, short: `${by} better` } : { tone: 'worse', long: `${by} worse than the start`, short: `${by} worse` };
 }
 
+/** A night evolution holding still by day: the words a night run waits with, else null. */
+export const waitsWords = (e: Pick<Evolution, 'status' | 'waits'>): string | null => (e.waits && isGoing(e) ? nightStatusPlain(e.waits) : null);
+
 /** Its row on the evaluation's page: its state, and for one that is done, what came of it. */
 export function rowWords(e: Evolution & { bestGain?: number }): { text: string; standing: Standing | null } {
   const plain = (text: string) => ({ text, standing: null });
+  const waits = waitsWords(e);
+  // Joined, not one template: the translator takes the two parts one by one.
+  if (waits) return plain(e.status === 'running' ? [waits, triedWords(e)].join(' · ') : waits);
   if (e.status === 'starting') return plain('Starting');
-  if (e.status === 'running') return plain(`Running · ${triedWords(e)}`);
+  // Written out whole: "Running · {0}" lost to the scores' "Running · {0} of {1}", which left "tried" untranslated.
+  if (e.status === 'running') return plain(`Running · ${count(e.tried)} of ${count(e.candidates)} tried`);
   if (e.status === 'paused') return plain(`Paused · ${triedWords(e)}`);
   if (e.status === 'stopped') return plain('Stopped');
   if (e.status === 'failed') return plain('Failed');
@@ -85,7 +96,7 @@ export function rowWords(e: Evolution & { bestGain?: number }): { text: string; 
 }
 
 /** The second line of its evaluation in the column while it works. */
-export const columnWords = (e: Pick<Evolution, 'tried' | 'candidates'>) => `Evolving · ${count(e.tried)} of ${count(e.candidates)}`;
+export const columnWords = (e: Pick<Evolution, 'tried' | 'candidates' | 'status' | 'waits'>) => waitsWords(e) ?? `Evolving · ${count(e.tried)} of ${count(e.candidates)}`;
 
 /** The one working on each evaluation, by the evaluation's id (the newest, when there are two). */
 export function evolvingBy<T extends Evolution>(list: T[]): Map<string, T> {

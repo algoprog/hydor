@@ -299,7 +299,8 @@ await test("Custom's instructions: the routing rule, the triggered skill's text,
   say('u1', 'Please research the best e-bikes for steep hills under 3000 euros');
   const c1 = String(await skillpack.context!({ key, cwd: root, extra: {} }, deps));
   assert.match(c1, /with the skill tool’s query for what the work is\. When one fits, load it with the skill tool, say “Using skill <name>”/);
-  assert.doesNotMatch(c1, /[A-Z]{5,}/, 'no shouting');
+  // Without the skills' folders: the scratch folder's random name may hold five capitals in a row.
+  assert.doesNotMatch(c1.replace(/ folder="[^"]+"/g, ''), /[A-Z]{5,}/, 'no shouting');
   assert.match(c1, /<skill name="research" folder="[^"]+">\n# Research/);
   assert.doesNotMatch(c1, /^---$/m, 'frontmatter left out');
   const notes = notesOf(db, key, 'skillpack');

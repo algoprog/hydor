@@ -5,7 +5,8 @@
 // parse or apply, a version already tried, a protected file, a failing run's log, the cheap-then-full rule; a restart
 // in the middle; pause and resume, a refused score pausing it, its hours, a stall and stop; taking the best onto a
 // branch (twice); deleting; the evaluation's own lists without its scores; the routes' rules for agents, the tools,
-// and every route in the guide's API topic.
+// and every route in the guide's API topic; an evolution that works at night, with the night's clock set by the test
+// (holding still by day, the night's end both ways, its hours, pause, restarts, the morning's notice).
 // Build and run with a scratch data folder (no GPU is used):
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/experiments/evolve-test.ts
 //   DATA_DIR=/tmp/hydor-test-evolve CUDA_VISIBLE_DEVICES= node dist/dev/evolve-test.js
@@ -24,11 +25,12 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { ruleFor } from '../guide/api.ts';
 import { internalHeaders } from '../internal.ts';
 import { createEvaluation, getScore, listed, listScores, startScore, waitScore } from './evaluations.ts';
-import { applyBlocks, candidatesOf, EVOLVE_ROOT, getEvolution, haltEvolutions, migrate, parseReply, pickModel, pickParent, random, resumeEvolutions, slugOf, stopEvolution, useEvolveDeps, type EvolveAsk } from './evolve.ts';
+import { applyBlocks, candidatesOf, EVOLVE, EVOLVE_ROOT, getEvolution, haltEvolutions, migrate, parseReply, pickModel, pickParent, random, resumeEvolutions, searchWords, slugOf, stopEvolution, useEvolveDeps, type EvolveAsk } from './evolve.ts';
 import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
-import { forgetNotices, setSettings, tick, useDeps } from './queue.ts';
-import { getRun } from './records.ts';
+import { clock as nightClock, NIGHT_AGAIN } from './night.ts';
+import { cleanJob, forgetNotices, setSettings, submit, tick, useDeps } from './queue.ts';
+import { getRun, listRuns } from './records.ts';
 import { experimentTools, SPAWN_NOTE } from './tools.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -68,6 +70,8 @@ class Sessions extends EventEmitter {
 }
 const sessions = new Sessions();
 const told: any[] = [];
+const notices: { key: string; body: string; title: string; url: string }[] = [];
+sessions.on('notify', (n) => notices.push(n));
 
 const http = Fastify();
 http.setErrorHandler((err: Error, _req, reply) => {
@@ -719,6 +723,306 @@ test('every route is in the guide’s API topic', () => {
   const routes = [...fs.readFileSync(path.join(process.cwd(), 'server', 'experiments', 'evolve-routes.ts'), 'utf8').matchAll(/app\.(get|post|put|patch|delete)\(\s*'(\/api\/[^']+)'/g)].map((m) => `${m[1].toUpperCase()} ${m[2]}`);
   assert.equal(routes.length, 10);
   for (const r of routes) assert.ok(api.includes(`\`${r}\``), r);
+});
+
+// ---- an evolution that works at night -------------------------------------------------------------------------------
+
+/** A time on the computer's own clock, in January 2026. */
+const at = (day: number, h: number, m = 0) => new Date(2026, 0, day, h, m).getTime();
+let wallNow = at(1, 12);
+const WAITS = 'Waits for the night (from 23:00)';
+const nightHours = (o: Record<string, unknown> = {}) => setSettings(db, { cpuSlots: 8, nightFrom: '23:00', nightTo: '07:00', nightEnds: 'finish', ...o });
+
+// A second project whose scorer goes on while a file is there, so that a night can end in the middle of a score.
+const nightRepo = path.join(tmp, 'night-repo');
+const holdFile = path.join(tmp, 'hold');
+const hold = () => fs.writeFileSync(holdFile, '');
+const release = () => fs.rmSync(holdFile, { force: true });
+write(path.join(nightRepo, 'eval.sh'), ['. ./model.sh', `while [ -f ${holdFile} ]; do sleep 0.05; done`, `awk -v x="$X" -v s="$1" 'BEGIN { printf "score=%.4f\\n", 100 - (x - 7) * (x - 7) + s / 1000 }'`, ''].join('\n'));
+write(path.join(nightRepo, 'model.sh'), 'X=3\n');
+gitIn(nightRepo, 'init', '-q', '-b', 'main');
+gitIn(nightRepo, 'config', 'user.email', 't@example.com');
+gitIn(nightRepo, 'config', 'user.name', 'T');
+gitIn(nightRepo, 'add', '.');
+gitIn(nightRepo, 'commit', '-q', '-m', 'first');
+let nightEv: Evaluation;
+
+const startNight = async (body: Record<string, unknown> = {}) => {
+  const r = await call('POST', '/api/experiments/evolutions', { evaluation: nightEv.id, files: ['model.sh'], candidates: 10, stallAfter: 0, when: 'night', ...body });
+  assert.equal(r.status, 200, r.body.error);
+  return r.body.evolution as Evolution;
+};
+const read = async (id: string) => (await call('GET', `/api/experiments/evolutions/${id}`)).body.evolution as Evolution;
+/** The runs of the scores asked for a candidate (or 'start'), as they are now. */
+const runsFor = (id: string, candidate: string) =>
+  (scoresBy(id).get(candidate) ?? []).flatMap((s) => getScore(db, s)!.runs.map((r) => getRun(db, r)!));
+const mornings = () => notices.filter((n) => n.key === 'experiments:night');
+const endedOf = (id: string) => cands(id).filter((c) => c.status === 'scored' || c.status === 'failed').length;
+const inHand = (id: string) => cands(id).filter((c) => c.status !== 'scored' && c.status !== 'failed');
+const ordinaryNight = async (command: string) => submit(deps, await cleanJob(db, { command, cwd: tmp, gpus: 0, when: 'night' }));
+const runEnded = (id: string) => !['queued', 'waiting', 'starting', 'running'].includes(getRun(db, id)!.status);
+
+test('a night evolution: when is checked in words, and the tool’s card says when it works', async () => {
+  EVOLVE.nightCheckMs = 50;
+  nightClock.now = () => wallNow;
+  nightHours();
+  release();
+  nightEv = await createEvaluation(deps, { name: 'Night score', cwd: nightRepo, command: 'sh eval.sh {seed}', metric: 'score', better: 'higher', protect: ['eval.sh'], seeds: [1, 2], gpus: 0 });
+  const base = await startScore(deps, nightEv.id, { kind: 'baseline', by: { who: 'you' } });
+  const b = await waitScore(deps, base.id, 60_000);
+  assert.equal(b?.status, 'done', b?.why);
+  assert.ok(b!.runs.every((r) => getRun(db, r)!.when === undefined), 'a score of your own is not a night run, by day');
+
+  const bad = await call('POST', '/api/experiments/evolutions', { evaluation: nightEv.id, files: ['model.sh'], when: 'tonight' });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.error, 'when: "night" for an evolution that works at night, or leave it out');
+
+  answer = async (q) => {
+    await delay(600_000, q.signal);
+    return '';
+  };
+  const c = ctx({ cwd: nightRepo });
+  const props = (experimentTools(c).find((t) => t.name === 'evolve_start')!.inputSchema as any).properties;
+  assert.deepEqual(props.when.enum, ['night', 'now']);
+  const sentence = 'It will start tonight, between 23:00 and 07:00';
+  sessions.mode = 'default';
+  sessions.answer = 'deny';
+  await tool('evolve_start', { files: ['model.sh'], when: 'night' }, c);
+  assert.ok(sessions.cards.at(-1)!.detail!.includes(sentence), sessions.cards.at(-1)!.detail);
+  for (const when of [undefined, 'now']) {
+    await tool('evolve_start', { files: ['model.sh'], when }, c);
+    assert.ok(!sessions.cards.at(-1)!.detail!.includes('tonight'), sessions.cards.at(-1)!.detail);
+  }
+  sessions.answer = 'accept';
+  const yes = await tool('evolve_start', { files: ['model.sh'], candidates: 10, when: 'night' }, c);
+  assert.ok(!yes.error, yes.text);
+  assert.deepEqual([yes.json.evolution.when, yes.json.evolution.waits, yes.json.starts], ['night', WAITS, sentence]);
+  assert.equal((await tool('evolve_get', { id: yes.json.evolution.id }, c)).json.waits, WAITS);
+  await stopEvolution(deps, yes.json.evolution.id);
+  await call('DELETE', `/api/experiments/evolutions/${yes.json.evolution.id}`);
+  const now = await startNight({ when: 'now' });
+  assert.equal(now.when, undefined);
+  await call('DELETE', `/api/experiments/evolutions/${now.id}`);
+});
+
+test('a night evolution holds still by day, works at night, and goes on from where it was the next night', async () => {
+  EVOLVE.nightCheckMs = 50;
+  nightClock.now = () => wallNow;
+  nightHours();
+  release();
+  notices.length = 0;
+  wallNow = at(5, 12);
+  prompts.length = 0;
+  calls = 0;
+  clock = 0;
+  // #1 and #2 are worse and end in the night; #3 is better than the start, #4 worse: both are being scored when the
+  // night ends. #5 and #6, of the next night, are held too.
+  const X = ['2', '1', '4', '0', '5', '6', '8', '9', '10', '11'];
+  answer = async (q, i) => {
+    if (i === 2 || i === 3) {
+      await until(() => endedOf(e.id) >= 2, 120_000, '#1 and #2');
+      hold();
+    }
+    if (i === 4 || i === 5) {
+      await until(() => endedOf(e.id) >= 4, 120_000, '#3 and #4');
+      hold();
+    }
+    return reply(parentX(q.prompt), X[i]);
+  };
+  const e = await startNight({ aim: 'Find a better X', atOnce: 2, hours: 1 });
+  assert.deepEqual([e.when, e.status, e.waits], ['night', 'starting', WAITS]);
+
+  // By day: the start's score waits for the night, and no model is asked.
+  await until(() => runsFor(e.id, 'start').length === 2 && runsFor(e.id, 'start').every((r) => r.status === 'waiting'), 60_000, 'the start’s runs in line');
+  await sleep(600);
+  assert.ok(runsFor(e.id, 'start').every((r) => r.when === 'night' && r.status === 'waiting' && r.why === WAITS));
+  assert.deepEqual([prompts.length, cands(e.id).length, evo(e.id).status], [0, 0, 'starting']);
+
+  // At night it is scored, and the search goes: two at a time.
+  wallNow = at(5, 23);
+  await until(() => cands(e.id).length === 4 && cands(e.id).filter((c) => c.status === 'scoring').length === 2 && inHand(e.id).every((c) => runsFor(e.id, c.id).some((r) => r.status === 'running')), 120_000, 'two being scored');
+  assert.equal(evo(e.id).status, 'running');
+  assert.equal((await read(e.id)).waits, undefined);
+  assert.equal(prompts.length, 4);
+  await sleep(600);
+  assert.equal(prompts.length, 4, 'no more while two are in hand');
+  assert.ok(evo(e.id).activeMs > 0, 'the night counts');
+
+  // The night ends: the morning tells of it; what runs finishes; nothing new starts.
+  wallNow = at(6, 7);
+  await until(() => mornings().length === 1, 20_000, 'the morning');
+  assert.deepEqual([mornings()[0].title, mornings()[0].url], ['Experiments', `/experiments?evolution=${e.id}`], 'the search alone: the notice opens it');
+  assert.equal(mornings()[0].body, 'The search “Find a better X” tried 2 more versions and found nothing better than its best so far');
+  assert.equal((await read(e.id)).waits, WAITS);
+  release();
+  // #3 beat its island's best on the first seed: its full score is put in line, and waits for the night. #4 ends.
+  const three = byN(e.id, 3).id;
+  await until(() => byN(e.id, 4).status === 'scored' && runsFor(e.id, three).length === 3 && runsFor(e.id, three).slice(1).every((r) => r.status === 'waiting'), 60_000, 'what was running');
+  assert.equal(byN(e.id, 3).status, 'checking');
+  assert.ok(runsFor(e.id, three).slice(1).every((r) => r.when === 'night' && r.why === WAITS));
+  await sleep(600);
+  assert.deepEqual([cands(e.id).length, prompts.length, evo(e.id).status], [4, 4, 'running'], 'nothing new by day');
+
+  // Hours count nights only: a day that is longer than them does not end it.
+  const worked = evo(e.id).activeMs;
+  clock += 5 * 3_600_000;
+  await sleep(600);
+  assert.deepEqual([evo(e.id).status, evo(e.id).activeMs], ['running', worked]);
+
+  // A restart by day: rebuilt from what is kept, still holding.
+  const asked = scoresBy(e.id).get(three);
+  await haltEvolutions();
+  await resumeEvolutions(deps);
+  await sleep(800);
+  assert.deepEqual([cands(e.id).length, prompts.length, evo(e.id).status, evo(e.id).activeMs], [4, 4, 'running', worked]);
+  assert.deepEqual(scoresBy(e.id).get(three), asked, 'not asked again');
+
+  // Paused and resumed by day: still nothing new, and at night both slots are there.
+  assert.equal((await call('POST', `/api/experiments/evolutions/${e.id}/pause`, {})).body.evolution.status, 'paused');
+  assert.equal((await read(e.id)).waits, undefined);
+  await sleep(600);
+  assert.equal((await call('POST', `/api/experiments/evolutions/${e.id}/resume`, {})).body.evolution.status, 'running');
+  await sleep(600);
+  assert.deepEqual([cands(e.id).length, prompts.length], [4, 4]);
+
+  // The next night: it goes on from where it was, beside an ordinary night run.
+  const mine = await ordinaryNight('echo hi');
+  wallNow = at(6, 23);
+  await until(() => cands(e.id).length === 6 && inHand(e.id).length === 2 && inHand(e.id).every((c) => c.status === 'scoring' && runsFor(e.id, c.id).some((r) => r.status === 'running')), 120_000, '#5 and #6');
+  assert.equal(byN(e.id, 3).status, 'scored');
+  assert.equal(evo(e.id).best, three);
+  await until(() => runEnded(mine.id), 20_000, 'the night run');
+
+  // A restart in the night: the same two go on, scored once.
+  const before = inHand(e.id).map((c) => scoresBy(e.id).get(c.id));
+  await haltEvolutions();
+  await resumeEvolutions(deps);
+  await sleep(800);
+  assert.deepEqual(inHand(e.id).map((c) => scoresBy(e.id).get(c.id)), before);
+  assert.equal(cands(e.id).length, 6);
+
+  // The morning with runs and a search: one notice, the scores not counted, the runs' night opened. #3 and #4 ended
+  // after the last morning: they are told now.
+  wallNow = at(7, 7);
+  await until(() => mornings().length === 2, 20_000, 'the second morning');
+  assert.equal(mornings()[1].url, '/experiments?night=2026-01-06');
+  assert.equal(mornings()[1].body, `Last night: 1 run done. ${searchWords('Find a better X', 2, { mean: 91.0015, gain: 7 })}`);
+  assert.equal(searchWords('Find a better X', 2, { mean: 91.0015, gain: 7 }), 'The search “Find a better X” tried 2 more versions: its best is 91, 7 better than the start');
+  assert.equal(searchWords('rank.py', 1), 'The search “rank.py” tried 1 more version and found nothing better than its best so far');
+  assert.equal(searchWords('rank.py', 37, { mean: 0.44741, gain: 0.03512 }), 'The search “rank.py” tried 37 more versions: its best is 0.4474, 0.0351 better than the start');
+  const night = (await call('GET', '/api/experiments/runs?night=2026-01-06&everywhere=1')).body.runs as { id: string }[];
+  assert.deepEqual(night.map((r) => r.id), [mine.id], 'its scores are not among the night’s runs');
+
+  // Stopped by day: its waiting scores stop, and no morning tells of a search you stopped.
+  release();
+  await until(() => endedOf(e.id) >= 6 || inHand(e.id).some((c) => c.status === 'checking'), 60_000, '#5 and #6');
+  assert.equal((await call('POST', `/api/experiments/evolutions/${e.id}/stop`, {})).body.evolution.status, 'stopped');
+  await until(() => inHand(e.id).length === 0, 20_000, 'what was in hand');
+  assert.ok([...scoresBy(e.id).values()].flat().every((s) => !['waiting', 'running'].includes(getScore(db, s)!.status)));
+  const other = await ordinaryNight('echo again');
+  wallNow = at(7, 23);
+  await until(() => runEnded(other.id), 20_000, 'the third night’s run');
+  wallNow = at(8, 7);
+  await until(() => mornings().length === 3, 20_000, 'the third morning');
+  assert.deepEqual([mornings()[2].body, mornings()[2].url], ['Last night: 1 run done', '/experiments?night=2026-01-07'], 'runs alone: as ever');
+  await call('DELETE', `/api/experiments/evolutions/${e.id}`);
+  clock = 0;
+});
+
+test('nights that stop their runs: a night evolution’s score starts again the next night; no night, it waits and says so', async () => {
+  EVOLVE.nightCheckMs = 50;
+  nightClock.now = () => wallNow;
+  nightHours({ nightEnds: 'stop' });
+  release();
+  prompts.length = 0;
+  calls = 0;
+  wallNow = at(10, 23);
+  answer = (q) => {
+    hold();
+    return reply(parentX(q.prompt), '2');
+  };
+  const e = await startNight({ atOnce: 1 });
+  await until(() => cands(e.id).length === 1 && runsFor(e.id, cands(e.id)[0].id).some((r) => r.status === 'running'), 120_000, 'a try being scored');
+  wallNow = at(11, 7);
+  const one = cands(e.id)[0].id;
+  await until(() => runsFor(e.id, one)[0].status === 'waiting', 60_000, 'its run stopped');
+  assert.equal(runsFor(e.id, one)[0].why, NIGHT_AGAIN);
+  await sleep(600);
+  assert.deepEqual([cands(e.id)[0].status, cands(e.id).length, prompts.length], ['scoring', 1, 1]);
+  nightHours({ nightFrom: '23:00', nightTo: '23:00' });
+  assert.equal((await read(e.id)).waits, 'Waits for the night: none is set. Give Night two different times in Where runs go');
+  nightHours({ nightEnds: 'stop' });
+  release();
+  wallNow = at(11, 23);
+  await until(() => byN(e.id, 1).status === 'scored', 60_000, 'it the next night');
+  assert.equal(scoresBy(e.id).get(one)!.length, 1);
+  await stopEvolution(deps, e.id);
+  await call('DELETE', `/api/experiments/evolutions/${e.id}`);
+});
+
+test('a night evolution whose model cannot be asked waits for you, and goes on with what it had once resumed', async () => {
+  EVOLVE.nightCheckMs = 50;
+  nightClock.now = () => wallNow;
+  nightHours();
+  release();
+  prompts.length = 0;
+  calls = 0;
+  wallNow = at(13, 23);
+  let down = true;
+  answer = async (q, i) => {
+    if (down) throw new Error('no model');
+    await delay(300, q.signal);
+    return reply(parentX(q.prompt), String(40 + i));
+  };
+  const e = await startNight({ atOnce: 1 });
+  await until(() => evo(e.id).status === 'paused', 60_000, 'it to pause');
+  assert.match(evo(e.id).why!, /^The model could not be asked: no model/);
+  await sleep(600);
+  assert.deepEqual([prompts.length, cands(e.id).length, cands(e.id)[0].status], [1, 1, 'proposing'], 'not asked again on its own');
+  down = false;
+  await call('POST', `/api/experiments/evolutions/${e.id}/resume`, {});
+  await until(() => evo(e.id).tried >= 2, 60_000, 'on again');
+  assert.equal(byN(e.id, 1).status, 'scored', 'the one it had in hand');
+  await stopEvolution(deps, e.id);
+  await call('DELETE', `/api/experiments/evolutions/${e.id}`);
+  wallNow = at(14, 7);
+  await sleep(500);
+});
+
+test('a night evolution’s hours end it once that much night has passed; an ordinary evolution knows nothing of the night', async () => {
+  EVOLVE.nightCheckMs = 50;
+  nightClock.now = () => wallNow;
+  nightHours();
+  release();
+  prompts.length = 0;
+  calls = 0;
+  // By day, with night hours set, an ordinary one goes at once; its scores are no night runs.
+  wallNow = at(15, 12);
+  answer = (q, i) => reply(parentX(q.prompt), String(20 + i));
+  const plain = await startNight({ when: undefined, atOnce: 1, hours: 1 });
+  await until(() => evo(plain.id).tried >= 1, 60_000, 'a try by day');
+  assert.deepEqual([plain.when, plain.waits, evo(plain.id).waits], [undefined, undefined, undefined]);
+  assert.ok([...scoresBy(plain.id).keys()].flatMap((k) => runsFor(plain.id, k)).every((r) => r.when === undefined));
+  clock += 2 * 3_600_000;
+  assert.equal((await over(plain.id)).why, 'Its 1 hour is up', 'its hours count the day');
+  clock = 0;
+
+  wallNow = at(15, 23);
+  answer = async (q, i) => {
+    await delay(400, q.signal);
+    return reply(parentX(q.prompt), String(30 + i));
+  };
+  const e = await startNight({ atOnce: 1, candidates: 200, hours: 0.001 });
+  const done = await over(e.id, 60_000);
+  assert.deepEqual([done.status, done.why], ['done', 'Its 0.001 hours are up']);
+  assert.ok(done.activeMs >= 3600, `${done.activeMs} ms of the night`);
+  // Nothing is left open for the next test of the night.
+  wallNow = at(16, 7);
+  await sleep(500);
+  for (const id of [plain.id, e.id]) await call('DELETE', `/api/experiments/evolutions/${id}`);
+  assert.equal(listRuns(db, { status: ['queued', 'waiting', 'running'], limit: 10 }).length, 0);
+  nightClock.now = () => Date.now();
+  EVOLVE.nightCheckMs = 3000;
 });
 
 const listEvolutions = () => (db.prepare('select id from exp_evolutions').all() as { id: string }[]).map((r) => r.id);

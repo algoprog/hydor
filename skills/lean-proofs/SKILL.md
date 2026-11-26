@@ -106,6 +106,44 @@ When the work belongs to a project that keeps findings (you have the `findings` 
 `supported` or `refuted`, and the Lean file as its evidence (`{ kind: "file", ref: its path in the
 project }`).
 
+## In a Lake project of your own
+
+- When Lean is the app's own, `lake` and `lean` are not on the path (the tools and `leancheck` find them by
+  themselves). To run them: `PATH="$HYDOR_LEAN_DIR/elan/bin:$PATH" ELAN_HOME="$HYDOR_LEAN_DIR/elan" lake build`.
+- `lake init <name> lib` (and `lake new`) also make a git repository, a README and a workflow file for GitHub:
+  say so, and take out what the person did not ask for.
+- No `require` of Mathlib unless they want it: a project that requires Mathlib needs its own copy
+  (`lake exe cache get`, several GB), so ask first. A loose `.lean` file that imports Mathlib uses the app's copy.
+- A snippet cannot import the project's files: to try small values, put the `#eval` lines in a temporary file of
+  the project, check it, and delete it.
+- Checking leaves `.lake/` (lake's own `.gitignore` leaves it out) and `lake-manifest.json` (it belongs with the
+  project).
+- A pin covers how your own definitions are written, not only their values: a definition rewritten under an
+  agreed statement goes back to the person, like a changed statement.
+
+## Several results: a board
+
+For a paper's chain of lemmas rather than one theorem:
+
+1. List the statements in the order the paper proves them, with what each one uses. Agree the formal
+   statement of **every** one with the person first, as section 1 says, and pin each: one table for
+   them (the statement in words, in Lean, its pin). A statement later found wrong goes back to them,
+   with what depends on it.
+2. One file a result (or one theorem a part), in a Lake project so that the files can import one
+   another. Each proof is `sorry` at first, and each later result is free to use the earlier ones as
+   stated. The whole must compile with the gaps before any proving.
+3. Keep a board in the project, a Markdown file: result · `name@pin` · what it rests on · status
+   (stated, proved, or stuck with what was tried).
+4. Prove from the leaves up (what rests on nothing first). When the person wants it done in parallel,
+   hand the parts out as a Campaign instead: each part is one result, and its check is
+   `leancheck <file> --theorem name@pin` (exit code 0). A member changes no statement and no other
+   part's file. A part that needs an earlier one uses it as stated even while that one is still
+   `sorry`. `leancheck` fails a theorem that rests on any gap, so until the earlier ones are proved,
+   such a part's check is the same command with `--allow-sorry`, and no `sorry` or `admit` in its own
+   file.
+5. The whole is proved when, after merging, every part's check passes without `--allow-sorry` and one
+   `leancheck` over the top file shows no `sorry` left anywhere it rests on.
+
 ## Pitfalls
 
 - "It compiles" is not "it is proved": `sorry` compiles with a warning. Only the verdict counts.

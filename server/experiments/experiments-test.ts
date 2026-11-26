@@ -39,7 +39,7 @@ import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
 import { MAX_METRICS, nanText, oomText, parseLine, Tracker } from './metrics.ts';
 import { cleanJob, endLine, forgetLive, forgetNotices, onCallBrief, repairEnded, setSettings, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
-import { clock, morningWords, NIGHT_AGAIN, NIGHT_BEHIND, nightAt, tonightMore } from './night.ts';
+import { clock, morningAlso, morningWords, NIGHT_AGAIN, NIGHT_BEHIND, nightAt, tonightMore } from './night.ts';
 import { addEvent, getInfo, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveInfo, saveSeries, saveTable, seriesOf, updateRun, waitStarted, workOut } from './records.ts';
 import { useMachines } from './remote.ts';
 import { holm, lgamma, pairedBootstrap, pairedT, tTwoSided, welch } from './stats.ts';
@@ -1993,6 +1993,59 @@ test('hours changed so another night begins on the same date: it has its own mor
     mornings().map((n) => n.body),
     ['Last night: 1 run done', 'Last night: 2 runs done'],
   );
+});
+
+test('the morning does not count runs that score an evaluation; what else worked says its own sentence in the one notice', async () => {
+  const evolves = morningAlso.of;
+  const scoring = () => nightJob('echo s=1', { tags: ['evaluation'], env: { HYDOR_EVALUATION: 'e1none' } });
+  let also = [
+    { line: 'The search “one” tried 3 more versions and found nothing better than its best so far', url: '/experiments?evolution=v1one' },
+    { line: 'The search “two” tried 1 more version and found nothing better than its best so far', url: '/experiments?evolution=v1two' },
+  ];
+  let since = 0;
+  morningAlso.of = (_db, from) => ((since = from), also);
+  try {
+    // Scores alone: nothing of the runs, and the notice opens the first search.
+    now = at(28, 23);
+    nightTest();
+    const s = await scoring();
+    await until(ended(s.id), 20_000, 'the score’s run');
+    now = at(29, 7);
+    await steps();
+    assert.deepEqual(
+      mornings().map((n) => [n.body, n.url, n.kind]),
+      [[`${also[0].line}. ${also[1].line}`, '/experiments?evolution=v1one', 'done']],
+    );
+    assert.ok(since > 0 && since <= Date.now(), 'asked for what worked since the night was first watched');
+
+    // Runs beside them: one notice, the runs first, and it opens the night's runs.
+    now = at(29, 23);
+    notices.length = 0;
+    also = also.slice(0, 1);
+    const s2 = await scoring();
+    const r = await nightJob('echo mine');
+    await until(() => [s2, r].every((x) => ended(x.id)()), 20_000, 'both');
+    now = at(30, 7);
+    await steps();
+    assert.deepEqual(
+      mornings().map((n) => [n.body, n.url]),
+      [[`Last night: 1 run done. ${also[0].line}`, '/experiments?night=2026-01-29']],
+    );
+
+    // Nothing else worked, or telling of it fails: as ever, and nothing for scores alone.
+    notices.length = 0;
+    morningAlso.of = () => {
+      throw new Error('no');
+    };
+    now = at(30, 23);
+    const s3 = await scoring();
+    await until(ended(s3.id), 20_000, 'the score’s run');
+    now = at(31, 7);
+    await steps();
+    assert.equal(mornings().length, 0);
+  } finally {
+    morningAlso.of = evolves;
+  }
 });
 
 test('a cluster refuses a night run in words; run again keeps when; the tools’ card says when it starts', async () => {

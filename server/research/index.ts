@@ -4,7 +4,8 @@
 // report as a page or a Word document. Here: what the lead and the researchers are told, and the budget kept
 // as they work: web searches counted across the research (the app's web_search, with the agents' own web
 // search off so every search counts), and rounds counted as researchers start. Here too, every agent's prior_work
-// tool: whether an idea or a result has been done before (prior-work.ts).
+// tool: whether an idea or a result has been done before (prior-work.ts), and oeis_lookup: which known sequence
+// some integers are (oeis.ts).
 import { researchOf, type ResearchSettings, type ResearchState } from '../../shared/research.ts';
 import { childKeys } from '../children/family.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
@@ -12,6 +13,7 @@ import { GivenAtStart } from '../features/freshStart.ts';
 import type { Deps, Feature, RunCtx } from '../features/types.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { leadInstructions, RESEARCHER_INSTRUCTIONS } from './instructions.ts';
+import { OEIS_GUIDE, oeisTool } from './oeis.ts';
 import { PRIOR_WORK_GUIDE, priorWorkTool } from './prior-work.ts';
 
 /** The research a session takes part in: its lead's key and settings, and whether it leads or researches. */
@@ -80,14 +82,17 @@ export const research: Feature = {
     d.app.get('/api/research/:key', async (req) => researchState(d, (req.params as { key: string }).key) ?? { key: (req.params as { key: string }).key, settings: null });
   },
 
-  // "Is this new?": every agent's and apps' steps' (prior-work.ts), in a research or not.
-  tools: (ctx) => [priorWorkTool(!!ctx.step)],
+  // "Is this new?" (prior-work.ts) and the OEIS (oeis.ts): every agent's and apps' steps', in a research or not.
+  tools: (ctx) => [priorWorkTool(!!ctx.step), oeisTool()],
 
   spawn(s, d) {
     // A new Codex thread has no key yet: its own settings say whether it leads, its parent's whether it researches.
     const r = researchFor(d.db, s.key ?? '', s.extra);
     given.note(s.runId, researchWords(r));
-    const guides = [{ tools: ['prior_work'], text: PRIOR_WORK_GUIDE }];
+    const guides = [
+      { tools: ['prior_work'], text: PRIOR_WORK_GUIDE },
+      { tools: ['oeis_lookup'], text: OEIS_GUIDE },
+    ];
     if (!r) return { guides };
     // Every search goes through web_search, where the budget is kept: the agents' own web search is off.
     const off = s.agent === 'claude' ? { disallowedTools: ['WebSearch'] } : s.agent === 'codex' ? { codexConfig: { web_search: 'disabled' } } : {};

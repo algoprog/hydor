@@ -446,6 +446,7 @@ export const STEP_TOOLS = [
   'reading_list',
   'zotero_sync',
   'prior_work',
+  'oeis_lookup',
 ];
 /**
  * Of those, the ones only steps have (agents in sessions don't): what the user is like, from memory and their sessions'

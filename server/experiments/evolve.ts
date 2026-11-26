@@ -5,6 +5,8 @@
 // is kept. Every candidate is scored in a git worktree of the app's own (a slot, at the start commit), so a candidate
 // that touches a protected file is refused by the seal and the person's checkout is never changed. Each candidate's
 // version of the files is kept whole, so any of them can be rebuilt or taken onto a branch on its own.
+// A night evolution (when: "night") asks for night runs only (night.ts), asks the model for nothing by day, counts its
+// hours by night alone, and says in the morning's notice how far it got.
 // shared/evolve.ts has the shapes; the routes are in evolve-routes.ts and the agents' tools in tools.ts.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -21,7 +23,8 @@ import { git } from '../git.ts';
 import { helper } from '../helper.ts';
 import { ChangedError, deleteScore, getEvaluation, getScore, mustEvaluation, protectsPath, startScore, STOPPED_WHILE_STARTING, stopScore, waitScore } from './evaluations.ts';
 import { files as runFiles } from './local.ts';
-import { tick } from './queue.ts';
+import { clock, morningAlso, nightAt, nightWhy, nightZone, type NightWork } from './night.ts';
+import { settingsOf, tick } from './queue.ts';
 import { getRun, RUNS_ROOT, tables } from './records.ts';
 
 /** The limits of a spec, and the rules of the search (a test reads them). */
@@ -51,6 +54,8 @@ export const EVOLVE = {
   toolDiffLines: 200,
   /** Lines of a failed run's log kept with its candidate. */
   logLines: 20,
+  /** How often a night evolution looks whether it is night (a test makes it short). */
+  nightCheckMs: 3000,
 };
 
 // ---- what it depends on (a test puts its own in) ------------------------------------------------------------------
@@ -119,6 +124,11 @@ interface Inner {
   since?: number;
   /** The hash of the start's files. */
   startHash: string;
+  /** A night evolution: whether it was night when last looked, and when it was last counted running in the night. */
+  night?: boolean;
+  seen?: number;
+  /** A night evolution: how many were tried, and its best, when a morning last told of it. */
+  told?: { tried: number; best?: string };
 }
 
 interface Rec {
@@ -163,7 +173,51 @@ function store(db: DB, r: Rec) {
 /** The time it has spent running, now. */
 const activeNow = (r: Rec) => r.evo.activeMs + (r.evo.status === 'running' && r.inner.since ? Math.max(0, use.now() - r.inner.since) : 0);
 
-const view = (r: Rec): Evolution => ({ ...r.evo, activeMs: activeNow(r) });
+const isNight = (db: DB) => nightAt(clock.now(), settingsOf(db), nightZone(db)) !== null;
+
+/**
+ * A night evolution's running time is added up a look at a time, and only for looks in the night: never more than a
+ * few looks' worth at once, so a day (or a computer asleep) in between is not counted.
+ */
+function countNight(r: Rec) {
+  if (r.inner.seen !== undefined) r.evo.activeMs += Math.min(Math.max(0, use.now() - r.inner.seen), Math.max(1000, 3 * EVOLVE.nightCheckMs));
+  r.inner.seen = undefined;
+}
+
+/** Looks whether it is night for a night evolution: its time is counted, and the pages hear when that changes. */
+function lookAtNight(d: Deps, id: string): boolean {
+  const night = isNight(d.db);
+  const r = load(d.db, id);
+  if (!r?.evo.when) return night;
+  const changed = r.inner.night !== night;
+  const counted = r.inner.seen !== undefined;
+  countNight(r);
+  if (night && r.evo.status === 'running') r.inner.seen = use.now();
+  r.inner.night = night;
+  if (changed || counted || r.inner.seen !== undefined) store(d.db, r);
+  if (changed) tellSoon(d, id);
+  return night;
+}
+
+/** Looks for as long as a night evolution's work goes on here; returns what ends the looking. */
+function watchItsNight(d: Deps, id: string): () => void {
+  if (!load(d.db, id)?.evo.when) return () => {};
+  lookAtNight(d, id);
+  const t = setInterval(() => {
+    try {
+      lookAtNight(d, id);
+    } catch (e) {
+      console.error(`[experiments] evolution ${id}:`, (e as Error)?.message ?? e);
+    }
+  }, EVOLVE.nightCheckMs);
+  t.unref?.();
+  return () => clearInterval(t);
+}
+
+function view(db: DB, r: Rec): Evolution {
+  const going = r.evo.status === 'starting' || r.evo.status === 'running';
+  return { ...r.evo, activeMs: activeNow(r), ...(r.evo.when && going && !isNight(db) ? { waits: nightWhy({}, settingsOf(db)) } : {}) };
+}
 
 /** Changes an evolution as it is now, at once (nothing else runs between reading and writing). */
 function patch(d: Deps, id: string, fn: (r: Rec) => void): Rec | null {
@@ -178,16 +232,18 @@ function patch(d: Deps, id: string, fn: (r: Rec) => void): Rec | null {
 /** Into running, or out of it: the time it ran is counted. */
 function setStatus(r: Rec, status: Evolution['status']) {
   if (r.evo.status === 'running' && status !== 'running') {
-    r.evo.activeMs = activeNow(r);
+    if (r.evo.when) countNight(r);
+    else r.evo.activeMs = activeNow(r);
     r.inner.since = undefined;
   }
-  if (status === 'running' && r.evo.status !== 'running') r.inner.since = use.now();
+  // A night evolution's time is counted by lookAtNight instead.
+  if (status === 'running' && r.evo.status !== 'running' && !r.evo.when) r.inner.since = use.now();
   r.evo.status = status;
 }
 
 export function getEvolution(db: DB, id: string): Evolution | null {
   const r = load(db, id);
-  return r ? view(r) : null;
+  return r ? view(db, r) : null;
 }
 
 export function mustEvolution(db: DB, id: string): Evolution {
@@ -425,6 +481,8 @@ export async function checkEvolveSpec(db: DB, b: Record<string, any>): Promise<C
     files.set(f, body.toString('utf8'));
   }
 
+  // night: its scores are night runs, and it tries nothing new by day. "now" is the ordinary way, as for a run.
+  if (given(b.when) && b.when !== 'night' && b.when !== 'now') throw new HttpError(400, 'when: "night" for an evolution that works at night, or leave it out');
   const aim = typeof b.aim === 'string' ? b.aim.trim() : '';
   if (aim.length > EVOLVE.aim) throw new HttpError(400, `The aim is at most ${EVOLVE.aim.toLocaleString('en-US')} characters`);
   const candidates = wholeNumber(b.candidates, EVOLVE.candidates.min, EVOLVE.candidates.max, 'Candidates', EVOLVE.candidates.default);
@@ -436,7 +494,7 @@ export async function checkEvolveSpec(db: DB, b: Record<string, any>): Promise<C
     if (!Number.isFinite(hours) || hours < 0 || hours > 24 * 60) throw new HttpError(400, 'Hours: a number from 0 to 1440');
     if (!hours) hours = undefined;
   }
-  const spec: EvolveSpec = { evaluation: ev.id, from, files: list, ...(aim ? { aim } : {}), candidates, ...(hours ? { hours } : {}), atOnce, stallAfter };
+  const spec: EvolveSpec = { evaluation: ev.id, from, files: list, ...(aim ? { aim } : {}), candidates, ...(hours ? { hours } : {}), atOnce, stallAfter, ...(b.when === 'night' ? { when: 'night' as const } : {}) };
   return { spec, ev, inner, commit, ...(branch ? { branch } : {}), files };
 }
 
@@ -491,9 +549,11 @@ async function launch(d: Deps, id: string) {
   const entry = liveEntry(id);
   const signal = entry.abort.signal;
   entry.done = (async () => {
+    let unwatch = () => {};
     try {
       let r = load(d.db, id);
       if (!r || r.evo.status !== 'starting') return;
+      unwatch = watchItsNight(d, id);
       await makeSlots(r);
       if (signal.aborted) return;
       const ev = getEvaluation(d.db, r.evo.evaluation);
@@ -503,7 +563,7 @@ async function launch(d: Deps, id: string) {
       if (score?.status === 'failed' && score.why === STOPPED_WHILE_STARTING) score = null;
       if (!score) {
         await resetSlot(r, 0);
-        score = await startScore(d, ev.id, { kind: 'score', folder: slotTop(id, 0), by: { who: 'evolve', evolution: id, candidate: 'start' } });
+        score = await startScore(d, ev.id, { kind: 'score', folder: slotTop(id, 0), ...(r.evo.when ? { when: r.evo.when } : {}), by: { who: 'evolve', evolution: id, candidate: 'start' } });
         tellSoon(d, id);
       }
       score = await settled(d, score.id, signal);
@@ -535,6 +595,7 @@ async function launch(d: Deps, id: string) {
         );
       return;
     } finally {
+      unwatch();
       if (live.get(id) === entry) live.delete(id);
     }
     drive(d, id);
@@ -1036,7 +1097,7 @@ async function score(d: Deps, id: string, cid: string, slot: number, signal: Abo
       await resetSlot(r, slot, filesOf(r, cid));
       // Stopped meanwhile: its lane ends it.
       if (signal.aborted) return;
-      s = await startScore(d, ev.id, { kind: 'score', folder: slotTop(id, slot), ...(full ? {} : { seeds: [ev.seeds[0]] }), by: { who: 'evolve', evolution: id, candidate: cid } });
+      s = await startScore(d, ev.id, { kind: 'score', folder: slotTop(id, slot), ...(full ? {} : { seeds: [ev.seeds[0]] }), ...(r.evo.when ? { when: r.evo.when } : {}), by: { who: 'evolve', evolution: id, candidate: cid } });
     } catch (e) {
       if (e instanceof ChangedError) {
         finish(d, id, cid, { status: 'failed', why: e.message });
@@ -1137,6 +1198,41 @@ interface Live {
 }
 const live = new Map<string, Live>();
 
+/** Whether a night evolution has nothing more to make (so no slot of it waits for a night). */
+const nothingMore = (db: DB, r: Rec) => !!overWhy(r) || (db.prepare('select count(*) as n from exp_candidates where evolution = ?').get(r.evo.id) as { n: number }).n >= r.evo.candidates;
+
+/** A short wait that a stop ends at once. */
+const nap = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const done = () => {
+      clearTimeout(t);
+      signal.removeEventListener('abort', done);
+      resolve();
+    };
+    const t = setTimeout(done, ms);
+    signal.addEventListener('abort', done, { once: true });
+    if (signal.aborted) done();
+  });
+
+/**
+ * Where a slot of a night evolution waits before the model is asked: until it is night and the evolution runs. So by
+ * day nothing is asked for, whatever was in hand. A slot with a change still to be asked for (`inHand`: the app
+ * restarted) only waits for the night, as a paused one finishes what it had; unless the model could not be asked
+ * (`resumed`: wait for the person). A slot with nothing in hand stays while the evolution is paused, so that a resume
+ * finds all its slots, and returns when there is nothing more to make.
+ */
+async function waitForNight(d: Deps, id: string, signal: AbortSignal, o: { inHand: boolean; resumed: boolean }): Promise<void> {
+  while (!signal.aborted) {
+    const night = lookAtNight(d, id);
+    const r = load(d.db, id);
+    if (!r || (r.evo.status !== 'running' && r.evo.status !== 'paused')) return;
+    const running = r.evo.status === 'running';
+    if (!o.inHand && running && nothingMore(d.db, r)) return;
+    if (night && (running || (o.inHand && !o.resumed))) return;
+    await nap(EVOLVE.nightCheckMs, signal);
+  }
+}
+
 function liveEntry(id: string): Live {
   const entry: Live = { abort: new AbortController(), done: Promise.resolve() };
   live.set(id, entry);
@@ -1158,10 +1254,17 @@ function endWith(d: Deps, id: string, status: 'done' | 'stopped' | 'failed', why
 /** One slot's work: the candidate it had in hand, then new ones while it runs. */
 async function lane(d: Deps, id: string, slot: number, signal: AbortSignal) {
   let c = candidatesOf(d.db, id).find((x) => inFlight(x) && candRow(d.db, x.id)?.slot === slot) ?? null;
+  const night = !!load(d.db, id)?.evo.when;
+  let unasked = false;
   for (;;) {
     if (signal.aborted) {
       if (c && !halted(signal)) finish(d, id, c.id, { status: 'failed', why: 'It was stopped before it was scored' });
       return;
+    }
+    if (night && (!c || getCand(d.db, c.id)?.status === 'proposing')) {
+      await waitForNight(d, id, signal, { inHand: !!c, resumed: unasked });
+      unasked = false;
+      if (signal.aborted) continue;
     }
     c ??= nextCandidate(d, id, slot);
     if (!c) return;
@@ -1173,6 +1276,11 @@ async function lane(d: Deps, id: string, slot: number, signal: AbortSignal) {
     if (now.status === 'proposing') {
       if (!(await propose(d, id, now.id, signal))) {
         if (signal.aborted) continue;
+        // A night evolution's slot stays, with what it has in hand, until the person resumes it.
+        if (night && load(d.db, id)?.evo.status === 'paused') {
+          unasked = true;
+          continue;
+        }
         return;
       }
     } else await score(d, id, now.id, slot, signal);
@@ -1185,6 +1293,7 @@ function drive(d: Deps, id: string) {
   const entry = liveEntry(id);
   const signal = entry.abort.signal;
   entry.done = (async () => {
+    const unwatch = watchItsNight(d, id);
     try {
       for (;;) {
         const r = load(d.db, id);
@@ -1201,6 +1310,7 @@ function drive(d: Deps, id: string) {
     } catch (e) {
       if (!halted(signal)) endWith(d, id, 'failed', `It stopped on an error: ${(e as Error)?.message ?? e}`);
     } finally {
+      unwatch();
       if (live.get(id) === entry) live.delete(id);
     }
   })();
@@ -1239,7 +1349,7 @@ export function resumeEvolution(d: Deps, id: string): Evolution {
 export async function stopEvolution(d: Deps, id: string, why = 'Stopped by you'): Promise<Evolution> {
   const r = load(d.db, id);
   if (!r) throw new HttpError(404, 'There is no such evolution');
-  if (r.evo.status === 'done' || r.evo.status === 'stopped' || r.evo.status === 'failed') return view(r);
+  if (r.evo.status === 'done' || r.evo.status === 'stopped' || r.evo.status === 'failed') return view(d.db, r);
   endWith(d, id, 'stopped', why);
   live.get(id)?.abort.abort('stop');
   // Its scores still going stop (a slot that was not running is stopped by its lane).
@@ -1263,7 +1373,11 @@ export async function resumeEvolutions(d: Deps): Promise<void> {
       continue;
     }
     // Time the app was not running is not counted.
-    if (row.status === 'running') patch(d, row.id, (r) => (r.inner.since = use.now()));
+    if (row.status === 'running')
+      patch(d, row.id, (r) => {
+        if (r.evo.when) r.inner.seen = undefined;
+        else r.inner.since = use.now();
+      });
     drive(d, row.id);
   }
 }
@@ -1274,6 +1388,43 @@ export async function haltEvolutions(): Promise<void> {
   for (const e of all) e.abort.abort(HALT);
   await Promise.all(all.map((e) => e.done.catch(() => {})));
 }
+
+// ---- the morning ----------------------------------------------------------------------------------------------------
+
+/** A score as the page writes it: four figures (five from 100 up). */
+const figures = (v: number, digits = Math.abs(v) >= 100 ? 5 : 4) => (v !== 0 && (Math.abs(v) >= 1e6 || Math.abs(v) < 1e-3) ? v.toExponential(2) : String(Number.isInteger(v) ? v : Number(v.toPrecision(digits))));
+
+/** A night evolution's sentence in the morning's notice. `best`: the new best it found, when it found one. */
+export function searchWords(name: string, tried: number, best?: { mean: number; gain: number }): string {
+  const head = `The search “${name}” tried ${tried} more version${tried === 1 ? '' : 's'}`;
+  return best ? `${head}: its best is ${figures(best.mean)}, ${figures(best.gain, 3)} better than the start` : `${head} and found nothing better than its best so far`;
+}
+
+/**
+ * The night evolutions that worked since the night was first watched, the first first: how many more each tried since a
+ * morning last told of it, and its best when that is new. One the person stopped is no news. What is told is noted.
+ */
+function morningSearches(db: DB, since: number): NightWork[] {
+  evolveTables(db);
+  const rows = db.prepare('select id from exp_evolutions e where exists (select 1 from exp_candidates c where c.evolution = e.id and c.ended_at >= ?) order by created_at, id').all(since) as { id: string }[];
+  const out: NightWork[] = [];
+  for (const { id } of rows) {
+    const r = load(db, id);
+    if (!r?.evo.when || r.evo.status === 'stopped') continue;
+    const tried = r.evo.tried - (r.inner.told?.tried ?? 0);
+    if (tried <= 0) continue;
+    const best = r.evo.best && r.evo.best !== r.inner.told?.best ? getCand(db, r.evo.best) : null;
+    const name = (r.evo.aim?.trim() || r.evo.files.join(', ')).replace(/\s+/g, ' ');
+    out.push({
+      line: searchWords(name.length > 60 ? `${name.slice(0, 59).trimEnd()}…` : name, tried, best?.full && best.gain !== undefined ? { mean: best.full.mean, gain: best.gain } : undefined),
+      url: `/experiments?evolution=${id}`,
+    });
+    r.inner.told = { tried: r.evo.tried, ...(r.evo.best ? { best: r.evo.best } : {}) };
+    store(db, r);
+  }
+  return out;
+}
+morningAlso.of = morningSearches;
 
 // ---- reading one --------------------------------------------------------------------------------------------------
 

@@ -1858,11 +1858,12 @@ agents that speak ACP and take MCP servers.
   changes and a stronger one some (never more than half of any ten), each built on one of the best versions so far
   along three separate lines of descent; every try is scored by the sealed command in a working copy of the app's own,
   first cheaply and with all seeds only when it looks better, and a try that touches a protected file is refused. Its
-  page shows the start, the best so far with what it changed, every try with its score, and a chart; **Take the best**
+  page shows the start, the best so far with what it changed, every try with its score, and a chart; started **Tonight**,
+  it works only in your night hours, over as many nights as it needs, and the morning's notice says how far it got; **Take the best**
   puts it on a branch of its own. It stops at the number of tries, the hours, or when nothing better came for a while,
   and carries on after a restart. Agents start one only with your yes on a card (evolve_start, evolve_get).
 - **Proofs checked with Lean** (Settings → General → **Lean (proof checker)**; the LaTeX editor's Tools → **Check a
-  proof…** and **Formalise in Lean…**): Lean 4 is a proof checker, and a proof it accepts is correct. The app uses your
+  proof…**, **Formalise in Lean…** and **Explore a conjecture…**): Lean 4 is a proof checker, and a proof it accepts is correct. The app uses your
   own Lean or sets one up in its own folder when you agree (about 620 MB to download, 3 GB unpacked), with Mathlib as a
   second step (about 600 MB to download, 8 GB unpacked). A Lean project of your own that uses Mathlib is not run until
   its own copy is fetched, so that no check downloads it unasked or builds it from source.
@@ -1875,7 +1876,10 @@ agents that speak ACP and take MCP servers.
   statement (`name@pin`), so a statement weakened after you agreed it fails even though it is proved. The lean-proofs skill has agents agree the formal statement with you before proving
   anything (translated back into plain mathematics, with every difference listed), and the proof-check skill reads a
   proof written in words step by step and reports its gaps. Checking a Lean file can run code in it, so it runs in
-  the app's sandbox where there is one, and asks you once a session where there is none.
+  the app's sandbox where there is one, and asks you once a session where there is none. The explore-conjecture skill
+  has agents find out whether a conjecture is false, known or open (a counterexample hunted first in exact arithmetic,
+  small cases computed, integer sequences looked up in the OEIS with the oeis_lookup tool, earlier work checked), and
+  a chain of lemmas is formalised as a board, every statement agreed and pinned before any is proved.
 - **The experiments reviewers ask for, in one click**: the Reviewer simulator's "Baselines and ablations" and the
   Rebuttal workbench's experiments to run each have **Run these…**, which opens the start page with a request for an
   agent to plan them within your GPU hours, queue them in Experiments, and report each with its numbers in a results
@@ -1885,7 +1889,7 @@ agents that speak ACP and take MCP servers.
   smallest faithful version and ask which way to go before any run, measure it against your code as it is, try to
   explain a gain away, and record what came of it, also when it did not help.
 - New skills for every agent: papers' peer review, reproducing a paper, figures for papers, trying to break a result,
-  proofs in Lean, and checking a proof written in words.
+  proofs in Lean, checking a proof written in words, and exploring a conjecture.
 
 ## For engineers
 

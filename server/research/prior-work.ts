@@ -733,8 +733,11 @@ export async function priorWork(input: PriorAsk, deps: PriorDeps): Promise<Prior
 
 // ---- what it reaches out with here -------------------------------------------------------------------------------
 
-/** One source's address read as an app's step would: its host's calls apart, tried again while the failure may pass. */
-function sourceFetch(ctx: RunCtx): PriorDeps['fetch'] {
+/**
+ * One source's address read as an app's step would: its host's calls apart, tried again while the failure may pass.
+ * `who` keeps what is kept of it apart (oeis_lookup reads this way too: oeis.ts).
+ */
+export function politeFetch(ctx: RunCtx, who = 'prior_work'): PriorDeps['fetch'] {
   return async (url, o) => {
     const shown = url.replace(/([?&]api_key=)[^&]+/, '$1…');
     // Named http_request for its spacing and retries; `for` keeps what it keeps apart from a step's own look-ups, and
@@ -750,7 +753,7 @@ function sourceFetch(ctx: RunCtx): PriorDeps['fetch'] {
         return r.text();
       },
     };
-    const out = await callTool(tool, { url: shown, for: 'prior_work' }, ctx, { signal: o.signal, browser: false });
+    const out = await callTool(tool, { url: shown, for: who }, ctx, { signal: o.signal, browser: false });
     if (!out.ok) throw new Error(out.text);
     return out.text;
   };
@@ -767,7 +770,7 @@ export function priorDeps(ctx: RunCtx): PriorDeps {
     : { openalex: serviceKey(db, 'OPENALEX_API_KEY', 'api.openalex.org'), semanticscholar: serviceKey(db, 'SEMANTIC_SCHOLAR_API_KEY', 'api.semanticscholar.org') };
   return {
     ask: (q) => helper(db, { ...q, task: 'checking an idea for earlier work' }),
-    fetch: sourceFetch(ctx),
+    fetch: politeFetch(ctx),
     async rank(items, idea, o) {
       const base = { items, interests: [{ text: idea, label: 'the idea', weight: 1 }] };
       if (!o.wordsOnly) {

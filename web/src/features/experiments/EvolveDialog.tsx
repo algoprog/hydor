@@ -1,16 +1,20 @@
 // Starting an evolution, from an evaluation's page (Evolve…): which files it may change (the app suggests some), what
-// to try for and how many tries, with the rest under More. Without a baseline it offers to measure it first. What the
-// server refuses (a protected file, changes not committed…) is shown as it says it.
+// to try for, how many tries and when it works (Start: at once, or at night), with the rest under More. Without a
+// baseline it offers to measure it first. What the server refuses (a protected file, changes not committed…) is shown
+// as it says it.
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import type { Evaluation } from '@shared/evaluations';
 import type { Evolution } from '@shared/evolve';
+import type { ExperimentsSettings } from '@shared/experiments';
 import { api, post } from '../../lib/api';
 import { folderName } from '../../lib/folderNames';
 import { useApp } from '../../lib/store';
 import { Button, cx, Dialog, IconButton, inputCls, Segmented, Throbber } from '../../components/ui';
+import { loadSettings } from './api';
 import { evolveStartUrl, suggestUrl } from './evolveApi';
 import { EVOLVE_ABOUT } from './evolveWords';
+import { StartChoice, type StartAt } from './StartChoice';
 
 /** Files it may change, at most, and how many tries a number of your own may be (as the server says too). */
 const MOST_FILES = 8;
@@ -49,6 +53,8 @@ function Form({ evaluation, baseline, onMeasure, onClose, onStarted }: Props) {
   const [hours, setHours] = useState('');
   const [atOnce, setAtOnce] = useState('2');
   const [stall, setStall] = useState('40');
+  const [startAt, setStartAt] = useState<StartAt>('free');
+  const [night, setNight] = useState<ExperimentsSettings | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -61,6 +67,12 @@ function Form({ evaluation, baseline, onMeasure, onClose, onStarted }: Props) {
       live = false;
     };
   }, [evaluation.id]);
+
+  useEffect(() => {
+    loadSettings()
+      .then(setNight)
+      .catch(() => setNight(null));
+  }, []);
 
   const typed = text.trim().replace(/^(\.\/)+/, '');
   const add = (file: string) => {
@@ -90,6 +102,7 @@ function Form({ evaluation, baseline, onMeasure, onClose, onStarted }: Props) {
         ...(hours.trim() ? { hours: Number(hours) } : {}),
         atOnce: Number(atOnce),
         ...(stall.trim() ? { stallAfter: Number(stall) } : {}),
+        ...(startAt === 'night' ? { when: 'night' } : {}),
       });
       onStarted(r.evolution);
     } catch (e) {
@@ -202,6 +215,9 @@ function Form({ evaluation, baseline, onMeasure, onClose, onStarted }: Props) {
             {tries === 'own' && own.length > 1 && !inRange && <span className="text-[12px] text-warn">From 10 to 2000</span>}
           </div>
         </div>
+
+        {/* An evaluation always runs on this computer. */}
+        <StartChoice value={startAt} onChange={setStartAt} night={night} where="local" labelClass="mb-1.5" />
 
         <div>
           <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex min-h-8 items-center gap-1 font-medium text-fg-2 hover:text-fg">

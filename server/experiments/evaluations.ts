@@ -1136,6 +1136,8 @@ export interface ScoreAsk {
   kind: ScoreKind;
   folder?: string;
   seeds?: unknown;
+  /** Its runs wait for the night (a night evolution's scores; nothing else asks for it). */
+  when?: 'night';
   by: EvalScore['by'];
 }
 
@@ -1183,6 +1185,7 @@ export async function startScore(d: Deps, id: string, o: ScoreAsk): Promise<Eval
           gpuMemGb: ev.gpuMemGb,
           hours: ev.hours,
           where: ev.where,
+          ...(o.when ? { when: o.when } : {}),
           // One score, not a notice for each of its runs.
           notify: { done: false, failed: false },
         }),

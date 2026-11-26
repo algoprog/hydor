@@ -915,7 +915,9 @@ export async function verifyFile(lean, file, opts = {}) {
     if (!c.ok) {
       const first = c.messages.errors[0];
       const where = first.line ? ` (line ${first.line}${first.file ? ` of ${first.file}` : ''})` : '';
-      return no(`it does not build: ${plural(Math.max(1, c.messages.count), 'error')}, the first${where}: ${first.message.split('\n')[0]}`, { errors: c.messages.errors, sorries });
+      // A statement is compared with its pin only once the file builds: say so, or the pin reads as if it had held.
+      const pinned = asked.some((t) => t.pin) ? '. Its pin was not checked: a statement is compared only once the file builds' : '';
+      return no(`it does not build: ${plural(Math.max(1, c.messages.count), 'error')}, the first${where}: ${first.message.split('\n')[0]}${pinned}`, { errors: c.messages.errors, sorries });
     }
     const reasons = [];
     if (sorries.length && !o.allowSorry) reasons.push(`it still has ${plural(sorries.length, 'gap')} marked sorry`);

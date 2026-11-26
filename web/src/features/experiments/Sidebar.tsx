@@ -9,7 +9,7 @@ import type { ExperimentGroup, GpuNow, QueueNow, RunRecord } from '@shared/exper
 import type { EvaluationListed } from '@shared/evaluations';
 import type { Evolution } from '@shared/evolve';
 import { entryLine, toneClass } from './evalWords';
-import { columnWords } from './evolveWords';
+import { columnWords, waitsWords } from './evolveWords';
 import { countWaitingForNight, nightCountWords } from './nightWords';
 import { LOCALE } from '../../i18n/locale';
 import { timeAgo } from '../../lib/format';
@@ -241,7 +241,7 @@ export function EvaluationLine({ ev, scoring, evolving }: { ev: EvaluationListed
   return (
     <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-fg-3">
       {line.changed && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-warn" aria-hidden />}
-      {!line.changed && (scoring || evolving) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />}
+      {!line.changed && (scoring || evolving) && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${evolving && waitsWords(evolving) ? 'bg-fg-3' : 'bg-accent'}`} aria-hidden />}
       <span className="tnum min-w-0 truncate">
         {line.changed && (
           <>

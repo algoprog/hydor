@@ -52,6 +52,15 @@ assert.deepEqual(W.stateLine(evo(), 72 * 60_000).parts, ['Running', '37 of 200 t
 assert.deepEqual(W.stateLine(evo({ failed: 0 }), 5_000).parts, ['Running', '37 of 200 tried', 'under a minute']);
 assert.deepEqual(W.stateLine(evo({ status: 'paused', why: 'The model could not be asked: no.' }), 0), { tone: 'paused', parts: ['Paused'], why: 'The model could not be asked: no.' });
 assert.deepEqual(W.stateLine(evo({ status: 'paused' }), 0), { tone: 'paused', parts: ['Paused'] });
+// A night evolution by day: it says when it goes on, and its time does not count on.
+const waits = 'Waits for the night (from 23:00)';
+assert.deepEqual(W.stateLine(evo({ when: 'night', waits }), 60_000), { tone: 'waiting', parts: [waits, '37 of 200 tried', '4 failed'] });
+assert.deepEqual(W.stateLine(evo({ when: 'night', waits, status: 'starting', tried: 0, failed: 0 }), 0), { tone: 'waiting', parts: [waits] });
+const none = 'Waits for the night: none is set. Give Night two different times in Where runs go';
+assert.deepEqual(W.stateLine(evo({ when: 'night', waits: none, failed: 0 }), 0).parts, [none, '37 of 200 tried']);
+assert.deepEqual(W.stateLine(evo({ when: 'night', status: 'paused' }), 0), { tone: 'paused', parts: ['Paused'] });
+assert.equal(W.workedMs({ activeMs: 5000, status: 'running', waits }, 1000, 61_000), 5000);
+assert.equal(W.workedMs({ activeMs: 5000, status: 'running' }, 1000, 61_000), 65_000);
 assert.deepEqual(W.stateLine(evo({ status: 'done', why: 'No new best in the last 40' }), 0).parts, ['Done: no new best in the last 40']);
 assert.deepEqual(W.stateLine(evo({ status: 'done', why: '200 tried' }), 0).parts, ['Done: all 200 tried']);
 assert.deepEqual(W.stateLine(evo({ status: 'done', why: 'Its 1 hour is up' }), 0).parts, ['Done: its time is up']);
@@ -79,6 +88,14 @@ assert.equal(done.text, 'Done');
 assert.equal(done.standing!.long, '0.035 better than the start');
 assert.equal(W.rowWords(evo({ status: 'done' })).text, 'Done · nothing beat the start');
 assert.equal(W.columnWords(evo()), 'Evolving · 37 of 200');
+// a night evolution by day: it waits, on its row and in the column, as its own page says
+const byDay = { waits: 'Waits for the night (from 23:00)' };
+assert.equal(W.rowWords(evo(byDay)).text, 'Waits for the night (from 23:00) · 37 of 200 tried');
+assert.equal(W.rowWords(evo({ ...byDay, status: 'starting' })).text, 'Waits for the night (from 23:00)');
+assert.equal(W.rowWords(evo({ ...byDay, status: 'paused' })).text, 'Paused · 37 of 200 tried');
+assert.equal(W.columnWords(evo(byDay)), 'Waits for the night (from 23:00)');
+assert.equal(W.columnWords(evo({ waits: 'Waits for the night: none is set. Give Night two different times in Where runs go' })), 'Waits for the night');
+assert.equal(W.waitsWords(evo()), null);
 const going = W.evolvingBy([evo({ id: 'v3', status: 'paused' }), evo({ id: 'v2' }), evo({ id: 'v1' }), evo({ id: 'v4', evaluation: 'e2', status: 'starting' }), evo({ id: 'v5', evaluation: 'e3', status: 'done' })]);
 assert.deepEqual([...going].map(([k, v]) => [k, v.id]), [['e1', 'v2'], ['e2', 'v4']]);
 

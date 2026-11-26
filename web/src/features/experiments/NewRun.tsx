@@ -10,11 +10,10 @@ import type { MachineView } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { machineId } from '../../lib/machine';
 import { useApp } from '../../lib/store';
-import { trIn } from '../../i18n/runtime';
 import { FolderPicker } from '../../components/FolderPicker';
 import { Button, cx, Dialog, IconButton, inputCls, Segmented } from '../../components/ui';
 import { loadSettings } from './api';
-import { hoursWords, stopNote } from './nightWords';
+import { StartChoice, type StartAt } from './StartChoice';
 
 const DEFAULT_RULES =
   'Read the log and the code. If a fix is clear and safe, run it again with experiment_run (from the last checkpoint if there is one), changing as little as possible. Never delete files or checkpoints. Then tell the user in a few lines what happened and what you did.';
@@ -87,7 +86,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
   const [mem, setMem] = useState('');
   const [name, setName] = useState('');
   const [group, setGroup] = useState('');
-  const [startAt, setStartAt] = useState<'free' | 'night'>('free');
+  const [startAt, setStartAt] = useState<StartAt>('free');
   const [night, setNight] = useState<ExperimentsSettings | null>(null);
   const [more, setMore] = useState(false);
   const [settings, setSettings] = useState('');
@@ -327,23 +326,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
         {where.startsWith('c:') ? (
           startAt === 'night' && <p className="leading-relaxed text-fg-3">A cluster has its own queue: its runs cannot wait for tonight.</p>
         ) : (
-          <div>
-            {/* When it starts: not the button's "Start". */}
-            <span className="mb-1 block text-fg-2">{trIn('night', 'Start')}</span>
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <Segmented
-                size="sm"
-                value={startAt}
-                onChange={setStartAt}
-                options={[
-                  { value: 'free', label: 'When a GPU is free' },
-                  { value: 'night', label: trIn('night', 'Tonight') },
-                ]}
-              />
-              <span className="text-[12px] text-fg-3">{hoursWords(night, where)}</span>
-            </div>
-            {startAt === 'night' && stopNote(night, where) && <p className="mt-1 leading-relaxed text-fg-3">{stopNote(night, where)}</p>}
-          </div>
+          <StartChoice value={startAt} onChange={setStartAt} night={night} where={where} />
         )}
         <div className="grid gap-3 sm:grid-cols-2">
           {mode === 'one' && (

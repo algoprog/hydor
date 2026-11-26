@@ -20,6 +20,8 @@ export interface EvolveSpec {
   atOnce?: number;
   /** Stop when this many in a row brought no new best (40 unless given; 0 never). */
   stallAfter?: number;
+  /** It works at night: its scores are night runs, and no new change is asked for by day. `hours` counts nights only. */
+  when?: 'night';
 }
 
 export type EvolveStatus = 'starting' | 'running' | 'paused' | 'done' | 'stopped' | 'failed';
@@ -49,6 +51,8 @@ export interface Evolution extends EvolveSpec {
   activeMs: number;
   /** What "Take the best" made last. */
   taken?: { branch: string; commit: string; at: number; candidate: string };
+  /** Worked out as it is read, never kept: a night evolution holding still by day, in the words a night run waits with. */
+  waits?: string;
   by: { who: 'you' | 'agent'; session?: string };
 }
 

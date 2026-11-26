@@ -699,6 +699,8 @@ const evolveBrief = (e: Evolution) => ({
   atOnce: e.atOnce,
   ...(e.hours ? { hours: e.hours } : {}),
   stallAfter: e.stallAfter,
+  ...(e.when ? { when: e.when } : {}),
+  ...(e.waits ? { waits: e.waits } : {}),
   ...(e.start ? { start: { mean: e.start.mean, std: e.start.std, values: e.start.values } } : {}),
   tried: e.tried,
   failed: e.failed,
@@ -721,6 +723,12 @@ const EVOLVE_START: RunTool = {
       candidates: { type: 'number', description: `How many changes to try at most (${EVOLVE.candidates.min} to ${EVOLVE.candidates.max}; default ${EVOLVE.candidates.default}).` },
       hours: { type: 'number', description: 'Stop after this many hours of running.' },
       atOnce: { type: 'number', description: `How many are worked on at once (${EVOLVE.atOnce.min} to ${EVOLVE.atOnce.max}; default ${EVOLVE.atOnce.default}).` },
+      when: {
+        type: 'string',
+        enum: ['night', 'now'],
+        description:
+          '"night": it works only in the night hours (Experiments → Where runs go), over as many nights as it needs: its scores are night runs, nothing new is tried by day, hours counts night time only, and the user hears in the morning how far it got. Leave it out to start now.',
+      },
     },
     required: ['files'],
   },
@@ -735,7 +743,7 @@ const EVOLVE_START: RunTool = {
         if (found.length > 1) return failed(`This folder has ${found.length} evaluations: say which with evaluation (${found.map((x) => `${x.evaluation.id}: ${x.evaluation.name}`).join('; ')}).`);
         evaluation = found[0].evaluation.id;
       }
-      const body = { evaluation, from, files: a.files, aim: a.aim, candidates: a.candidates, hours: a.hours, atOnce: a.atOnce };
+      const body = { evaluation, from, files: a.files, aim: a.aim, candidates: a.candidates, hours: a.hours, atOnce: a.atOnce, when: a.when };
       // Checked before the card, so what cannot start is not asked about.
       const c = await checkEvolveSpec(db, body);
       const s = c.spec;
@@ -748,11 +756,12 @@ const EVOLVE_START: RunTool = {
         `# each try asks the helper model once (twice when its answer cannot be used)`,
         `Stops: after ${s.candidates} tries${s.stallAfter ? `, ${s.stallAfter} in a row with no new best` : ''}${s.hours ? `, or ${s.hours} hours` : ''}`,
         ...(s.aim ? [`Aim: ${s.aim.replace(/\s+/g, ' ').slice(0, 300)}`] : []),
+        ...(s.when ? [`# ${tonight(ctx, 'local')}`] : []),
       ].join('\n');
       const no = await mayRun(ctx, `Evolve ${s.files.length === 1 ? s.files[0] : `${s.files.length} files`} with “${ev.name}”`, detail);
       if (no) return failed(no);
       const e = await startEvolution(ctx.deps, body, { who: 'agent', session: ctx.key });
-      return json({ evolution: evolveBrief(e), note: 'It starts by scoring the start with all seeds; read how it goes with evolve_get. The person takes the best onto a branch from its page.', page: evolvePage(e.id) });
+      return json({ evolution: evolveBrief(e), ...(e.when ? { starts: tonight(ctx, 'local') } : {}), note: 'It starts by scoring the start with all seeds; read how it goes with evolve_get. The person takes the best onto a branch from its page.', page: evolvePage(e.id) });
     } catch (e) {
       return failed(e);
     }

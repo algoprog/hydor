@@ -142,7 +142,8 @@ async function spaced(host: string, ms: number) {
 }
 
 /**
- * A public address: redirects followed one by one, each checked; arXiv's API at most every three seconds. `headers`
+ * A public address: redirects followed one by one, each checked; arXiv's API at most every three seconds, the OEIS at
+ * most every second. `headers`
  * (a service's key) go to the address's own host alone, never on to where it redirects.
  */
 export async function get(url: string, o: { accept?: string; max?: number; signal?: AbortSignal; timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<Got> {
@@ -153,6 +154,7 @@ export async function get(url: string, o: { accept?: string; max?: number; signa
     if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('not a web address');
     await assertPublic(u);
     if (u.hostname === 'export.arxiv.org') await spaced(u.hostname, 3100);
+    if (u.hostname === 'oeis.org') await spaced(u.hostname, 1000);
     const r = await fetch(u, { redirect: 'manual', signal: all, headers: { 'user-agent': UA, accept: o.accept ?? '*/*', ...(u.host === first ? o.headers : {}) } });
     const loc = r.headers.get('location');
     if (r.status >= 300 && r.status < 400 && loc) {

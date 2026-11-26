@@ -44,6 +44,7 @@ const TOOLS: Record<string, { icon: ReactNode; text: string }> = {
   read_paper: { icon: <FileSearch size={14} />, text: 'Finds and reads papers' },
   reading_list: { icon: <BookOpen size={14} />, text: 'Keeps your reading list' },
   prior_work: { icon: <FileSearch size={14} />, text: 'Checks ideas for earlier work' },
+  oeis_lookup: { icon: <FileSearch size={14} />, text: 'Looks up number sequences' },
   zotero_sync: { icon: <Link2 size={14} />, text: 'Syncs with Zotero' },
   save_sheet: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes' },
   save_doc: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes' },

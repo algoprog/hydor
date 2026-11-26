@@ -125,7 +125,7 @@ import { CompareDialog } from './Compare';
 import { FileTree, FileView, kindIcon, NewButton, type TreeActions, type TreeEntry } from './FileTree';
 import { docDefs, type DocDefs } from './complete';
 import { NameDialog, OutlineList, Problems, where } from './parts';
-import { paperItems, PaperTools, proofRequest, type PaperAsk } from './PaperTools';
+import { paperItems, PaperTools, proofRequest, type PaperAsk, type ProofAsk } from './PaperTools';
 import { Preview, type Flash } from './Preview';
 import { ProjectSearch } from './ProjectSearch';
 import { ReferencesDialog } from './References';
@@ -1278,8 +1278,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     const s = scopes[scopes.length - 1];
     onAsk(s.lead || 'In this LaTeX document: ');
   };
-  /** Check a proof, Formalise in Lean: the request about the proof at the cursor, in the box for asking. */
-  const askProof = (what: 'check' | 'formalise') => {
+  /** Check a proof, Formalise in Lean, Explore a conjecture: the request about the cursor's place, in the box for asking. */
+  const askProof = (what: ProofAsk) => {
     if (!onAsk) return;
     // With a picture in view, the lines are of no file: the document, at its start.
     const at = isView(file) ? { file: label(TEX_MAIN), from: 1, to: 1, picked: false } : { file: label(file), from: cursor.picked ? cursor.from : cursor.line, to: cursor.picked ? cursor.to : cursor.line, picked: cursor.picked };

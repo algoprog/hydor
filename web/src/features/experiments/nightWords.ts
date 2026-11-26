@@ -19,6 +19,12 @@ export function nightStatus(why: string | undefined): string {
   return from ? tr('Waits for the night (from {0})').replace('{0}', from) : 'Waits for the night';
 }
 
+/** The same left in English, for a line the page's translator takes part by part (an evolution's row and column line). */
+export function nightStatusPlain(why: string | undefined): string {
+  const from = AT_HOUR.exec(why ?? '')?.[1];
+  return from ? `Waits for the night (from ${from})` : 'Waits for the night';
+}
+
 /** The small print beside "Tonight". `where`: where the run goes ("local", "m:<id>"). */
 export function hoursWords(s: Pick<ExperimentsSettings, 'nightFrom' | 'nightTo'> | null, where: string): string {
   if (where.startsWith('m:')) return 'in that machine’s night hours';

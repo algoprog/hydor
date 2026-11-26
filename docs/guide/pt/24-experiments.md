@@ -109,6 +109,7 @@ Quando as suas GPUs também são usadas no seu próprio trabalho durante o dia, 
 - **Quando a noite acabar**: **Deixar as execuções em andamento terminarem** (a opção inicial) ou **Interrompê-las e começá-las de novo na noite seguinte**. Uma execução interrompida começa de novo do zero (o log que ela tinha fica guardado na pasta dela) e mostra “A noite acabou: a execução começa de novo hoje à noite” até lá. Mudar o horário de modo que deixe de ser noite também encerra a noite.
 - **Como começar uma**: em “Nova execução”, para uma execução ou uma varredura, defina **Início** como **Hoje à noite**; o horário da noite aparece escrito ao lado. A caixa de diálogo sempre abre em **Quando uma GPU estiver livre**, inclusive com **Executar de novo**.
 - **De manhã**: um único aviso, como “Noite passada: 5 execuções concluídas, 1 com falha, 2 ainda esperam por hoje à noite”, abre Experimentos com as execuções daquela noite em primeiro lugar. Uma execução noturna que termina durante a noite não envia um aviso próprio de “concluída” (uma falha é avisada como sempre, e uma sessão que pediu para saber continua sendo informada de como foi); uma que termina depois do aviso da manhã é avisada separadamente. Não há aviso quando nenhuma execução noturna terminou nem está esperando.
+- **Uma busca à noite**: o [Evoluir](#evolve-searching-for-a-better-version) iniciado com **Hoje à noite** trabalha só nesse horário. As pontuações dele não são contadas entre as execuções da noite: o aviso diz em uma frase própria quantas versões a mais ele testou e qual é a melhor (e quando só buscas trabalharam, abre a primeira delas).
 - **Os agentes** também mandam execuções exploratórias para a noite; o cartão de aprovação deles diz quando a execução vai começar.
 
 ## O que uma execução registra
@@ -245,6 +246,7 @@ Abra a página da avaliação, clique em ⋯ e em **Evoluir…**. A janela pergu
 - **O que pode ser alterado?** Digite um arquivo e clique em **Adicionar**, ou toque nos que aparecem em **Sugeridos**: até 8 arquivos de texto que tenham commit e não tenham mudado desde então. Um arquivo protegido pela avaliação não pode ser alterado: você é avisado disso.
 - **O que deve ser tentado?** (opcional): algumas linhas, como “Deixe o reranker mais rápido sem perder nDCG@10”.
 - **Quantas tentativas**: 50, 100, 200 ou **Outros** para um número à sua escolha (de 10 a 2000).
+- **Início**: **Quando uma GPU estiver livre** ou **Hoje à noite**: nesse caso ele trabalha só no seu horário da noite (veja [Execuções que esperam pela noite](#runs-that-wait-for-the-night)), por quantas noites precisar. De dia ele mostra **Esperando pela noite (a partir de 23:00)** e não pede nada ao modelo, **Parar depois de (horas)** conta só as noites, e o aviso da manhã diz até onde ele chegou.
 - Em **Mais**: **Parar depois de (horas)**, **Quantas ao mesmo tempo** (de 1 a 4) e **Parar quando esta quantidade seguida não trouxer nada melhor** (40, a menos que você mude).
 
 Clique em **Começar**. Primeiro ele pontua o seu ponto de partida, com todas as sementes da avaliação, e depois começa. Uma avaliação sem linha de base mostra **Medir a linha de base** no lugar de **Começar**.

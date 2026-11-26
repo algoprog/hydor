@@ -30,9 +30,11 @@ import {
   stateLine,
   TAKE_ABOUT,
   tryScore,
+  waitsWords,
   workedMs,
   type StateLine,
 } from './evolveWords';
+import { nightStatusPlain } from './nightWords';
 
 export interface EvolutionViewProps {
   id: string;
@@ -200,7 +202,7 @@ function State({ data }: { data: EvolutionDetail }) {
   }, [e.status]);
   const line: StateLine = stateLine(e, workedMs(e, data.readAt, Math.max(now, data.readAt)));
   const why = splitWhy(line.why);
-  const dot = { going: 'bg-accent', paused: 'bg-warn', done: 'bg-ok', stopped: 'bg-fg-3', failed: 'bg-err' }[line.tone];
+  const dot = { going: 'bg-accent', waiting: 'bg-fg-3', paused: 'bg-warn', done: 'bg-ok', stopped: 'bg-fg-3', failed: 'bg-err' }[line.tone];
   return (
     <div className="mt-1 text-[12.5px] text-fg-2">
       <p className="flex items-start gap-2">
@@ -328,7 +330,7 @@ function StartTile({ evolution: e }: { evolution: Evolution }) {
           <span translate="no">{meanStd(e.start)}</span>
         </Big>
       ) : (
-        <Big muted>{isEnded(e) ? 'Not scored' : 'Scoring…'}</Big>
+        <Big muted>{isEnded(e) ? 'Not scored' : waitsWords(e) ? nightStatusPlain(undefined) : 'Scoring…'}</Big>
       )}
       <Sub>
         {seeds > 0 && <span>{seeds === 1 ? '1 seed' : `${seeds} seeds`}</span>}

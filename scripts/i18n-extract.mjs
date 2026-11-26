@@ -518,6 +518,15 @@ add('Night to', 'server/experiments/queue.ts');
     }
   }
 }
+// A night evolution's sentence in that notice (searchWords in evolve.ts), joined after the runs' with ". ": the pages'
+// translator takes the notice sentence by sentence, so each reading is an entry of its own, without its full stop.
+for (const s of [
+  'The search “{0}” tried {1} more versions: its best is {2}, {3} better than the start',
+  'The search “{0}” tried 1 more version: its best is {1}, {2} better than the start',
+  'The search “{0}” tried {1} more versions and found nothing better than its best so far',
+  'The search “{0}” tried 1 more version and found nothing better than its best so far',
+])
+  add(s, 'server/experiments/evolve.ts');
 // The names and lines of what ships, and of the choices the server offers (permission modes, the buttons of an approval).
 const NAMED = ['assistants/builtins', 'apps/templates', 'apps/templates-more', 'apps/templates-research', 'apps/templates-papers', 'apps/templates-lab', 'apps/explore', 'apps/draft', 'apps/screens', 'pages/latex-check', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api', 'automations/account-watch'];
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {

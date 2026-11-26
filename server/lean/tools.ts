@@ -107,7 +107,7 @@ const CHECK: RunTool = {
     type: 'object',
     properties: {
       file: { type: 'string', description: 'A .lean file (relative to the session’s folder, or cwd).' },
-      code: { type: 'string', description: 'A snippet to check instead of a file, imports and all.' },
+      code: { type: 'string', description: 'A snippet to check instead of a file, imports and all. It is checked on its own (with Mathlib when it imports it) and cannot import a project’s own files: to use those, put the lines in a file of the project and check that file.' },
       cwd: { type: 'string', description: 'The folder file is relative to (default: the session’s).' },
       minutes: { type: 'number', description: 'Time limit (default about 10; a project’s first build is slow).' },
     },

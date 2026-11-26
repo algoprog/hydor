@@ -193,7 +193,11 @@ What is not saved yet is saved first, so each gets the paper as you see it.
 
 **As a goal's check.** Every session has a command for the same verdict, **leancheck**. Set a [goal](/guide/goals) whose command check is `leancheck Proofs/Main.lean --theorem main_theorem@3fa2c1d9ab12` (the theorem's name, then **@** and the pin of the statement you agreed) and the agent keeps working until that statement is proved. With a name alone (`--theorem main_theorem`) the theorem of that name is checked whatever it states, and with no `--theorem`, every theorem of the file. The command ends with 0 when verified, 1 when not, 2 when the question is wrong (no such file or theorem, a pin written wrongly) and 3 when a statement is no longer the pinned one; with `--allow-sorry`, which lets an unfinished proof through, a theorem that still has a gap is shown as **gap**, never **ok**.
 
-**In the LaTeX editor**, **Tools → Check a proof…** asks the agent beside the editor to go through the proof at the cursor (or the lines you picked) and report it gap by gap with line numbers: whether it holds as written, holds once gaps are filled, or fails. **Tools → Formalise in Lean…** asks it to state that theorem in Lean and agree the statement with you before proving it. Both only put the request in the box: you read it and send it. Checking a proof in words needs no Lean.
+**In the LaTeX editor**, **Tools → Check a proof…** asks the agent beside the editor to go through the proof at the cursor (or the lines you picked) and report it gap by gap with line numbers: whether it holds as written, holds once gaps are filled, or fails. **Tools → Formalise in Lean…** asks it to state that theorem in Lean and agree the statement with you before proving it. **Tools → Explore a conjecture…** asks it to look into the claim there (below). All three only put the request in the box: you read it and send it. Checking a proof in words needs no Lean.
+
+**Explore a conjecture.** When you have a guess, a pattern or a claim in mathematics and want to know whether it is worth your time, use **Tools → Explore a conjecture…** or ask in any session. The agent first says the statement exactly, then looks for a counterexample (the edge cases, then a computer search over a stated range, in exact arithmetic), computes the small cases, looks the numbers up and checks whether it has been done. It ends with one of three answers: false, with a counterexample; known, with where; or open as far as it can tell, with the range it holds for. Small cases never prove anything, and it says so. Sequences of whole numbers it looks up in the [OEIS](https://oeis.org), the online encyclopedia of integer sequences, with the oeis_lookup tool: what is looked up is sent to oeis.org (a confidential session has no such tool), and a match on a few terms is only a lead. This needs no Lean.
+
+**A board of lemmas.** For a chain of results, such as the lemmas of a paper's section, the agent agrees every statement with you first and pins each, writes them all in Lean with the proofs left out, and keeps a board in the project: each result, its pin, what it rests on and where it stands. It then proves them starting with those that rest on no other, or, when you want them done side by side, hands them out as a [Campaign](/guide/engineering#campaigns-a-big-change-in-many-parts), one result a part. The whole counts as proved only when every one is, with no gap left.
 
 ## Review, answer and present your paper
 
@@ -337,6 +341,8 @@ Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you
 - "Check my paper for ACL before I submit it, and fix what you safely can."
 - "Check the proof of Lemma 2 in my paper."
 - "State this theorem in Lean and prove it."
+- "Is this true: every number of the form n² + n + 41 is prime? Look for a counterexample first."
+- "Formalise the three lemmas of section 4 as a board, and prove them in order."
 - "Set a goal: Proofs/Main.lean passes leancheck for main_theorem, pinned to the statement we agreed."
 - "Are all the references in my LaTeX paper real, with the right authors and years? Correct the ones that are not."
 - "Merge the duplicate entries in my paper's bibliography and fill in what their DOIs know."

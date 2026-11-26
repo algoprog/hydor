@@ -5,12 +5,13 @@
 //
 // A night is named by the date it began on. The one being watched is kept in the app's data, so a morning that comes
 // while the app is not running is still told when it is back. A night run keeps the nights it was part of, which is
-// what the morning's notice opens (Experiments, ?night=<date>).
+// what the morning's notice opens (Experiments, ?night=<date>). The runs that score evaluations are not counted
+// (a night evolution's: evolve.ts tells of its own in the same notice).
 import { ACTIVE, type ExperimentsSettings, type RunRecord } from '../../shared/experiments.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
-import { listRuns, updateRun } from './records.ts';
+import { isScoringRun, listRuns, updateRun } from './records.ts';
 
 /** The clock the night is read from (the tests set it). */
 export const clock = { now: () => Date.now() };
@@ -170,14 +171,30 @@ export function morningWords(n: Morning): string {
   return `Last night: ${parts.join(', ')}`;
 }
 
-/** The one notice of a night: nothing when none of its runs ended and none still waits. `stopping`: those going are being put back to wait. */
+/** What else worked in a night beside the runs: its sentence in the morning's notice, and the page it opens. */
+export interface NightWork {
+  line: string;
+  url: string;
+}
+/** Evolve puts its own here (evolve.ts): the searches that worked since the night was first watched, the first first. */
+export const morningAlso: { of: (db: DB, since: number) => NightWork[] } = { of: () => [] };
+
+/** The one notice of a night: nothing when none of its runs ended, none still waits and no search worked. `stopping`: those going are being put back to wait. */
 function tellMorning(d: Deps, { night, since }: Watch, stopping: boolean): void {
-  // One you stopped, or one stopped before it started, is not news.
-  const ended = listRuns(d.db, { night, limit: 5000 }).filter((r) => isNightHere(r) && !ACTIVE.includes(r.status) && (r.endedAt ?? 0) >= since && (r.status !== 'stopped' || (!!r.startedAt && r.why !== 'Stopped by you')));
-  const open = listRuns(d.db, { status: ACTIVE, limit: 5000 }).filter(isNightHere);
+  // One you stopped, or one stopped before it started, is not news. Nor are scores: they are not experiments.
+  const runs = (r: RunRecord) => isNightHere(r) && !isScoringRun(r);
+  const ended = listRuns(d.db, { night, limit: 5000 }).filter((r) => runs(r) && !ACTIVE.includes(r.status) && (r.endedAt ?? 0) >= since && (r.status !== 'stopped' || (!!r.startedAt && r.why !== 'Stopped by you')));
+  const open = listRuns(d.db, { status: ACTIVE, limit: 5000 }).filter(runs);
   const waiting = open.filter((r) => stopping || r.status === 'queued' || r.status === 'waiting').length;
-  if (!ended.length && !waiting) return;
-  for (const r of open) noteNight(d.db, r, night);
+  const ofRuns = ended.length > 0 || waiting > 0;
+  let also: NightWork[] = [];
+  try {
+    also = morningAlso.of(d.db, since);
+  } catch (e) {
+    console.error('[experiments] the night’s searches:', (e as Error)?.message ?? e);
+  }
+  if (!ofRuns && !also.length) return;
+  if (ofRuns) for (const r of open) noteNight(d.db, r, night);
   const n: Morning = {
     done: ended.filter((r) => r.status === 'done').length,
     failed: ended.filter((r) => r.status === 'failed' || r.status === 'lost').length,
@@ -189,9 +206,9 @@ function tellMorning(d: Deps, { night, since }: Watch, stopping: boolean): void 
     key: 'experiments:night',
     kind: n.failed && !n.done ? 'failed' : 'done',
     title: 'Experiments',
-    body: morningWords(n),
+    body: [...(ofRuns ? [morningWords(n)] : []), ...also.map((x) => x.line)].join('. '),
     agent: 'claude',
     at: Date.now(),
-    url: `/experiments?night=${night}`,
+    url: ofRuns ? `/experiments?night=${night}` : also[0].url,
   } satisfies NotifyEvent);
 }

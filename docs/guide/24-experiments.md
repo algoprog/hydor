@@ -109,6 +109,7 @@ When your GPUs are also for your own work by day, or for services that must stay
 - **When the night ends**: **Let running ones finish** (what it is to start with), or **Stop them and start them again the next night**. A stopped run starts again from the beginning (the log it had is kept in its folder), and says "The night ended: it starts again tonight" until then. Changing the hours so that it is no longer night ends the night too.
 - **Starting one**: in New run, for a run or a sweep, set **Start** to **Tonight**; the night's hours are written beside it. The dialog opens on **When a GPU is free** every time, **Run again** too.
 - **In the morning**: one notice, such as "Last night: 5 runs done, 1 failed, 2 still wait for tonight", opens Experiments with that night's runs first. A night run that ends in the night sends no "done" notice of its own (a failure is told as ever, and a session that asked still hears how it went); one that ends after the morning notice is told on its own. There is no notice when no night run ended or waits.
+- **A search at night**: [Evolve](#evolve-searching-for-a-better-version) started **Tonight** works only in these hours. Its scores are not counted among the night's runs: the notice says in a sentence of its own how many more versions it tried and its best (and when only searches worked, opens the first of them).
 - **Agents** send exploratory runs there too; their approval card says when a run will start.
 
 ## What a run records
@@ -245,6 +246,7 @@ Open the evaluation's page, click ⋯ and **Evolve…**. The window asks:
 - **What may it change?** Type a file and click **Add**, or tap the ones under **Suggested**: up to 8 text files that are committed and have no changes since. A file the evaluation protects cannot be changed: you are told so.
 - **What should it try?** (optional): a few lines, such as "Make the reranker faster without losing nDCG@10".
 - **How many tries**: 50, 100, 200, or **Other** for a number of your own (10 to 2000).
+- **Start**: **When a GPU is free**, or **Tonight**: it then works only in your night hours (see [Runs that wait for the night](#runs-that-wait-for-the-night)), over as many nights as it needs. By day it says **Waits for the night (from 23:00)** and asks the model for nothing, **Stop after (hours)** counts only the nights, and the morning's notice says how far it got.
 - Under **More**: **Stop after (hours)**, **How many at once** (1 to 4) and **Stop when this many in a row brought nothing better** (40 unless you change it).
 
 Click **Start**. It scores your start first, with all the evaluation's seeds, then begins. An evaluation with no baseline shows **Measure the baseline** instead of **Start**.

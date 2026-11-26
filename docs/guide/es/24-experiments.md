@@ -109,6 +109,7 @@ Cuando tus GPU también se usan de día para tu propio trabajo, o para servicios
 - **Cuando termina la noche**: **Dejar que terminen las que están en curso** (la opción inicial), o **Detenerlas y empezarlas de nuevo la noche siguiente**. Una ejecución detenida empieza otra vez desde el principio (el log que tenía se conserva en su carpeta) y, hasta entonces, dice “La noche terminó: la ejecución empieza de nuevo esta noche”. Cambiar las horas de modo que ya no sea de noche también termina la noche.
 - **Cómo empezar una**: en Nueva ejecución, para una ejecución o un barrido, pon **Inicio** en **Esta noche**; las horas de la noche aparecen al lado. El cuadro de diálogo se abre siempre en **Cuando haya una GPU libre**, también con **Ejecutar de nuevo**.
 - **Por la mañana**: un solo aviso, como “Anoche: 5 ejecuciones terminadas, fallidas: 1, 2 aún esperan a esta noche”, abre Experimentos con las ejecuciones de esa noche primero. Una ejecución nocturna que termina de noche no envía su propio aviso de “terminada” (un fallo se avisa como siempre, y una sesión que lo pidió igual se entera de cómo fue); una que termina después del aviso de la mañana se avisa por separado. No hay aviso cuando ninguna ejecución nocturna terminó ni está esperando.
+- **Una búsqueda de noche**: [Evolucionar](#evolve-searching-for-a-better-version) iniciado con **Esta noche** trabaja solo en estas horas. Sus puntuaciones no se cuentan entre las ejecuciones de la noche: el aviso dice en una frase propia cuántas versiones más probó y cuál es la mejor (y cuando solo trabajaron búsquedas, abre la primera de ellas).
 - **Los agentes** también envían allí ejecuciones exploratorias; su tarjeta de aprobación dice cuándo empezará una ejecución.
 
 ## Qué registra una ejecución
@@ -245,6 +246,7 @@ Abre la página de la evaluación, haz clic en ⋯ y en **Evolucionar…**. La v
 - **¿Qué puede cambiar?** Escribe un archivo y haz clic en **Añadir**, o toca los de **Sugeridos**: hasta 8 archivos de texto que estén en un commit y no tengan cambios desde entonces. Un archivo que la evaluación protege no se puede cambiar: se te avisa.
 - **¿Qué debería probar?** (opcional): unas líneas, como “Haz que el reordenador sea más rápido sin perder nDCG@10”.
 - **Cuántos intentos**: 50, 100, 200, u **Otros** para un número propio (de 10 a 2000).
+- **Inicio**: **Cuando haya una GPU libre** o **Esta noche**: entonces trabaja solo en tus horas de noche (consulta [Ejecuciones que esperan a la noche](#runs-that-wait-for-the-night)), durante tantas noches como necesite. De día dice **Espera a la noche (desde las 23:00)** y no le pide nada al modelo, **Detener después de (horas)** cuenta solo las noches, y el aviso de la mañana dice hasta dónde llegó.
 - En **Más**: **Detener después de (horas)**, **Cuántos a la vez** (de 1 a 4) y **Detener cuando esta cantidad de intentos seguidos no aporte nada mejor** (40 si no lo cambias).
 
 Haz clic en **Empezar**. Primero puntúa tu punto de partida, con todas las semillas de la evaluación, y luego empieza. Una evaluación sin línea base muestra **Medir la línea base** en lugar de **Empezar**.
