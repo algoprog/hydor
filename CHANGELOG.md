@@ -19,6 +19,9 @@ Every agent finds three commands in its shell: wait for a long job, change sever
   service works on Linux only; on Windows, waiting for a program by name needs PowerShell, and waiting on a command or
   a Slurm job needs Git for Windows. On a Mac and on Windows these commands are new and less tried than on Linux.
 - **Turning it off**: start the app with `HYDOR_SHELL_TOOLS=0`. There is no switch for it in Settings.
+- **Fewer, fuller steps**: agents are told to send independent lookups together and to check on a long job at intervals
+  that fit how long it should take, since every separate step re-reads the whole conversation. It is part of how the
+  app instructs agents, so there is no setting for it and no guideline to edit.
 - **For people working on Hydor**: `npm run check` runs the type check and the tests that belong to what you changed,
   and prints only what fails.
 

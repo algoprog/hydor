@@ -519,7 +519,7 @@ Chaque session démarrée par l’app, qu’elle travaille avec Claude Code, Cod
 - **`edits`** effectue plusieurs modifications exactes par recherche et remplacement, dans autant de fichiers que nécessaire, en un seul appel. Rien n’est écrit à moins que chaque modification ne trouve son texte exactement une fois : une modification qui ne correspond pas laisse donc vos fichiers tels qu’ils étaient. Elle affiche les lignes modifiées avec leurs numéros, pour que l’agent n’ait pas à relire les fichiers.
 - **`sym`** trouve où quelque chose est défini (une fonction, une classe, un type) et l’affiche en entier avec ses numéros de ligne exacts, dans les fichiers TypeScript, JavaScript, Python et Rust. Elle peut aussi lister les endroits où un nom est utilisé et les déclarations d’un fichier. Elle lit le code, si bien qu’une accolade dans une chaîne ou un commentaire ne la trompe pas, et elle n’a besoin d’aucun index. Pour le texte brut et les autres langages, les agents continuent d’utiliser grep.
 
-En bref, les agents consacrent moins d’appels à attendre, à modifier plusieurs endroits et à lire du code. Chaque commande s’explique elle-même avec `--help`, ce qu’un agent lit lorsqu’il cherche une option.
+En bref, les agents consacrent moins d’appels à attendre, à modifier plusieurs endroits et à lire du code. Chaque commande s’explique avec `--help`, que l’agent consulte lorsqu’il cherche une option. Les agents ont aussi pour instruction de procéder par étapes moins nombreuses et plus complètes (envoyer ensemble les recherches indépendantes, et vérifier une longue tâche à des intervalles adaptés à sa durée prévue) ; cela fait partie de la façon dont l’app donne ses instructions aux agents, ce n’est pas une consigne que vous modifiez.
 
 Quelques limites :
 

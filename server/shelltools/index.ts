@@ -230,3 +230,6 @@ export function createShellTools(o: ShellToolsOptions = {}): ShellTools {
 }
 
 export const shelltools = createShellTools();
+
+/** The tools sessions are told about now: those that passed their test run, none while the switch is off or the test runs have not finished (what the capability's `spawn` offers, read-only). */
+export const offeredShellTools = (): Tool[] => (shellToolsOn() ? shelltools.passed() : []);

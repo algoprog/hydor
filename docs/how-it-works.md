@@ -79,7 +79,10 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   own Node.js on the app's own copy of the tool, whatever the app's version or folder: agents' shells have no Node.js on
   their PATH), tries each once in the way an agent's shell runs it, and from then on puts that folder first on the PATH
   of every session it starts (Claude Code, Codex, Custom and the other ACP agents: `server/shelltools/`) and adds a
-  short text to their instructions naming the commands that worked. `HYDOR_SHELL_TOOLS=0` turns it off.
+  short text to their instructions naming the commands that worked. `HYDOR_SHELL_TOOLS=0` turns it off. Every agent is
+  also given, in the app's own code (`server/steps/`; no setting and no switch), three lines on taking fewer, fuller
+  steps, since each separate tool step re-reads the whole conversation: send independent lookups together, put several
+  lookups in one command, and check on a long job at intervals that fit how long it should take.
 - **Your accounts, your machine.** The app talks to the agents through their official command-line tools and
   never sees your model credentials; sign-in happens in the agents' own login flows.
 

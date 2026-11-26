@@ -237,7 +237,9 @@ agents that speak ACP and take MCP servers.
   TypeScript, JavaScript, Python and Rust). Claude Code, Codex, Custom and the other agents find them on their PATH and
   are told what they do, in the desktop apps for Mac, Windows and Linux, in Docker and in a copy run from the
   repository, with nothing to install. The app tries each once as it starts and tells agents only about those that
-  work. `HYDOR_SHELL_TOOLS=0` turns it off; there is no setting for it.
+  work. `HYDOR_SHELL_TOOLS=0` turns it off; there is no setting for it. Agents are also told, by the app itself and with no
+  setting to turn it off, to take fewer, fuller steps: to send independent lookups together and to check on a long job
+  at intervals that fit how long it should take.
 - **Agents that work the app**: every agent knows the app's own guide (the `app_guide` tool) and answers questions
   about it from there, with links to the place. Ask it to change a setting or set something up (a project, an
   assistant, a scheduled task, memory notes…) and it does it through the app's API (`app_api`): reading runs at

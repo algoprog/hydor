@@ -519,7 +519,7 @@ Toda sessão que o app começa, trabalhando com Claude Code, Codex ou Custom, en
 - **`edits`** faz várias alterações exatas de buscar e substituir, em quantos arquivos forem necessários, em uma única chamada. Nada é gravado a menos que cada alteração encontre seu texto exatamente uma vez, então uma alteração que não se encaixa deixa seus arquivos como estavam. Ele mostra as linhas que alterou, com os números, para que o agente não precise ler os arquivos de novo.
 - **`sym`** encontra onde algo é definido (uma função, uma classe, um tipo) e mostra a definição inteira com os números exatos das linhas, em arquivos TypeScript, JavaScript, Python e Rust. Também pode listar onde um nome é usado e as declarações de um arquivo. Ele lê o código, então uma chave dentro de uma string ou de um comentário não o confunde, e não precisa de índice. Para texto simples e outras linguagens, os agentes continuam usando o grep.
 
-Em resumo, os agentes gastam menos chamadas esperando, editando em vários lugares e lendo código. Cada comando se explica com `--help`, que é o que um agente lê quando procura uma opção.
+Resumindo, os agentes gastam menos chamadas esperando, editando em vários lugares e lendo código. Cada comando se explica com `--help`, que é o que um agente lê quando precisa de uma opção. Os agentes também são orientados a dar passos em menor número e mais completos (a enviar juntas as consultas independentes e a verificar um trabalho demorado em intervalos compatíveis com o tempo que ele deve levar); isso faz parte do modo como o app instrui os agentes, não é uma diretriz que você edita.
 
 Alguns limites:
 
