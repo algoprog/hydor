@@ -161,7 +161,7 @@ const server = http.createServer(async (req, res) => {
   if (!who && !flags.open) return send(401, { error: 'sign in' });
   if (req.url === '/ask') { const r = await hydor('ai', flags.badAsk ? { prompt: 'hi' } : { tier: 'quick', messages: [{ role: 'user', content: 'hi' }] }, { 'x-hydor-person': req.headers['x-hydor-person'] ?? '' }); return send(r.status < 500 ? 200 : 502, await r.json()); }
   if (req.url === '/find') { const r = await hydor('embed', { texts: ['hi'], kind: 'query' }); return send(r.status < 500 ? 200 : 502, await r.json()); }
-  send(200, '<!doctype html><title>Small</title><script src="/app.js"></script><p>Hello ' + (who?.name ?? 'you') + '</p>', 'text/html');
+  send(200, '<!doctype html><title>Small</title><script src="app.js"></script><p>Hello ' + (who?.name ?? 'you') + '</p>', 'text/html');
 });
 server.listen(Number(process.env.PORT), flags.everywhere ? '0.0.0.0' : flags.fixed ? '127.0.0.1' : process.env.BIND || process.env.HOST);
 process.on('SIGTERM', () => { if (!flags.deaf) server.close(() => process.exit(0)), server.closeAllConnections(); });
@@ -186,13 +186,13 @@ function app(flags: Record<string, boolean> = {}, file: object = FILE): string {
 const run = (dir: string) => checkContract({ dir, ports: PORTS, readyMs: 8000 });
 const states = (r: CheckResult) => Object.fromEntries(r.lines.map((l) => [l.id, l.state]));
 const line = (r: CheckResult, id: string) => r.lines.find((l) => l.id === id)!;
-const ALL = { file: "passed", build: "passed", ready: "passed", loopback: "passed", signin: "passed", secrets: "passed", ai: "passed", embed: "passed", stop: "passed", data: "passed", writes: "passed" };
+const ALL = { file: "passed", paths: "passed", build: "passed", ready: "passed", loopback: "passed", signin: "passed", secrets: "passed", ai: "passed", embed: "passed", stop: "passed", data: "passed", writes: "passed" };
 
 await step("the address it listens on is read from env.host: one written into the program fails, and the variable the file names is the only one set", async () => {
   const fixed = await run(app({ fixed: true }));
   assert.equal(line(fixed, "loopback").state, "failed", line(fixed, "loopback").text);
   assert.match(line(fixed, "loopback").text, /Told to listen on 127\.0\.0\.2 \(in HOST\), it listened on 127\.0\.0\.1 instead: it does not read HOST/);
-  assert.deepEqual(Object.keys(states(fixed)).slice(0, 4), ["file", "build", "ready", "loopback"]);
+  assert.deepEqual(Object.keys(states(fixed)).slice(0, 5), ["file", "paths", "build", "ready", "loopback"]);
   assert.equal(line(fixed, "data").state, "passed", "its data is still judged");
   const named = await run(app({}, { ...FILE, env: { ...FILE.env, host: "BIND" } }));
   assert.equal(line(named, "loopback").state, "passed", line(named, "loopback").text);
@@ -222,7 +222,7 @@ await step("an app that does what it says passes every line", async () => {
   const r = await run(app());
   assert.deepEqual(states(r), ALL, JSON.stringify(r.lines, null, 1));
   assert.equal(r.ok, true);
-  assert.equal(r.summary, "11 lines: 11 passed, 0 failed.");
+  assert.equal(r.summary, "12 lines: 12 passed, 0 failed.");
 });
 
 await step("each broken claim fails its own line, with what was tried, and the rest stand", async () => {
@@ -250,10 +250,10 @@ await step("each broken claim fails its own line, with what was tried, and the r
 
 await step("an app that never says it is ready, a build that fails and a file that cannot be read stop the check there, saying why", async () => {
   const silent = await run(app({ neverReady: true }));
-  assert.deepEqual(states(silent), { file: "passed", build: "passed", ready: "failed" });
+  assert.deepEqual(states(silent), { file: "passed", paths: "passed", build: "passed", ready: "failed" });
   assert.match(line(silent, "ready").text, /asked \/health for \d+ s: it answered 500/);
   const broken = await run(app({}, { ...FILE, build: "node -e \"console.log('no such step'); process.exit(3)\"" }));
-  assert.deepEqual(states(broken), { file: "passed", build: "failed" });
+  assert.deepEqual(states(broken), { file: "passed", paths: "passed", build: "failed" });
   assert.match(line(broken, "build").text, /ended with code 3/);
   assert.ok(line(broken, "build").details!.some((d) => d.includes("no such step")));
   const bad = await run(app({}, { start: "node server.mjs" }));
@@ -285,7 +285,7 @@ await step("as a command in the app's folder: one line a check, a summary, and a
   const ok = spawnSync(process.execPath, [script, "--ports", "4780-4799"], { cwd: app(), encoding: "utf8" });
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   assert.match(ok.stdout, /^ok {4}hydor\.json says what is needed: /);
-  assert.match(ok.stdout, /\n11 lines: 11 passed, 0 failed\.\n$/);
+  assert.match(ok.stdout, /\n12 lines: 12 passed, 0 failed\.\n$/);
   const failed = spawnSync(process.execPath, [script, app({ writes: true }), "--ports", "4780-4799"], { encoding: "utf8" });
   assert.equal(failed.status, 1, failed.stdout + failed.stderr);
   assert.match(failed.stdout, /\nFAIL {2}It writes only in its data folder: .*\n {8}· made cache\.txt\n {8}To do: /);

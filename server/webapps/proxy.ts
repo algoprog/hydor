@@ -7,10 +7,16 @@
 //    not a way in: browsers share cookies across the ports of one host, so an app on one would read Hydor's.)
 // 2. A path with a token, for a tunnel with a single hostname: /w/<session token>/… . The page runs in a sandbox
 //    (Content-Security-Policy: sandbox, without allow-same-origin) so it has an origin of no one and can reach
-//    nothing of Hydor's, and no Set-Cookie reaches the browser.
+//    nothing of Hydor's, and no Set-Cookie reaches the browser. A sandboxed page has no cookies, localStorage or sessionStorage
+//    of its own (the browser throws), so on this way the proxy keeps them for it, in memory, one set for each app and person
+//    (outliving the token): the app's Set-Cookie lines go into a jar (never to the browser) and its requests and sockets get the
+//    jar's cookies for their path in place of the Cookie header the browser sent; and each page of HTML gets a small script
+//    first in its head that, only where the browser's own throw, gives the page localStorage, sessionStorage and
+//    document.cookie, sending changes to `<prefix>/__hydor/state` (which the proxy answers itself, never the app). See
+//    "what a page keeps on the path way" below.
 //
 // In both: no valid session, a plain 403; the request goes to 127.0.0.1:<the app's port> with Host
-// localhost:<port>; the cookies of Hydor and of this proxy are taken off; any x-hydor-person the browser sent is
+// localhost:<port>; the cookies of Hydor and of this proxy are taken off (on the path way the app gets its jar's instead); any x-hydor-person the browser sent is
 // taken off and a fresh one for the session's person is signed on every request (sign.ts); WebSocket upgrades
 // follow the same rules; every request marks the app as used (and so does an open socket, until it closes).
 import crypto from "node:crypto";
@@ -218,35 +224,318 @@ const POINT_SCRIPT = (to: string) =>
   `document.addEventListener('submit',function(e){e.preventDefault();e.stopPropagation()},true);` +
   `path()})();</script>`;
 
-/** The page with the pointing helper put in; the page as it was when it does not ask for it. */
-export function showPage(html: string, flags: ShowFlags, frame?: string): string {
-  if (!flags.point || !frame) return html;
-  const script = POINT_SCRIPT(frame);
+/** The page with `script` put first in its head (at the very start when it has none). */
+function putFirst(html: string, script: string): string {
   const m = /<head[^>]*>/i.exec(html);
   return m ? html.slice(0, m.index + m[0].length) + script + html.slice(m.index + m[0].length) : script + html;
 }
 
-/** A policy that has a script-src also lets the helper it was given run (by its hash, nothing wider). */
-export function allowShownScripts(csp: string, flags: ShowFlags, frame?: string): string {
-  if (!flags.point || !frame) return csp;
-  const hash = `'sha256-${crypto.createHash("sha256").update(POINT_SCRIPT(frame).replace(/^<script[^>]*>/, "").replace(/<\/script>$/, "")).digest("base64")}'`;
-  return csp
-    .split(";")
-    .map((d) => (/^\s*script-src(\s|$)/i.test(d) && !d.includes(hash) ? `${d.replace(/\s+$/, "")} ${hash}` : d))
-    .join(";");
+/** The page with the pointing helper put in; the page as it was when it does not ask for it. */
+export function showPage(html: string, flags: ShowFlags, frame?: string): string {
+  if (!flags.point || !frame) return html;
+  return putFirst(html, POINT_SCRIPT(frame));
 }
 
-const collect = (stream: NodeJS.ReadableStream, max: number): Promise<Buffer | null> =>
-  new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    stream.on("data", (c: Buffer) => {
-      size += c.length;
-      if (size <= max) chunks.push(c);
-    });
-    stream.on("end", () => resolve(size > max ? null : Buffer.concat(chunks)));
-    stream.on("error", reject);
-  });
+/** The text a script element holds, as a policy hashes it. */
+const scriptHash = (script: string): string =>
+  `'sha256-${crypto.createHash("sha256").update(script.replace(/^<script[^>]*>/, "").replace(/<\/script>$/, "")).digest("base64")}'`;
+
+/**
+ * A policy that restricts scripts also lets the scripts Hydor put in a page run (by their hashes, nothing wider), and one that
+ * restricts connections lets the page reach its own state address `connect` (a host with its path, no scheme: the page's own).
+ * Each policy of a header is looked at on its own (a page must pass all of them). The directive that governs a script element is
+ * script-src-elem, else script-src, else default-src; one that already allows 'unsafe-inline' with no nonce, hash or
+ * 'strict-dynamic' is left alone, since a hash beside it would turn 'unsafe-inline' off. The directive that governs connections is
+ * connect-src, else default-src (which then gets a connect-src of its own, so that nothing else it covers is widened).
+ */
+export function allowInlineScripts(csp: string, hashes: string[], connect?: string): string {
+  return csp
+    .split(",")
+    .map((policy) => {
+      const ds = policy.split(";").map((d) => d.trim()).filter(Boolean);
+      const find = (name: string) => ds.findIndex((d) => d.split(/\s+/)[0].toLowerCase() === name);
+      const srcs = (i: number) => ds[i].split(/\s+/).slice(1);
+      const lower = (a: string[]) => a.map((x) => x.toLowerCase());
+      const dflt = find("default-src");
+      // What default-src allows before any hash is put in it (a connect-src of its own starts from that).
+      const dfltSources = dflt >= 0 ? srcs(dflt) : [];
+      if (hashes.length) {
+        const i = [find("script-src-elem"), find("script-src"), dflt].find((x) => x >= 0);
+        if (i !== undefined) {
+          const s = srcs(i);
+          const l = lower(s);
+          const keepsInline = l.includes("'unsafe-inline'") && !l.some((x) => /^'(nonce-|sha(256|384|512)-|strict-dynamic')/.test(x));
+          if (!keepsInline) {
+            const add = hashes.filter((h) => !s.includes(h));
+            ds[i] = [ds[i].split(/\s+/)[0], ...s.filter((x) => x.toLowerCase() !== "'none'"), ...add].join(" ");
+          }
+        }
+      }
+      if (connect) {
+        const c = find("connect-src");
+        const i = c >= 0 ? c : dflt;
+        if (i >= 0) {
+          const s = c >= 0 ? srcs(c) : dfltSources;
+          const l = lower(s);
+          const open = l.some((x) => x === "'self'" || x === "*" || x === "http:" || x === "https:" || x === connect.toLowerCase());
+          if (!open) {
+            const next = [...s.filter((x) => x.toLowerCase() !== "'none'"), connect];
+            if (c >= 0) ds[c] = ["connect-src", ...next].join(" ");
+            else ds.push(["connect-src", ...next].join(" "));
+          }
+        }
+      }
+      return ds.join("; ");
+    })
+    .join(", ");
+}
+
+/** A policy that has a script-src also lets the pointing helper it was given run (by its hash, nothing wider). */
+export function allowShownScripts(csp: string, flags: ShowFlags, frame?: string): string {
+  if (!flags.point || !frame) return csp;
+  return allowInlineScripts(csp, [scriptHash(POINT_SCRIPT(frame))]);
+}
+
+// ---- what a page keeps on the path way -------------------------------------------------------------------------------------------
+//
+// A page on the path way has an origin of no one (the sandbox): the browser keeps no cookie for it and gives it no localStorage,
+// sessionStorage or document.cookie (they throw). So the proxy keeps them for it, in memory, one set for each app and person (so it
+// outlives the 12-hour token and each new Preview address), never in the browser:
+//  - the app's cookies: its Set-Cookie lines go into a jar (expiry, Max-Age, Path and HttpOnly kept; Domain, SameSite, Secure and
+//    Partitioned ignored; never the reserved names), and each request and socket the page makes goes to the app with the jar's
+//    cookies for its path in place of whatever Cookie header the browser sent (which can only be the host's, never the app's);
+//  - localStorage, as the page last sent it;
+//  - a small script put first in each page's head that, only where the browser's own throw, gives the page localStorage,
+//    sessionStorage (in memory, for the page) and document.cookie, and sends their changes to `<prefix>/__hydor/state`,
+//    which the proxy answers itself (never the app).
+
+export interface StateCaps {
+  /** Cookies in one jar. */
+  cookies: number;
+  /** Bytes (names, values and paths) in one jar. */
+  bytes: number;
+  /** One cookie, as browsers do. */
+  cookieBytes: number;
+  /** Jars, and sets of localStorage: the least recently used goes first. */
+  jars: number;
+  /** One set of localStorage (its keys and values), as the page sends it. */
+  localBytes: number;
+}
+// A jar's cookies go to the app in one header: 8 KB keeps it, with the request's other headers, well under the 16 KB a Node server takes.
+export const STATE_CAPS: StateCaps = { cookies: 50, bytes: 8 << 10, cookieBytes: 4096, jars: 500, localBytes: 1 << 20 };
+
+interface JarCookie {
+  name: string;
+  value: string;
+  path: string;
+  /** When it ends (ms), or none (until the proxy stops). */
+  exp: number | null;
+  httpOnly: boolean;
+  /** When it was last set: the oldest goes first when a jar is full. */
+  seq: number;
+}
+
+/** The directory of a path, as a browser takes a cookie's default Path. */
+const defaultPathOf = (p: string): string => {
+  const i = p.lastIndexOf("/");
+  return p.startsWith("/") && i > 0 ? p.slice(0, i) : "/";
+};
+/** Whether a cookie of path `cp` goes with a request for path `rp`. */
+const pathMatches = (cp: string, rp: string): boolean => rp === cp || (rp.startsWith(cp) && (cp.endsWith("/") || rp[cp.length] === "/"));
+/** The path of an address (no query). */
+const pathOnly = (u: string): string => {
+  const p = u.split(/[?#]/, 1)[0];
+  return p.startsWith("/") ? p : "/";
+};
+
+/** A cookie line (`name=value; Path=/; Max-Age=60`) as the jar keeps it (`gone`: it ends it), or null when there is nothing to keep. */
+function parseCookie(line: string, requestPath: string, now: number): { name: string; value: string; path: string; exp: number | null; httpOnly: boolean; gone: boolean } | null {
+  const parts = line.split(";");
+  const first = parts[0];
+  const eq = first.indexOf("=");
+  if (eq <= 0) return null;
+  const name = first.slice(0, eq).trim();
+  const value = first.slice(eq + 1).trim();
+  if (!name || /[\s\u0000-\u001f\u007f()<>@,;:\\"/[\]?={}]/.test(name) || /[\u0000-\u001f\u007f]/.test(value) || RESERVED_COOKIES.has(name)) return null;
+  let path = defaultPathOf(requestPath);
+  let maxAge: number | null = null;
+  let expires: number | null = null;
+  let httpOnly = false;
+  for (const a of parts.slice(1)) {
+    const i = a.indexOf("=");
+    const k = (i < 0 ? a : a.slice(0, i)).trim().toLowerCase();
+    const v = i < 0 ? "" : a.slice(i + 1).trim();
+    if (k === "path" && v.startsWith("/")) path = v;
+    else if (k === "max-age" && /^-?\d+$/.test(v)) maxAge = Number(v);
+    else if (k === "expires") {
+      const t = Date.parse(v);
+      if (!Number.isNaN(t)) expires = t;
+    } else if (k === "httponly") httpOnly = true;
+  }
+  const exp = maxAge !== null ? now + maxAge * 1000 : expires;
+  return { name, value, path, exp, httpOnly, gone: maxAge !== null ? maxAge <= 0 : exp !== null && exp <= now };
+}
+
+/** A map that drops its least recently used entry beyond `max`. */
+class Lru<V> {
+  private m = new Map<string, V>();
+  constructor(private max: number) {}
+  get(k: string): V | undefined {
+    const v = this.m.get(k);
+    if (v !== undefined) {
+      this.m.delete(k);
+      this.m.set(k, v);
+    }
+    return v;
+  }
+  set(k: string, v: V): void {
+    this.m.delete(k);
+    this.m.set(k, v);
+    while (this.m.size > this.max) this.m.delete(this.m.keys().next().value as string);
+  }
+  delete(k: string): void {
+    this.m.delete(k);
+  }
+  get size(): number {
+    return this.m.size;
+  }
+}
+
+/** What the proxy keeps for pages on the path way: cookie jars and localStorage, one each per key (an app and a person). */
+export function createPageState(caps: StateCaps = STATE_CAPS, clock: () => number = Date.now) {
+  const jars = new Lru<Map<string, JarCookie>>(caps.jars);
+  const locals = new Lru<Record<string, string>>(caps.jars);
+  let seq = 0;
+  const size = (c: JarCookie) => Buffer.byteLength(c.name) + Buffer.byteLength(c.value) + Buffer.byteLength(c.path);
+  const live = (jar: Map<string, JarCookie>): JarCookie[] => {
+    const now = clock();
+    for (const [k, c] of jar) if (c.exp !== null && c.exp <= now) jar.delete(k);
+    return [...jar.values()];
+  };
+  return {
+    /**
+     * Keeps cookie lines as a browser would. `requestPath` is the app-side path they came for (their default Path). From the page
+     * itself (document.cookie) a cookie is never HttpOnly and never takes the place of one that is.
+     */
+    setCookies(key: string, lines: readonly string[] | undefined, requestPath: string, fromPage = false): void {
+      if (!lines?.length) return;
+      const now = clock();
+      let jar = jars.get(key);
+      for (const line of lines) {
+        const c = parseCookie(line, requestPath, now);
+        if (!c) continue;
+        const id = `${c.name}\0${c.path}`;
+        if (c.gone) {
+          if (jar && !(fromPage && jar.get(id)?.httpOnly)) jar.delete(id);
+          continue;
+        }
+        if (Buffer.byteLength(c.name) + Buffer.byteLength(c.value) > caps.cookieBytes) continue;
+        if (!jar) jars.set(key, (jar = new Map()));
+        if (fromPage && jar.get(id)?.httpOnly) continue;
+        jar.delete(id);
+        jar.set(id, { name: c.name, value: c.value, path: c.path, exp: c.exp, httpOnly: fromPage ? false : c.httpOnly, seq: ++seq });
+        // Over the caps: the oldest go first.
+        let all = live(jar);
+        let bytes = all.reduce((n, x) => n + size(x), 0);
+        while (all.length > caps.cookies || bytes > caps.bytes) {
+          const oldest = all.reduce((a, b) => (a.seq <= b.seq ? a : b));
+          jar.delete(`${oldest.name}\0${oldest.path}`);
+          all = all.filter((x) => x !== oldest);
+          bytes -= size(oldest);
+        }
+      }
+      if (jar && !jar.size) jars.delete(key);
+    },
+    /** The Cookie header for a request to `requestPath` (longer paths first, then the older), or "". */
+    cookieHeader(key: string, requestPath: string): string {
+      const jar = jars.get(key);
+      if (!jar) return "";
+      return live(jar)
+        .filter((c) => pathMatches(c.path, requestPath))
+        .sort((a, b) => b.path.length - a.path.length || a.seq - b.seq)
+        .map((c) => `${c.name}=${c.value}`)
+        .join("; ");
+    },
+    /** What document.cookie shows a page at `requestPath`: the cookies it may read (not HttpOnly), as [name, value, end in ms or 0]. */
+    pageCookies(key: string, requestPath: string): [string, string, number][] {
+      const jar = jars.get(key);
+      if (!jar) return [];
+      return live(jar)
+        .filter((c) => !c.httpOnly && pathMatches(c.path, requestPath))
+        .sort((a, b) => b.path.length - a.path.length || a.seq - b.seq)
+        .map((c) => [c.name, c.value, c.exp ?? 0]);
+    },
+    getLocal: (key: string): Record<string, string> => locals.get(key) ?? {},
+    /** Replaces what the page keeps in localStorage; false when it is too big. */
+    setLocal(key: string, items: Record<string, string>): boolean {
+      let n = 0;
+      for (const [k, v] of Object.entries(items)) n += Buffer.byteLength(k) + Buffer.byteLength(v);
+      if (n > caps.localBytes) return false;
+      if (Object.keys(items).length) locals.set(key, { ...items });
+      else locals.delete(key);
+      return true;
+    },
+    sizes: () => ({ jars: jars.size, locals: locals.size }),
+  };
+}
+export type PageState = ReturnType<typeof createPageState>;
+
+/** The state script's code: `C` is its config (below). It acts only where the browser's own storage and cookie throw. */
+const STATE_CODE =
+  `(function(){var W=window,D=document,U=C.p+"/__hydor/state",T=0,LS;` +
+  `function bad(f){try{f();return 0}catch(e){return 1}}` +
+  `function send(b){try{fetch(U,{method:"POST",keepalive:true,body:JSON.stringify(b)})}catch(e){}}` +
+  `function mk(init,on){var d=Object.create(null),k;for(k in init)d[k]=String(init[k]);` +
+  `var a={getItem:function(k){k=String(k);return k in d?d[k]:null},setItem:function(k,v){d[String(k)]=String(v);on()},` +
+  `removeItem:function(k){delete d[String(k)];on()},clear:function(){for(var k in d)delete d[k];on()},` +
+  `key:function(i){var s=Object.keys(d);return i>=0&&i<s.length?s[i]:null}};` +
+  `return[new Proxy(a,{get:function(t,k){return k==="length"?Object.keys(d).length:k in a?a[k]:typeof k==="string"&&k in d?d[k]:undefined},` +
+  `set:function(t,k,v){if(typeof k==="string"){d[k]=String(v);on()}return true},deleteProperty:function(t,k){delete d[k];on();return true},` +
+  `has:function(t,k){return k in a||k in d},ownKeys:function(){return Object.keys(d)},` +
+  `getOwnPropertyDescriptor:function(t,k){return k in d?{value:d[k],writable:true,enumerable:true,configurable:true}:undefined}}),d]}` +
+  `function def(o,n,v){Object.defineProperty(o,n,{get:function(){return v},configurable:true})}` +
+  `if(bad(function(){return W.localStorage})){var l=mk(C.l,function(){clearTimeout(T);T=setTimeout(flush,200)});LS=l[1];def(W,"localStorage",l[0])}` +
+  `function flush(){if(T){clearTimeout(T);T=0;send({local:LS})}}` +
+  `addEventListener("pagehide",flush);` +
+  `if(bad(function(){return W.sessionStorage}))def(W,"sessionStorage",mk({},function(){})[0]);` +
+  `if(bad(function(){return D.cookie})){var K={};C.c.forEach(function(c){K[c[0]]=[c[1],c[2]]});` +
+  `Object.defineProperty(D,"cookie",{configurable:true,get:function(){var o=[],t=Date.now(),n;for(n in K)if(!K[n][1]||K[n][1]>t)o.push(n+"="+K[n][0]);return o.join("; ")},` +
+  `set:function(s){s=String(s);var p=s.split(";"),i=p[0].indexOf("=");if(i<=0)return;var n=p[0].slice(0,i).trim(),v=p[0].slice(i+1).trim(),m=null,e=null,j,a,q;` +
+  `for(j=1;j<p.length;j++){a=p[j].split("=");q=a[0].trim().toLowerCase();if(q==="max-age")m=parseInt(a[1],10);else if(q==="expires"&&!isNaN(Date.parse(a.slice(1).join("="))))e=Date.parse(a.slice(1).join("="))}` +
+  `if(m!==null&&!isNaN(m))e=Date.now()+m*1000;if(m!==null&&m<=0||e!==null&&e<=Date.now())delete K[n];else K[n]=[v,e||0];send({cookie:s,path:C.d})}})}` +
+  `})();`;
+
+/** `json` for the inside of a script element: no `</script>`, `<!--` or line separator can end or break it. */
+const jsonForScript = (v: unknown): string =>
+  JSON.stringify(v).replace(/[<>&\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+
+/** The state script for a page: what the proxy keeps for it, and where it sends changes (`prefix`/__hydor/state). */
+export function stateScript(prefix: string, local: Record<string, string>, cookies: [string, string, number][], pagePath: string): string {
+  const cfg = { p: prefix, l: local, c: cookies, d: defaultPathOf(pagePath) };
+  return `<script data-hydor-state>var C=${jsonForScript(cfg)};${STATE_CODE}</script>`;
+}
+
+/** The address a page is allowed to send state to under a policy's connect-src: the host it is at and the path. */
+const stateSource = (host: string, prefix: string) => `${host}${prefix}/__hydor/state`;
+
+/** The most of a page the proxy reads to change it (8 MB). */
+const PAGE_MAX = 8 << 20;
+/** The most a page may send to be kept at once (1 MB, with room for its framing). */
+const STATE_BODY_MAX = (1 << 20) + 4096;
+
+/** A page read whole, or when it is bigger than `max`: what was read, and the rest still to come. */
+async function readPage(stream: NodeJS.ReadableStream, max: number): Promise<{ chunks: Buffer[]; rest?: AsyncIterable<Buffer> }> {
+  const it = (stream as AsyncIterable<Buffer>)[Symbol.asyncIterator]();
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for (;;) {
+    const n = await it.next();
+    if (n.done) return { chunks };
+    chunks.push(n.value);
+    size += n.value.length;
+    if (size > max) return { chunks, rest: { [Symbol.asyncIterator]: () => it } };
+  }
+}
 
 function readToken(
   raw: string,
@@ -413,6 +702,9 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
   /** Where each app's frame was last (only frames of Hydor's page are watched). */
   const lastPaths = new Map<string, string>();
   const domain = (o.domain ?? "").toLowerCase().replace(/^\.+|\.+$/g, "");
+  /** What pages on the path way keep (cookies, localStorage): one set for each app and person. */
+  const pageState = createPageState();
+  const stateKey = (r: Resolved) => `${r.app.id}\0${r.person.id}`;
 
   /** The slug a Host header names (`<slug>.localhost`, `<slug>.<domain>`), if it names one. */
   const slugOf = (req: http.IncomingMessage): string | null => {
@@ -536,8 +828,13 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
     const origin = typeof out.origin === "string" ? out.origin : undefined;
     const fromItself = origin !== undefined && (r.prefix ? origin === "null" : ownOrigin(origin, req));
     if (fromItself) out.origin = here;
-    // Pages that are rewritten come as they are, not compressed.
-    if (baseOf(r.app) || r.flags.point) out["accept-encoding"] = "identity";
+    // Pages that are rewritten come as they are, not compressed (the path way's pages get the state script put in).
+    if (baseOf(r.app) || r.flags.point || r.prefix) out["accept-encoding"] = "identity";
+    // A page there carries what Hydor keeps for this person, so it is never "not modified" (the browser's copy would be stale).
+    if (r.prefix && /text\/html/i.test(String(out.accept ?? ""))) {
+      delete out["if-none-match"];
+      delete out["if-modified-since"];
+    }
     // A page on the path way has an origin of no one, so a browser calls everything it asks for cross-site, and an app
     // that guards against that (TanStack Start's server functions do: 403 for anything not same-origin) would refuse
     // its own page. Said same-origin only for that page: its "null" origin, or a plain read with no Origin at all.
@@ -553,10 +850,15 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
         delete out.referer;
       }
     }
-    const jar = String(req.headers.cookie ?? "")
-      .split(/;\s*/)
-      .filter((c) => c && !RESERVED_COOKIES.has(c.split("=")[0].trim()));
-    if (jar.length) out.cookie = jar.join("; ");
+    // On the path way the browser keeps nothing of the app's (what it sends is the host's own, Hydor's or a tunnel's): the app gets
+    // its jar's cookies for the path in their place.
+    const jar = r.prefix
+      ? pageState.cookieHeader(stateKey(r), pathOnly(upstreamPath(r)))
+      : String(req.headers.cookie ?? "")
+          .split(/;\s*/)
+          .filter((c) => c && !RESERVED_COOKIES.has(c.split("=")[0].trim()))
+          .join("; ");
+    if (jar) out.cookie = jar;
     else delete out.cookie;
     // Fresh for this request, for this session's person.
     out[PERSON_HEADER] = signPerson(r.person, host.secret(r.app.id));
@@ -569,6 +871,53 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
     (set ?? [])
       .filter((c) => !RESERVED_COOKIES.has(c.split("=")[0].trim()))
       .map((c) => c.replace(/;\s*domain=[^;]*/gi, ""));
+
+  /** `POST <prefix>/__hydor/state`: a page's localStorage (all of it) and cookie changes, from the state script. */
+  const answerState = (req: http.IncomingMessage, res: http.ServerResponse, r: Resolved) => {
+    const reply = (code: number, text?: string) => {
+      res.writeHead(code, { ...CORS, "Cache-Control": "no-store", ...(text ? { "Content-Type": "text/plain; charset=utf-8" } : {}), ...(code === 413 ? { Connection: "close" } : {}) });
+      res.end(text);
+    };
+    if (req.method !== "POST") return reply(405, "Send a POST.");
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let big = false;
+    req.on("data", (c: Buffer) => {
+      size += c.length;
+      if (size > STATE_BODY_MAX) {
+        if (!big) {
+          big = true;
+          res.once("finish", () => req.destroy());
+          reply(413, "That is too much to keep.");
+        }
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on("end", () => {
+      if (big) return;
+      let body: { local?: unknown; cookie?: unknown; path?: unknown } | null = null;
+      try {
+        body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      } catch {}
+      if (!body || typeof body !== "object" || Array.isArray(body)) return reply(400, "Send JSON.");
+      const key = stateKey(r);
+      const { local, cookie } = body;
+      if (local === undefined && cookie === undefined) return reply(400, "Nothing to keep.");
+      if (local !== undefined) {
+        if (!local || typeof local !== "object" || Array.isArray(local) || !Object.values(local).every((v) => typeof v === "string")) return reply(400, "local is an object of strings.");
+        if (!pageState.setLocal(key, local as Record<string, string>)) return reply(413, "That is too much to keep.");
+      }
+      if (cookie !== undefined) {
+        if (typeof cookie !== "string" || cookie.length > 8192) return reply(400, "cookie is one cookie string.");
+        const at = typeof body.path === "string" && body.path.startsWith("/") && body.path.length < 2000 ? body.path : "/";
+        // Its default Path is the page's directory: asked for as a request to `at/x` would be.
+        pageState.setCookies(key, [cookie], at.endsWith("/") ? `${at}x` : `${at}/x`, true);
+      }
+      reply(204);
+    });
+    req.on("error", () => res.destroy());
+  };
 
   /** Upgraded connections: the server does not track them once they are upgraded. */
   const sockets = new Set<Duplex>();
@@ -642,6 +991,8 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
       return res.end();
     }
     host.touch(r.app.id);
+    // What the page keeps (its localStorage and cookies) is the proxy's to answer, never the app's.
+    if (r.prefix && pathOnly(r.url) === "/__hydor/state") return answerState(req, res, r);
     if (r.frame) {
       const dest = String(req.headers["sec-fetch-dest"] ?? "");
       let seen: string | null = null;
@@ -672,6 +1023,8 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
               ...a.headers,
             };
             delete headers["set-cookie"];
+            // On the path way the app's cookies stay here, in the jar for this app and person; the browser is given none.
+            if (r.prefix) pageState.setCookies(stateKey(r), a.headers["set-cookie"], pathOnly(upstreamPath(r)));
             const cookies = r.prefix
               ? []
               : cookiesFromApp(a.headers["set-cookie"]);
@@ -707,32 +1060,53 @@ export function createAppsProxy(o: AppsProxyOptions): AppsProxy {
               base &&
               TEXTUAL.test(String(a.headers["content-type"] ?? "")) &&
               !a.headers["content-encoding"];
-            // A page that is to be shown with the pointing helper (the app's frame in Hydor's page): read whole.
+            // A page that is to get the pointing helper (the app's frame in Hydor's page) or the state script (the path way): read whole.
             const dest = String(req.headers["sec-fetch-dest"] ?? "");
             // The pointing helper is only for a frame of Hydor's page.
             const flags: ShowFlags = r.flags.point && dest === "iframe" ? { point: true } : {};
-            const shown =
+            const html =
               req.method === "GET" &&
-              !!flags.point &&
               String(a.headers["content-type"] ?? "").includes("text/html") &&
               !a.headers["content-encoding"];
-            if (shown) {
+            const shown = html && !!flags.point;
+            const stateful = html && !!r.prefix && a.statusCode === 200;
+            if (shown || stateful) {
               const inner: NodeJS.ReadableStream = rewrite ? a.pipe(replacing(base, r.prefix ?? "")) : a;
-              collect(inner, 8 << 20).then(
-                (buf) => {
-                  if (!buf) return page(res, 502, "The page is too big to show here.");
-                  const body = Buffer.from(showPage(buf.toString("utf8"), flags, r.frame), "utf8");
+              readPage(inner, PAGE_MAX)
+                .then(async (got) => {
+                  if (got.rest) {
+                    // Too big to change: it goes on as it is (the pointing helper needs the page, so there it is an answer).
+                    if (shown) return page(res, 502, "The page is too big to show here.");
+                    if (rewrite) delete headers["content-length"];
+                    res.writeHead(a.statusCode ?? 502, headers);
+                    for (const c of got.chunks) if (!res.write(c)) await new Promise((ok) => res.once("drain", ok));
+                    for await (const c of got.rest) if (!res.write(c)) await new Promise((ok) => res.once("drain", ok));
+                    return void res.end();
+                  }
+                  let text = showPage(Buffer.concat(got.chunks).toString("utf8"), flags, r.frame);
+                  const hashes = shown ? [scriptHash(POINT_SCRIPT(r.frame!))] : [];
+                  let connect: string | undefined;
+                  if (stateful) {
+                    const key = stateKey(r);
+                    const at = pathOnly(upstreamPath(r));
+                    const script = stateScript(r.prefix!, pageState.getLocal(key), pageState.pageCookies(key, at), at);
+                    text = putFirst(text, script);
+                    hashes.push(scriptHash(script));
+                    connect = stateSource(String(req.headers.host ?? ""), r.prefix!);
+                    // Its inlined state is this person's own: no copy of it is kept or revalidated.
+                    headers["cache-control"] = "no-store";
+                    delete headers.etag;
+                    delete headers["last-modified"];
+                  }
+                  const body = Buffer.from(text, "utf8");
                   headers["content-length"] = String(body.length);
                   delete headers["transfer-encoding"];
-                  {
-                    const csp = headers["content-security-policy"];
-                    if (csp) headers["content-security-policy"] = (Array.isArray(csp) ? csp : [csp]).map((c) => allowShownScripts(c, flags, r.frame));
-                  }
+                  const csp = headers["content-security-policy"];
+                  if (csp) headers["content-security-policy"] = (Array.isArray(csp) ? csp : [csp]).map((c) => allowInlineScripts(c, hashes, connect));
                   res.writeHead(a.statusCode ?? 502, headers);
                   res.end(body);
-                },
-                () => res.destroy(),
-              );
+                })
+                .catch(() => res.destroy());
               return;
             }
             if (rewrite) delete headers["content-length"];

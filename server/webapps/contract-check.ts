@@ -11,13 +11,14 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { HYDOR_FILE, HYDOR_FILE_MAX, type HydorFile, readHydorText, type TryRequest, usesServices } from "../../shared/hydor-file.ts";
+import { scanOwnPaths } from "./own-paths.ts";
 import { appEnv, argvOf, buildEnv, contractRunShape, descendants, nodeBin, signalApp } from "./run-app.ts";
 import { PERSON_HEADER, type Person, signPerson, verifyPerson } from "./sign.ts";
 
 export type LineState = "passed" | "failed" | "note" | "notRun";
 
 export interface ContractLine {
-  /** file, build, ready, loopback, signin, secrets, ai, embed, mail, smoke, stop, data, writes. */
+  /** file, paths, build, ready, loopback, signin, secrets, ai, embed, mail, smoke, stop, data, writes. */
   id: string;
   title: string;
   state: LineState;
@@ -26,6 +27,8 @@ export interface ContractLine {
   /** What to do about it, when it failed. */
   hint?: string;
   details?: string[];
+  /** A failed line with a group is a warning to fix that never stops a launch or fails the check (the pages show it with the pages' lines). */
+  group?: "pages";
 }
 
 export interface CheckResult {
@@ -65,6 +68,7 @@ export interface CheckOptions {
 
 const TITLES: Record<string, string> = {
   file: "hydor.json says what is needed",
+  paths: "It works under any path",
   build: "It builds",
   ready: "It starts and says it is ready",
   loopback: "It listens where it is told, and nowhere else",
@@ -582,16 +586,18 @@ export function runSmoke(line: string, dir: string, env: Record<string, string>,
 export async function checkContract(o: CheckOptions): Promise<CheckResult> {
   const dir = path.resolve(o.dir);
   const lines: ContractLine[] = [];
-  const line = (id: string, state: LineState, text: string, extra: { hint?: string; details?: string[] } = {}) => {
-    const l: ContractLine = { id, title: TITLES[id] ?? id, state, text, ...(extra.hint ? { hint: extra.hint } : {}), ...(extra.details?.length ? { details: extra.details.slice(0, 8) } : {}) };
+  const line = (id: string, state: LineState, text: string, extra: { hint?: string; details?: string[]; group?: "pages" } = {}) => {
+    const l: ContractLine = { id, title: TITLES[id] ?? id, state, text, ...(extra.hint ? { hint: extra.hint } : {}), ...(extra.details?.length ? { details: extra.details.slice(0, 8) } : {}), ...(extra.group ? { group: extra.group } : {}) };
     lines.push(l);
     o.onLine?.(l);
   };
   const result = (): CheckResult => {
     const of = (s: LineState) => lines.filter((l) => l.state === s).length;
-    const failed = of("failed");
+    // A warning (a failed line with a group) is to fix, and fails nothing.
+    const warned = lines.filter((l) => l.state === "failed" && l.group).length;
+    const failed = of("failed") - warned;
     const untried = of("notRun");
-    const summary = `${lines.length} ${lines.length === 1 ? "line" : "lines"}: ${of("passed")} passed, ${failed} failed${untried ? `, ${untried} could not be tried` : ""}${of("note") ? `, ${of("note")} to note` : ""}.`;
+    const summary = `${lines.length} ${lines.length === 1 ? "line" : "lines"}: ${of("passed")} passed, ${failed} failed${warned ? `, ${warned} to fix` : ""}${untried ? `, ${untried} could not be tried` : ""}${of("note") ? `, ${of("note")} to note` : ""}.`;
     return { ok: failed === 0, summary, lines };
   };
 
@@ -602,6 +608,20 @@ export async function checkContract(o: CheckOptions): Promise<CheckResult> {
   }
   const file = read.file;
   line("file", "passed", `${HYDOR_FILE} reads: start “${one(file.start, 80)}”, ready at ${file.ready}, sign-in by ${file.signIn === "hydor" ? "Hydor" : "the app itself"}${file.database ? `, database ${file.database.file}` : ""}${file.keys.length ? `, ${file.keys.length} ${file.keys.length === 1 ? "key" : "keys"}` : ""}.`);
+
+  // ---- its own addresses: read from its files, so said whatever else comes of the check
+  o.onStep?.("Reading its own addresses");
+  const own = scanOwnPaths(dir);
+  if (!own.found.length) line("paths", "passed", own.files ? `None of its ${own.files} source ${own.files === 1 ? "file" : "files"} writes an address of its own that starts with “/”, so it works at any path.` : "It has no pages or scripts of its own to read, so there is no address to look at.", { group: "pages" });
+  else {
+    const named = own.found.slice(0, 5).map((f) => `${f.file}:${f.line} ${f.address}`);
+    const more = own.found.length - named.length;
+    line("paths", "failed", `${own.found.length} ${own.found.length === 1 ? "address" : "addresses"} of its own start with “/”: ${named.join("; ")}${more > 0 ? ` and ${more} more` : ""}. They leave the app when Hydor shows it through a tunnel, where it lives under a path of its own.`, {
+      hint: "Make them relative: notes, app.js, api/notes, ./img/x.png, with no “/” at the start (a server can build them from the X-Forwarded-Prefix header; with Vite set base: './').",
+      details: named,
+      group: "pages",
+    });
+  }
 
   const work = o.work ?? fs.mkdtempSync(path.join(os.tmpdir(), "hydor-check-"));
   const data = path.join(work, "data");
@@ -941,5 +961,5 @@ const MARK: Record<LineState, string> = { passed: "ok  ", failed: "FAIL", note: 
 /** A line as the command prints it. */
 export function printLine(l: ContractLine): string {
   const more = l.state === "passed" ? [] : [...(l.details ?? []).map((d) => `        · ${d}`), ...(l.hint ? [`        To do: ${l.hint}`] : [])];
-  return [`${MARK[l.state]}  ${l.title}: ${l.text}`, ...more].join("\n");
+  return [`${l.state === "failed" && l.group ? "fix " : MARK[l.state]}  ${l.title}: ${l.text}`, ...more].join("\n");
 }

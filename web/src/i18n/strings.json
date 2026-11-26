@@ -20393,6 +20393,7 @@
 "some files":"web/src/features/git/RepoView.tsx",
 "Some headings are out of order.":"shared/check-words.ts",
 "Some links lead nowhere.":"shared/check-words.ts",
+"Some of its links and files would break when it is shown at another address.":"web/src/features/webapps/simple/plain.ts",
 "Some of its tokens have no known price, so it may have spent more.":"web/src/features/budget/CapDialog.tsx",
 "Some of the agents’ own skills could not be read:":"web/src/features/skillpack/SkillsPage.tsx",
 "Some of the agents’ own skills could not be read: {0}":"web/src/features/skillpack/SkillsPage.tsx",

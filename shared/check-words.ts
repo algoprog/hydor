@@ -3,6 +3,7 @@
 /** What each line of the checks means when it fails, by its id (server/webapps/contract-check.ts and pagechecks/lines.ts). */
 export const CHECK_PROBLEMS: Record<string, string> = {
   file: 'Hydor cannot tell how to run it.',
+  paths: 'Some of its links and files would break when it is shown at another address.',
   build: 'It could not be put together.',
   ready: 'It does not start.',
   loopback: 'While it is being made, others on your network could reach it.',

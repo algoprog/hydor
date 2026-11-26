@@ -719,6 +719,12 @@ export interface WebAppChecks {
   notCovered?: string[];
 }
 
+/** Lines the contract check makes that are warnings, never a launch's stop: they sit with the pages' lines, and are told to the agent with the contract's. */
+export const CONTRACT_WARNINGS = ['paths'];
+
+/** Whether the contract check made this line (not the checks of the pages). */
+export const fromContract = (l: Pick<CheckLine, 'id' | 'group'>) => !l.group || l.group === 'contract' || CONTRACT_WARNINGS.includes(l.id);
+
 /** The lines of the page checks that stop a launch: what could hurt someone. Every failed line of the contract stops one too. */
 export const PAGE_LINES_THAT_STOP = ['browser-keys', 'cross-site-forms', 'cookie-flags', 'pages-answer'];
 

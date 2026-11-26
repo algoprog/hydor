@@ -4,7 +4,7 @@
 // (confirmChange: Plan mode refuses, Full access asks nothing, else a card they may allow for the session). Their names do not begin
 // with anything the app sorts into file edits (shared/assistants.ts `kindByName`: write_, edit_, delete_, run_, web_…).
 import path from "node:path";
-import { isWebAppStage, WEBAPP_STAGES, type CheckLine, type ChooseAnswer, type FlowsOffer, type WebAppChecks, type WebAppChoice, type WebAppChoose, type WebAppDetail, type WebAppFlows, type WebAppsList, type WebAppStep, type WebAppSteps, type WebKinds } from "../../shared/webapps.ts";
+import { CONTRACT_WARNINGS, fromContract, isWebAppStage, WEBAPP_STAGES, type CheckLine, type ChooseAnswer, type FlowsOffer, type WebAppChecks, type WebAppChoice, type WebAppChoose, type WebAppDetail, type WebAppFlows, type WebAppsList, type WebAppStep, type WebAppSteps, type WebKinds } from "../../shared/webapps.ts";
 import type { RunCtx, RunTool, ToolOutput } from "../features/types.ts";
 import { call, confirmChange } from "../guide/api.ts";
 import { fillForm } from "../guide/form.ts";
@@ -49,9 +49,9 @@ async function api<T = Json>(ctx: RunCtx, method: string, url: string, body?: Js
  * at most a dozen lines; what was fixed since the run before is said.
  */
 export function checkText(c: WebAppChecks): string {
-  const mark = (l: CheckLine) => (l.state === "failed" ? "FAILED" : l.state === "notRun" ? "could not run" : "note");
+  const mark = (l: CheckLine) => (l.state === "failed" ? (CONTRACT_WARNINGS.includes(l.id) ? "TO FIX (does not stop a launch)" : "FAILED") : l.state === "notRun" ? "could not run" : "note");
   const order: Record<string, number> = { failed: 0, notRun: 1, note: 2 };
-  const contract = c.lines.filter((l) => !l.group || l.group === "contract");
+  const contract = c.lines.filter(fromContract);
   const open = contract.map((l, i) => ({ l, i })).filter((x) => x.l.state !== "passed").sort((a, b) => order[a.l.state] - order[b.l.state] || a.i - b.i).map((x) => x.l);
   const passed = contract.filter((l) => l.state === "passed");
   const fixed = c.lines.filter((l) => l.fixed).map((l) => l.id);
@@ -122,8 +122,8 @@ async function appText(ctx: RunCtx, app: WebAppDetail, n: number): Promise<strin
   if (checks) {
     // The contract's failures in words, the pages' by id: webapp_contract_check says more.
     const failed = checks.lines.filter((l) => l.state === "failed");
-    const pages = failed.filter((l) => l.group && l.group !== "contract").map((l) => l.id);
-    lines.push(checks.ran ? `Last check (${checks.ok ? "nothing failed" : "something failed"}): ${checks.summary ?? checks.problem ?? ""}${failed.filter((l) => !l.group || l.group === "contract").map((l) => `\n- ${l.id}: ${l.text}`).join("")}${pages.length ? `\n- pages: ${pages.join(", ")}` : ""}` : "The check has not been run yet (webapp_contract_check).");
+    const pages = failed.filter((l) => !fromContract(l)).map((l) => l.id);
+    lines.push(checks.ran ? `Last check (${checks.ok ? "nothing failed" : "something failed"}): ${checks.summary ?? checks.problem ?? ""}${failed.filter(fromContract).map((l) => `\n- ${l.id}: ${l.text}`).join("")}${pages.length ? `\n- pages: ${pages.join(", ")}` : ""}` : "The check has not been run yet (webapp_contract_check).");
   }
   lines.push(marker(app));
   return lines.join("\n");

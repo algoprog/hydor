@@ -519,7 +519,7 @@ await step("the agents' tools say it as it is: where it stands, the check's line
   assert.match(got.text, /Stage: /);
   assert.match(got.text, /sign-in by Hydor .* database desk\.db \(SQLite\); 2 key\(s\); services: ai, embed, mail\./);
   const checked = await run("webapp_contract_check");
-  assert.match(checked.text, /Passed: file, build, ready, loopback, signin, secrets, ai, embed, mail, stop, data, writes\./);
+  assert.match(checked.text, /Passed: file, paths, build, ready, loopback, signin, secrets, ai, embed, mail, stop, data, writes\./);
   assert.match(checked.text, /Page checks: \d+ lines on \d+ pages?/);
 });
 

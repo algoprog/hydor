@@ -62,6 +62,7 @@ launched one each have their own data folder and secret.
 - Run the program itself in `start` (not `npm start`), so the signal reaches it.
 - Needs only what is under `/usr`, Node, and what `build` installs in the folder.
 - Behind Hydor the request's `Host` is `localhost:<port>`. Use relative links and same-origin checks; do not require `https`.
+- Work at any path. Where Hydor is reached through one hostname (a tunnel), an app's Preview shows it under a path (`/w/<token>/…`), and an address that starts with `/` leaves that path and reaches Hydor. So every address the app writes for its own pages, files and API has no leading slash: `href="notes"`, `<form action="login">`, `<script src="app.js">`, `fetch("api/notes")`, CSS `url(img/x.png)`, `location.href = "notes"`. Vite: `base: './'`. A server redirects and builds links relative to the request; behind a path Hydor sends the header `X-Forwarded-Prefix: /w/<token>` (absent at an address of its own), so `prefix + "/notes"` works too. Route in the browser by hash (`#/notes`), or with a basename the server writes into the page from that header. The check line "It works under any path" lists the addresses that start with `/`; it is to be fixed and never stops a launch.
 
 ## Who is there (`"signIn": "hydor"`)
 

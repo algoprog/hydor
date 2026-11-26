@@ -33,7 +33,7 @@ export const asCheckLine = (l: ContractLine): CheckLine => ({
   state: l.state,
   title: l.title,
   text: l.text,
-  group: "contract",
+  group: l.group ?? "contract",
   ...(l.hint ? { hint: l.hint } : {}),
   ...(l.details?.length ? { details: l.details } : {}),
 });

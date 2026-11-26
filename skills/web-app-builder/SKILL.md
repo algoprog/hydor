@@ -47,7 +47,7 @@ Say the stage as you save a step (`webapp_steps {action: "save", message, stage}
    file each, inline CSS, made-up content, `prefers-color-scheme` for dark and light, fine at 390 px). Not three apps.
    `webapp_choose {shape: "designs", stage: "design", designs: [{id, name, line, page}]}`; keep the pick in one
    stylesheet the app uses.
-3. **Build.** `hydor.json` first, kept true. A step for each thing that works, said as the person would ("Added team
+3. **Build.** `hydor.json` first, kept true. Every address for the app's own pages, files and API is relative, `href="notes"` and `fetch("api/notes")`, never `"/notes"`: Preview may show it under a path (the contract's rules say how). A step for each thing that works, said as the person would ("Added team
    invitations"), and `docs/try.md` before you finish. Sample data like their business, no real
    person's. Keep what people write safe (parameters in SQL, escaping, a library for passwords); with accounts, say who
    may see what for each list and test it.

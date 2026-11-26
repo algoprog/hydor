@@ -11,6 +11,7 @@ import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
+import vm from "node:vm";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { WebApp, WebAppDetail, WebAppOpen, WebAppsList } from "../../shared/webapps.ts";
 import { sandboxAvailable } from "../agent/sandbox.ts";
@@ -19,7 +20,7 @@ import { kvSet, openDb, type DB } from "../db.ts";
 import { registerFeatures, startFeatures, stopFeatures } from "../features/registry.ts";
 import type { Deps } from "../features/types.ts";
 import { appAddressOf, createWebapps, IDLE_MS, idleMsFromEnv, type Webapps, type WebappsOptions } from "./index.ts";
-import { allowFrameBy, carryPathWay, frameOrigin } from "./proxy.ts";
+import { allowFrameBy, allowInlineScripts, carryPathWay, createPageState, frameOrigin, STATE_CAPS } from "./proxy.ts";
 import { processInfo } from "./sweep.ts";
 import { writeTestApp } from "./test-apps.ts";
 
@@ -65,17 +66,40 @@ function person(h) {
   const p = JSON.parse(Buffer.from(payload, 'base64url').toString());
   return p.exp * 1000 > Date.now() ? p : null;
 }
-http.createServer((req, res) => {
+const seen = [];
+const html = (res, headers, body, code = 200) => { res.writeHead(code, { 'content-type': 'text/html; charset=utf-8', ...headers }); res.end(body); };
+const server = http.createServer({ maxHeaderSize: 65536 }, (req, res) => {
   const send = (code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
   if (req.url === '/api/health') return send(200, { ok: true });
+  const [pathname, query] = req.url.split('?');
+  if (pathname === '/seen') return send(200, seen);
+  seen.push(req.method + ' ' + req.url);
+  const cookies = (lines) => { res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': lines }); res.end('{}'); };
+  if (pathname === '/login') return cookies(['sid=1; Path=/; HttpOnly', 'theme=dark; Path=/', 'a=b; Path=/sub', 'wa_session=evil; Path=/']);
+  if (pathname === '/logout') return cookies(['sid=; Max-Age=0; Path=/', 'theme=x; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/', 'a=; Max-Age=-5; Path=/sub']);
+  if (pathname === '/dir/setc') return cookies(['d=1']);
+  if (pathname === '/many') return cookies(Array.from({ length: 60 }, (_, i) => 'c' + i + '=v'));
+  if (pathname.startsWith('/fat/')) return cookies(['fat' + pathname.slice(5) + '=' + 'x'.repeat(4000) + '; Path=/']);
+  if (pathname === '/huge') return cookies(['huge=' + 'x'.repeat(5000)]);
+  if (pathname === '/enc') return send(200, { ae: req.headers['accept-encoding'] ?? null });
+  if (pathname === '/big') return html(res, {}, '<html><head><title>big</title></head><body>' + 'x'.repeat(9 << 20) + '</body></html>');
+  if (pathname === '/notfound') return html(res, {}, '<html><head></head><body>none</body></html>', 404);
+  if (pathname.endsWith('/page')) {
+    const csp = { inline: "script-src 'self' 'unsafe-inline'", self: "script-src 'self'", nonce: "script-src 'nonce-abc'", dflt: "default-src 'self'", none: "default-src 'none'", conn: "script-src 'self'; connect-src https://api.example.com", elem: "script-src-elem 'self'; script-src 'unsafe-inline'" }[query];
+    return html(res, { ...(csp ? { 'content-security-policy': csp } : {}), etag: '"v1"' }, '<!doctype html><html><head><meta charset="utf-8"><title>page</title></head><body><script>document.title = 1</script>hello</body></html>');
+  }
+  if (pathname === '/nohead') return html(res, {}, '<p>no head here</p>');
   if (req.url.split('?')[0] === '/whoami') {
     const p = person(req.headers['x-hydor-person']);
     return p ? send(200, { id: p.id, name: p.name, role: p.role }) : send(401, { error: 'nobody' });
   }
-  if (req.url === '/headers') return send(200, { cookie: req.headers.cookie ?? null });
+  if (pathname.endsWith('/headers')) return send(200, { cookie: req.headers.cookie ?? null });
   if (req.url === '/framed') { res.writeHead(200, { 'content-type': 'text/plain', 'content-security-policy': "frame-ancestors 'self'; img-src 'self'", 'x-frame-options': 'DENY' }); return res.end('framed'); }
   send(404, { error: 'not here' });
-}).listen(Number(process.env.PORT), '127.0.0.1');
+});
+// A socket handshake is answered with the cookies it came with (the proxy gives it the jar's).
+server.on('upgrade', (req, socket) => socket.end('HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\nconnection: close\r\n\r\n' + (req.headers.cookie ?? 'none')));
+server.listen(Number(process.env.PORT), '127.0.0.1');
 `;
 
 type Build = "ok" | "fail" | "slow" | "nobuild";
@@ -571,6 +595,319 @@ try {
     } finally {
       await new Promise<void>((resolve) => s.close(() => resolve()));
     }
+  });
+
+  await step("path way: the proxy keeps the app's cookies and localStorage for a sandboxed page (a jar and a state script per app and person), never in the browser", async () => {
+    const O = { origin: "https://hydor.example.org" };
+    const HOST = "hydor.example.org";
+    const url = async (p: string, o = O) => new URL((await open(main, ok.id, { path: p }, o)).json.url);
+    const b = new Browser(PORT);
+    /** One request on the path way with a token of its own (each open is a new address for the same app and person). */
+    const at = async (p: string, o: { headers?: Record<string, string>; method?: string; body?: string } = {}) => {
+      const u = await url(p);
+      return b.request(u.host, u.pathname + u.search, o);
+    };
+    const seenByApp = async () => (await at("/seen")).json() as string[];
+    /** The state script of a page: its config, its code and whether it is first in the head. */
+    const stateOf = (text: string) => {
+      const m = /<script data-hydor-state>var C=(\{.*?\});(\(function\(\)\{.*?\}\)\(\);)<\/script>/s.exec(text);
+      assert.ok(m, `a state script in ${text.slice(0, 200)}`);
+      return { cfg: JSON.parse(m[1]) as { p: string; l: Record<string, string>; c: [string, string, number][]; d: string }, code: m[2], script: m[0], inner: m[0].replace(/^<script[^>]*>|<\/script>$/g, "") };
+    };
+    const cspsOf = (a: Answer) => [a.headers["content-security-policy"]].flat().join(", ");
+    const hashOf = (inner: string) => `'sha256-${crypto.createHash("sha256").update(inner).digest("base64")}'`;
+
+    // Cookies: the app's Set-Cookie lines never reach the browser, and its next requests have them.
+    const login = await at("/login");
+    assert.equal(login.status, 200);
+    assert.equal(login.headers["set-cookie"], undefined, "no Set-Cookie on the path way");
+    assert.equal(b.jar.size, 0, "the browser keeps nothing");
+    const sent = async (p: string, cookie?: string) => (await at(p, cookie ? { headers: { cookie } } : {})).json().cookie as string | null;
+    assert.equal(await sent("/headers"), "sid=1; theme=dark", "Path=/ ones, in the order they were set; the Path=/sub one and the reserved wa_session are not");
+    assert.equal(await sent("/sub/headers"), "a=b; sid=1; theme=dark", "the longer path first");
+    assert.equal(await sent("/sub/deeper/headers"), "a=b; sid=1; theme=dark", "a path covers what is below it");
+    assert.equal(await sent("/subway/headers"), "sid=1; theme=dark", "/sub is not /subway");
+    // Hydor's own cookies the browser sends never reach the app, and nothing the browser sends takes the jar's place.
+    assert.equal(await sent("/headers", "wa_session=secret; wa_app=x; ac_preview=y; foo=bar; sid=evil; cf_clearance=z"), "sid=1; theme=dark");
+    // A cookie with no Path is kept for the directory of the page that set it.
+    await at("/dir/setc");
+    assert.equal(await sent("/dir/headers"), "d=1; sid=1; theme=dark");
+    assert.equal(await sent("/dir/x/headers"), "d=1; sid=1; theme=dark");
+    assert.equal(await sent("/headers"), "sid=1; theme=dark");
+    // A socket handshake gets the jar's cookies too, in place of the browser's.
+    const ws = await at("/ws", { headers: { connection: "upgrade", upgrade: "websocket", cookie: "wa_session=secret; foo=bar" } });
+    assert.equal(ws.text, "sid=1; theme=dark", "the app's cookies for /ws, not the browser's");
+    // Max-Age=0 and a date in the past delete (a negative Max-Age too).
+    await at("/logout");
+    assert.equal(await sent("/headers"), null);
+    assert.equal(await sent("/sub/headers"), null);
+    assert.equal(await sent("/dir/headers"), "d=1", "other cookies stay");
+    // The reserved names are never kept, from the app or from a page.
+    assert.equal((await at("/login")).status, 200);
+    assert.doesNotMatch(String(await sent("/headers")), /wa_session|evil/);
+
+    // The page: one script first in the head of an HTML answer; none on the hostname way, none in other answers.
+    const pg = await at("/page");
+    assert.equal(pg.status, 200);
+    assert.match(pg.headers["cache-control"] as string, /no-store/);
+    assert.equal(pg.headers.etag, undefined, "its inlined state is this person's: never revalidated");
+    const st = stateOf(pg.text);
+    assert.ok(pg.text.indexOf("<head>") + 6 === pg.text.indexOf("<script data-hydor-state>"), "first thing in the head");
+    assert.ok(pg.text.indexOf("<script data-hydor-state>") < pg.text.indexOf("<script>document.title"), "before the app's own scripts");
+    assert.match(st.cfg.p, /^\/w\/[^/]+$/);
+    assert.equal(st.cfg.d, "/");
+    assert.deepEqual(st.cfg.l, {});
+    assert.deepEqual(st.cfg.c.map((c) => c[0]), ["theme"], "document.cookie lists the jar's cookies for the page's path that are not HttpOnly (no sid, no d of /dir)");
+    console.log(`  (the state script is ${st.script.length - JSON.stringify(st.cfg).length} bytes without its config)`);
+    assert.match(String((await at("/nohead")).text), /^<script data-hydor-state>.*<\/script><p>no head here<\/p>$/s, "no head: at the very start");
+    assert.doesNotMatch((await at("/whoami")).text, /hydor-state/, "not in JSON");
+    const nf = await at("/notfound");
+    assert.equal(nf.status, 404);
+    assert.doesNotMatch(nf.text, /hydor-state/, "only a 200");
+    assert.doesNotMatch((await at("/page", { method: "POST", body: "{}" })).text, /hydor-state/, "only a GET");
+    // Read uncompressed.
+    assert.equal((await at("/enc", { headers: { "accept-encoding": "gzip, br" } })).json().ae, "identity");
+    // A page bigger than 8 MB passes through untouched.
+    const big = await at("/big");
+    assert.equal(big.status, 200);
+    assert.ok(big.text.length > 9 << 20 && !big.text.includes("hydor-state"), "untouched");
+    // The hostname way stays as it was: cookies go to the browser, no script, the browser's Accept-Encoding goes on.
+    const hb = new Browser(PORT);
+    const hu = new URL((await open(main, ok.id, { path: "/login" })).json.url);
+    const hl = await hb.open(hu.href);
+    assert.ok(String(hl.headers["set-cookie"]).includes("sid=1"), "the hostname way gives the browser the cookie");
+    assert.doesNotMatch((await hb.request(hu.host, "/page")).text, /hydor-state/);
+    assert.equal((await hb.request(hu.host, "/enc", { headers: { "accept-encoding": "gzip" } })).json().ae, "gzip");
+    assert.equal((await hb.request(hu.host, "/headers")).json().cookie, "sid=1; theme=dark; a=b", "and sends them back as it always did (this test browser keeps no paths)");
+
+    // What the page sends is kept for the next one, and never reaches the app.
+    const host = new URL((await url("/")).href).host;
+    const prefix = st.cfg.p;
+    const post = (body: string, p = `${st.cfg.p}/__hydor/state`) => b.request(host, p, { method: "POST", body });
+    const val = "</script><!-- \u2028 <b>&";
+    let r = await post(JSON.stringify({ local: { k: val, other: "1" } }));
+    assert.equal(r.status, 204, r.text);
+    assert.equal(r.text, "");
+    const again = await at("/page");
+    assert.doesNotMatch(again.text.replace(/<script data-hydor-state>.*?<\/script>/s, ""), /hydor-state/, "one script");
+    assert.equal((again.text.match(/<\/script>/g) ?? []).length, 2, "the value cannot end the script (the app's own and ours)");
+    assert.ok(!again.text.includes("<!--") && !again.text.includes("\u2028"), "nor open a comment");
+    assert.deepEqual(stateOf(again.text).cfg.l, { k: val, other: "1" }, "comes back inlined");
+    // It replaces what was kept (the page sends all of it), and is the same for the next address of the same app and person.
+    assert.equal((await post(JSON.stringify({ local: { only: "x" } }))).status, 204);
+    assert.deepEqual(stateOf((await at("/page")).text).cfg.l, { only: "x" });
+    // Cookies the page sets go into the jar as a Set-Cookie line would, never HttpOnly, with the page's directory as default Path.
+    assert.equal((await post(JSON.stringify({ cookie: "pref=1; Path=/" }))).status, 204);
+    assert.equal((await post(JSON.stringify({ cookie: "mine=2; HttpOnly", path: "/dir/" }))).status, 204);
+    assert.equal((await post(JSON.stringify({ cookie: "sid=hacked; Path=/" }))).status, 204);
+    assert.equal(await sent("/headers"), "sid=1; theme=dark; pref=1", "an HttpOnly cookie is not overwritten by a page");
+    assert.equal(await sent("/dir/headers"), "d=1; mine=2; sid=1; theme=dark; pref=1");
+    const cs = stateOf((await at("/dir/page")).text);
+    assert.equal(cs.cfg.d, "/dir", "the default path of the page's cookies is its directory");
+    assert.deepEqual(cs.cfg.c.map((c) => c[0]), ["d", "mine", "theme", "pref"], "the page at /dir reads what its path covers; a cookie a page set is never HttpOnly, whatever it said");
+    assert.deepEqual(stateOf((await at("/page")).text).cfg.c.map((c) => c[0]), ["theme", "pref"], "document.cookie shows no HttpOnly cookie");
+    assert.equal((await post(JSON.stringify({ cookie: "pref=; Max-Age=0; Path=/" }))).status, 204);
+    assert.equal(await sent("/headers"), "sid=1; theme=dark");
+    // Refused plainly.
+    for (const [body, code, say] of [["nope", 400, /Send JSON/], ["[]", 400, /Send JSON/], ["{}", 400, /Nothing to keep/], [JSON.stringify({ local: { a: 1 } }), 400, /object of strings/], [JSON.stringify({ local: "x" }), 400, /object of strings/], [JSON.stringify({ cookie: 5 }), 400, /one cookie/], [JSON.stringify({ local: { big: "x".repeat(1_100_000) } }), 413, /too much/], [JSON.stringify({ local: { big: "x".repeat(900_000), more: "y".repeat(200_000) } }), 413, /too much/]] as const) {
+      r = await post(body);
+      assert.equal(r.status, code, body.slice(0, 40));
+      assert.match(r.text, say);
+    }
+    assert.deepEqual(stateOf((await at("/page")).text).cfg.l, { only: "x" }, "a refused one kept nothing");
+    r = await b.request(host, `${prefix}/__hydor/state`);
+    assert.equal(r.status, 405);
+    // A token that is no token has no state to send to; none of it reached the app.
+    assert.equal((await b.request(host, "/w/nonsense/__hydor/state", { method: "POST", body: "{}" })).status, 403);
+    assert.deepEqual((await seenByApp()).filter((x) => x.includes("__hydor")), [], "never forwarded to the app");
+    // A hostname page has no state endpoint of its own: it goes to the app as any path.
+    assert.equal((await hb.request(hu.host, "/__hydor/state", { method: "POST", body: "{}" })).status, 404);
+
+    // The app's own policy.
+    // (Each address has a script of its own, with its own prefix in it: a policy is read against the script of the same answer.)
+    const csp = async (q: string) => cspsOf(await at(`/page?${q}`));
+    const split = (c: string) => c.split(", ")[0];
+    const withScript = async (q: string) => {
+      const a = await at(`/page?${q}`);
+      return { policy: split(cspsOf(a)), inner: stateOf(a.text).inner };
+    };
+    assert.equal(split(await csp("inline")), "script-src 'self' 'unsafe-inline'", "'unsafe-inline' with no hash or nonce is left alone (a hash would turn it off)");
+    const self = await withScript("self");
+    assert.equal(self.policy, `script-src 'self' ${hashOf(self.inner)}`);
+    const nonce = await withScript("nonce");
+    assert.equal(nonce.policy, `script-src 'nonce-abc' ${hashOf(nonce.inner)}`);
+    assert.match(split(await csp("dflt")), /^default-src 'self' 'sha256-[^']+'$/, "default-src covers scripts when there is no script-src");
+    assert.doesNotMatch(split(await csp("dflt")), /connect-src/, "'self' already lets it reach its own state address");
+    const none = split(await csp("none"));
+    assert.match(none, /^default-src 'sha256-[^']+'; connect-src [^ ;]+\/__hydor\/state$/, "'none' is no more; connect gets an entry of its own, not the whole of default-src");
+    assert.ok(none.includes(`connect-src ${HOST}${prefix}/__hydor/state`) || /connect-src hydor\.example\.org\/w\/[^/]+\/__hydor\/state/.test(none));
+    assert.match(split(await csp("conn")), /^script-src 'self' 'sha256-[^']+'; connect-src https:\/\/api\.example\.com hydor\.example\.org\/w\/[^/]+\/__hydor\/state$/, "connect-src gets its own state address and keeps the rest");
+    const elem = split(await csp("elem"));
+    assert.match(elem, /^script-src-elem 'self' 'sha256-[^']+'; script-src 'unsafe-inline'$/, "script-src-elem is what governs a script element");
+    assert.match(await csp("none"), /sandbox allow-scripts/, "the sandbox stays beside it");
+    assert.doesNotMatch(await csp(""), /sha256|connect-src/);
+
+    // The pieces: policies are looked at one by one, and both scripts (the pointing helper and the state script) fit in one.
+    assert.equal(allowInlineScripts("script-src 'self'", ["'sha256-A'", "'sha256-B'"]), "script-src 'self' 'sha256-A' 'sha256-B'");
+    assert.equal(allowInlineScripts("script-src 'self' 'sha256-A'", ["'sha256-A'", "'sha256-B'"]), "script-src 'self' 'sha256-A' 'sha256-B'", "no hash twice");
+    assert.equal(allowInlineScripts("script-src 'unsafe-inline' 'sha256-Z'", ["'sha256-A'"]), "script-src 'unsafe-inline' 'sha256-Z' 'sha256-A'", "a hash already there: 'unsafe-inline' is already off");
+    assert.equal(allowInlineScripts("script-src 'unsafe-inline' 'strict-dynamic'", ["'sha256-A'"]), "script-src 'unsafe-inline' 'strict-dynamic' 'sha256-A'");
+    assert.equal(allowInlineScripts("img-src 'self'", ["'sha256-A'"], "x.test/w/t/__hydor/state"), "img-src 'self'", "a policy with nothing on scripts or connections stays as it is");
+    assert.equal(allowInlineScripts("script-src 'self', script-src 'unsafe-inline'", ["'sha256-A'"]), "script-src 'self' 'sha256-A', script-src 'unsafe-inline'", "each policy on its own");
+    assert.equal(allowInlineScripts("connect-src *", [], "x.test/w/t/__hydor/state"), "connect-src *");
+    assert.equal(allowInlineScripts("connect-src https:", [], "x.test/w/t/__hydor/state"), "connect-src https:");
+    assert.equal(allowInlineScripts("connect-src 'none'", [], "x.test/w/t/__hydor/state"), "connect-src x.test/w/t/__hydor/state");
+    assert.equal(allowInlineScripts("SCRIPT-SRC 'self'; Connect-Src 'self'", ["'sha256-A'"], "x.test/w/t/__hydor/state"), "SCRIPT-SRC 'self' 'sha256-A'; Connect-Src 'self'");
+    // Both scripts in one page, under one policy (a frame of Hydor's page with pointing on).
+    const pointed = (await open(main, ok.id, { path: "/page?self", frame: true, point: true }, O)).json.url;
+    const pu = new URL(pointed);
+    const both = await b.request(pu.host, pu.pathname + pu.search, { headers: { "sec-fetch-dest": "iframe" } });
+    assert.equal(both.status, 200, both.text);
+    assert.ok(both.text.includes("data-hydor-point") && both.text.includes("data-hydor-state"));
+    assert.ok(both.text.indexOf("data-hydor-state") < both.text.indexOf("data-hydor-point"), "state first, then pointing");
+    const bothInner = [...both.text.matchAll(/<script data-hydor-(?:state|point)>(.*?)<\/script>/gs)].map((m) => m[1]);
+    assert.equal(bothInner.length, 2);
+    const bc = split(cspsOf(both));
+    for (const inner of bothInner) assert.ok(bc.includes(hashOf(inner)), "each script has its hash");
+    // A frame with pointing but a page the helper is not for (not an iframe load) has only the state script.
+    const plain = await b.request(pu.host, pu.pathname + pu.search);
+    assert.ok(!plain.text.includes("data-hydor-point") && plain.text.includes("data-hydor-state"));
+
+    // The script runs where the browser's own throw, and nowhere else (its logic, in a bare context).
+    const run = (cfg: { p: string; l: Record<string, string>; c: [string, string, number][]; d: string }, throws: boolean) => {
+      const calls: { url: string; body: any; keepalive: boolean }[] = [];
+      const listeners: Record<string, () => void> = {};
+      const win: any = { addEventListener: (n: string, f: () => void) => (listeners[n] = f) };
+      if (throws) for (const n of ["localStorage", "sessionStorage"]) Object.defineProperty(win, n, { get() { throw new Error("SecurityError") }, configurable: true });
+      else { win.localStorage = "native-l"; win.sessionStorage = "native-s"; }
+      const doc: any = {};
+      if (throws) Object.defineProperty(doc, "cookie", { get() { throw new Error("SecurityError") }, set() { throw new Error("SecurityError") }, configurable: true });
+      else doc.cookie = "native=1";
+      const sandbox: any = { window: win, document: doc, fetch: (u: string, o: any) => calls.push({ url: u, body: JSON.parse(o.body), keepalive: o.keepalive }), setTimeout, clearTimeout, addEventListener: win.addEventListener };
+      vm.runInNewContext(`var C=${JSON.stringify(cfg)};${st.code}`, sandbox);
+      return { win, doc, calls, listeners };
+    };
+    const cfg = { p: "/w/tok", l: { a: "1" }, c: [["theme", "dark", 0], ["old", "x", 1]] as [string, string, number][], d: "/dir" };
+    const nat = run(cfg, false);
+    assert.equal(nat.win.localStorage, "native-l", "where native works, nothing is touched");
+    assert.equal(nat.doc.cookie, "native=1");
+    const sb = run(cfg, true);
+    const L = sb.win.localStorage;
+    assert.equal(L.getItem("a"), "1");
+    assert.equal(L.getItem("zzz"), null);
+    assert.equal(L.length, 1);
+    L.setItem("n", 5);
+    assert.equal(L.getItem("n"), "5", "values are strings");
+    assert.equal(L.key(0), "a");
+    assert.equal(L.key(2), null);
+    L.b = 7;
+    assert.equal(L.b, "7");
+    assert.equal(sb.calls.length, 0, "debounced");
+    await sleep(350);
+    assert.equal(sb.calls.length, 1, "one send for several changes");
+    assert.equal(sb.calls[0].url, "/w/tok/__hydor/state");
+    assert.equal(sb.calls[0].keepalive, true);
+    assert.deepEqual(JSON.parse(JSON.stringify(sb.calls[0].body)), { local: { a: "1", n: "5", b: "7" } });
+    L.removeItem("a");
+    delete L.b;
+    sb.listeners.pagehide();
+    assert.deepEqual(JSON.parse(JSON.stringify(sb.calls[1].body)), { local: { n: "5" } }, "pagehide sends what is waiting at once");
+    L.clear();
+    assert.equal(L.length, 0);
+    const S = sb.win.sessionStorage;
+    S.setItem("s", "1");
+    assert.equal(S.getItem("s"), "1");
+    await sleep(350);
+    assert.equal(sb.calls.filter((c) => c.body.local && Object.keys(c.body.local).length === 0).length, 1, "clear is sent; sessionStorage never is");
+    assert.ok(sb.calls.every((c) => !JSON.stringify(c.body).includes('"s"')));
+    const D = sb.doc;
+    assert.equal(D.cookie, "theme=dark", "the expired one is not shown");
+    D.cookie = "x=1; Path=/";
+    D.cookie = "y=2";
+    assert.equal(D.cookie, "theme=dark; x=1; y=2");
+    assert.deepEqual(sb.calls.slice(-2).map((c) => c.body), [{ cookie: "x=1; Path=/", path: "/dir" }, { cookie: "y=2", path: "/dir" }]);
+    D.cookie = "x=; Max-Age=0";
+    D.cookie = "theme=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    assert.equal(D.cookie, "y=2");
+    D.cookie = "z=3; Max-Age=3600";
+    assert.equal(D.cookie, "y=2; z=3");
+    D.cookie = "garbage";
+    assert.equal(D.cookie, "y=2; z=3", "no name=value, no cookie");
+  });
+
+  await step("what the proxy keeps for pages on the path way: expiry, paths and the caps (50 cookies and 8 KB in a jar, 4 KB a cookie, the least recently used of 500 jars)", async () => {
+    // The pieces, with a clock.
+    let now = 1_000_000;
+    const ps = createPageState(undefined, () => now);
+    ps.setCookies("k", ["a=1; Max-Age=10; Path=/", "b=2; Expires=" + new Date(now + 20_000).toUTCString() + "; Path=/", "c=3; Path=/x/y", "e=5; Max-Age=10; Expires=" + new Date(now - 5000).toUTCString()], "/p/q");
+    assert.equal(ps.cookieHeader("k", "/z"), "a=1; b=2");
+    assert.equal(ps.cookieHeader("k", "/x/y/z"), "c=3; a=1; b=2");
+    assert.equal(ps.cookieHeader("k", "/x/yz"), "a=1; b=2");
+    assert.equal(ps.cookieHeader("k", "/p/q/r"), "e=5; a=1; b=2", "Max-Age wins over Expires, and the default Path is the directory (/p)");
+    now += 11_000;
+    assert.equal(ps.cookieHeader("k", "/z"), "b=2", "Max-Age ends it");
+    now += 10_000;
+    assert.equal(ps.cookieHeader("k", "/z"), "", "so does Expires");
+    assert.equal(ps.cookieHeader("other", "/z"), "", "one jar per key");
+    ps.setCookies("k", ["d=1; Path=/", "d=2; Path=/; Domain=example.com; SameSite=Strict; Secure; Partitioned"], "/");
+    assert.equal(ps.cookieHeader("k", "/"), "d=2", "Domain, SameSite, Secure and Partitioned are ignored; the same name and path is one cookie");
+    ps.setCookies("k", ["d=3; Path=/other", "wa_session=x", "ac_preview=x", "wa_app=x", "=novalue", "novalue", "bad name=1", "q=1; Max-Age=0"], "/");
+    assert.equal(ps.cookieHeader("k", "/"), "d=2");
+    assert.equal(ps.cookieHeader("k", "/other"), "d=3; d=2", "the same name at two paths: two cookies");
+    assert.deepEqual(ps.pageCookies("k", "/other"), [["d", "3", 0], ["d", "2", 0]]);
+    ps.setCookies("k", ["h=1; HttpOnly; Path=/"], "/");
+    assert.equal(ps.pageCookies("k", "/").some((c) => c[0] === "h"), false, "HttpOnly is for the app alone");
+    assert.match(ps.cookieHeader("k", "/"), /h=1/);
+    ps.setCookies("k", ["h=2; Path=/"], "/", true);
+    assert.match(ps.cookieHeader("k", "/"), /h=1/, "a page cannot take the place of an HttpOnly cookie");
+    ps.setCookies("k", ["h=; Max-Age=0; Path=/"], "/", true);
+    assert.match(ps.cookieHeader("k", "/"), /h=1/, "nor delete it");
+    ps.setCookies("k", ["h=; Max-Age=0; Path=/"], "/");
+    assert.doesNotMatch(ps.cookieHeader("k", "/"), /h=/, "the app can");
+    // The caps: 50 cookies, 8 KB, 4 KB each: the oldest go first.
+    const many = createPageState();
+    many.setCookies("k", Array.from({ length: 60 }, (_, i) => `c${i}=v`), "/");
+    assert.equal(many.cookieHeader("k", "/").split("; ").length, 50);
+    assert.equal(many.cookieHeader("k", "/").split("; ")[0], "c10=v");
+    assert.equal(many.cookieHeader("k", "/").split("; ").at(-1), "c59=v");
+    many.setCookies("k", ["c10=again"], "/");
+    many.setCookies("k", ["new=1"], "/");
+    assert.match(many.cookieHeader("k", "/"), /^c12=v/, "a cookie set again is a new one");
+    assert.match(many.cookieHeader("k", "/"), /c10=again/);
+    const fat = createPageState();
+    fat.setCookies("k", Array.from({ length: 5 }, (_, i) => `f${i}=${"x".repeat(4000)}`), "/");
+    assert.deepEqual(fat.cookieHeader("k", "/").split("; ").map((c) => c.split("=")[0]), ["f3", "f4"], "8 KB in a jar: the oldest go");
+    fat.setCookies("k", [`huge=${"x".repeat(5000)}`], "/");
+    assert.doesNotMatch(fat.cookieHeader("k", "/"), /huge/, "more than 4 KB is no cookie");
+    // 500 jars (here 3): the least recently used goes, and using one is using it.
+    const jars = createPageState({ ...STATE_CAPS, jars: 3 });
+    for (const k of ["j1", "j2", "j3"]) jars.setCookies(k, ["a=1"], "/");
+    assert.equal(jars.cookieHeader("j1", "/"), "a=1", "used again: now the newest");
+    jars.setCookies("j4", ["a=1"], "/");
+    assert.deepEqual(["j1", "j2", "j3", "j4"].map((k) => jars.cookieHeader(k, "/")), ["a=1", "", "a=1", "a=1"]);
+    assert.equal(jars.sizes().jars, 3);
+    for (const k of ["j1", "j2", "j3"]) assert.equal(jars.setLocal(k, { x: k }), true);
+    jars.getLocal("j1");
+    jars.setLocal("j4", { x: "j4" });
+    assert.deepEqual(["j1", "j2", "j3", "j4"].map((k) => jars.getLocal(k).x), ["j1", undefined, "j3", "j4"], "localStorage has the same cap");
+    assert.equal(jars.setLocal("j1", { big: "x".repeat((1 << 20) + 1) }), false, "1 MB of it at most");
+    assert.deepEqual(jars.getLocal("j1"), { x: "j1" }, "and a refused one changes nothing");
+    assert.deepEqual(createPageState().getLocal("none"), {});
+    // Through the proxy: the same caps. (The jar of this app and person has other cookies in it: the newest 60 push them out.)
+    const O = { origin: "https://hydor.example.org" };
+    const b = new Browser(PORT);
+    const at = async (p: string) => {
+      const u = new URL((await open(main, ok.id, { path: p }, O)).json.url);
+      return b.request(u.host, u.pathname + u.search);
+    };
+    await at("/many");
+    assert.deepEqual(((await at("/headers")).json().cookie as string).split("; "), Array.from({ length: 50 }, (_, i) => `c${i + 10}=v`));
+    for (let i = 0; i < 5; i++) await at(`/fat/${i}`);
+    assert.deepEqual(((await at("/headers")).json().cookie as string).split("; ").map((c) => c.split("=")[0]), ["fat3", "fat4"], "8 KB: the oldest cookies go, the newest stay");
+    await at("/huge");
+    assert.doesNotMatch((await at("/headers")).json().cookie, /huge/);
+    // Another person has a jar of their own (a different app likewise).
+    assert.equal(b.jar.size, 0, "and the browser kept nothing of all this");
   });
 
   await step("opening by path (an address that is not localhost, no domain): /w/<token>/…, a page in a sandbox, signed in as the same person", async () => {

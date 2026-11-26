@@ -5,11 +5,11 @@
 // server/webapps/contract-check.ts
 import { spawn } from "node:child_process";
 import crypto2 from "node:crypto";
-import fs2 from "node:fs";
+import fs3 from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import os from "node:os";
-import path2 from "node:path";
+import path3 from "node:path";
 
 // shared/hydor-file.ts
 var HYDOR_FILE = "hydor.json";
@@ -73,7 +73,7 @@ function readHydorValue(value) {
     if (/[\u0000-\u001f\u007f]/.test(v)) return void say(`${what} should be one line.`);
     return v.trim();
   };
-  const path3 = (v, what) => {
+  const path4 = (v, what) => {
     if (typeof v !== "string" || !v.startsWith("/") || v.startsWith("//") || /[\s\\#]/.test(v) || v.length > 200) return void say(`${what} should be an address inside the app: it starts with one slash, like /health, with no spaces.`);
     return v;
   };
@@ -110,9 +110,9 @@ function readHydorValue(value) {
       }
     }
   }
-  const ready = value.ready === void 0 ? void say('\u201Cready\u201D is missing: an address that answers once the app is ready, like "/health". It has to answer without anyone signed in.') : path3(value.ready, "\u201Cready\u201D");
+  const ready = value.ready === void 0 ? void say('\u201Cready\u201D is missing: an address that answers once the app is ready, like "/health". It has to answer without anyone signed in.') : path4(value.ready, "\u201Cready\u201D");
   const signIn = value.signIn === "hydor" || value.signIn === "own" ? value.signIn : void say('\u201CsignIn\u201D should be "hydor" (Hydor says who is there, in the x-hydor-person header) or "own" (the app has accounts of its own).');
-  const privatePath = value.private === void 0 ? "/" : path3(value.private, "\u201Cprivate\u201D");
+  const privatePath = value.private === void 0 ? "/" : path4(value.private, "\u201Cprivate\u201D");
   if (value.private !== void 0 && value.signIn === "own") say('\u201Cprivate\u201D is only for "signIn": "hydor": take it out.');
   if (signIn === "hydor" && isObject(value.env) && value.env.secret === void 0) say('With "signIn": "hydor", \u201Cenv.secret\u201D is needed: the app checks who is there with its secret.');
   const tryOf = (v, what) => {
@@ -120,7 +120,7 @@ function readHydorValue(value) {
     if (!isObject(v)) return void say(`${what} should be { "method": "POST", "path": "/\u2026", "body": {\u2026} }.`);
     unknown(v, ["method", "path", "body"], `In ${what}, `);
     if (v.method !== "GET" && v.method !== "POST") say(`${what}.method should be "GET" or "POST".`);
-    const p = path3(v.path, `${what}.path`);
+    const p = path4(v.path, `${what}.path`);
     if (!p || v.method !== "GET" && v.method !== "POST") return void 0;
     return { method: v.method, path: p, ...v.body !== void 0 ? { body: v.body } : {} };
   };
@@ -239,7 +239,7 @@ function readHydorValue(value) {
     if (method !== "POST" && method !== "PUT") say(`${what}.method should be "POST" or "PUT".`);
     const send = v.send === void 0 ? "json" : v.send;
     if (send !== "json" && send !== "form") say(`${what}.send should be "json" or "form".`);
-    const p = path3(v.path, `${what}.path`);
+    const p = path4(v.path, `${what}.path`);
     const body = isObject(v.body) && Object.values(v.body).every((x) => typeof x === "string" || typeof x === "number" || typeof x === "boolean") ? v.body : void 0;
     if (!body) say(`${what}.body should be the fields to send, such as { "email": "{email}", "password": "{password}" }.`);
     if (!p || !body || method !== "POST" && method !== "PUT" || send !== "json" && send !== "form") return void 0;
@@ -293,9 +293,216 @@ function readHydorText(text) {
 }
 var usesServices = (s) => !!(s.ai || s.embed || s.mail);
 
-// server/webapps/run-app.ts
+// server/webapps/own-paths.ts
 import fs from "node:fs";
 import path from "node:path";
+var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", "dist", "build", "out", "coverage", "target", "vendor", "vendored", "third_party", "third-party", "bower_components", "jspm_packages", "site-packages", "venv", "__pycache__", "design"]);
+var MARKUP = /* @__PURE__ */ new Set([".html", ".htm", ".vue", ".svelte", ".ejs", ".hbs", ".njk", ".pug", ".php", ".erb", ".jinja", ".j2", ".twig", ".liquid", ".mustache", ".mjml"]);
+var CODE = /* @__PURE__ */ new Set([".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx", ".go"]);
+var HASH = /* @__PURE__ */ new Set([".py", ".rb"]);
+var STYLE = /* @__PURE__ */ new Set([".css", ".scss", ".sass", ".less"]);
+var MAX_FILE = 512 * 1024;
+var MAX_FILES = 3e3;
+var MAX_DEPTH = 10;
+var MAX_LINE = 2e3;
+var kindOf = (ext) => MARKUP.has(ext) ? "markup" : CODE.has(ext) ? "code" : HASH.has(ext) ? "hash" : STYLE.has(ext) ? "style" : null;
+function sources(root) {
+  const out = [];
+  const walk = (dir2, depth) => {
+    if (depth > MAX_DEPTH || out.length >= MAX_FILES) return;
+    let names;
+    try {
+      names = fs.readdirSync(dir2, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    names.sort((a, b) => a.name.localeCompare(b.name));
+    for (const d of names) {
+      if (out.length >= MAX_FILES) return;
+      const full = path.join(dir2, d.name);
+      if (d.isDirectory()) {
+        if (d.name.startsWith(".") || SKIP_DIRS.has(d.name) || /^(__tests__|tests?|e2e)$/.test(d.name)) continue;
+        walk(full, depth + 1);
+      } else if (d.isFile()) {
+        const kind = kindOf(path.extname(d.name).toLowerCase());
+        if (!kind || /\.min\.|\.d\.ts$|(^|[.-])(test|spec)\.[a-z]+$|-test\.[a-z]+$/i.test(d.name)) continue;
+        try {
+          if (fs.statSync(full).size > MAX_FILE) continue;
+        } catch {
+          continue;
+        }
+        out.push({ file: full, kind });
+      }
+    }
+  };
+  walk(root, 0);
+  return out;
+}
+function blank(text, kind) {
+  if (kind === "markup") return text.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, " "));
+  if (kind === "style") return text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
+  const o = text.split("");
+  const n = o.length;
+  let i = 0;
+  const wipe = (from, to) => {
+    for (let k = from; k < to; k++) if (o[k] !== "\n") o[k] = " ";
+  };
+  while (i < n) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (kind === "hash" && c === "#") {
+      let e = text.indexOf("\n", i);
+      if (e < 0) e = n;
+      wipe(i, e);
+      i = e;
+    } else if (kind === "code" && c === "/" && next === "/") {
+      let e = text.indexOf("\n", i);
+      if (e < 0) e = n;
+      wipe(i, e);
+      i = e;
+    } else if (kind === "code" && c === "/" && next === "*") {
+      let e = text.indexOf("*/", i + 2);
+      e = e < 0 ? n : e + 2;
+      wipe(i, e);
+      i = e;
+    } else if (c === '"' || c === "'" || c === "`" && kind === "code") {
+      let k = i + 1;
+      while (k < n && text[k] !== c && (c === "`" || text[k] !== "\n")) k += text[k] === "\\" ? 2 : 1;
+      i = k + 1;
+    } else i++;
+  }
+  return o.join("");
+}
+var Q = "[\"'`]";
+var OWN = String.raw`(\/(?!\/)[^"'\`\\\s)]*)`;
+var OWN_STR = String.raw`(\/(?!\/)[^"'\`\\]*)`;
+var RULES = [
+  // markup: href, src, action, formaction, poster (and the ones scripts read), written or in JSX/templates as a string
+  { re: new RegExp(String.raw`(?<![\w-])(?:href|src|action|formaction|poster|data-src|data-href)\s*=\s*(?:\{\s*)?\\?${Q}${OWN}`, "gi") },
+  // meta refresh
+  { re: new RegExp(String.raw`http-equiv\s*=\s*\\?["']refresh\\?["'][^>]*?content\s*=\s*\\?["']\s*\d+\s*;\s*url\s*=\s*${OWN}`, "gi") },
+  // css: url(/…) and @import "/…"
+  { re: new RegExp(String.raw`url\(\s*${Q}?${OWN}`, "gi") },
+  { re: new RegExp(String.raw`@import\s+${Q}${OWN}`, "gi") },
+  // requests
+  { re: new RegExp(String.raw`(?<![\w$.])(?:window\.)?(?:fetch|axios|ky|got|new\s+EventSource|new\s+WebSocket|new\s+Request)\s*\(\s*${Q}${OWN_STR}`, "g") },
+  { re: new RegExp(String.raw`(?<![\w$])(?:axios|ky|got|\$|superagent)\.(?:get|post|put|patch|delete|head|options|request|getJSON|ajax|postJSON)\s*\(\s*${Q}${OWN_STR}`, "g") },
+  { re: new RegExp(String.raw`\.open\(\s*["'](?:GET|POST|PUT|PATCH|DELETE|HEAD)["']\s*,\s*${Q}${OWN_STR}`, "g") },
+  { re: new RegExp(String.raw`\bbaseURL\s*:\s*${Q}${OWN_STR}`, "g") },
+  { re: new RegExp(String.raw`navigator\.sendBeacon\(\s*${Q}${OWN_STR}`, "g") },
+  // moving the page
+  { re: new RegExp(String.raw`(?:(?<![\w$.])|(?<=\b(?:window|document|top|self|parent)\.))location(?:\.href)?\s*=(?!=)\s*${Q}${OWN_STR}`, "g") },
+  { re: new RegExp(String.raw`\blocation\.(?:assign|replace)\(\s*${Q}${OWN_STR}`, "g") },
+  { re: new RegExp(String.raw`\b(?:pushState|replaceState)\([^,()]*,[^,()]*,\s*${Q}${OWN_STR}`, "g") },
+  // the server sending people on
+  { re: new RegExp(String.raw`\bredirect\w*\(\s*(?:\d{3}\s*,\s*|[A-Za-z_.]*Status\w*\s*,\s*)?${Q}${OWN_STR}`, "g") },
+  { re: new RegExp(String.raw`\bRedirect\(\s*\w+\s*,\s*\w+\s*,\s*${Q}${OWN_STR}`, "g") },
+  { re: new RegExp(String.raw`(?:["'](?:[Ll]ocation)["']|\bLocation)\s*[:,]\s*${Q}${OWN_STR}`, "g") },
+  { re: new RegExp(String.raw`\bLocation:\s*${OWN}`, "g") }
+];
+var SRCSET = /(?<![\w-])srcset\s*=\s*\\?(["'])([^"']*)\1/gi;
+var lineOf = (starts, at) => {
+  let lo = 0;
+  let hi = starts.length - 1;
+  while (lo < hi) {
+    const mid = lo + hi + 1 >> 1;
+    if (starts[mid] <= at) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo + 1;
+};
+var VITE = /^vite\.config\.(?:[cm]?[jt]s)$/;
+function viteBase(dir2) {
+  let config = null;
+  try {
+    config = fs.readdirSync(dir2).find((n) => VITE.test(n)) ?? null;
+  } catch {
+  }
+  if (!config || !fs.existsSync(path.join(dir2, "index.html"))) return null;
+  let text = "";
+  try {
+    text = fs.readFileSync(path.join(dir2, config), "utf8");
+  } catch {
+    return null;
+  }
+  const code = blank(text, "code");
+  const m = /\bbase\s*:\s*(["'`])([^"'`]*)\1/.exec(code);
+  if (m && m[2] !== "/") return null;
+  if (!m && /\bbase\s*:/.test(code)) return null;
+  const at = m ? m.index : 0;
+  return { file: config, line: text.slice(0, at).split("\n").length, address: m ? `base: "/"` : `no base (Vite builds with "/": set base: './')` };
+}
+function addressesIn(text, ext) {
+  const kind = kindOf(ext.toLowerCase());
+  if (!kind) return [];
+  const clean = blank(text, kind);
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const r of RULES) {
+    r.re.lastIndex = 0;
+    for (let m = r.re.exec(clean); m; m = r.re.exec(clean)) {
+      const address = m[r.at ?? 1];
+      if (!address) continue;
+      const at = m.index + m[0].lastIndexOf(address);
+      if (seen.has(at)) continue;
+      seen.add(at);
+      out.push({ at, address });
+    }
+  }
+  SRCSET.lastIndex = 0;
+  for (let m = SRCSET.exec(clean); m; m = SRCSET.exec(clean)) {
+    let pos = m.index + m[0].indexOf(m[2], m[0].indexOf("=") + 1);
+    for (const part of m[2].split(",")) {
+      const lead = part.length - part.trimStart().length;
+      const url = part.trim().split(/\s+/)[0] ?? "";
+      if (/^\/(?!\/)/.test(url) && !seen.has(pos + lead)) {
+        seen.add(pos + lead);
+        out.push({ at: pos + lead, address: url });
+      }
+      pos += part.length + 1;
+    }
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+function scanOwnPaths(dir2) {
+  const root = path.resolve(dir2);
+  const found = [];
+  const list = sources(root);
+  let files = 0;
+  for (const { file, kind } of list) {
+    let text;
+    try {
+      text = fs.readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+    files++;
+    if (text.split("\n").some((l) => l.length > MAX_LINE)) continue;
+    const rel = path.relative(root, file).split(path.sep).join("/");
+    const ext = path.extname(file).toLowerCase();
+    if (path.basename(file) === "index.html" && kind === "markup") {
+      const folder = path.dirname(file);
+      let config = false;
+      try {
+        config = fs.readdirSync(folder).some((n) => VITE.test(n));
+      } catch {
+      }
+      if (config) {
+        const b = viteBase(folder);
+        if (b) found.push({ file: path.relative(root, path.join(folder, b.file)).split(path.sep).join("/"), line: b.line, address: b.address });
+        continue;
+      }
+    }
+    const starts = [0];
+    for (let i = text.indexOf("\n"); i >= 0; i = text.indexOf("\n", i + 1)) starts.push(i + 1);
+    for (const a of addressesIn(text, ext)) found.push({ file: rel, line: lineOf(starts, a.at), address: a.address });
+  }
+  return { files, found };
+}
+
+// server/webapps/run-app.ts
+import fs2 from "node:fs";
+import path2 from "node:path";
 function contractRunShape(file) {
   return {
     start: { shell: file.start },
@@ -304,8 +511,8 @@ function contractRunShape(file) {
     ready: file.ready
   };
 }
-var nodeBin = () => fs.realpathSync(process.execPath);
-var pathFor = (node) => `${path.dirname(node)}:/usr/local/bin:/usr/bin:/bin`;
+var nodeBin = () => fs2.realpathSync(process.execPath);
+var pathFor = (node) => `${path2.dirname(node)}:/usr/local/bin:/usr/bin:/bin`;
 function argvOf(command) {
   if (process.platform === "win32") return [process.env.ComSpec ?? "cmd.exe", "/d", "/s", "/c", command.shell];
   return ["/bin/sh", "-c", `exec ${command.shell}`];
@@ -329,14 +536,14 @@ function appEnv(shape, o) {
 function descendants(pid) {
   let ids;
   try {
-    ids = fs.readdirSync("/proc").filter((n) => /^\d+$/.test(n));
+    ids = fs2.readdirSync("/proc").filter((n) => /^\d+$/.test(n));
   } catch {
     return [];
   }
   const kids = /* @__PURE__ */ new Map();
   for (const id of ids) {
     try {
-      const stat = fs.readFileSync(`/proc/${id}/stat`, "utf8");
+      const stat = fs2.readFileSync(`/proc/${id}/stat`, "utf8");
       const open2 = stat.indexOf("(");
       const close = stat.lastIndexOf(")");
       const ppid = Number(stat.slice(close + 2).split(" ")[1]);
@@ -378,7 +585,7 @@ function signalApp(child, sandboxed, signal) {
   }
 }
 function buildEnv(node, home, extra = {}) {
-  fs.mkdirSync(home, { recursive: true, mode: 448 });
+  fs2.mkdirSync(home, { recursive: true, mode: 448 });
   const out = {
     PATH: pathFor(node),
     HOME: home,
@@ -443,6 +650,7 @@ function verifyPerson(value, secret, graceSeconds = 0, now = Date.now()) {
 // server/webapps/contract-check.ts
 var TITLES = {
   file: "hydor.json says what is needed",
+  paths: "It works under any path",
   build: "It builds",
   ready: "It starts and says it is ready",
   loopback: "It listens where it is told, and nowhere else",
@@ -529,7 +737,7 @@ function ask(port, method, at, o = {}) {
 function listening(file) {
   let text;
   try {
-    text = fs2.readFileSync(file, "utf8");
+    text = fs3.readFileSync(file, "utf8");
   } catch {
     return [];
   }
@@ -545,9 +753,9 @@ function inodesOf(pid) {
   const out = /* @__PURE__ */ new Set();
   for (const p of [pid, ...descendants(pid).map((d) => d.pid)]) {
     try {
-      for (const fd of fs2.readdirSync(`/proc/${p}/fd`)) {
+      for (const fd of fs3.readdirSync(`/proc/${p}/fd`)) {
         try {
-          const m = /^socket:\[(\d+)\]$/.exec(fs2.readlinkSync(`/proc/${p}/fd/${fd}`));
+          const m = /^socket:\[(\d+)\]$/.exec(fs3.readlinkSync(`/proc/${p}/fd/${fd}`));
           if (m) out.add(m[1]);
         } catch {
         }
@@ -558,7 +766,7 @@ function inodesOf(pid) {
   return out;
 }
 async function open(r) {
-  if (fs2.existsSync("/proc/net/tcp")) {
+  if (fs3.existsSync("/proc/net/tcp")) {
     const all = [...listening("/proc/net/tcp"), ...listening("/proc/net/tcp6")];
     const own = inodesOf(r.child.pid);
     const mine = all.filter((x) => x.port === r.port || own.has(x.inode));
@@ -583,20 +791,20 @@ async function snapshot(dir2) {
   const walk = async (at) => {
     let entries;
     try {
-      entries = await fs2.promises.readdir(at, { withFileTypes: true });
+      entries = await fs3.promises.readdir(at, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of entries) {
       if (SKIP.has(e.name)) continue;
-      const full = path2.join(at, e.name);
+      const full = path3.join(at, e.name);
       if (e.isDirectory()) {
-        out.set(path2.relative(dir2, full) + "/", "folder");
+        out.set(path3.relative(dir2, full) + "/", "folder");
         await walk(full);
       } else {
         try {
-          const s = await fs2.promises.lstat(full);
-          out.set(path2.relative(dir2, full), `${s.size}:${s.mtimeMs}`);
+          const s = await fs3.promises.lstat(full);
+          out.set(path3.relative(dir2, full), `${s.size}:${s.mtimeMs}`);
         } catch {
         }
       }
@@ -798,13 +1006,13 @@ function linksOf(type, text, at, port) {
 }
 var shapesOf = (value) => [.../* @__PURE__ */ new Set([value, encodeURIComponent(value), Buffer.from(value).toString("base64").replace(/=+$/, ""), Buffer.from(value).toString("base64url")])];
 function readFile(dir2) {
-  const at = path2.join(dir2, HYDOR_FILE);
+  const at = path3.join(dir2, HYDOR_FILE);
   let text;
   try {
-    const st = fs2.lstatSync(at);
+    const st = fs3.lstatSync(at);
     if (!st.isFile()) return { problems: [`${HYDOR_FILE} is not a plain file.`] };
     if (st.size > HYDOR_FILE_MAX) return { problems: [`${HYDOR_FILE} is too large to be one (over 64 KB).`] };
-    text = fs2.readFileSync(at, "utf8");
+    text = fs3.readFileSync(at, "utf8");
   } catch {
     return { problems: [`There is no ${HYDOR_FILE} at the root of the app (${dir2}).`] };
   }
@@ -813,8 +1021,8 @@ function readFile(dir2) {
 }
 async function runBuild(line, dir2, home, ms, signal, box) {
   const windows = process.platform === "win32";
-  const cache = process.env.npm_config_cache ?? path2.join(os.homedir(), ".npm");
-  const plain = buildEnv(nodeBin(), home, !box && fs2.existsSync(cache) ? { npm_config_cache: cache } : {});
+  const cache = process.env.npm_config_cache ?? path3.join(os.homedir(), ".npm");
+  const plain = buildEnv(nodeBin(), home, !box && fs3.existsSync(cache) ? { npm_config_cache: cache } : {});
   const argv = windows ? [process.env.ComSpec ?? "cmd.exe", "/d", "/s", "/c", line] : ["/bin/sh", "-c", line];
   const boxedAs = box ? await box({ dir: dir2, home, argv, env: plain }) : null;
   const all = boxedAs?.argv ?? argv;
@@ -864,18 +1072,19 @@ function runSmoke(line, dir2, env, box) {
   });
 }
 async function checkContract(o) {
-  const dir2 = path2.resolve(o.dir);
+  const dir2 = path3.resolve(o.dir);
   const lines = [];
   const line = (id, state, text, extra = {}) => {
-    const l = { id, title: TITLES[id] ?? id, state, text, ...extra.hint ? { hint: extra.hint } : {}, ...extra.details?.length ? { details: extra.details.slice(0, 8) } : {} };
+    const l = { id, title: TITLES[id] ?? id, state, text, ...extra.hint ? { hint: extra.hint } : {}, ...extra.details?.length ? { details: extra.details.slice(0, 8) } : {}, ...extra.group ? { group: extra.group } : {} };
     lines.push(l);
     o.onLine?.(l);
   };
   const result2 = () => {
     const of = (s) => lines.filter((l) => l.state === s).length;
-    const failed = of("failed");
+    const warned = lines.filter((l) => l.state === "failed" && l.group).length;
+    const failed = of("failed") - warned;
     const untried = of("notRun");
-    const summary = `${lines.length} ${lines.length === 1 ? "line" : "lines"}: ${of("passed")} passed, ${failed} failed${untried ? `, ${untried} could not be tried` : ""}${of("note") ? `, ${of("note")} to note` : ""}.`;
+    const summary = `${lines.length} ${lines.length === 1 ? "line" : "lines"}: ${of("passed")} passed, ${failed} failed${warned ? `, ${warned} to fix` : ""}${untried ? `, ${untried} could not be tried` : ""}${of("note") ? `, ${of("note")} to note` : ""}.`;
     return { ok: failed === 0, summary, lines };
   };
   const read = readFile(dir2);
@@ -885,11 +1094,23 @@ async function checkContract(o) {
   }
   const file = read.file;
   line("file", "passed", `${HYDOR_FILE} reads: start \u201C${one(file.start, 80)}\u201D, ready at ${file.ready}, sign-in by ${file.signIn === "hydor" ? "Hydor" : "the app itself"}${file.database ? `, database ${file.database.file}` : ""}${file.keys.length ? `, ${file.keys.length} ${file.keys.length === 1 ? "key" : "keys"}` : ""}.`);
-  const work = o.work ?? fs2.mkdtempSync(path2.join(os.tmpdir(), "hydor-check-"));
-  const data = path2.join(work, "data");
-  const home = path2.join(work, "home");
-  fs2.mkdirSync(data, { recursive: true });
-  fs2.mkdirSync(home, { recursive: true });
+  o.onStep?.("Reading its own addresses");
+  const own = scanOwnPaths(dir2);
+  if (!own.found.length) line("paths", "passed", own.files ? `None of its ${own.files} source ${own.files === 1 ? "file" : "files"} writes an address of its own that starts with \u201C/\u201D, so it works at any path.` : "It has no pages or scripts of its own to read, so there is no address to look at.", { group: "pages" });
+  else {
+    const named = own.found.slice(0, 5).map((f) => `${f.file}:${f.line} ${f.address}`);
+    const more = own.found.length - named.length;
+    line("paths", "failed", `${own.found.length} ${own.found.length === 1 ? "address" : "addresses"} of its own start with \u201C/\u201D: ${named.join("; ")}${more > 0 ? ` and ${more} more` : ""}. They leave the app when Hydor shows it through a tunnel, where it lives under a path of its own.`, {
+      hint: "Make them relative: notes, app.js, api/notes, ./img/x.png, with no \u201C/\u201D at the start (a server can build them from the X-Forwarded-Prefix header; with Vite set base: './').",
+      details: named,
+      group: "pages"
+    });
+  }
+  const work = o.work ?? fs3.mkdtempSync(path3.join(os.tmpdir(), "hydor-check-"));
+  const data = path3.join(work, "data");
+  const home = path3.join(work, "home");
+  fs3.mkdirSync(data, { recursive: true });
+  fs3.mkdirSync(home, { recursive: true });
   const taken = /* @__PURE__ */ new Set();
   let stand = null;
   let running = null;
@@ -899,7 +1120,7 @@ async function checkContract(o) {
     else {
       o.onStep?.(`Building: ${file.build}`);
       const t = Date.now();
-      const b = await runBuild(file.build, dir2, path2.join(work, "build-home"), o.buildMs ?? 10 * 6e4, o.signal, o.buildBox);
+      const b = await runBuild(file.build, dir2, path3.join(work, "build-home"), o.buildMs ?? 10 * 6e4, o.signal, o.buildBox);
       if (b.code !== 0) {
         line("build", "failed", b.timedOut ? `\u201C${one(file.build, 120)}\u201D did not finish in time.` : `\u201C${one(file.build, 120)}\u201D ended with code ${b.code}.`, { hint: `The build runs in the app's folder with nothing of your environment: no keys, no global tools but Node's.${b.say ? ` ${b.say}` : ""}`, details: b.tail.slice(-6) });
         return result2();
@@ -928,7 +1149,7 @@ async function checkContract(o) {
       const argv = argvOf(shape.start);
       const boxed = o.box?.({ dir: dir2, data, home, argv }) ?? null;
       const cmd = boxed ?? argv;
-      const nice = process.platform !== "win32" && fs2.existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "10"] : [];
+      const nice = process.platform !== "win32" && fs3.existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "10"] : [];
       const all = [...nice, ...cmd];
       const child = spawn(all[0], all.slice(1), { cwd: dir2, env, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
       const log = [];
@@ -1092,7 +1313,7 @@ async function checkContract(o) {
       o.onStep?.("Running its smoke test");
       const hint = `\u201Csmoke\u201D is what a launch runs to try the app: it has to pass with nobody's data, signed out (signed in by Hydor, with "signIn": "hydor").`;
       if (typeof file.smoke === "string") {
-        const smokeHome = path2.join(work, "smoke-home");
+        const smokeHome = path3.join(work, "smoke-home");
         const address = `http://localhost:${app.port}`;
         const env = buildEnv(node, smokeHome, { SMOKE_URL: address, ...file.env.url ? { [file.env.url]: address } : {} });
         const ran = await runSmoke(file.smoke, dir2, env, o.box ? (argv) => o.box({ dir: dir2, data: smokeHome, home: smokeHome, argv }) : void 0);
@@ -1120,14 +1341,14 @@ async function checkContract(o) {
       else line("stop", "failed", `Told to stop (SIGTERM), it was still running after ${STOP_MS / 1e3} s and had to be killed.`, { hint: "On SIGTERM: stop taking requests, finish what is being answered, close the database, exit." });
     }
     o.onStep?.("Starting it again on the same data");
-    const marker = path2.join(data, "hydor-check.keep");
-    fs2.writeFileSync(marker, "kept");
+    const marker = path3.join(data, "hydor-check.keep");
+    fs3.writeFileSync(marker, "kept");
     const db = file.database;
-    const dbFile = db ? path2.join(data, db.file) : null;
+    const dbFile = db ? path3.join(data, db.file) : null;
     const Sql = db?.sqlite ? await sqliteModule() : null;
     let was = null;
-    let wrote = fs2.readdirSync(data).filter((n) => n !== "hydor-check.keep");
-    if (dbFile && Sql && fs2.existsSync(dbFile)) {
+    let wrote = fs3.readdirSync(data).filter((n) => n !== "hydor-check.keep");
+    if (dbFile && Sql && fs3.existsSync(dbFile)) {
       try {
         const h = new Sql(dbFile);
         h.exec("create table if not exists _hydor_check (id integer primary key, said text); insert into _hydor_check (said) values ('kept')");
@@ -1151,9 +1372,9 @@ async function checkContract(o) {
       else loopback("passed", `Port ${app.port} was open on 127.0.0.1 only, and told ${other} in ${hostVar} it listened there.`);
     }
     await stopApp(second.app);
-    if (!fs2.existsSync(marker)) lost.push("a file put in the data folder was gone after the restart");
+    if (!fs3.existsSync(marker)) lost.push("a file put in the data folder was gone after the restart");
     if (dbFile && db) {
-      if (wrote.includes(db.file) && !fs2.existsSync(dbFile)) lost.push(`${db.file} was gone after the restart`);
+      if (wrote.includes(db.file) && !fs3.existsSync(dbFile)) lost.push(`${db.file} was gone after the restart`);
       if (was && Sql) {
         try {
           const h = new Sql(dbFile);
@@ -1162,14 +1383,14 @@ async function checkContract(o) {
           else if (now.tables[t] < n) lost.push(`the table ${t} had ${n} rows and has ${now.tables[t]}`);
           h.exec("drop table if exists _hydor_check");
           h.close();
-          const own = Object.keys(was.tables).filter((t) => t !== "_hydor_check");
-          kept = ` ${db.file} kept its ${own.length === 1 ? "table" : `${own.length} tables`} and every row.`;
+          const own2 = Object.keys(was.tables).filter((t) => t !== "_hydor_check");
+          kept = ` ${db.file} kept its ${own2.length === 1 ? "table" : `${own2.length} tables`} and every row.`;
         } catch (e) {
           lost.push(`${db.file} could not be read after the restart (${one(e.message, 120)})`);
         }
       }
     }
-    fs2.rmSync(marker, { force: true });
+    fs3.rmSync(marker, { force: true });
     if (!lines.some((l) => l.id === "data")) {
       if (lost.length) line("data", "failed", `After a restart with the same data folder: ${lost.join("; ")}.`, { hint: `Keep everything in the folder in ${file.env.data}, and never empty or remake it as the app starts.`, details: lost });
       else if (db && !wrote.includes(db.file)) line("data", "note", `It answered again on the same data folder, but had not made ${db.file} there by then, so nothing of it could be looked at.`, { hint: `Make the database as the app starts, in the folder in ${file.env.data}.` });
@@ -1184,13 +1405,13 @@ async function checkContract(o) {
     const left = running;
     if (left && !left.ended()) await stopApp(left);
     await stand?.close();
-    if (!o.work) fs2.rmSync(work, { recursive: true, force: true });
+    if (!o.work) fs3.rmSync(work, { recursive: true, force: true });
   }
 }
 var MARK = { passed: "ok  ", failed: "FAIL", note: "note", notRun: "??  " };
 function printLine(l) {
   const more = l.state === "passed" ? [] : [...(l.details ?? []).map((d) => `        \xB7 ${d}`), ...l.hint ? [`        To do: ${l.hint}`] : []];
-  return [`${MARK[l.state]}  ${l.title}: ${l.text}`, ...more].join("\n");
+  return [`${l.state === "failed" && l.group ? "fix " : MARK[l.state]}  ${l.title}: ${l.text}`, ...more].join("\n");
 }
 
 // scripts/hydor-check.ts
