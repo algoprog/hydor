@@ -31,6 +31,7 @@ import { AGENT_FILE } from '../models/config.ts';
 import { Scheduler } from '../scheduler.ts';
 import type { SessionManager } from '../sessions.ts';
 import { runCode } from './code.ts';
+import { priorWorkTool, setPriorDepsForTests } from '../research/prior-work.ts';
 import { changeAboutMe } from './me.ts';
 import { findRecords, removeRecords } from './data.ts';
 import { apps } from './index.ts';
@@ -74,6 +75,9 @@ async function fakeHttp(a: Record<string, unknown>): Promise<{ text: string }> {
   }
   throw new Error(`http_request: HTTP 404 Not Found  ·  ${url.host}`);
 }
+/** The body alone of what http_request gives. */
+const bodyOfHttp = (t: string) => t.slice(t.indexOf('\n\n') + 2);
+
 /** The real services, for LIVE=1: the same answer's shape. */
 async function liveHttp(a: Record<string, unknown>): Promise<{ text: string }> {
   if (a.auth) throw new Error(`http_request: There is no key named ${a.auth} in the vault.`);
@@ -770,15 +774,18 @@ test('Gap finder: the month’s papers in an area by its category or its words; 
   assert.deepEqual((final.ideas as Record<string, unknown>[]).map((i) => [i.n, i.title]), [[1, 'New and small'], [2, 'New and big']]);
   assert.equal(final.headline, '2 of 2 ideas look new');
   assert.equal((final.recent as Record<string, unknown>[])[0].url, null, 'a link that is not one is left out');
-  // A verdict put with its idea: the closest paper named, P numbers in words.
-  const merged = await program('gap-finder', 'merge', {
-    idea: { title: 'X', idea: 'Do X.', crosses: 'M1 × R2', first: 'Try it.' },
-    verdict: { verdict: 'Partly done', why: 'P1 does half of it, as R2 hints.', closest: 1, cost: 'about 10 GPU hours', fits: 'It fits' },
-    papers: [{ n: 1, title: 'Half of X', year: 2025, url: 'https://arxiv.org/abs/9' }],
-    mine: [{ n: 1, title: 'ProCIS' }],
-    recent: [{ n: 1, title: 'R one' }, { n: 2, title: 'When to Retrieve' }],
-  });
-  assert.deepEqual([merged.verdict, merged.why, merged.crosses, merged.closest, merged.closest_url, merged.fits], ['partly done', '“Half of X” does half of it, as “When to Retrieve” hints.', '“ProCIS” × “When to Retrieve”', 'Half of X (2025)', 'https://arxiv.org/abs/9', 'fits']);
+  // What the check found put with its idea: its verdict in the page's words, the closest paper named with its link.
+  const found = { verdict: 'partly', summary: 'Half of it exists.', closest: [{ title: 'Half of X', year: 2025, url: 'https://arxiv.org/abs/9' }] };
+  const into = { idea: { title: 'I', idea: 'Do it.', crosses: 'M1 × R1', first: 'Try.' }, verdict: { cost: 'about 10 GPU hours', fits: 'It fits' }, mine: [{ n: 1, title: 'ProCIS' }], recent: [{ n: 1, title: 'When to Retrieve' }] };
+  const merged = await program('gap-finder', 'merge', { ...into, found });
+  assert.deepEqual([merged.verdict, merged.why, merged.crosses, merged.closest, merged.closest_url, merged.fits, merged.first], ['partly done', 'Half of it exists.', '“ProCIS” × “When to Retrieve”', 'Half of X (2025)', 'https://arxiv.org/abs/9', 'fits', 'Try.']);
+  assert.equal((await program('gap-finder', 'merge', { ...into, found: { ...found, verdict: 'known' } })).verdict, 'already done');
+  assert.equal((await program('gap-finder', 'merge', { ...into, found: { verdict: 'new', summary: 'Nothing does it.', closest: [] } })).verdict, 'new');
+  const unjudged = await program('gap-finder', 'merge', { ...into, found: { ...found, verdict: 'unjudged' } });
+  assert.equal(unjudged.verdict, 'not checked', 'no verdict is never read as new');
+  const failed = await program('gap-finder', 'merge', { ...into, found: '' });
+  assert.deepEqual([failed.verdict, failed.closest, failed.closest_url], ['not checked', '', null]);
+  assert.match(String(failed.why), /did not run/);
 });
 
 // ---- Paper radar through the flow runner -------------------------------------------------------------------------
@@ -842,6 +849,7 @@ const services: Feature = {
           }),
           RANK_BY_INTEREST,
           USER_PROFILE,
+          priorWorkTool(true),
         ]
       : [],
 };
@@ -858,6 +866,18 @@ registerFeatures([services], deps);
 startRuns(deps);
 await http.ready();
 setHelperModel(db, 'fake');
+// The check for prior work reaches the same stand-in services (its model is the fake one, by the helper setting).
+process.env.HYDOR_EMBED = 'off';
+setPriorDepsForTests({ keys: {}, fetch: async (url) => bodyOfHttp((await fakeHttp({ url })).text) });
+
+/** The stand-in model's answers to the check's two questions: its searches, and each paper by `relation` (null: not these). */
+const priorReply = (user: string, relation: (idea: string) => string): unknown => {
+  if (!user.startsWith('<idea>')) return null;
+  if (!user.includes('<papers>')) return { queries: ['text embeddings quantization', 'hierarchical embeddings', 'embedding size trade-off', 'quantized text representations', 'compact retrieval embeddings'] };
+  const idea = user.slice(0, user.indexOf('<papers>'));
+  const n = [...user.matchAll(/<paper n="(\d+)">/g)].map((m) => Number(m[1]));
+  return { papers: n.map((i) => ({ n: i, relation: i === 1 ? relation(idea) : 'related', same: 'Both quantize embeddings.', differs: 'The idea is hierarchical.' })), summary: 'Quantized embeddings exist. The hierarchy does not seem to.' };
+};
 
 test('Paper radar, as it comes: you read, the papers found and ranked against your topics, written up, the papers looked at kept; the next update brings none of them again; its page saves and puts aside papers in its records', async () => {
   routes = [arxivRoute, openAlexRoute];
@@ -980,15 +1000,21 @@ test('Citation alerts, Deadline radar, Living related work and Gap finder, as th
   // Gap finder: your paper and the month's, ideas proposed, each checked for prior work.
   routes = [arxivRoute, (u) => (u.host === 'api.semanticscholar.org' && u.pathname.endsWith('/paper/search') ? JSON.stringify({ data: [] }) : null)];
   reply = (user) =>
-    user.includes('Propose')
+    priorReply(user, (idea) => (idea.includes('Idea 2') ? 'same' : 'related')) ??
+    (user.includes('Propose')
       ? { ideas: [1, 2, 3].map((i) => ({ title: `Idea ${i}`, idea: `Do thing ${i}.`, crosses: 'M1 × R2', queries: 'text embeddings quantization | hierarchical embeddings', first: `Try ${i}.`, needs: 'a 400M model' })) }
-      : user.includes('Judge it')
-        ? { verdict: user.includes('Idea 2') ? 'done' : 'new', why: 'P1 is near it.', closest: 1, first: 'Try it.', cost: 'about 5 GPU hours', fits: 'fits' }
-        : {};
+      : user.includes('Say what its first experiment takes')
+        ? { first: 'Try it.', cost: 'about 5 GPU hours', fits: 'fits' }
+        : {});
   const gap = await run('gap-finder', { papers: 'Balancing hierarchical representation and quantization', area: 'cs.IR', compute: 'one 24 GB GPU', ideas: '2' });
   assert.deepEqual(gap.res.ideas.map((i: any) => [i.title, i.verdict]), [['Idea 1', 'new'], ['Idea 3', 'new']]);
   assert.match(gap.res.ideas[0].crosses, /^“Balancing hierarchical/);
   assert.equal(gap.res.headline, '2 of 2 ideas look new');
+  // Each idea was checked with the shared check: its verdict, why, and the closest paper with its source's address.
+  const first = gap.res.ideas[0];
+  assert.equal(first.why, 'Quantized embeddings exist. The hierarchy does not seem to.');
+  assert.match(first.closest, /\(\d{4}\)$/);
+  assert.match(first.closest_url, /^https:\/\/(arxiv\.org\/abs|doi\.org)\//);
 });
 
 // ---- About you: what the research apps start from, and whose language they write in -------------------------------
@@ -1073,7 +1099,6 @@ test('About you: the apps whose words only the person reads answer in their lang
     return s.instructions;
   };
   assert.match(prompt('citation-alerts', 'sort'), /exactly one of "builds on".*"mentions".*in English/s);
-  assert.match(prompt('gap-finder', 'verdict'), /exactly one of "new".*"partly done".*"done".*in English/s);
   assert.match(prompt('gap-finder', 'verdict'), /exactly one of "fits".*"tight".*"too big".*in English/s);
   assert.match(prompt('gap-finder', 'propose'), /queries:.*always in English/);
   assert.match(prompt('paper-radar', 'guess'), /search words for arXiv: always in English/);
@@ -1216,29 +1241,30 @@ test('Gap finder: several areas between commas are searched together; the ideas 
   asked.length = 0;
   await program('gap-finder', 'month', { area: 'cs.IR', today: '2026-11-05' });
   assert.match(decodeURIComponent(asked.find((u) => u.includes('export.arxiv.org'))!), /search_query=cat:cs\.IR AND submittedDate/, 'one area as before');
-  // The repeat goes several at a time, and a check does not depend on running alone.
+  // The repeat goes several at a time, each idea checked with the shared check, a failed one passed by.
   const check = allSteps(templateById('gap-finder')!.flow!.steps).find((s) => s.id === 'check');
   assert.ok(check && check.do === 'repeat' && (check.atOnce ?? 1) >= 2, 'its checks go side by side');
-  routes = [arxivRoute, (u) => (u.host === 'api.semanticscholar.org' && u.pathname.endsWith('/paper/search') ? JSON.stringify({ data: [] }) : null)];
-  const idea = (n: number) => ({ title: `Idea ${n}`, idea: `Do thing ${n}.`, queries: 'text embeddings quantization | hierarchical embeddings', first: 'Try it.', needs: 'a model' });
-  const alone = await program('gap-finder', 'prior', { idea: idea(1) });
-  const together = await Promise.all([1, 2, 3].map((n) => program('gap-finder', 'prior', { idea: idea(n) }, ctxOf())));
-  assert.deepEqual(together[0], alone, 'the same papers whether it runs alone or with others');
-  assert.deepEqual(together[2], await program('gap-finder', 'prior', { idea: idea(3) }), 'and the same again for another idea');
+  const prior = allSteps(templateById('gap-finder')!.flow!.steps).find((s) => s.id === 'prior');
+  assert.ok(prior && prior.do === 'tool' && prior.tool === 'prior_work' && prior.failed === 'skip');
 });
 
 test('Gap finder, whole: its checks start side by side, and its answer is the same as one at a time', async () => {
   routes = [arxivRoute, (u) => (u.host === 'api.semanticscholar.org' && u.pathname.endsWith('/paper/search') ? JSON.stringify({ data: [] }) : null)];
   reply = (user) =>
-    user.includes('Propose')
+    priorReply(user, () => 'overlaps') ??
+    (user.includes('Propose')
       ? { ideas: [1, 2, 3].map((i) => ({ title: `Idea ${i}`, idea: `Do thing ${i}.`, crosses: 'M1 × R2', queries: 'text embeddings quantization', first: `Try ${i}.`, needs: 'a 400M model' })) }
-      : user.includes('Judge it')
-        ? { verdict: 'new', why: 'P1 is near it.', closest: 1, first: 'Try it.', cost: 'about 5 GPU hours', fits: 'fits' }
-        : {};
+      : user.includes('Say what its first experiment takes')
+        ? { first: 'Try it.', cost: 'about 5 GPU hours', fits: 'fits' }
+        : {});
   const t = templateById('gap-finder')!;
+  asked.length = 0;
+  forgetAll();
   const r = (await waitFor(startRun({ app: 'tpl:gap-finder', slug: 'gap-finder', recipe: t, source: 'web', inputs: { papers: 'Balancing hierarchical representation and quantization', area: 'cs.IR', compute: 'one 24 GB GPU', ideas: '3' } }).id, 180_000))!;
   assert.equal(r.status, 'done', r.error);
+  assert.ok(asked.some((u) => decodeURIComponent(u).includes('export.arxiv.org/api/query?search_query=all:text AND all:embeddings AND all:quantization')), 'the searches the idea came with are among those run');
   assert.equal((r.result as Record<string, any>).ideas.length, 3);
+  assert.deepEqual((r.result as Record<string, any>).ideas.map((i: any) => i.verdict), ['partly done', 'partly done', 'partly done']);
   const prior = store.listSteps(db, r.id).filter((s) => s.id === 'prior');
   assert.equal(prior.length, 3);
   const firstEnd = Math.min(...prior.map((s) => s.endedAt ?? Infinity));

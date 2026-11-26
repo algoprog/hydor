@@ -1,7 +1,7 @@
 // How a round of a goal went, by rules alone (no model, no files): each check's closeness from where it started, the
 // round's score, kept or undone and why, rounds without progress, and the limits. The driver (driver.ts) feeds it the
 // checks' results; the tests (verdict-test.ts) feed it made-up ones.
-import { closeness, GOAL_PATIENCE, meets, tally, type GoalCheck, type GoalOutcome, type GoalResult, type GoalRound, type GoalState } from '../../shared/goals.ts';
+import { closeness, GOAL_PATIENCE, holdsAt, numeric, tally, type GoalCheck, type GoalOutcome, type GoalResult, type GoalRound, type GoalState } from '../../shared/goals.ts';
 
 /** A round must raise the score by more than this to count as a gain. */
 export const NO_GAIN = 0.005;
@@ -97,8 +97,9 @@ function notKept(i: RoundInput, score: number): NotKept | undefined {
   for (const c of i.checks) {
     if (before(c.id)?.holds && !now(c.id)?.holds) return { why: `${c.label} stopped holding`, cause: 'broke' };
   }
+  // A measured number or a score.
   for (const c of i.checks) {
-    if (c.kind !== 'measure' || !c.target) continue;
+    if (!numeric(c) || !c.target) continue;
     const b = before(c.id)?.value;
     const v = now(c.id)?.value;
     if (b == null || v == null) continue;
@@ -130,7 +131,7 @@ function gain(i: RoundInput, score: number): string {
   for (const c of i.checks) {
     const b = before(c.id)?.value;
     const v = now(c.id)?.value;
-    if (c.kind !== 'measure' || !c.target || b == null || v == null) continue;
+    if (!numeric(c) || !c.target || b == null || v == null) continue;
     const gap = Math.abs(c.target.value - b) || Math.abs(b) || 1;
     const move = (c.target.op === '>=' ? v - b : b - v) / gap;
     if (move > 0 && (!top || move > top.move)) top = { c, b, v, move };
@@ -180,16 +181,21 @@ export function limitReason(g: Pick<GoalState, 'rounds' | 'contract' | 'spentUsd
   return null;
 }
 
-/** Measured checks given new targets (the person's Keep anyway): every round's results for them are judged again. */
+/** A score check's gain for a target: how far the target is past the baseline's mean, in the better direction (0 at least). */
+const gainFor = (c: GoalCheck, target: number) => (c.baseline && c.target ? Math.max(0, Number((c.target.op === '>=' ? target - c.baseline.mean : c.baseline.mean - target).toPrecision(12))) : (c.gain ?? 0));
+
+/**
+ * Measured checks (and scores) given new targets (the person's Keep anyway): every round's results for them are judged
+ * again. A score's gain follows its target, and it still holds only where it beat the baseline beyond the noise.
+ */
 export function relaxed(g: Pick<GoalState, 'contract' | 'rounds'>, relax: Record<string, number>): Pick<GoalState, 'contract' | 'rounds'> {
-  const checks = g.contract.checks.map((c) => (c.kind === 'measure' && c.target && relax[c.id] != null ? { ...c, target: { ...c.target, value: relax[c.id] } } : c));
+  const checks = g.contract.checks.map((c) => (numeric(c) && c.target && relax[c.id] != null ? { ...c, target: { ...c.target, value: relax[c.id] }, ...(c.kind === 'score' ? { gain: gainFor(c, relax[c.id]) } : {}) } : c));
   const start = g.rounds[0];
   const rounds = g.rounds.map((r) => {
     const results = r.results.map((x) => {
       const c = checks.find((y) => y.id === x.id);
       if (!c || relax[c.id] == null || x.value == null || x.error) return x;
-      const holds = c.target!.op === '>=' ? x.value >= c.target!.value : x.value <= c.target!.value;
-      return { ...x, holds };
+      return { ...x, holds: holdsAt(c, x.value, x.verdict) };
     });
     return { ...r, results: scored(checks, results, start === r ? { results } : start), score: scoreOf(checks, results, start === r ? { results } : start) };
   });
@@ -209,9 +215,9 @@ export function rejudged(checks: GoalCheck[], rounds: GoalRound[], ids: string[]
     let changed = false;
     const results = r.results.map((x) => {
       const c = checks.find((y) => y.id === x.id);
-      if (!c || !ids.includes(c.id) || c.kind !== 'measure' || !c.target || x.value == null || x.error) return x;
+      if (!c || !ids.includes(c.id) || !numeric(c) || !c.target || x.value == null || x.error) return x;
       changed = true;
-      return { ...x, holds: meets(c, x.value) };
+      return { ...x, holds: holdsAt(c, x.value, x.verdict) };
     });
     if (!changed) return r;
     const from = start === r ? { results } : start;

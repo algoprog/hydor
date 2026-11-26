@@ -1,10 +1,14 @@
 // The checks, the protected paths and the limits as fields: what Change… on the agreement card turns its rows into, and
-// what the bar's menu (Change the checks…) opens for a goal that runs. The caller keeps the draft and sends it.
-import { useRef, useState } from 'react';
+// what the bar's menu (Change the checks…) opens for a goal that runs. The caller keeps the draft and sends it. A score
+// check picks one of the session's folder's evaluations (GET /api/experiments/evaluations?cwd=); the app fixes its target
+// from the evaluation's baseline when you start or save.
+import { useEffect, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { GOAL_MAX_CHECKS, type GoalCheck, type GoalCheckKind, type GoalContract, type GoalLimits } from '@shared/goals';
 import { Button, cx, MenuItem, Popover, inputCls } from '../../components/ui';
-import { KIND_LABEL, limitsOf, limitsProblem } from './words';
+import { api } from '../../lib/api';
+import { go } from '../../lib/nav';
+import { baselineOf, evalPage, evalProblem, KIND_LABEL, limitsOf, limitsProblem, num, scoreNeeds, type EvalChoice } from './words';
 
 /** A check being edited: one added here has no id yet (the server gives it one) and a key of its own for the editor. */
 type Editing = GoalCheck & { _k?: string };
@@ -30,6 +34,8 @@ export function draftProblem(d: ContractDraft): string | null {
     if (c.kind === 'command' && !c.run?.trim()) return `“${c.label}” needs a command`;
     if (c.kind === 'measure' && (!c.run?.trim() || !c.target || !Number.isFinite(c.target.value))) return `“${c.label}” needs a command and a target`;
     if (c.kind === 'review' && !c.claim?.trim()) return `“${c.label}” needs a sentence for the reviewer`;
+    if (c.kind === 'score' && !c.evaluation) return `“${c.label}” needs an evaluation`;
+    if (c.kind === 'score' && c.gain != null && !(Number.isFinite(c.gain) && c.gain >= 0)) return `“${c.label}”: how much better must be 0 or more`;
   }
   return limitsProblem(d.limits);
 }
@@ -66,10 +72,104 @@ const fresh = (kind: GoalCheckKind): Editing => {
       ? { id, _k, kind, label: '', run: '', target: { op: '>=', value: 0 } }
       : kind === 'review'
         ? { id, _k, kind, label: '', claim: '', evidence: { diff: true } }
-        : { id, _k, kind, label: '' };
+        : kind === 'score'
+          ? { id, _k, kind, label: '', evaluation: '', gain: 0 }
+          : { id, _k, kind, label: '' };
 };
 
-function CheckFields({ c, onChange, onRemove }: { c: Editing; onChange: (c: Editing) => void; onRemove: () => void }) {
+/** The evaluations of the session's folder, for a score check to pick from: null while they load (or with no folder known). */
+function useEvaluations(cwd: string | undefined): EvalChoice[] | null {
+  const [list, setList] = useState<EvalChoice[] | null>(null);
+  useEffect(() => {
+    if (!cwd) return;
+    let on = true;
+    api<{ evaluations: EvalChoice[] }>(`/api/experiments/evaluations?cwd=${encodeURIComponent(cwd)}`)
+      .then((r) => on && setList(r.evaluations ?? []))
+      .catch(() => on && setList([]));
+    return () => {
+      on = false;
+    };
+  }, [cwd]);
+  return list;
+}
+
+/** A link inside the app, as a button (go). */
+const AppLink = ({ to, children }: { to: string; children: string }) => (
+  <button type="button" onClick={() => go(to)} className="text-accent underline-offset-2 hover:underline">
+    {children}
+  </button>
+);
+
+/** A score check's fields: its evaluation, how much better than its baseline it must be, and what that comes to. */
+function ScoreFields({ c, set, evals }: { c: Editing; set: (p: Partial<GoalCheck>) => void; evals: EvalChoice[] | null }) {
+  const ev = evals?.find((e) => e.id === c.evaluation);
+  // The evaluation's baseline now, else the one the check was agreed against.
+  const base = ev ? baselineOf(ev) : c.baseline ? { mean: c.baseline.mean } : null;
+  const better = ev?.better ?? (c.target?.op === '<=' ? 'lower' : 'higher');
+  // One the list does not have (removed, or of another folder) says so too, unless it is the one agreed and the list could not say.
+  const problem = evals?.length && c.evaluation ? evalProblem(ev) : null;
+  const pick = (id: string) => {
+    const e = evals?.find((x) => x.id === id);
+    // Another evaluation: the app fixes the target and baseline afresh.
+    set({ evaluation: id, target: undefined, baseline: undefined, ...(c.label.trim() || !e ? {} : { label: `Beats the baseline on ${e.metric}` }) });
+  };
+  return (
+    <>
+      <div className="mt-2">
+        <span className={label}>The evaluation that scores it</span>
+        {evals && !evals.length && !c.baseline ? (
+          <p className="text-[12.5px] leading-snug text-fg-3">
+            This folder has no evaluation yet. <AppLink to="/experiments">Set one up in Experiments</AppLink>
+          </p>
+        ) : (
+          <select value={c.evaluation ?? ''} onChange={(e) => pick(e.target.value)} disabled={!evals && !c.baseline} aria-label="The evaluation that scores it" className={cx(field, 'w-full')}>
+            <option value="" disabled>
+              {evals ? 'Pick an evaluation' : 'Loading…'}
+            </option>
+            {evals?.map((e) => (
+              <option key={e.id} value={e.id} translate="no">
+                {`${e.name} · ${e.metric}`}
+              </option>
+            ))}
+            {/* The one it was agreed with, also when the folder's list does not have it (or could not be read). */}
+            {c.evaluation && c.baseline && !evals?.some((e) => e.id === c.evaluation) && (
+              <option value={c.evaluation} translate="no">
+                {`${c.baseline.name} · ${c.baseline.metric}`}
+              </option>
+            )}
+          </select>
+        )}
+      </div>
+      <div className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-1">
+        <div className="w-60 max-w-full">
+          <span className={label}>Better than the baseline by at least</span>
+          <Num aria-label="Better than the baseline by at least" value={c.gain} placeholder="0" onChange={(v) => set({ gain: v ?? 0 })} />
+        </div>
+        {base && (
+          <span className="pb-2 text-[12px] text-fg-3">
+            {'Baseline '}
+            <span translate="no" className="tnum">
+              {num(base.mean)}
+            </span>
+            {' · it holds at '}
+            <span translate="no" className="tnum">
+              {scoreNeeds(better, base.mean, c.gain ?? 0)}
+            </span>
+            {', beyond the noise of its seeds'}
+          </span>
+        )}
+      </div>
+      {problem && (
+        <p className="mt-1.5 text-[12px] leading-snug text-warn">
+          {`${problem}. `}
+          {ev && <AppLink to={evalPage(ev.id)}>Open the evaluation</AppLink>}
+        </p>
+      )}
+    </>
+  );
+}
+
+function CheckFields({ c, onChange, onRemove, evals }: { c: Editing; onChange: (c: Editing) => void; onRemove: () => void; evals: EvalChoice[] | null }) {
   const set = (p: Partial<GoalCheck>) => onChange({ ...c, ...p });
   return (
     <div className="rounded-lg border border-line bg-bg-1 p-2.5">
@@ -126,14 +226,16 @@ function CheckFields({ c, onChange, onRemove }: { c: Editing; onChange: (c: Edit
           </label>
         </div>
       )}
+      {c.kind === 'score' && <ScoreFields c={c} set={set} evals={evals} />}
       {c.kind === 'you' && <p className="mt-1.5 text-[12px] text-fg-3">Only you can say whether this holds: it asks you when every other check does.</p>}
     </div>
   );
 }
 
-export function ChecksEditor({ value, onChange }: { value: ContractDraft; onChange: (d: ContractDraft) => void }) {
+export function ChecksEditor({ value, onChange, cwd }: { value: ContractDraft; onChange: (d: ContractDraft) => void; cwd?: string }) {
   const add = useRef<HTMLButtonElement>(null);
   const [menu, setMenu] = useState(false);
+  const evals = useEvaluations(cwd);
   const setCheck = (i: number, c: Editing) => onChange({ ...value, checks: value.checks.map((x, j) => (j === i ? c : x)) });
   const limits = value.limits;
   return (
@@ -142,7 +244,7 @@ export function ChecksEditor({ value, onChange }: { value: ContractDraft; onChan
         <div className="mb-1.5 text-[11px] font-semibold tracking-wide text-fg-3 uppercase">Done when</div>
         <div className="space-y-2">
           {value.checks.map((c, i) => (
-            <CheckFields key={c._k ?? c.id} c={c} onChange={(x) => setCheck(i, x)} onRemove={() => onChange({ ...value, checks: value.checks.filter((_, j) => j !== i) })} />
+            <CheckFields key={c._k ?? c.id} c={c} evals={evals} onChange={(x) => setCheck(i, x)} onRemove={() => onChange({ ...value, checks: value.checks.filter((_, j) => j !== i) })} />
           ))}
         </div>
         {value.checks.length < GOAL_MAX_CHECKS && (
@@ -151,13 +253,23 @@ export function ChecksEditor({ value, onChange }: { value: ContractDraft; onChan
               <Plus size={14} /> Add a check
             </button>
             <Popover anchor={add} open={menu} onClose={() => setMenu(false)} width={260} title="Add a check">
-              {(['command', 'measure', 'review', 'you'] as GoalCheckKind[]).map((k) => (
+              {(['command', 'measure', 'score', 'review', 'you'] as GoalCheckKind[]).map((k) => (
                 <MenuItem
                   key={k}
-                  hint={k === 'command' ? 'a command that must pass' : k === 'measure' ? 'a number that must reach a target' : k === 'review' ? 'a sentence a reviewer finds true' : 'you confirm it'}
+                  hint={
+                    k === 'command'
+                      ? 'a command that must pass'
+                      : k === 'measure'
+                        ? 'a number that must reach a target'
+                        : k === 'score'
+                          ? 'an evaluation’s score must beat its baseline'
+                          : k === 'review'
+                            ? 'a sentence a reviewer finds true'
+                            : 'you confirm it'
+                  }
                   onClick={() => (setMenu(false), onChange({ ...value, checks: [...value.checks, fresh(k)] }))}
                 >
-                  {KIND_LABEL[k]}
+                  {k === 'score' ? 'A score' : KIND_LABEL[k]}
                 </MenuItem>
               ))}
             </Popover>

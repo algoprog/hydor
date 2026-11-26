@@ -16,7 +16,7 @@ export interface ProjectMemoryArticleHit {
 
 export interface ProjectMemorySearch {
   query: string;
-  /** The project's own memory notes (its topics and profile too), best first. */
+  /** The project's own memory notes (its topics, profile and findings too), best first. */
   notes: MemoryListEntry[];
   /** Its wiki memory's articles and sources, best first; none while wiki memory is off. */
   articles: ProjectMemoryArticleHit[];

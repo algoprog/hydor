@@ -3,13 +3,15 @@
 // it did, and — where rounds can be undone — Your say: keep it anyway, undo it, or go another way from it.
 import { useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CircleAlert, Circle, Undo2, X } from 'lucide-react';
-import { tally, type GoalCheck, type GoalRound, type GoalState } from '@shared/goals';
+import { meets, numeric, tally, type GoalCheck, type GoalRound, type GoalState } from '@shared/goals';
 import { Badge, Button, cx, inputCls } from '../../components/ui';
 import { say } from './Say';
 import { useAct } from './state';
-import { before, busy, changeText, outcomeLabel, membersText, pauseWait, resultText, roundBroke, roundCost, roundName, shortLabel, sinceTitle, startResultText, valueText } from './words';
+import { before, busy, changeText, outcomeLabel, membersText, pauseWait, resultText, roundBroke, roundCost, roundName, scoringWords, shortLabel, sinceTitle, startResultText, valueText } from './words';
 
 const ROWS_SHOWN = 8;
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function Marker({ g, r }: { g: GoalState; r: GoalRound }) {
   const cls = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full';
@@ -30,7 +32,7 @@ function Chip({ g, r }: { g: GoalState; r: GoalRound }) {
 function Mark({ c, holds, error }: { c: GoalCheck; holds: boolean; error?: string }) {
   if (holds) return <Check size={12} strokeWidth={2.5} className="text-ok" />;
   if (error) return <CircleAlert size={12} className="text-warn" />;
-  return c.kind === 'measure' ? <Circle size={10} className="text-fg-3" /> : <X size={12} strokeWidth={2.5} className="text-err" />;
+  return numeric(c) ? <Circle size={10} className="text-fg-3" /> : <X size={12} strokeWidth={2.5} className="text-err" />;
 }
 
 /**
@@ -45,8 +47,15 @@ function SayPanel({ g, r, what, onClose }: { g: GoalState; r: GoalRound; what: '
   const [run, working] = useAct(g.key);
   const [reason, setReason] = useState('');
   const [relax, setRelax] = useState<Record<string, boolean>>({});
-  // Measured checks this round fails: keep the check, or change its target to what the round reached.
-  const failing = what === 'keep' ? g.contract.checks.filter((c) => c.kind === 'measure' && c.target && r.results.find((x) => x.id === c.id)?.value != null && !r.results.find((x) => x.id === c.id)?.holds) : [];
+  // Measured checks (and scores) this round fails: keep the check, or change its target to what the round reached. A score
+  // that met its target but not beyond the noise would not hold at any target: not offered.
+  const failing =
+    what === 'keep'
+      ? g.contract.checks.filter((c) => {
+          const x = r.results.find((y) => y.id === c.id);
+          return numeric(c) && c.target && x?.value != null && !x.holds && !(c.kind === 'score' && meets(c, x.value));
+        })
+      : [];
   const go = async () => {
     const targets = Object.fromEntries(failing.filter((c) => relax[c.id]).map((c) => [c.id, r.results.find((x) => x.id === c.id)!.value!]));
     const done = await run({ action: 'round', n: r.n, do: what, ...(reason.trim() ? { reason: reason.trim() } : {}), ...(Object.keys(targets).length ? { relax: targets } : {}) });
@@ -232,7 +241,9 @@ function Running({ g }: { g: GoalState }) {
         <span className="h-2 w-2 rounded-full bg-accent" />
       </span>
       <span className="w-4 shrink-0 text-center text-[12px] text-fg-3 tnum">{g.round}</span>
-      <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{g.status === 'checking' ? 'Running the checks' : 'Working on it'}</span>
+      <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium" title={g.scoring?.why}>
+        {g.status === 'checking' ? (g.scoring ? capital(scoringWords(g.scoring)) : 'Running the checks') : 'Working on it'}
+      </span>
       <Badge tone="info">{g.status === 'checking' ? 'Checking' : 'Working'}</Badge>
     </li>
   );

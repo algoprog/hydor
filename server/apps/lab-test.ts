@@ -38,6 +38,8 @@ import { setHelperModel } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { Scheduler } from '../scheduler.ts';
 import type { SessionManager } from '../sessions.ts';
+import { entries, repoRoot } from '../memory/store.ts';
+import { memoryTools } from '../memory/tools.ts';
 import { apps } from './index.ts';
 import { changeAboutMe } from './me.ts';
 import { saveResult, startRun, startRuns, waitFor } from './runs.ts';
@@ -421,6 +423,20 @@ test('Research sprint: the runs fitted to the budget (the baseline first, each h
   assert.deepEqual(no.hypotheses.map((h: any) => h.mark), ['untested', 'untested', 'untested']);
   assert.equal(no.hours, 3, 'the hours planned when none ran');
   assert.equal((await runCode(codeOf(t, 'wrap'), { hypotheses: hyps, approved: '', ids: [], refused: ['No GPU fits'] })).status, 'No runs started: No GPU fits');
+  // What the project keeps of each hypothesis: its verdict (not tested is open), the evidence's sentence, its runs and
+  // the branch; a sentence with numbers and no run behind it is left out. A tool step records each, after the sum-up.
+  const said = [{ id: 'H1', verdict: 'Supported', evidence: '0.34 against 0.31' }, { id: 'H2', verdict: 'Not supported: no gain' }, { id: 'H3', verdict: 'Unclear', evidence: 'Within 0.01 of the baseline' }];
+  const kept = await runCode(codeOf(t, 'wrap'), { hypotheses: [...hyps.slice(0, 2), { id: 'H3', hypothesis: 'N '.repeat(200) }], verdicts: said, waited, branch: 'sprint/curriculum' });
+  assert.deepEqual(kept.findings.slice(0, 2), [
+    { statement: 'A curriculum helps', verdict: 'supported', learned: '0.34 against 0.31', evidence: [{ kind: 'run', ref: 'e2', label: 'h1-s1' }, { kind: 'commit', ref: 'sprint/curriculum', label: 'sprint/curriculum' }] },
+    { statement: 'Long only helps', verdict: 'refuted', learned: 'no gain', evidence: [{ kind: 'commit', ref: 'sprint/curriculum', label: 'sprint/curriculum' }] },
+  ]);
+  assert.deepEqual([kept.findings[2].verdict, kept.findings[2].learned, kept.findings[2].statement.length <= 300], ['unclear', '', true]);
+  assert.deepEqual(no.findings.map((f: any) => [f.verdict, f.learned, f.evidence]), [['open', '', []], ['open', '', []], ['open', '', []]], 'stopped before its runs: stated, not tested');
+  const ids = allSteps(t.flow!.steps).map((s) => s.id);
+  assert.deepEqual(ids.slice(ids.indexOf('wrap')), ['wrap', 'record', 'keep']);
+  const keep = allSteps(t.flow!.steps).find((s) => s.id === 'keep')!;
+  assert.ok(keep.do === 'tool' && keep.tool === 'finding_record' && keep.failed === 'skip');
 });
 
 test('Sweep planner: the budget read as runs or GPU hours, grid or random within it, your changes, and what mattered (eta squared) with the best run', async () => {
@@ -572,7 +588,7 @@ test('the views draw with a run’s values: the workbench’s next text with a b
   // Every name the run pages use is in their answers (or the form's).
   const answers: Record<string, Record<string, unknown>> = {
     'annotation-workbench': result,
-    'research-sprint': { question: 'Q', status: 'Done', hypotheses: [{ id: 'H1', hypothesis: 'h', verdict: 'Supported', mark: 'supported', evidence: 'e', confirm: 'c', refute: 'r' }], runs: [{ id: 'x1', name: 'n', condition: 'c', hypothesis: 'H1', status: 'done', value: 1 }], results: '| a |', results_page: '/experiments?table=t1', report: 'R', notebook: '/pages/n', next: ['x'], branch: 'b', worktree: '/w', hours: 1 },
+    'research-sprint': { question: 'Q', status: 'Done', hypotheses: [{ id: 'H1', hypothesis: 'h', verdict: 'Supported', mark: 'supported', evidence: 'e', confirm: 'c', refute: 'r', closest: 'A paper (2020)', closest_url: 'https://arxiv.org/abs/2001.00001' }], runs: [{ id: 'x1', name: 'n', condition: 'c', hypothesis: 'H1', status: 'done', value: 1 }], results: '| a |', results_page: '/experiments?table=t1', report: 'R', notebook: '/pages/n', next: ['x'], branch: 'b', worktree: '/w', hours: 1 },
     'sweep-planner': { best: 'lr=1', best_value: 1, best_run: 'a', summary: 'S', next: ['x'], mattered: [{ setting: 'lr', effect: 0.5, best: '1', means: 'm' }], points, runs: [{ id: 'a', settings: 'lr=1', value: 1, status: 'done', best: true }], count: 1, stopped: 0, group: 'g', page: '/experiments?sweep=s', hours: 1 },
     'weekly-report': { ...report, from: '2026-11-02', to: '2026-11-06', markdown: 'M', subject: 'S', email: 'E' },
     'lab-notebook': { title: 'T', date: '2026-11-05', day: 'Thursday 5 November 2026', summary: 'S', tried: [], found: [], decided: [], open: [], links: [], link: 'L', kept: true },
@@ -651,9 +667,18 @@ const newRun = (o: Partial<RunRecord>): RunRecord => {
   exp.runs.push(r);
   return r;
 };
+/** What the check for prior work finds of a sprint's hypotheses (server/research/prior-work.ts, which has tests of its own). */
+const paper = (title: string, year: number, relation: string, same: string, differs: string) => ({ title, authors: 'An Author', year, url: `https://arxiv.org/abs/${year}.00001`, relation, same, differs });
+const priorOf = (idea: string) =>
+  idea.includes('curriculum helps')
+    ? { verdict: 'partly', summary: 's', closest: [paper('Curriculum learning for [neural] rankers', 2020, 'overlaps', 'A curriculum.', 'It orders by difficulty, not length.')] }
+    : idea.includes('Long-only')
+      ? { verdict: 'known', summary: 's', closest: [paper('Training on long queries', 2021, 'same', 'It trains on long queries alone.', 'Nothing.')] }
+      : { verdict: 'new', summary: 's', closest: [] };
 const fakes: Feature = {
   id: 'fake-experiments',
   tools: () => [
+    tool('prior_work', (a) => priorOf(String(a.idea))),
     tool('experiment_run', (a) => {
       const r = newRun({ name: a.name, command: a.command, cwd: a.cwd, group: a.group, tags: a.tags, params: a.params, gpus: a.gpus, metrics: { last: { mrr10: a.params?.condition === 'baseline' ? 0.31 : 0.34 } } });
       return { id: r.id, status: 'queued' };
@@ -679,7 +704,9 @@ http.setErrorHandler((err: Error, _req, reply) => {
 });
 const scheduler = new Scheduler(db, sessions as unknown as SessionManager);
 const deps = { app: http, db, sessions: sessions as any, scheduler, models: null as any, broadcast: () => {}, toSubscribers: () => {}, publicBase: () => 'https://lab.example' } as Deps;
-registerFeatures([apps, documents, fakes, automations], deps);
+// Memory's finding tools, for steps (the rest of memory has no part in these apps).
+const findingTools: Feature = { id: 'finding-tools', tools: (ctx) => memoryTools(ctx).filter((t) => t.name.startsWith('finding')) };
+registerFeatures([apps, documents, fakes, findingTools, automations], deps);
 startRuns(deps);
 await http.ready();
 setHelperModel(db, 'fake');
@@ -755,6 +782,34 @@ test('Annotation workbench, a whole run: pasted texts labelled by the model in b
   assert.equal((await http.inject({ method: 'GET', url: `/api/apps/tpl:annotation-workbench/data/items?where=${where}` })).json().count, 0);
 });
 
+test('Research sprint: the closest earlier work under each hypothesis in what you are asked, one already known said so; a check that did not run is not read as nothing found', async () => {
+  const t = tpl('research-sprint');
+  const ids = allSteps(t.flow!.steps).map((s) => s.id);
+  assert.deepEqual(ids.slice(ids.indexOf('listed'), ids.indexOf('chosen') + 1), ['listed', 'prior', 'found', 'near', 'compared', 'check', 'chosen']);
+  const found = allSteps(t.flow!.steps).find((s) => s.id === 'found')!;
+  assert.ok(found.do === 'tool' && found.tool === 'prior_work' && found.failed === 'skip');
+  const ask = allSteps(t.flow!.steps).find((s) => s.id === 'check')!;
+  assert.ok(ask.do === 'ask' && ask.question.includes('{{compared.list}}'));
+  const near = async (id: string, idea: string) => runCode(codeOf(t, 'near'), { h: { id }, found: idea ? priorOf(idea) : '' });
+  const checked = [await near('H1', 'a curriculum helps'), await near('H2', 'Long-only'), await near('H3', 'something else'), await near('H4', ''), { id: 'H5', verdict: 'unjudged', title: 'Near (one)', year: 2022, url: 'https://doi.org/10.1/a(b)', relation: 'unjudged' }];
+  const hyps = [{ id: 'H1', hypothesis: 'One', test: 'Two seeds' }, ...['H2', 'H3', 'H4', 'H5'].map((id) => ({ id, hypothesis: id }))];
+  const c = await runCode(codeOf(t, 'compared'), { hypotheses: hyps, near: checked });
+  assert.equal(
+    c.list,
+    [
+      'H1. One\n    Tested by: Two seeds\n    Closest: [Curriculum learning for \\[neural\\] rankers](https://arxiv.org/abs/2020.00001) (2020), It orders by difficulty, not length.',
+      'H2. H2\n    **Already known:** [Training on long queries](https://arxiv.org/abs/2021.00001) (2021) does this. It trains on long queries alone.',
+      'H3. H3\n    Closest: nothing found, which is not proof that it is new.',
+      'H4. H4\n    Closest: not checked for earlier work.',
+      'H5. H5\n    Closest: [Near (one)](https://doi.org/10.1/a%28b%29) (2022), not compared with it.',
+    ].join('\n'),
+  );
+  assert.deepEqual(c.hypotheses.map((h: any) => h.closest), ['Curriculum learning for [neural] rankers (2020)', 'Already known: Training on long queries (2021)', 'None found', 'Not checked', 'Near (one) (2022)']);
+  // What you keep or write in answer keeps its closest work when it is the same hypothesis.
+  const chosen = await runCode(codeOf(t, 'chosen'), { proposed: hyps, compared: c.hypotheses, mine: 'H2\nSomething of my own' });
+  assert.deepEqual(chosen.hypotheses.map((h: any) => [h.hypothesis, h.closest ?? '']), [['H2', 'Already known: Training on long queries (2021)'], ['Something of my own', '']]);
+});
+
 test('Research sprint and Sweep planner, whole runs with Experiments’ tools as steps: hypotheses to runs to verdicts; a sweep to what mattered', async () => {
   model.answer = (user) => {
     if (user.includes('plan a short research sprint'))
@@ -798,10 +853,27 @@ test('Research sprint and Sweep planner, whole runs with Experiments’ tools as
   assert.deepEqual(exp.calls.find(([n]) => n === 'experiment_run')![1].better, { mrr10: 'max' }, 'each run knows which way is better');
   assert.equal(sr.results_page, '/experiments?table=t1');
   assert.deepEqual(sr.hypotheses.map((h: any) => [h.id, h.mark]), [['H1', 'supported'], ['H2', 'unclear']]);
+  // Each hypothesis was checked for earlier work before anything was built: a column in what it gives, with its link.
+  assert.deepEqual(sr.hypotheses.map((h: any) => [h.closest, h.closest_url]), [['Curriculum learning for [neural] rankers (2020)', 'https://arxiv.org/abs/2020.00001'], ['Already known: Training on long queries (2021)', 'https://arxiv.org/abs/2021.00001']]);
+  const checks = exp.calls.filter(([n]) => n === 'prior_work').map(([, a]) => a);
+  assert.equal(checks.length, 2);
+  assert.ok(checks.every((a) => a.field === 'Does a curriculum help long queries?' && a.language === 'English'));
+  assert.ok(checks.some((a) => a.idea === 'A curriculum helps long queries Curriculum against baseline, 2 seeds'));
   assert.deepEqual(sr.runs.map((r: any) => [r.condition, r.value]), [['baseline', 0.31], ['curriculum', 0.34]]);
   assert.equal(sr.status, 'Done: 2 of 2 runs finished');
   assert.match(sr.results, /curriculum \| 0\.340\*/);
   assert.equal(sr.branch, 'sprint/curriculum');
+  // Each hypothesis is now a finding of the repository's project, with its runs and the sprint's branch.
+  const project = repoRoot(path.join(os.homedir(), 'code', 'retriever'))!;
+  const found = entries(db, { scope: 'repo', scopeKey: project, kinds: ['finding'] }).sort((a, b) => a.id - b.id);
+  assert.deepEqual(
+    found.map((e) => [e.finding!.statement, e.finding!.verdict, e.finding!.learned, e.finding!.evidence.map((x) => `${x.kind} ${x.label}`), e.finding!.run]),
+    [
+      ['A curriculum helps long queries', 'supported', '0.34 against 0.31', ['run cur-s1', 'commit sprint/curriculum'], { id: s.id, app: 'Research sprint' }],
+      ['Long-only training helps', 'unclear', 'over the budget', ['commit sprint/curriculum'], { id: s.id, app: 'Research sprint' }],
+    ],
+  );
+  assert.equal(found[0].text, 'Supported: A curriculum helps long queries — 0.34 against 0.31');
   // The sweep: the researcher's settings kept, the budget's runs, bad trials stopped early, what mattered worked out.
   exp.calls.length = 0;
   const w = startRun({ app: 'tpl:sweep-planner', slug: 'sweep-planner', recipe: tpl('sweep-planner'), source: 'api', inputs: { command: 'python train.py', folder: '/w/model', metric: 'val_loss', better: 'Lower', settings: 'lr: 1e-4, 3e-4, 1e-3\nbatch_size: 16, 32', budget: '4 runs', early: 'Yes', check: 'Yes' } });

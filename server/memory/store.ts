@@ -7,7 +7,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { MEMORY_BASES, PROFILE_WORDS_DEFAULT, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, TOP_K_DEFAULT, TOP_K_MAX, isUserProfile, type MemoryBasis, type MemoryDrift, type MemoryEntry, type MemoryHistoryRow, type MemoryKind, type MemoryScope, type MemorySource } from '../../shared/memory.ts';
+import { findingOf, findingText, type FindingData } from '../../shared/findings.ts';
+import { MEMORY_BASES, PROFILE_WORDS_DEFAULT, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, TOP_K_DEFAULT, TOP_K_MAX, isSummary, isUserProfile, type MemoryBasis, type MemoryDrift, type MemoryEntry, type MemoryHistoryRow, type MemoryKind, type MemoryScope, type MemorySource } from '../../shared/memory.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 
@@ -63,6 +64,8 @@ export function memorySchema(db: DB) {
   if (!cols.has('hit_at')) db.exec('alter table memory_entries add column hit_at integer');
   if (!cols.has('given')) db.exec('alter table memory_entries add column given integer not null default 0');
   if (!cols.has('given_at')) db.exec('alter table memory_entries add column given_at integer');
+  // A finding's own data (JSON: shared/findings.ts); its text is written from it.
+  if (!cols.has('finding')) db.exec('alter table memory_entries add column finding text');
   db.exec(`
     drop index if exists memory_entries_scope;
     -- A place's entries, the latest changed first, without sorting all of them.
@@ -280,6 +283,7 @@ interface Row {
   source: MemorySource;
   anchor_list?: string | null;
   drift?: string | null;
+  finding?: string | null;
 }
 
 /** A basis as stored: one of the known ones, else none. */
@@ -295,6 +299,16 @@ function driftOf(v: string | null | undefined): MemoryDrift | undefined {
   try {
     const d = JSON.parse(v) as MemoryDrift;
     return Array.isArray(d?.paths) && typeof d.since === 'string' ? { paths: d.paths.map(String), since: d.since, at: Number(d.at) || 0 } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A finding's data as stored (JSON), when it reads. */
+function findingData(v: string | null | undefined): FindingData | undefined {
+  if (!v) return undefined;
+  try {
+    return findingOf(JSON.parse(v)) ?? undefined;
   } catch {
     return undefined;
   }
@@ -318,12 +332,13 @@ const toEntry = (r: Row): MemoryEntry => ({
   given: r.given ?? 0,
   hitAt: r.hit_at ?? undefined,
   hits: r.hits ?? 0,
-  covers: r.kind && r.kind !== 'note' ? r.covers : undefined,
+  covers: isSummary(r) ? r.covers : undefined,
   session: r.session ?? undefined,
   turn: r.turn ?? undefined,
   source: r.source,
   anchors: r.anchor_list ? r.anchor_list.split('\u001f').sort() : undefined,
   drift: driftOf(r.drift),
+  ...(r.kind === 'finding' ? { finding: findingData(r.finding) } : {}),
 });
 
 /** Who changed an entry, where and why. */
@@ -393,18 +408,18 @@ const cleanTitle = (t: unknown) => (typeof t === 'string' && t.trim() ? cleanTex
 
 export function addEntry(
   db: DB,
-  e: { scope: MemoryScope; scopeKey: string; text: string; kind?: MemoryKind; expiresAt?: number; basis?: MemoryBasis; title?: string },
+  e: { scope: MemoryScope; scopeKey: string; text: string; kind?: MemoryKind; expiresAt?: number; basis?: MemoryBasis; title?: string; finding?: FindingData },
   by: ChangeBy,
 ): MemoryEntry {
   memorySchema(db);
   const at = by.at ?? Date.now();
-  const kind = e.kind ?? 'note';
-  const text = clean({ scope: e.scope, kind }, e.text);
+  const kind = e.kind ?? (e.finding ? 'finding' : 'note');
+  const text = clean({ scope: e.scope, kind }, e.finding ? findingText(e.finding) : e.text);
   const scopeKey = e.scope === 'global' ? '' : e.scopeKey;
   const id = db.transaction(() => {
     const r = db
-      .prepare('insert into memory_entries (scope, scope_key, kind, text, title, basis, status, created_at, updated_at, expires_at, session, turn, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(e.scope, scopeKey, kind, text, cleanTitle(e.title), basisOf(e.basis) ?? null, 'active', at, at, e.expiresAt ?? null, by.session ?? null, by.turn ?? null, by.source);
+      .prepare('insert into memory_entries (scope, scope_key, kind, text, title, basis, status, created_at, updated_at, expires_at, session, turn, source, finding) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(e.scope, scopeKey, kind, text, cleanTitle(e.title), basisOf(e.basis) ?? null, 'active', at, at, e.expiresAt ?? null, by.session ?? null, by.turn ?? null, by.source, e.finding ? JSON.stringify(e.finding) : null);
     const id = Number(r.lastInsertRowid);
     log(db, id, 'added', null, text, by, at);
     return id;
@@ -421,6 +436,8 @@ export function addEntry(
 export function updateEntry(db: DB, id: number, text: string, by: ChangeBy, o: { basis?: MemoryBasis; title?: string } = {}): { before: string; entry: MemoryEntry } | null {
   const cur = getEntry(db, id);
   if (!cur) return null;
+  // A finding's text is written from its data: only updateFinding changes it, so the two never differ.
+  if (cur.kind === 'finding') throw new Error(`#${id} is a finding: its text is written from its verdict and words`);
   const at = by.at ?? Date.now();
   const next = clean(cur, text);
   if (next === cur.text) {
@@ -437,6 +454,25 @@ export function updateEntry(db: DB, id: number, text: string, by: ChangeBy, o: {
   })();
   changed(db, cur);
   return { before: cur.text, entry: getEntry(db, id)! };
+}
+
+/**
+ * Changes a finding's data, and its text with it (its history keeps the step); the one way a finding changes.
+ * Returns the finding, or null when there is none by that number.
+ */
+export function updateFinding(db: DB, id: number, finding: FindingData, by: ChangeBy): MemoryEntry | null {
+  const cur = getEntry(db, id);
+  if (!cur || cur.kind !== 'finding' || cur.status !== 'active') return null;
+  if (JSON.stringify(findingOf(finding)) === JSON.stringify(cur.finding)) return cur;
+  const at = by.at ?? Date.now();
+  const next = clean(cur, findingText(finding));
+  db.transaction(() => {
+    // `source` says who changed it last; the session stays the one that recorded it (who else changed it is in its history).
+    db.prepare('update memory_entries set text = ?, finding = ?, updated_at = ?, source = ? where id = ?').run(next, JSON.stringify(finding), at, by.source, id);
+    if (next !== cur.text) log(db, id, 'updated', cur.text, next, by, at);
+  })();
+  changed(db, cur);
+  return getEntry(db, id);
 }
 
 /** Says how an entry is known (none: not said); false when nothing changed. Its history keeps the step. */
@@ -488,7 +524,7 @@ export function restoreEntry(db: DB, id: number, by: ChangeBy, text?: string): b
   const cur = getEntry(db, id);
   if (!cur || cur.status === 'active') return false;
   const at = by.at ?? Date.now();
-  const next = text != null ? clean(cur, text) : cur.text;
+  const next = text != null && cur.kind !== 'finding' ? clean(cur, text) : cur.text;
   db.transaction(() => {
     db.prepare("update memory_entries set status = 'active', text = ?, updated_at = ?, expires_at = case when expires_at <= ? then null else expires_at end where id = ?").run(next, at, at, id);
     log(db, id, 'restored', null, next, by, at);
@@ -741,7 +777,8 @@ export function expireDue(db: DB, now = Date.now()): number {
 /**
  * Notes about the user or a project that no agent has needed for STALE_DAYS: not changed, looked up or used
  * since (being given without asking does not count). Topics and profiles are left out (the tidy-up keeps them current), and so
- * are notes with an end date (they go by themselves) and a session's (they go with the session).
+ * are findings (a dead end is worth keeping, however long since anyone needed it), notes with an end date (they go by
+ * themselves) and a session's (they go with the session).
  */
 export function staleEntries(db: DB, o: { now?: number; limit?: number } = {}): MemoryEntry[] {
   memorySchema(db);
@@ -771,7 +808,13 @@ export function sweep(db: DB, now = Date.now()) {
   expireDue(db, now);
   const old = now - 30 * 86400_000;
   db.transaction(() => {
-    const gone = db.prepare("select id from memory_entries where status = 'deleted' and updated_at < ?").all(old) as { id: number }[];
+    // A finding that a later one replaced stays, for as long as the later one is kept: it is the project's record.
+    const gone = db
+      .prepare(
+        `select e.id from memory_entries e where e.status = 'deleted' and e.updated_at < ?
+         and not (e.kind = 'finding' and exists (select 1 from memory_entries n where n.scope = e.scope and n.scope_key = e.scope_key and n.kind = 'finding' and json_extract(n.finding, '$.replaces') = e.id))`,
+      )
+      .all(old) as { id: number }[];
     const orphans = db
       .prepare(
         "select id from memory_entries where scope = 'session' and not exists (select 1 from sessions s where s.key = scope_key) and not exists (select 1 from app_sessions a where a.key = scope_key)",

@@ -65,7 +65,7 @@ mkdir -p "$out/server" "$out/node"
 echo "== The server"
 cd "$root"
 # What the server reads from its own folder as it runs (APP_ROOT in server/config.ts). scripts/agent-tools/bin and lib are
-# the waitfor, edits and sym programs, which every agent gets on its PATH through launchers the server writes
+# the waitfor, edits, sym and leancheck programs, which every agent gets on its PATH through launchers the server writes
 # (server/shelltools); not their test/ or fixtures/. tar keeps their executable bits.
 # (tar rather than rsync: macOS 15 ships openrsync, which lacks some of rsync's options.)
 tar -cf - \
@@ -113,10 +113,10 @@ else
 fi
 rm -rf "$tmp"
 
-# The programs every agent gets on its PATH (waitfor, edits, sym) run on the app's own Node.js, from where they are staged.
+# The programs every agent gets on its PATH (waitfor, edits, sym, leancheck) run on the app's own Node.js, from where they are staged.
 echo "== The agents' command-line tools"
 if [ "$os" = win32 ]; then appnode="$out/node/node.exe"; else appnode="$out/node/bin/node"; fi
-for t in waitfor edits sym; do
+for t in waitfor edits sym leancheck; do
   [ -f "$out/server/scripts/agent-tools/bin/$t" ] || { echo "scripts/agent-tools/bin/$t is not in the staged server." >&2; exit 1; }
   "$appnode" "$out/server/scripts/agent-tools/bin/$t" --help > /dev/null
 done

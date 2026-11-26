@@ -7,10 +7,12 @@
 // app loses nothing: a tick every 15 seconds closes questions whose time is up, stops a round past its money or time,
 // and picks up what a restart cut short. It never touches a session's live state; it sends a message only when the
 // loop really goes on. It never puts files back where anyone (the person, the agent, another session in the same
-// folder) could have written since the loop last looked at them: putBack is the one way it restores.
+// folder) could have written since the loop last looked at them: putBack is the one way it restores. A score check
+// (scores.ts) waits for the project's evaluation, which may take hours: the bar says how its runs stand, Pause and Stop
+// stop them, a restart waits for the same score again, and an evaluation that moved meanwhile asks the person.
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { GOAL_MAX_RULES, GOAL_PATIENCE, GOAL_SETTINGS, goalMessageOf, goalOver, standing, tally, type GoalAction, type GoalCheck, type GoalContract, type GoalQuestion, type GoalResult, type GoalRound, type GoalSettings, type GoalState, type GoalStatus } from '../../shared/goals.ts';
+import { GOAL_MAX_RULES, GOAL_PATIENCE, GOAL_SETTINGS, goalMessageOf, goalOver, numeric, standing, tally, type GoalAction, type GoalCheck, type GoalContract, type GoalQuestion, type GoalResult, type GoalRound, type GoalSettings, type GoalState, type GoalStatus } from '../../shared/goals.ts';
 import type { NotifyEvent, SessionSummary, WorktreeInfo } from '../../shared/types.ts';
 import { netCutAvailable, sandboxAvailable, sandboxShell, type Shell } from '../agent/sandbox.ts';
 import { CUT_BY_RESTART } from '../agents/acp.ts';
@@ -29,9 +31,10 @@ import { checkpoint as takeCheckpoint, restoreCheckpoint, restoreRefusal } from 
 import { askMessage, draftMessage, draftNotes, reminderMessage, restartedMessage, roundMessage } from './brief.ts';
 import { addAsked, alsoBlocks, changedPaths, diffText, headOf, killLeftover, parentOf, pathsIn, protectedHits, runChecks, sameFiles, treeOf, untrackedStamp, type CheckEnv } from './checks.ts';
 import { finalReview, reviewClaim, reviewRules } from './review.ts';
+import { finalTests, fixScores, movedWhy, MOVED_CONTEXT, MOVED_WAY, SCORE_CUT, scoreCheck, scoreTimeoutOf, type ScoreTrouble } from './scores.ts';
 import { allGoals, dropGoal, goalUpdated, loadGoal, publicGoal, saveGoal, type Judged, type RestoreMark, type StoredGoal } from './store.ts';
 import { goalDefaults } from './settings.ts';
-import { cleanContract, cleanSettings, topId } from './validate.ts';
+import { cleanContract, cleanSettings, MAX, topId } from './validate.ts';
 import { allButYouHold, duration, limitReason, reckon, rejudged, relaxed, scored, scoreOf, stalled, usd, type RoundInput } from './verdict.ts';
 
 export const NO_GOAL = 'This session has no goal.';
@@ -94,6 +97,8 @@ function setStatus(g: StoredGoal, s: GoalStatus, now = Date.now()) {
   // Pause pressed while a round ran (pausesHere) holds only while that round runs or is checked: paused for any other
   // reason, waiting on the person, over, it goes, and never outlives the round (P1).
   if (s !== 'working' && s !== 'checking') g.pausing = undefined;
+  // How a score's runs stand shows only while one is waited for.
+  if (s !== 'checking' && s !== 'measuring') g.scoring = undefined;
   if (goalOver(s)) {
     g.endedAt ??= now;
     g.round = undefined;
@@ -320,8 +325,11 @@ function atWork(d: Deps, s: SessionSummary, now = Date.now(), seen = new Set<str
 /** L2: how many commands the session's agent started still run (Codex keeps an interrupted turn's commands running). */
 const openCommands = (d: Deps, key: string) => d.sessions.summary(key)?.live?.openCommands ?? 0;
 
-/** Whether a check runs a command: a command or a measured number, or a review that reads a command's output. */
-export const runsCommand = (c: GoalCheck): boolean => c.kind === 'command' || c.kind === 'measure' || (c.kind === 'review' && !!c.evidence?.run?.trim());
+/**
+ * Whether a check runs a command: a command or a measured number, a score (the evaluation's sealed command, through the
+ * Experiments queue, perhaps on a GPU), or a review that reads a command's output.
+ */
+export const runsCommand = (c: GoalCheck): boolean => c.kind === 'command' || c.kind === 'measure' || c.kind === 'score' || (c.kind === 'review' && !!c.evidence?.run?.trim());
 
 /**
  * Whether the app may run the agent's proposed commands before the person agreed to them: only where the session's
@@ -785,8 +793,88 @@ async function changeSinceStart(g: StoredGoal, cwd: string, w: WorktreeInfo | un
   return '';
 }
 
+/**
+ * What a step hears of its score checks' waits: Pause or Stop ended one, or the goal moved on before it began (cut); Pause
+ * waits for the round, so none began (held); one whose evaluation moved; one that could not be scored; the goal's time ran out.
+ */
+interface ScoreNotes {
+  cut?: boolean;
+  held?: boolean;
+  limit?: boolean;
+  moved: Map<string, string>;
+  unrun: Set<string>;
+}
+const scoreNotes = (): ScoreNotes => ({ moved: new Map(), unrun: new Set() });
+
+/** Score waits under way, by session: Pause and Stop end them, and the score's runs are stopped. */
+const scoreWaits = new Map<string, AbortController>();
+
+/** Ends the wait for a score under way in the session's goal (Pause, Stop): true when there was one. */
+function cutScore(key: string): boolean {
+  const c = scoreWaits.get(key);
+  if (!c) return false;
+  c.abort();
+  return true;
+}
+
+/** Why the goal paused when Pause came while a score was waited for. */
+export const SCORE_PAUSED = 'Paused by you while it was being scored: its runs were stopped. Resume scores it again.';
+
+/**
+ * A score check's result (scores.ts): never one started while Pause waits for the round or after the goal moved on, its
+ * wait bounded by the goal's own time, the score kept with the goal while it is waited for (a restart waits for it again),
+ * and how its runs stand on the bar meanwhile.
+ */
+async function scoreFor(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, cwd: string, c: GoalCheck, notes?: ScoreNotes): Promise<GoalResult> {
+  const f = fresh(d, g);
+  if (!f || (f.status !== 'checking' && f.status !== 'measuring') || f.pausing) {
+    if (notes) notes[f?.pausing && f.status === 'checking' ? 'held' : 'cut'] = true;
+    return { id: c.id, holds: false, closeness: 0, error: SCORE_CUT, ms: 0 };
+  }
+  const own = scoreTimeoutOf(c);
+  // Only checking counts as the goal's time at work: what is left of it bounds the wait.
+  const left = f.status === 'checking' && f.contract.limits.minutes != null ? Math.floor((f.contract.limits.minutes * 60_000 - activeNow(f)) / 1000) : Infinity;
+  const ctrl = new AbortController();
+  scoreWaits.set(g.key, ctrl);
+  let trouble: ScoreTrouble | undefined;
+  try {
+    const r =
+      left < 1
+        ? { result: { id: c.id, holds: false, closeness: 0, error: 'The goal’s time ran out before it could be scored', ms: 0 } as GoalResult, trouble: 'late' as const }
+        : await scoreCheck(d, c, {
+            key: g.key,
+            cwd,
+            timeoutS: Math.min(own, left),
+            signal: ctrl.signal,
+            open: f._.scores?.[c.id],
+            started: (id) => remember(d, g, (x) => (x._.scores = { ...(x._.scores ?? {}), [c.id]: id })),
+            progress: (s) => {
+              const x = fresh(d, g);
+              if (!x || (!s && !x.scoring) || (s && x.status !== 'checking' && x.status !== 'measuring')) return;
+              x.scoring = s ?? undefined;
+              commit(d, x);
+            },
+          });
+    trouble = r.trouble;
+    if (notes && trouble) {
+      if (trouble === 'cut') notes.cut = true;
+      else if (trouble === 'moved') notes.moved.set(c.id, r.result.error ?? '');
+      else if (trouble === 'late' && left < own) notes.limit = true;
+      else notes.unrun.add(c.id);
+    }
+    return r.result;
+  } finally {
+    if (scoreWaits.get(g.key) === ctrl) scoreWaits.delete(g.key);
+    remember(d, g, (x) => {
+      if (!x._.scores?.[c.id]) return;
+      const { [c.id]: _gone, ...rest } = x._.scores;
+      x._.scores = Object.keys(rest).length ? rest : undefined;
+    });
+  }
+}
+
 /** What running the checks needs: where, how (the session's sandbox), the change for a reviewer, and who hears of each command starting. */
-function checkContext(d: Deps, g: StoredGoal, p: { cwd: string; w?: WorktreeInfo }, run: { shell?: (command: string) => Shell; noRun?: string }, now?: string): CheckEnv {
+function checkContext(d: Deps, g: StoredGoal, p: { cwd: string; w?: WorktreeInfo }, run: { shell?: (command: string) => Shell; noRun?: string }, now?: string, notes?: ScoreNotes): CheckEnv {
   let diff: Promise<string> | null = null;
   return {
     cwd: p.cwd,
@@ -805,6 +893,7 @@ function checkContext(d: Deps, g: StoredGoal, p: { cwd: string; w?: WorktreeInfo
         const all = (f._.asked ??= {});
         all[id] = addAsked(all[id] ?? [], added);
       }),
+    score: (c) => scoreFor(d, g, p.cwd, c, notes),
   };
 }
 
@@ -873,11 +962,13 @@ const canonical = (v: unknown): unknown =>
         )
       : v;
 /**
- * What of a check decides what the app measures: its kind, command, how its number is read, its claim and evidence. Its
- * name, target, slack and unit only say how a value is named, judged or shown, and its time limit how long a run may take
+ * What of a check decides what the app measures: its kind, command, how its number is read, its claim and evidence, a
+ * score's evaluation and the baseline (its score, of its seal) it is compared with. Its name, target, slack and unit only
+ * say how a value is named, judged or shown, a score's gain how it is judged, and its time limit how long a run may take
  * (P3): a check changed in those alone measures the same thing.
  */
-const measured = ({ label: _label, target: _target, slack: _slack, unit: _unit, timeoutS: _timeoutS, ...c }: GoalCheck) => JSON.stringify(canonical(c));
+const measured = ({ label: _label, target: _target, slack: _slack, unit: _unit, timeoutS: _timeoutS, gain: _gain, baseline, ...c }: GoalCheck) =>
+  JSON.stringify(canonical({ ...c, ...(baseline ? { baseline: { score: baseline.score, seal: baseline.seal } } : {}) }));
 /** All of a check but its name: whether it changed at all. */
 const defined = ({ label: _label, ...c }: GoalCheck) => JSON.stringify(canonical(c));
 
@@ -977,7 +1068,9 @@ function reach(d: Deps, g: StoredGoal, o: { summary: string; final?: GoalResult[
   g.question = undefined;
   g.reason = undefined;
   setStatus(g, 'reached');
-  g.report = { summary: o.summary, ...(o.final ? { final: o.final } : {}), ...(o.review ? { review: o.review } : {}) };
+  // The final test of a score check's evaluation is the person's alone: the report says it is there to run.
+  const finals = finalTests(d.db, g.contract.checks);
+  g.report = { summary: o.summary, ...(o.final ? { final: o.final } : {}), ...(o.review ? { review: o.review } : {}), ...(finals.length ? { finals } : {}) };
   commit(d, g);
   notify(d, g.key, 'done', `Goal reached: ${g.contract.title ?? g.contract.objective}`);
 }
@@ -1305,7 +1398,8 @@ async function sendAsk(d: Deps, g: StoredGoal, why: string) {
 /**
  * Checks were proposed (by the agent, or the app's own when it proposed none). They are measured at once (true: the
  * caller runs measureStep) only where that runs no command the person has not agreed to: the session's agent runs
- * commands unasked anyway, or no check runs one. Otherwise they wait for the person unmeasured, with nothing run.
+ * commands unasked anyway, or no check runs one. Otherwise they wait for the person unmeasured, with nothing run. A
+ * score check is never measured before the person agrees, in any mode (measureStep leaves it for Start).
  */
 function proposed(d: Deps, g: StoredGoal): boolean {
   g.rounds = [];
@@ -1486,7 +1580,11 @@ async function measureStep(d: Deps, key: string) {
   const p = place(d, key, g);
   if (!p) return;
   const first = !g.rounds.length;
-  const ids = first ? g.contract.checks.map((c) => c.id) : (g._.remeasure ?? []);
+  const asked = first ? g.contract.checks.map((c) => c.id) : (g._.remeasure ?? []);
+  // A score is never run before the person agreed the goal, whatever the session's mode (its runs may take their GPUs):
+  // it waits for Start, which scores it first, as where it starts from.
+  const unagreed = g._.agreed ? [] : g.contract.checks.filter((c) => c.kind === 'score' && asked.includes(c.id)).map((c) => c.id);
+  const ids = asked.filter((id) => !unagreed.includes(id));
   const t0 = Date.now();
   let ckpt0: string | undefined;
   if (first && p.w) {
@@ -1498,12 +1596,16 @@ async function measureStep(d: Deps, key: string) {
       return;
     }
   }
-  const results = await runAll(
+  const notes = scoreNotes();
+  const all = await runAll(
     d,
     g,
     g.contract.checks.filter((c) => ids.includes(c.id)),
-    checkContext(d, g, p, await checkRunner(d, key, p.cwd), ckpt0),
+    checkContext(d, g, p, await checkRunner(d, key, p.cwd), ckpt0, notes),
   );
+  // A score whose wait Pause or Stop ended is no value: it is measured when the goal goes on.
+  const cut = all.filter((r) => r.error === SCORE_CUT).map((r) => r.id);
+  const results = all.filter((r) => !cut.includes(r.id));
   // Where the loop leaves the files is after its checks ran: what they wrote is nobody's change.
   const left = p.w ? ((await checkpoint(p.w).catch(() => null)) ?? undefined) : undefined;
   const f = fresh(d, g);
@@ -1529,8 +1631,11 @@ async function measureStep(d: Deps, key: string) {
     if ((g.best ?? 0) !== 0) mergeResults(g, results, [g.best!]);
   }
   // Paused or stopped meanwhile: what was measured is kept, and it goes no further (Resume measures again).
-  if (g.status !== 'measuring') return commit(d, g);
-  g._.remeasure = undefined;
+  if (g.status !== 'measuring' || cut.length) {
+    if (cut.length) g._.remeasure = [...new Set([...(g._.remeasure ?? []), ...cut])];
+    return commit(d, g);
+  }
+  g._.remeasure = unagreed.length ? unagreed : undefined;
   if (kept != null) g.best = kept;
   g._.measureFor = undefined;
   // Measured for the person's Keep anyway where the goal was not going on: back to where it stood.
@@ -1564,6 +1669,49 @@ async function measureStep(d: Deps, key: string) {
   if (kept != null) return afterRound(d, g);
   await goOn(d, g);
 }
+
+/**
+ * A score check's evaluation moved while the goal ran (sealed again, another baseline, removed): its scores no longer mean
+ * what was agreed, and nothing is compared across them. The round in progress stays unchecked, and the person is asked, as
+ * for something only they can give: their answer fixes the check against the evaluation as it is now (answerMoved).
+ */
+function askMoved(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, moved: { id: string; why: string }[]) {
+  const f = fresh(d, g);
+  if (!f || (f.status !== 'checking' && f.status !== 'measuring')) return;
+  const why = `${bare(moved[0].why)}.`;
+  f._.moved = moved.map((m) => m.id);
+  f._.running = undefined;
+  f.question = { id: rid(), kind: 'blocked', question: why, context: MOVED_CONTEXT, ways: [{ name: MOVED_WAY }], pick: 0, askedAt: Date.now() };
+  setStatus(f, 'needs-you');
+  f.reason = why;
+  commit(d, f);
+  notify(d, f.key, 'waiting', `The goal needs you: ${why}`);
+}
+
+/**
+ * Score checks fixed afresh after their evaluation moved: no value of theirs is kept (each was of another seal or baseline),
+ * and the next round checked gives where they start from (rebased), as for a check changed while the goal ran.
+ */
+function rebase(g: StoredGoal, ids: string[]) {
+  if (ids.length) {
+    const start = g.rounds[0];
+    for (const r of g.rounds) r.results = r.results.filter((x) => !ids.includes(x.id));
+    for (const r of g.rounds) {
+      const from = r === start ? { results: r.results } : start;
+      r.results = scored(g.contract.checks, r.results, from);
+      r.score = scoreOf(g.contract.checks, r.results, from);
+    }
+    g._.rebased = [...new Set([...(g._.rebased ?? []), ...ids])];
+    const rest = g._.remeasure?.filter((id) => !ids.includes(id));
+    g._.remeasure = rest?.length ? rest : undefined;
+  }
+  g._.moved = undefined;
+  g.question = undefined;
+  g.reason = undefined;
+}
+
+/** Paths as the goal keeps them, with the evaluations' own added: each once, at most as many as a goal may have. */
+const withPaths = (protect: string[], more: string[]) => [...new Set([...protect, ...more])].slice(0, MAX.paths);
 
 /** Pauses a check of a round that cannot go on now; the round stays unchecked, so Resume checks it again. */
 function holdRound(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, reason: string) {
@@ -1600,6 +1748,12 @@ async function checkStep(d: Deps, key: string) {
   // round to check (one made up here would cost a round and count towards a turning point): it goes on from there.
   if (g.round == null) return g._.starting ? startRound(d, g, g._.starting) : afterRound(d, g);
   const n = g.round;
+  // A score check whose evaluation was sealed again, given another baseline or removed: nothing runs, and the person is asked.
+  const moved = g.contract.checks.flatMap((c) => {
+    const why = movedWhy(d.db, c);
+    return why ? [{ id: c.id, why }] : [];
+  });
+  if (moved.length) return askMoved(d, g, moved);
   const best = g.rounds.find((r) => r.n === g!.best) ?? g.rounds[0];
   const w = g.undo ? p.w : undefined;
   // From here on, a turn that begins means someone may have written while the checks ran (putBack).
@@ -1620,12 +1774,30 @@ async function checkStep(d: Deps, key: string) {
     }
   }
   const hits = protectedHits(changed, g.contract.protect);
-  const env = checkContext(d, g, p, await checkRunner(d, key, p.cwd), ckpt);
+  const notes = scoreNotes();
+  const env = checkContext(d, g, p, await checkRunner(d, key, p.cwd), ckpt, notes);
   let results = await runAll(d, g, g.contract.checks, env);
+  // A score's wait ended without a score to judge by: the round is not judged. Pause or Stop: as they left it (a Resume
+  // meanwhile: the tick checks the round again). Pause pressed before the score began, while the round was to be checked
+  // first: paused now. Its evaluation moved meanwhile: the person is asked. The goal's time ran out: it stops at its limit,
+  // the round's work in the folder as it is.
+  if (notes.cut || notes.held || notes.moved.size || notes.limit) {
+    const f = fresh(d, g);
+    if (!f || f.status !== 'checking' || notes.cut) return;
+    f._.running = undefined;
+    if (notes.moved.size) return askMoved(d, f, [...notes.moved].map(([id, why]) => ({ id, why })));
+    if (notes.held) return pause(d, f, 'Paused by you before the round was scored, which may take long. Resume checks the round.');
+    atLimit(d, f, limitReason(f, activeNow(f)) ?? 'It worked its time');
+    return halfRound(d, f, n);
+  }
   // A check that held in the best round and could not run now (a reviewer that is down, a timeout, a missing tool) has not
-  // stopped holding: it runs once more, and if it still cannot, the round is neither kept nor undone.
+  // stopped holding: it runs once more, and if it still cannot, the round is neither kept nor undone. A score that could not
+  // be had is not scored again at once (it may take hours): the round waits for the person. A score refused or failed is how
+  // the files stand: it does not hold, as any check that fails.
   const heldBest = (id: string) => !!best?.results.find((r) => r.id === id)?.holds;
-  const unrun = g.contract.checks.filter((c) => heldBest(c.id) && results.find((r) => r.id === c.id)?.error);
+  const unscored = g.contract.checks.find((c) => c.kind === 'score' && heldBest(c.id) && notes.unrun.has(c.id));
+  if (unscored) return holdRound(d, g, `“${unscored.label}” could not be scored: ${bare(results.find((r) => r.id === unscored.id)?.error ?? 'no score')}. Resume to check the round again`);
+  const unrun = g.contract.checks.filter((c) => c.kind !== 'score' && heldBest(c.id) && results.find((r) => r.id === c.id)?.error);
   if (unrun.length) {
     const again = await runAll(d, g, unrun, env);
     results = results.map((r) => again.find((x) => x.id === r.id) ?? r);
@@ -1724,6 +1896,14 @@ async function checkStep(d: Deps, key: string) {
   if (outcome !== 'undone' && (left || ckpt)) {
     g._.filesAt = left ?? ckpt;
     g._.leftAt = Date.now();
+  }
+  // Score checks fixed afresh after their evaluation moved start from this round's score (as a check changed while the goal ran).
+  if (g._.rebased?.length) {
+    const ids = g._.rebased;
+    const got = round.results.filter((x) => ids.includes(x.id) && x.value != null && !x.error);
+    if (got.length) mergeResults(g, got.map((x) => ({ ...x, since: n })), [0]);
+    const left2 = ids.filter((id) => !got.some((x) => x.id === id));
+    g._.rebased = left2.length ? left2 : undefined;
   }
   // What the person changed while this round ran takes effect now that it is judged.
   applyPending(g);
@@ -1911,6 +2091,7 @@ async function step(key: string, fn: () => Promise<void>) {
 /** The person answered the open question, or its time was up (the agent's pick goes ahead). */
 async function answerQuestion(d: Deps, g: StoredGoal, a: { ways: number[]; other?: string; note?: string; by: 'you' | 'clock' }) {
   const q = g.question!;
+  if (q.kind === 'blocked' && g._.moved?.length) return answerMoved(d, g, a);
   const now = Date.now();
   const going = g.status === 'asking' || g.status === 'needs-you';
   if (q.kind === 'yours') {
@@ -1955,9 +2136,58 @@ async function answerQuestion(d: Deps, g: StoredGoal, a: { ways: number[]; other
   await startRound(d, g);
 }
 
+/**
+ * The person's answer after a score check's evaluation moved: the checks are fixed afresh against the evaluation as it is
+ * now and start over (rebase), and the round that waited is to be checked (the action starts that, after this step). When
+ * they still cannot be fixed (no baseline yet), the question stays, saying what is in the way now.
+ */
+async function answerMoved(d: Deps, g: StoredGoal, a: { ways: number[]; note?: string; by: 'you' | 'clock' }) {
+  const q = g.question!;
+  const ids = g._.moved!;
+  const p = place(d, g.key, g);
+  const fx = await fixScores(d, { key: g.key, cwd: p?.cwd ?? '', checks: g.contract.checks.filter((c) => ids.includes(c.id)), again: true, who: 'you' });
+  const f = fresh(d, g);
+  if (!f || f.question?.id !== q.id) return;
+  if (!p || fx.errors.length) {
+    const why = p ? fx.errors[0] : 'The session’s folder is not known, so the checks cannot be scored.';
+    f.question = { ...q, id: rid(), question: why, askedAt: Date.now() };
+    f.reason = why;
+    return commit(d, f);
+  }
+  f.answered = { ways: a.ways.slice(0, 1), ...(a.note ? { note: a.note } : {}), by: a.by, at: Date.now(), question: q.question, picked: [MOVED_WAY] };
+  f.contract = { ...f.contract, checks: f.contract.checks.map((c) => fx.checks.find((x) => x.id === c.id) ?? c), protect: withPaths(f.contract.protect, fx.protect) };
+  if (a.note) f._.note = a.note;
+  rebase(f, ids);
+  setStatus(f, 'checking');
+  commit(d, f);
+}
+
+const CHANGED_MEANWHILE = 'The checks changed meanwhile: look at them again';
+
+/**
+ * The score checks of the person's Start or change, fixed against their evaluations (fixScores: at Start against each
+ * baseline as it is then, in a change keeping the baseline a check was agreed against); null when there are none or the
+ * action will refuse anyway. A 400 with the first problem. `of`: the checks they were fixed from, which must still be the
+ * goal's when the action goes on.
+ */
+async function personScores(d: Deps, key: string, a: Extract<GoalAction, { action: 'agree' | 'change' }>): Promise<{ checks: GoalCheck[]; protect: string[]; of: string } | null> {
+  const g = loadGoal(d.db, key);
+  if (!g || (a.action === 'agree' ? g.status !== 'agreeing' : goalOver(g.status) || ['drafting', 'measuring', 'checking'].includes(g.status))) return null;
+  const later = a.action === 'change' && g.round != null && !g._.moved;
+  const cur = (later ? g.pending?.checks : undefined) ?? g.contract.checks;
+  const c = cleanContract(a.contract, { checks: cur, limits: g.contract.limits }, { title: a.action === 'agree', ids: true, top: usedTop(g) });
+  const checks = c.contract.checks ?? (a.action === 'agree' ? g.contract.checks : undefined);
+  if (c.errors.length || !checks?.some((x) => x.kind === 'score')) return null;
+  const fx = await fixScores(d, { key, cwd: place(d, key, g)?.cwd ?? '', checks, before: cur, again: a.action === 'agree', who: 'you' });
+  if (fx.errors.length) throw new HttpError(400, fx.errors[0]);
+  return { checks: fx.checks, protect: fx.protect, of: JSON.stringify(cur) };
+}
+
 /** Does what the person asked of a session's goal (POST /api/sessions/:key/goal); the goal as it stands after, or null without one. */
 export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<GoalState | null> {
   if (a.action === 'set') return publicGoal(await setGoal(d, key, a.objective, a.settings));
+  // Score checks are fixed against their evaluations first: that reads git, and the goal is read for the action after it.
+  const scores = a.action === 'agree' || a.action === 'change' ? await personScores(d, key, a) : null;
   const g = loadGoal(d.db, key);
   if (!g) {
     if (a.action === 'stop' || a.action === 'clear') return null;
@@ -1979,7 +2209,9 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
         drop(d, key);
         return null;
       }
-      const mid = g.status === 'working' ? g.round : undefined;
+      // A score waited for: its runs stop too, and the round it was for was not checked.
+      const cut = cutScore(key);
+      const mid = g.status === 'working' || (cut && g.status === 'checking') ? g.round : undefined;
       g.question = undefined;
       g.reason = 'Stopped by you.';
       setStatus(g, 'stopped');
@@ -1993,7 +2225,14 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       notOver();
       // P1: a round at work (running, or its checks) is finished and checked first: the goal pauses after it (pausesHere).
       // Anywhere else it pauses now.
-      if (g.status === 'paused' || g.pausing) break;
+      if (g.status === 'paused') break;
+      // A score waited for (it may take hours): its runs stop, and the goal pauses now; the round stays unchecked and
+      // Resume scores it again (measuring: measures it again).
+      if (cutScore(key)) {
+        pause(d, g, SCORE_PAUSED);
+        break;
+      }
+      if (g.pausing) break;
       if (pausesAfterRound(g)) {
         g.pausing = true;
         commit(d, g);
@@ -2088,8 +2327,14 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       // L1: limits the goal has already used up (what working out the checks cost, say) would stop it at once.
       const spentAlready = usedUp(d, g, c.contract.limits ?? g.contract.limits);
       if (spentAlready) throw new HttpError(409, spentAlready);
+      // Score checks, fixed against their evaluation's baseline as it is at this moment (personScores); its protected files join the goal's.
+      if (scores) {
+        if (JSON.stringify(g.contract.checks) !== scores.of) throw new HttpError(409, CHANGED_MEANWHILE);
+        c.contract.checks = scores.checks;
+      }
       const changed = c.contract.checks ? putChecks(g, c.contract.checks) : [];
       g.contract = { ...g.contract, ...c.contract };
+      if (scores) g.contract.protect = withPaths(g.contract.protect, scores.protect);
       g._.topId = c.top;
       g._.agreed = true;
       g.reason = undefined;
@@ -2122,10 +2367,17 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       if (g.status === 'measuring' || g.status === 'checking') throw new HttpError(409, 'Wait for the checks to finish running');
       // A round runs (or waits to be checked): it is judged by the checks it started with, and a change of checks or
       // protected paths takes effect once it has been (pending). Limits count at once.
-      const later = g.round != null;
+      // While the person is asked about a score whose evaluation moved, the round waits for their change: it counts at once.
+      const later = g.round != null && !g._.moved;
       const cur: Pick<GoalContract, 'checks' | 'limits'> = { checks: (later ? g.pending?.checks : undefined) ?? g.contract.checks, limits: g.contract.limits };
       const c = cleanContract(a.contract, cur, { ids: true, top: usedTop(g) });
       if (c.errors.length) throw new HttpError(400, c.errors[0]);
+      if (scores) {
+        if (JSON.stringify(cur.checks) !== scores.of) throw new HttpError(409, CHANGED_MEANWHILE);
+        c.contract.checks = scores.checks;
+        const has = c.contract.protect ?? (later ? g.pending?.protect : undefined) ?? g.contract.protect;
+        if (scores.protect.some((x) => !has.includes(x))) c.contract.protect = withPaths(has, scores.protect);
+      }
       // L1: limits lowered below what the goal has used: refused, rather than the goal stopping a tick later.
       const overUsed = c.contract.limits ? usedUp(d, g, c.contract.limits) : null;
       if (overUsed) throw new HttpError(409, overUsed);
@@ -2139,6 +2391,15 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       const changed = c.contract.checks ? putChecks(g, c.contract.checks) : [];
       g.contract = { ...g.contract, ...c.contract };
       if (changed.length) g._.remeasure = [...new Set([...(g._.remeasure ?? []), ...changed])];
+      // The change settled the score checks whose evaluation moved (fixed afresh against it, or taken out): they start
+      // over, and the round that waited is checked.
+      if (g._.moved && g.status === 'needs-you' && !g._.moved.some((id) => movedWhy(d.db, g.contract.checks.find((x) => x.id === id) ?? ({} as GoalCheck)))) {
+        rebase(g, g._.moved.filter((id) => g.contract.checks.some((x) => x.id === id)));
+        setStatus(g, 'checking');
+        commit(d, g);
+        launch(key, drive(key, () => checkStep(d, key)));
+        break;
+      }
       if (g.status === 'agreeing' && g.reason !== 'A check could not run') g.reason = agreeNote(d, g);
       // Waiting for the person's agreement: measured now, and back to the agreement, where the agent may run commands
       // unasked anyway; else when the person starts it.
@@ -2159,6 +2420,8 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
         const f = fresh(d, g);
         if (f?.question?.id === g.question!.id) await answerQuestion(d, f, { ways: a.ways, other: a.other, note: a.note, by: 'you' });
       });
+      // The answer after a score's evaluation moved: the round that waited is checked now (it may take long: not in this request).
+      if (loadGoal(d.db, key)?.status === 'checking') launch(key, drive(key, () => checkStep(d, key)));
       break;
     }
     case 'wait': {
@@ -2425,7 +2688,7 @@ async function sayOnRound(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAc
       f.dropped = [...f.dropped, { text: a.reason || `Round ${rr.n}: ${rr.way ?? (rr.did ? clip(rr.did.split(/(?<=[.!?])\s/)[0], 200) : 'its approach')}`, by: 'you' as const }].slice(-MAX_DROPPED);
     } else {
       if (a.relax && Object.keys(a.relax).length) {
-        const ok = Object.fromEntries(Object.entries(a.relax).filter(([id]) => f!.contract.checks.some((c) => c.id === id && c.kind === 'measure')));
+        const ok = Object.fromEntries(Object.entries(a.relax).filter(([id]) => f!.contract.checks.some((c) => c.id === id && numeric(c))));
         Object.assign(f, relaxed(f, ok));
       }
       const rr = f.rounds.find((x) => x.n === a.n)!;
@@ -2445,6 +2708,7 @@ async function sayOnRound(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAc
     f.question = undefined;
     f._.ask = undefined;
     f._.yours = undefined;
+    f._.moved = undefined;
     f.round = undefined;
     f._.report = undefined;
     f._.way = undefined;
@@ -2480,17 +2744,37 @@ function noGoal(d: Deps, key: string): string {
   return lg && !goalOver(lg.status) ? LEADS_GOAL : NO_GOAL;
 }
 
-/** goal_propose: the checks, protected paths and limits the agent proposes; what was wrong, or what happens now. */
-export function propose(d: Deps, key: string, a: Record<string, unknown>): { ok: boolean; text: string } {
-  const g = loadGoal(d.db, key);
+/** What goal_propose says while the app measures the proposal, and once the checks are agreed. */
+const MEASURING_PROPOSAL = 'The app is measuring the checks you proposed. Stop now: the rounds start when the user agrees.';
+const AGREED_ALREADY = 'The checks are agreed. Only the user can change them: say in goal_report what you would change and why.';
+
+/**
+ * goal_propose: the checks, protected paths and limits the agent proposes; what was wrong, or what happens now. A score
+ * check is fixed against its evaluation's baseline (scores.ts), and the files the evaluation protects join the paths.
+ */
+export async function propose(d: Deps, key: string, a: Record<string, unknown>): Promise<{ ok: boolean; text: string }> {
+  let g = loadGoal(d.db, key);
   if (!g || goalOver(g.status)) return { ok: false, text: noGoal(d, key) };
   if (g.status === 'paused') return { ok: false, text: PAUSED };
-  if (g.status === 'measuring' && !g._.agreed) return { ok: true, text: 'The app is measuring the checks you proposed. Stop now: the rounds start when the user agrees.' };
-  if (g.status !== 'drafting' && g.status !== 'agreeing') return { ok: false, text: 'The checks are agreed. Only the user can change them: say in goal_report what you would change and why.' };
+  if (g.status === 'measuring' && !g._.agreed) return { ok: true, text: MEASURING_PROPOSAL };
+  if (g.status !== 'drafting' && g.status !== 'agreeing') return { ok: false, text: AGREED_ALREADY };
   const c = cleanContract({ checks: a.checks, protect: a.protect, limits: a.limits, title: a.title }, { checks: [], limits: g.contract.limits }, { title: true });
   if (!c.contract.checks && !c.errors.length) c.errors.push('Give at least one check.');
   if (c.errors.length) return { ok: false, text: `Fix these and call goal_propose again:\n- ${c.errors.join('\n- ')}` };
-  g.contract = { ...g.contract, checks: c.contract.checks!, protect: c.contract.protect ?? [], limits: c.contract.limits ?? g.contract.limits, ...(c.contract.title ? { title: c.contract.title } : {}) };
+  let checks = c.contract.checks!;
+  let protect = c.contract.protect ?? [];
+  if (checks.some((x) => x.kind === 'score')) {
+    const fx = await fixScores(d, { key, cwd: place(d, key, g)?.cwd ?? '', checks, who: 'agent' });
+    if (fx.errors.length) return { ok: false, text: `Fix these and call goal_propose again:\n- ${fx.errors.join('\n- ')}` };
+    checks = fx.checks;
+    protect = withPaths(protect, fx.protect);
+    // Read again: the evaluations took a moment.
+    g = fresh(d, g);
+    if (!g || goalOver(g.status)) return { ok: false, text: noGoal(d, key) };
+    if (g.status === 'paused') return { ok: false, text: PAUSED };
+    if (g.status !== 'drafting' && g.status !== 'agreeing') return { ok: false, text: g.status === 'measuring' && !g._.agreed ? MEASURING_PROPOSAL : AGREED_ALREADY };
+  }
+  g.contract = { ...g.contract, checks, protect, limits: c.contract.limits ?? g.contract.limits, ...(c.contract.title ? { title: c.contract.title } : {}) };
   g._.topId = c.top;
   g.reason = undefined;
   if (!proposed(d, g)) return { ok: true, text: 'Shown to the user. Stop now: when they agree, the app measures where things stand and the rounds start.' };

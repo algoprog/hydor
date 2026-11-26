@@ -42,6 +42,23 @@ Os agentes salvam notas em dois casos: quando você pede (“Lembre que sou vege
 
 Você também pode escrever uma nota com **Adicionar uma nota** em [Configurações → Memória](/settings?s=memory&find=Add%20a%20note), e encontrar, editar, datar e excluir cada nota ali (veja [Notas](/guide/memory#notes)).
 
+## Descobertas: o que foi tentado e no que deu
+
+Um projeto de pesquisa esquece o que tentou: um agente entra de novo no mesmo beco sem saída, e as afirmações de um artigo se afastam do que as execuções mostraram. Uma **descoberta** é uma coisa que um projeto tentou e no que deu, guardada com suas evidências, por exemplo: “Negativos difíceis do BM25 aumentam o nDCG@10 de dev em relação aos negativos no lote: confirmada, +0,019 em 3 seeds, o ganho está nas consultas longas.” É uma nota da memória de um tipo próprio, por isso pertence a um projeto, é pesquisada por palavras e por significado, chega às sessões novas quando tem relação com o que você pede e mantém o seu histórico.
+
+Cada descoberta tem:
+
+- **Um enunciado**: a hipótese ou afirmação, em uma frase.
+- **Um veredito**: **Confirmada**, **Refutada**, **Pouco claro** ou **Aberta** (enunciada, mas ainda não testada).
+- **O que foi aprendido**: uma ou duas frases com os números, onde isso vale ou por que falhou.
+- **Evidência**, com no máximo 12 itens: execuções, pontuações e tabelas de resultados de [Experimentos](/guide/experiments), commits, arquivos, artigos e sessões. Um número em “O que foi aprendido” precisa da execução, pontuação ou tabela de onde veio; sem isso, a descoberta é recusada.
+
+**Os agentes as registram.** Em um projeto, os agentes são orientados a olhar as descobertas dele antes de propor ou começar um experimento, e a registrar uma depois de cada resultado, também quando não funcionou ou não ficou claro. O [Sprint de pesquisa](/guide/researchers#research-sprint) registra uma para cada uma de suas hipóteses, e **Tentar derrubar** registra o veredito sobre a afirmação. **Os becos sem saída são mantidos de propósito**: a arrumação nunca junta, resume, move ou remove uma descoberta (e a criação de uma wiki a partir do histórico do projeto também não as lê), e uma descoberta nunca é sugerida para remoção só porque nenhum agente precisou dela ultimamente. Duas descobertas que se contradizem são mantidas, até que uma posterior substitua a outra: a nova diz o que substitui, e a antiga sai da lista, mas permanece no histórico.
+
+**Onde vê-las.** A aba **Memória** de um projeto tem um filtro **Descobertas** ao lado de **Notas**, **Wiki** e **Documentos** (veja [A aba Memória de um projeto](/guide/wiki-memory#a-projects-memory-tab)), com um filtro menor para cada veredito. Uma linha mostra o enunciado, o veredito e há quanto tempo foi registrada. Abra uma para lê-la por inteiro: o que foi aprendido, as evidências como links que abrem cada execução, commit, arquivo, artigo ou sessão, quem a registrou e quando, e o que ela substitui. Quando um arquivo citado como evidência mudou desde então no repositório Git do projeto, a linha diz **o código mudou desde então** e a descoberta diz “O código em que isto se baseia mudou desde então.”, com os arquivos: teste de novo antes de se apoiar nela. As descobertas também aparecem entre as notas do projeto em [Configurações → Memória](/settings?s=memory), marcadas como **Descoberta**.
+
+**Como mudar ou esquecer uma.** Abra-a e pressione **Alterar** para corrigir à mão o veredito, o enunciado ou o que foi aprendido. **Esquecer** a remove; ela fica em [Notas excluídas](/guide/memory#deleted-notes) por 30 dias, para ser restaurada. Você também pode pedir a um agente: ele registra o resultado mais recente no lugar do antigo ou a esquece. Desligar a memória desliga as descobertas junto.
+
 ## Seu perfil
 
 Além das notas, a memória guarda um perfil seu: quem você é e o que faz, o que usa, como gosta das respostas e o que evitar. Enquanto a memória está ativada, todo agente o recebe uma vez, no início de uma sessão, logo depois das suas [Diretrizes dos agentes](/guide/guidelines), e deixa que ele molde a forma de trabalhar com você; suas diretrizes e o que você diz em uma sessão continuam valendo primeiro. As notas guardam o que importa de vez em quando; o perfil guarda o que todo agente deve sempre saber.
@@ -170,7 +187,7 @@ A página de um lugar abre dentro da seção, com o link **Memória** no alto pa
 
 **Para encontrar uma nota**, digite no campo de busca do grupo (ou da página de um lugar): “Buscar em 33 notas” ou “Buscar em 33 notas por palavras ou significado” quando a busca por significado está pronta. Ela encontra notas que contêm todas as palavras digitadas, com a última valendo como início de palavra, e, com a busca por significado ativada, notas que querem dizer o mesmo. As melhores vêm primeiro, cada uma com o lugar a que pertence, e **Mostrar mais** traz as vinte seguintes. “Nenhuma nota encontrada” indica que não há resultados. Esc ou o **×** limpa a busca, e o índice volta. Enquanto a memória não tem notas, o grupo avisa, com um botão **Trazer de outros assistentes** e a linha **Notas excluídas**.
 
-Cada nota em uma lista mostra suas duas primeiras linhas (com uma etiqueta **Assunto** ou **Perfil** quando for um deles) e, abaixo, uma linha de informações: o lugar, em uma lista que mistura lugares (uma busca, **Sessões**, **Não necessárias recentemente**, **Notas excluídas**); **Adicionado** ou **Alterado** e há quanto tempo (aponte para ver as datas exatas); **ainda não verificada**, quando ninguém a confirmou; **necessária uma vez** ou **necessária N vezes**, quantas vezes um agente a usou (consultou, citou ou trabalhou com o arquivo ou comando a que ela se refere); e **até** uma data, quando ela tem data final. Clique em uma nota para abri-la.
+Cada nota em uma lista mostra as duas primeiras linhas (com uma etiqueta **Assunto**, **Perfil** ou **Descoberta**, quando for o caso; veja [Descobertas](/guide/memory#findings-what-was-tried-and-what-came-of-it)) e, abaixo, uma linha de informações: o lugar, em uma lista que mistura lugares (uma busca, **Sessões**, **Não necessárias recentemente**, **Notas excluídas**); **Adicionado** ou **Alterado** e há quanto tempo (passe o ponteiro para ver as datas exatas); **ainda não verificada**, quando ninguém a confirmou; **necessária uma vez** ou **necessária N vezes**, a frequência com que um agente a usou (consultou, citou ou trabalhou com o arquivo ou comando de que ela trata); e **até** uma data, quando ela tem uma data final. Clique em uma nota para abri-la.
 
 ### Abrir uma nota
 
@@ -358,6 +375,8 @@ Você mesmo pode buscar em sessões anteriores com a caixa de busca (Ctrl+K, ou 
 ## Pergunte a um agente
 
 - “O que você lembra sobre mim? Exclua tudo sobre meu emprego antigo.”
+- “O que já tentamos para consultas longas?”
+- “Registre que a ideia do currículo não ajudou, junto com as execuções.”
 - “Adicione ao meu perfil que sou enfermeira e gosto de respostas em tópicos.”
 - “Mostre meu perfil e reduza para umas 300 palavras.”
 - “Comece toda sessão com 20 notas em vez de 10.”

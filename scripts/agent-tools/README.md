@@ -1,16 +1,18 @@
 # Command-line tools for coding agents
 
-Three small programs that save a coding agent round trips: `waitfor`, `edits` and `sym`. They are part of Hydor: every
+Small programs for coding agents: `waitfor`, `edits` and `sym`, which save round trips, and `leancheck`, which says
+whether the proofs in a Lean file hold. They are part of Hydor: every
 agent session the app starts (Claude Code, Codex, Custom and the other ACP agents) finds them on its `PATH` and is told
 about them, in a checkout, in Docker and in the desktop apps (below). You can also use them from your own shell and
 tell your own agents about them (below). None calls a model, and none needs anything installed beyond Node.js 22 (the
-tree-sitter parser `sym` uses is in `lib/sym/`, with its licence).
+tree-sitter parser `sym` uses is in `lib/sym/`, with its licence), but `leancheck`, which needs Lean 4.
 
 | Program | Takes the place of |
 |---|---|
 | `bin/waitfor` | `for i in $(seq ...); do sleep 5; ...; done; tail log` loops that wait for a job |
 | `bin/edits` | a script that does `text.replace(old, new)` on several files, with checks written by hand |
 | `bin/sym` | `grep -n "export function X" -A30`, then `sed -n A,Bp` to read the part you found |
+| `bin/leancheck` | reading `lake build`'s output and hoping a proof holds |
 
 Each has `--help`.
 
@@ -73,18 +75,42 @@ that has the word has to be parsed. When it cannot be sure where a definition en
 language form it does not know) it says "extent unsure" or "heuristic extent" in the header: look at those lines before
 you edit them.
 
+## leancheck
+
+Says whether the proofs in a Lean 4 file really hold, and exits 0 only then. It is ok when the file builds (in a Lake
+project, its imports first), nothing is left as `sorry`, each theorem named with `--theorem` (else every theorem and
+lemma of the file) depends only on the standard axioms (`propext`, `Classical.choice`, `Quot.sound`), and Lean's
+`leanchecker` accepts every declaration of the file and of the project's own files it imports.
+
+```bash
+leancheck Proofs/Main.lean                    # a goal's command check can be exactly this
+leancheck Proofs/Main.lean --theorem main     # just that theorem
+leancheck Proofs/Main.lean --allow-sorry      # a skeleton: gaps pass, everything else still fails
+```
+
+It does not trust what the file can change. `#print axioms` can be redefined by the file's own `macro_rules`, and
+`set_option debug.skipKernelTC true` puts in a proof the kernel never saw, reported as using no axioms (both with Lean
+4.36). So the axioms are read by a small program of ours that loads the compiled file without running its syntax
+(`lib/lean/core.mjs`), and `leanchecker` plays the declarations back through the kernel. The verdict cannot say whether
+the statement is the one you meant.
+
+Lean is found as your own `lake` and `lean` on `PATH`, else the one Hydor set up (`HYDOR_LEAN_DIR`, which the app's
+launcher sets). A snippet or loose file that imports Mathlib needs Mathlib added in the app. Exit: 0 verified, 1 not,
+2 it could not be checked, 64 usage.
+
 ## How the app gives them to agents
 
 Agents' shells have no Node.js on their `PATH` (the tools start with `#!/usr/bin/env node`), so the app does not link the
 scripts. At each start the server (`server/shelltools/`) writes a small `sh` launcher for each tool into
 `<data folder>/shelltools/bin`, which runs the app's own Node.js (`process.execPath`) on the tool's script in the app's
 own folder (`exec "<node>" "<app>/scripts/agent-tools/bin/<tool>" "$@"`; `sym` also gets `HYDOR_RG`, the ripgrep that
-comes with Codex, when there is one). A launcher is rewritten only when the app's folder or its Node.js changed, which
+comes with Codex, when there is one, and `leancheck` gets `HYDOR_LEAN_DIR`, where the app keeps its own Lean). A launcher is rewritten only when the app's folder or its Node.js changed, which
 is what every new version of a desktop app does (Windows and AppImages run from a copy of the server for each version);
 on Windows each also has a `.cmd`, and Git's bash, in which agents run commands, uses the one without an ending. The
 server then tries each launcher once, in the background, with a `PATH` of the system's folders and no node (`--help` for
-`waitfor` and `edits`; for `sym`, the outline of a three-line TypeScript file, which proves its parser loads), logs one
-line for each that fails, and from then on puts the launchers' folder first on the `PATH` of every session it starts and
+`waitfor`, `edits` and `leancheck`; for `sym`, the outline of a three-line TypeScript file, which proves its parser loads), logs one
+line for each that fails, and from then on puts the launchers' folder first on the `PATH` of every session it starts (and last on the `PATH` a goal's
+checks run with) and
 adds a text to its instructions that names only the tools that passed. `HYDOR_SHELL_TOOLS=0` turns all of it off
 ([configuration](../../docs/configuration.md)); there is no setting. The desktop apps ship `bin/` and `lib/` (not `test/`
 or `fixtures/`: `desktop/scripts/stage.sh`), and CI fails a packed app whose launchers cannot run the tools
@@ -95,7 +121,7 @@ or `fixtures/`: `desktop/scripts/stage.sh`), and CI fails a packed app whose lau
 For your own shell (the app's agents do not need this):
 
 ```bash
-for t in waitfor edits sym; do ln -s "$PWD/scripts/agent-tools/bin/$t" ~/.local/bin/$t; done   # from the repository's root
+for t in waitfor edits sym leancheck; do ln -s "$PWD/scripts/agent-tools/bin/$t" ~/.local/bin/$t; done   # from the repository's root
 ```
 
 The links point into your checkout, so a new version of the tools comes with a `git pull`. Check that `~/.local/bin` is
@@ -114,7 +140,7 @@ Honestly: the macOS and Windows paths are covered by tests that stand in for `ps
 ## Tests
 
 ```bash
-node --test "scripts/agent-tools/test/*.test.mjs"  # the three suites, from the repository's root
+node --test "scripts/agent-tools/test/*.test.mjs"  # the four suites, from the repository's root
 node --test scripts/agent-tools/test/sym.test.mjs # or one of them
 npm run check                                      # runs them when something here changed
 ```
@@ -141,11 +167,15 @@ Shell commands this app adds to your PATH (each has --help):
   when changing more than one place.
 - sym NAME...: a definition with its whole body and exact line range (TypeScript, JavaScript, Python, Rust).
   `sym --refs NAME` lists references, `sym --outline FILE` a file's declarations. Use grep for text and strings.
+- leancheck FILE.lean: whether its proofs hold (it builds, no sorry, standard axioms only, kernel re-check). Exits 0
+  only then, so a goal's command check can be "leancheck Proofs/Main.lean". --theorem NAME, --allow-sorry. Needs Lean
+  set up.
 ```
 
 ## What is in this folder
 
-`bin/` has the three programs (`sym` is a short launcher for `lib/sym/`). `lib/sym/grammars/` holds the five grammars
+`bin/` has the four programs (`sym` is a short launcher for `lib/sym/`, `leancheck` for `lib/lean/`, which the app's
+Lean tools use too). `lib/sym/grammars/` holds the five grammars
 `sym` reads code with, and `lib/sym/vendor/web-tree-sitter/` the parser that runs them: both are copied unchanged from
 npm packages, each with a `SOURCE.txt` of where from and their checksums (the licences are in `NOTICE` at the root of
 the repository). `lib/sym/dev/` has the scripts used to make and check them (`vendor-grammars.mjs`) and to check `sym`'s

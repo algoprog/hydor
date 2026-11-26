@@ -15,6 +15,7 @@ Auf einem Computer bleibt links eine Spalte neben allem stehen, was du hier öff
 - Die Warteschlangenzeile ganz oben sagt, was gerade passiert („2 aktiv · 1 wartend“ oder „Derzeit keine aktiven Läufe“). Darunter stehen die GPUs dieses Computers als kleine Anzeigen: der Speicher, den jede belegt, in der Akzentfarbe, wenn einer deiner Läufe sie belegt (fahre darüber, um zu sehen, wie stark sie ausgelastet ist und welcher Lauf sie belegt; ein Klick öffnet diesen Lauf).
 - **Experiment finden** filtert die Liste nach dem, was du eintippst: Titel, Beschreibung, Kategorie und Name eines Experiments sowie Namen und Befehle seiner Läufe. Passt ein Experiment nur über seine Läufe, steht dort, wie viele es sind („3 Läufe passen“).
 - **Übersicht** bringt dich zurück zur unten beschriebenen Seite.
+- **Evaluationen**, wenn du welche hast, mit ihren neuesten Bewertungen ([Evaluationen](#evaluations-keeping-score-the-same-way)).
 - Darunter folgen die Experimente, nach Kategorie gruppiert (jeweils mit einer kleinen Überschrift; die Kategorie mit dem neuesten Lauf steht zuerst; Experimente ohne Kategorie stehen unter **Weitere Experimente**, und solange keines eine Kategorie hat, gibt es gar keine Überschriften). Jedes zeigt seinen Titel und darunter, wie viele Läufe es hat und wie viele davon aktiv sind („6 Läufe · 1 aktiv“) oder wann sein letzter Lauf war („23 Läufe · vor 2 Std.“). In einer Kategorie steht das Experiment mit dem neuesten Lauf zuerst. **Läufe ohne Experiment** ist der letzte Eintrag, sofern es solche Läufe gibt.
 
 Die **Übersicht** zeigt:
@@ -172,13 +173,103 @@ Markiere in einer Tabelle der Läufe das Kästchen jedes Laufs, den du haben mö
 
 Das ⋯-Menü eines Experiments bietet außerdem **Die letzten 6 vergleichen**, sein Tab **Hyperparameter** **Die besten 6 vergleichen**.
 
+Bevor du dich auf eine Verbesserung verlässt: Mit **Versuchen, es zu widerlegen** unten in diesem Fenster versucht ein Agent, der an der Arbeit nicht beteiligt war, sie wegzuerklären. Prüfe **Das zu prüfende Ergebnis** (ein Satz, aus den ausgewählten Läufen ausgefüllt: Ändere ihn so, dass er sagt, was du meinst), wähle die **Baseline** und wer es ausführt (**Ausgeführt von**) und klicke auf **Starten**. Der Agent sucht nach anderen Erklärungen (Glückstreffer bei den Seeds, eine nicht abgestimmte Baseline, ein Datenleck, ein Fehler in der Metrik), führt Kontrollläufe in einem eigenen Experiment aus, auf einer Kopie deines Codes, und fragt nach, bevor er viel GPU-Zeit nutzt, repariert nichts und meldet „Es hält stand“, „Es hält teilweise stand“ oder „Es hält nicht stand“, zusammen mit dem, was er versucht hat (Läufe auf anderen Computern werden nicht einbezogen).
+
+## Evaluationen: Bewerten immer auf dieselbe Weise
+
+Mit einer Evaluation führt ein Projekt seinen Punktestand: ein Befehl und eine Zahl, versiegelt, sodass jeder Lauf und jeder Agent auf dieselbe Weise bewertet wird. Die Dateien, aus denen das Bewertungsskript besteht, und die Daten, mit denen es vergleicht, werden versiegelt. Solange sie abweichen, gibt es keine Bewertung, und jede Bewertung ermittelt die App aus ihrem eigenen Lauf des versiegelten Befehls. So lassen sich zwei Zahlen vergleichen, ohne dass du dich fragen musst, wie sie jeweils entstanden sind.
+
+Auf einem Computer führt die Spalte sie unter **Evaluationen** auf, über den Experimenten. Jede zeigt ihren neuesten Score und wie er zur Baseline steht („0.431 · 0.019 besser“), „Noch kein Score“, „Wird bewertet …“, während eine Bewertung läuft, „Wird weiterentwickelt · 37 von 200“, während [Weiterentwickeln](#evolve-searching-for-a-better-version) daran arbeitet, oder „geändert“ mit einer gelben Markierung, wenn ihre Dateien abweichen. Auf einem Handy sind sie Karten oben in der Übersicht.
+
+### Eine Evaluation einrichten
+
+Klicke oben auf **Mehr** (⋯) und dann auf [**Neue Evaluation**](/experiments?new=evaluation). Das Fenster hat vier Teile:
+
+- **Was bewertet wird**: der **Name**, der **Ordner** (ein Projekt, meist ein Git-Repository), der **Befehl zum Bewerten** (zum Beispiel `python eval.py --split dev --seed {seed}`: Schreibe `{seed}` dorthin, wo der Seed hingehört, um mit mehreren Seeds zu bewerten), **Die Zahl, die zählt**, so wie der Befehl sie ausgibt (`ndcg@10` für `ndcg@10=0.412`), und **Höher ist besser** oder **Niedriger ist besser**.
+- **Was sich nicht ändern darf**: die Dateien und Ordner, aus denen das Bewertungsskript und seine Daten bestehen. Tippe einen Eintrag ein und klicke auf **Hinzufügen**, oder tippe die an, die unter **Aus deinem Befehl vorgeschlagen** stehen. Steht `{seed}` im Befehl, legt **Seeds** fest, welche verwendet werden (1, 2, 3, wenn du nichts änderst).
+- **Abschlusstest** (optional): ein eigener Befehl und ein **Zurückgehaltener Ordner** außerhalb des Projekts, den nur der Abschlusstest bekommt: Agenten, die im Projekt arbeiten, sehen ihn dort nicht. Der Befehl findet ihn als `$HYDOR_HELD_OUT`.
+- **Ausführungsort**: die GPUs, die jeder Lauf braucht, ihr freier Speicher und ein Zeitlimit. Seine Läufe warten auf diesem Computer in der Warteschlange wie alle anderen.
+
+**Erstellen und versiegeln** versiegelt die Dateien (bei großen Ordnern dauert das eine Weile) und öffnet die Seite der Evaluation. Du weißt nicht, was du eintragen sollst? **Mit einem Agenten einrichten**, oben im Fenster, startet eine Anfrage in diesem Ordner: Der Agent liest nach, wie du trainierst und evaluierst, und schlägt die Evaluation vor. Sie wird nur erstellt, wenn du zustimmst.
+
+### Die Seite der Evaluation
+
+Unter ihrem Namen stehen die Zahl, welche Richtung besser ist, die Seeds und der Befehl (tippe darauf, um ihn ganz zu sehen), dann „Versiegelt am 24. Nov.: 4 Dateien, alle unverändert“. Darauf folgen drei Kacheln:
+
+- **Baseline**: der Score, mit dem die anderen verglichen werden. Anfangs steht dort „Noch nicht gemessen“: Klicke auf **Baseline messen**. **Neu messen** findest du in ihrem Menü.
+- **Neuester Score**: seine Zahl, der Branch und wie er zur Baseline steht („0.019 besser als die Baseline“; „Wie die Baseline, im Rahmen des Rauschens“, wenn der Unterschied leicht Zufall sein könnte), dazu, wie oft allein der Zufall einen solchen Unterschied ergeben würde.
+- **Abschlusstest**: **Hinzufügen**, **Abschlusstest ausführen …** oder seine Zahl und wie oft er seit dem Versiegeln gelaufen ist.
+
+Ab zwei Scores zeigt ein Diagramm jeden im Zeitverlauf, mit seiner Streuung über die Seeds und der Baseline als gestrichelter Linie. **Weiterentwickeln …** im Menü ⋯ der Seite startet eine Suche nach einer besseren Version ([Weiterentwickeln](#evolve-searching-for-a-better-version)). Sobald es eine gibt, führt **Weiterentwickeln** sie zwischen dem Diagramm und den Scores auf. **Bewertungen** listet die Scores auf, die neuesten zuerst: wann, wo (Branch und Commit, gegebenenfalls „mit nicht committeten Änderungen“), wer sie angefragt hat, den Score und wie er im Vergleich steht. Das Menü eines Scores öffnet seine Läufe, verwendet ihn als Baseline (**Als Baseline verwenden**), stoppt oder löscht ihn. Ist eine Bewertung fehlgeschlagen, weil der Befehl die Zahl nicht ausgegeben hat, werden die Namen angezeigt, die er ausgegeben hat: Tippe einen an, um stattdessen ihn zu verwenden (dabei wird neu versiegelt).
+
+**Jetzt bewerten** bewertet den Ordner. Hat das Repository Git-Worktrees, fragt die App: „Den Stand in welchem Ordner bewerten?“: den Ordner selbst oder einen der Worktrees, benannt nach seinem Branch. Eine Evaluation kann ihren eigenen Ordner, einen Ordner darin oder einen Git-Worktree desselben Repositorys bewerten.
+
+### Wenn sich versiegelte Dateien ändern
+
+Weicht eine versiegelte Datei ab, sagt ein gelber Hinweis, welche, und Bewertungen warten, bis die Dateien wieder im alten Stand sind:
+
+- **Änderungen anzeigen**: Jede Datei ist als Geändert, Fehlt oder Neue Datei markiert, mit dem, was sich darin geändert hat.
+- **Wiederherstellen**: schreibt die versiegelten Kopien darüber und sagt, was nicht wiederhergestellt werden konnte und warum (seither hinzugefügte Dateien bleiben).
+- **Neu versiegeln …**: akzeptiert die Dateien so, wie sie jetzt sind. Frühere Scores werden nicht mehr mit neuen verglichen (sie bleiben erhalten, eingeklappt unter **Vor dem neuen Versiegeln**), und die Baseline muss neu gemessen werden. Auch wenn du mit **Bearbeiten…** den Befehl, die Zahl oder die versiegelten Dateien änderst, wird neu versiegelt.
+
+### Der Abschlusstest
+
+**Abschlusstest ausführen …** (auf seiner Kachel oder im Menü der Seite) sagt, wie gut deine Arbeit wirklich auf Daten abschneidet, auf die nichts abgestimmt wurde. Jeder Blick darauf sagt etwas weniger aus, führe ihn also aus, wenn du glaubst, fertig zu sein. Das Fenster zeigt, wie oft er seit dem Versiegeln gelaufen ist. Gibt es Git-Worktrees, fragt es auch, auf welchem er läuft (**Mit dem Stand in**).
+
+### Was Agenten tun können
+
+Agenten können die Evaluationen lesen, eine Bewertung ihres Ordners anfordern (die App führt den versiegelten Befehl selbst aus; die Agenten melden diese Zahl, nicht ihre eigene), eine neue Evaluation vorschlagen (du siehst jeden Teil davon auf einer Karte, und sie wird nur erstellt, wenn du zustimmst) und versiegelte Dateien wiederherstellen. Sie können nicht selbst eine erstellen oder versiegeln, die Baseline festlegen oder den Abschlusstest ausführen oder lesen.
+
+Läufe, die im Ordner einer Evaluation gestartet werden, zeigen auf ihrer Seite, ob ihre Dateien beim Start dem versiegelten Stand entsprachen, und eine Lauftabelle markiert die, bei denen das nicht so war, mit einem gelben Zeichen. Ein Lauf, der zur Bewertung für eine Evaluation diente, führt zu ihr zurück.
+
+## Weiterentwickeln: nach einer besseren Version suchen
+
+Weiterentwickeln probiert viele kleine Änderungen an den Dateien aus, die du nennst, bewertet jede mit der Evaluation und behält die beste. Deine eigenen Dateien werden nicht angerührt: Jede Änderung wird in einer eigenen Kopie der App ausprobiert, erstellt aus deinem letzten Commit. Zum Schreiben der Änderungen nutzt die App das [Hilfsmodell](/guide/agents-models#choose-the-helper-model) und baut dabei jede auf einer der bisher besten Versionen auf.
+
+Das lohnt sich bei einer Datei, deren Qualität die Evaluation gut messen kann: eine Heuristik, eine Bewertungsfunktion, ein Prompt, eine langsame Routine. Es lohnt sich nicht, wenn die Evaluation schwach ist (wenige Beispiele, eine Zahl, die sich leicht austricksen lässt): Eine Suche findet die Schwachstellen dessen, was sie bewertet. Richte deshalb einen [Abschlusstest](#the-final-test) auf Daten ein, die die Suche nie sieht.
+
+### Eine Suche starten
+
+Öffne die Seite der Evaluation, klicke auf ⋯ und **Weiterentwickeln …**. Das Fenster fragt:
+
+- **Was darf geändert werden?** Tippe eine Datei ein und klicke auf **Hinzufügen**, oder tippe die unter **Vorgeschlagen** an: bis zu 8 Textdateien, die committet sind und seitdem keine Änderungen haben. Eine Datei, die die Evaluation schützt, kann nicht geändert werden: Das wird dir gesagt.
+- **Was soll ausprobiert werden?** (optional): ein paar Zeilen, etwa „Mach den Reranker schneller, ohne bei nDCG@10 zu verlieren“.
+- **Wie viele Versuche**: 50, 100, 200 oder **Andere** für eine eigene Zahl (10 bis 2000).
+- Unter **Mehr**: **Stoppen nach (Stunden)**, **Wie viele gleichzeitig** (1 bis 4) und **Stoppen, wenn so viele Versuche in Folge nichts Besseres gebracht haben** (40, wenn du es nicht änderst).
+
+Klicke auf **Starten**. Zuerst wird dein Ausgangsstand mit allen Seeds der Evaluation bewertet, dann geht es los. Eine Evaluation ohne Baseline zeigt **Baseline messen** statt **Starten**.
+
+### Die Seite der Suche lesen
+
+Ihre Zeile unter **Weiterentwickeln** auf der Seite der Evaluation zeigt „Läuft · 37 von 200 ausprobiert“, „Fertig · 0.035 besser als der Ausgangsstand“ oder „Angehalten“; klicke darauf, um sie zu öffnen. Oben stehen ihr Zweck, ihr Zustand (etwa „Fertig: kein neuer Bestwert bei den letzten 40“) und **Pausieren** oder **Fortsetzen**, **Stoppen** (danach lässt sie sich nicht fortsetzen) und ⋯ mit **Löschen …** (ihre Versuche, deren Scores und Arbeitskopien werden entfernt; ein Branch, den du übernommen hast, bleibt). Darauf folgen drei Kacheln:
+
+- **Ausgangsstand**: der Score deiner Version.
+- **Bisher am besten**: der beste Score, wie viel besser als der Ausgangsstand er ist, eine Zeile dazu, was geändert wurde, und **Änderung ansehen**.
+- **Ausprobiert**: wie viele von wie vielen, wie viele fehlgeschlagen sind und wie oft ein Modell gefragt wurde.
+
+Ein Diagramm zeigt alle Versuche der Reihe nach: Eine schnelle erste Bewertung (**Nur erster Seed**) ist heller als eine, die mit **Alle Seeds** geprüft wurde, fehlgeschlagene Versuche sind Markierungen am unteren Rand, **Bisher am besten** ist eine Stufenlinie und **Ausgangsstand** eine gestrichelte. Klicke auf einen Punkt, um den Versuch zu öffnen.
+
+**Was ausprobiert wurde** listet die Versuche auf, die neuesten zuerst: was jeder geändert hat, seinen Score (oder warum er fehlgeschlagen ist), wie er zum Ausgangsstand steht, auf welcher Version er aufbaut (**Baut auf**) und das **Modell**, das ihn geschrieben hat (**Schnell** oder ab und zu **Stark**). Ein Versuch bekommt zuerst eine schnelle Bewertung mit einem Seed; nur wenn er den besten seiner Entwicklungslinie schlägt, wird er mit allen Seeds geprüft, und nur dieser vollständige Score kann ihn zum besten machen. **Neuer Bestwert** markiert die, die bei ihrer Bewertung die besten waren, **Bestwert** den, der jetzt der beste ist. Öffne einen Versuch, um seine Änderung Datei für Datei zu sehen, und **Diesen übernehmen**.
+
+### Den besten Stand übernehmen
+
+**Besten Stand übernehmen** (und **Diesen übernehmen**) fragt zuerst nach und erstellt dann in deinem Repository einen Branch mit dieser Version: Die Dateien, die du ausgecheckt hast, werden nicht angerührt. Die Seite behält den Hinweis „Übernommen als <branch>“, der den Branch auf der [Git-Seite](/git) öffnet. Übernimmst du erneut, kommt ein Commit auf demselben Branch hinzu.
+
+Der Abschlusstest hat die übernommene Version noch nicht gesehen. Um sie dort zu prüfen, wechsle in deinem Ordner auf den Branch (oder lege einen Git-Worktree davon an) und klicke auf der Seite der Evaluation auf **Abschlusstest ausführen …**.
+
+### Was es kostet
+
+Jeder Versuch führt die Evaluation aus (mit einem Seed, dann mit allen, wenn er vielversprechend ist) und fragt ein Modell einmal, oder zweimal, wenn dessen erste Antwort nicht verwendbar ist. Mit GPUs reihen sich die Läufe wie alle anderen in die Warteschlange ein. **Pausieren** stoppt neue Versuche, und **Stoppen nach (Stunden)** sowie die Grenze für Versuche in Folge ohne Verbesserung verhindern, dass es ohne Nutzen weiterläuft.
+
+Agenten können eine Suche starten, wenn du auf einer Karte zustimmst, und ihren Verlauf lesen. Löschen können sie keine.
+
 ## Ergebnistabellen für Papers
 
 **Tabelle erstellen** (aus markierten Läufen, dem ⋯-Menü eines Experiments oder seinem Tab **Hyperparameter**) zeigt die Tabelle so, wie du sie wählst:
 
 - **Spalten**: die Metriken. Ein Klick fügt eine hinzu oder entfernt sie, und ihr Pfeil legt fest, ob größere oder kleinere Werte besser sind.
 - **Zeilen**: **Eine Zeile pro Experiment** oder eine Zeile pro Wert eines Hyperparameters, der sich zwischen den Läufen unterscheidet (**Eine Zeile pro Wert von lr**).
-- **Grundlinie**: die Zeile, gegen die die anderen getestet werden (die erste Zeile, wenn du keine auswählst).
+- **Baseline**: die Zeile, gegen die die anderen getestet werden (die erste Zeile, wenn du keine auswählst).
 - **Mit der Baseline vergleichen**: **Automatisch auswählen** (gepaart über Beispiele, wenn die Läufe Bewertungen pro Beispiel gespeichert haben, sonst gepaart über Seeds, wenn die Läufe der Zeilen ihre Seeds teilen, sonst ein Welch-t-Test über Seeds), **Welch-t-Test über Seeds**, **Gepaarter t-Test (nach Seed oder Beispiel)**, **Gepaarter Bootstrap über Beispiele** oder **Kein Test**.
 - **Bildunterschrift**.
 
@@ -229,7 +320,7 @@ Ein Job für einen Cluster läuft dort in einem Ordner (der Code muss bereits do
 
 ## Auf dem Smartphone
 
-Es gibt keine Spalte: Die Übersicht beginnt mit der Warteschlange, den GPUs und **Experiment finden** und listet die Experimente als Karten auf. Ein Experiment und ein Lauf öffnen sich an ihrer Stelle, mit einem Zurück-Pfeil. Eine Tabelle der Läufe scrollt seitwärts, wobei Kästchen und Name jedes Laufs im Blick bleiben; die Läufe in den Diagrammen sind eine Reihe von Chips über ihnen, und **Glättung** steht im Menü **Diagrammoptionen**. Das Protokoll eines Laufs wird auf Bildschirmbreite umgebrochen, **Folgen** arbeitet wie am Computer. Neuer Lauf, Vergleich und Tabellen öffnen sich vom unteren Bildschirmrand.
+Es gibt keine Spalte: Die Übersicht beginnt mit der Warteschlange, den GPUs und **Experiment finden** und listet die Evaluationen (wenn du welche hast) und die Experimente als Karten auf. Ein Experiment, eine Evaluation und ein Lauf öffnen sich an ihrer Stelle, mit einem Pfeil zurück. Eine Lauftabelle lässt sich seitwärts scrollen, wobei Kontrollkästchen und Name jedes Laufs sichtbar bleiben. Die Läufe in den Diagrammen stehen als Reihe von Chips darüber, und **Glättung** findest du im Menü **Diagrammoptionen**. Das Protokoll eines Laufs bricht auf die Breite des Bildschirms um, und **Folgen** funktioniert wie auf einem Computer. Neuer Lauf, Vergleichen und die Tabellen öffnen sich vom unteren Bildschirmrand.
 
 ## Frag einen Agenten
 
@@ -240,6 +331,12 @@ Es gibt keine Spalte: Die Übersicht beginnt mit der Warteschlange, den GPUs und
 - „Lass einen Agenten diesen Trainingslauf überwachen. Bei Speichermangel soll er die Batchgröße halbieren und am letzten Checkpoint fortsetzen.“
 - „Erstelle eine LaTeX-Tabelle der lora-Experimente mit Accuracy und F1 gegenüber der Baseline einschließlich Signifikanztests und füge sie in meine Paper ein.“
 - „Welcher meiner Läufe dieser Woche hatte den besten Validierungsverlust und welche Hyperparameter wurden verwendet?“
+- „Versuche, das Ergebnis zu widerlegen, dass der neue Loss die Baseline bei ndcg@10 schlägt.“
 - „Gib meinen Experimenten klarere Titel und Beschreibungen und sortiere sie in Kategorien ein.“
 - „Welche Hyperparameter sind in meinem Lernraten-Sweep am wichtigsten für den Dev-Verlust?“
 - „Zeig mir die Kurven der 5 besten Läufe des lora-Experiments.“
+- „Richte eine Evaluation für dieses Repository ein.“
+- „Bewerte meinen Branch gegen die Baseline.“
+- „Warum sagt meine Evaluation, dass sich Dateien geändert haben?“
+- „Entwickle die Bewertungsfunktion in rank.py anhand meiner Auswertung evolutionär weiter, 100 Versuche.“
+- „Wie läuft die Evolution?“

@@ -185,6 +185,29 @@ row('general', 'Update automatically', 'switch', {
   write: put('/api/update/auto', (v) => ({ on: v })),
   note: 'Only where the app can restart itself.',
 });
+row('general', 'Lean (proof checker)', 'action', {
+  states: ['set up', 'not set up'],
+  read: rd('/api/lean', 'ready'),
+  act: {
+    question: 'Set up Lean, the proof checker (a download of about 620 MB, about 3 GB once unpacked, kept in the app’s own folder)?',
+    run: async (api) => {
+      const s = await api<{ ready: boolean; installing: boolean }>('POST', '/api/lean/setup', {});
+      return s.ready && !s.installing ? ['Lean is set up already.'] : ['Setting Lean up in the background; hydor settings get general.lean-proof-checker says when it is ready.'];
+    },
+  },
+  note: 'Your own Lean is used as it is. Removing the one the app set up is done on the page.',
+});
+row('general', 'Add Mathlib', 'action', {
+  states: ['added', 'not added'],
+  read: { endpoint: '/api/lean', pick: (d) => d.mathlib === 'ready' },
+  act: {
+    question: 'Add Mathlib to Lean (several GB, about 6 GB once it is there; Lean is set up first if it is not)?',
+    run: async (api) => {
+      await api('POST', '/api/lean/setup', { mathlib: true });
+      return ['Adding Mathlib in the background; hydor settings get general.add-mathlib says when it is there.'];
+    },
+  },
+});
 row('general', 'Take the tour', 'page', { note: 'The welcome tour starts in the browser.' });
 row('general', 'Tips', 'switch', { read: rd('/api/tips', 'on'), write: put('/api/tips', (v) => ({ on: v })) });
 row('general', 'Starter ideas', 'switch', {

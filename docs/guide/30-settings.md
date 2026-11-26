@@ -28,6 +28,8 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Start when this computer starts**](/settings?s=general&find=Start%20when%20this%20computer%20starts): Starts the app when the computer starts.
 - [**Keep the computer awake**](/settings?s=general&find=Keep%20the%20computer%20awake): In the desktop apps, the computer does not go to sleep by itself while agents work and before scheduled tasks.
 - [**Update automatically**](/settings?s=general&find=Update%20automatically): Installs new versions by itself: the desktop apps as soon as they are out, after a minute’s notice; a copy from git when you have not used it for a while.
+- [**Lean (proof checker)**](/settings?s=general&find=Lean%20%28proof%20checker%29): Lets agents check mathematical proofs: a proof Lean accepts is correct.
+- [**Add Mathlib**](/settings?s=general&find=Add%20Mathlib): Add the library most mathematics needs to Lean.
 - [**Take the tour**](/settings?s=general&find=Take%20the%20tour): See what each part of the app does.
 - [**Tips**](/settings?s=general&find=Tips): Points out a part of the app the first time you come to it, after the welcome tour.
 - [**Starter ideas**](/settings?s=general&find=Starter%20ideas): Examples, your apps and an automation under the empty message box on the start page.

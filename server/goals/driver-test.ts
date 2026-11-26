@@ -79,6 +79,13 @@ import { addPost, members as swarmMembers, posted, postsOf, stopMember, tellLead
 import { goals } from './index.ts';
 import { setReviewer } from './review.ts';
 import { goalHoldsNotices, goalInfo, loadGoal, publicGoal, saveGoal, type RestoreMark } from './store.ts';
+import type { EvalScore, Evaluation } from '../../shared/evaluations.ts';
+import { createEvaluation, getScore, listScores, sealAgain, startScore } from '../experiments/evaluations.ts';
+import { stopTmuxServer } from '../experiments/local.ts';
+import { setSettings as setQueueSettings, tick as queueTick, useDeps as useQueueDeps } from '../experiments/queue.ts';
+import { getRun } from '../experiments/records.ts';
+import { MOVED_WAY } from './scores.ts';
+import { SCORE_PAUSED } from './driver.ts';
 import { GOAL_TOOLS } from './tools.ts';
 import { goalStartSettings, parseGoalAction } from './validate.ts';
 
@@ -5370,6 +5377,307 @@ test('S5 (third review): a Stop all from before the goal was set holds nothing o
   assert.equal(toLead(B).length, n + 1);
   assert.match(toLead(B).at(-1)!.text, /Done: the cache is in\.$/);
   await act(B, { action: 'stop' });
+});
+
+// ---- a score check: the project's evaluation scores the rounds ----------------------------------------------------
+// A repository of its own with a tiny evaluation (a shell script printing ndcg for each of three seeds: the model's number
+// plus the seed's noise; "slow" takes long), scored for real through the Experiments queue (tmux, no GPU).
+
+const EREPO = path.join(tmp, 'erepo');
+fs.mkdirSync(EREPO);
+write(EREPO, 'eval.sh', 'm=$(cat model.txt)\ncase "$m" in slow) sleep 60; exit 0;; esac\nn=$(sed -n "${1}p" noise.txt)\nawk -v m="$m" -v n="$n" \'BEGIN { printf "ndcg=%.4f\\n", m + n }\'\n');
+write(EREPO, 'noise.txt', '0\n0.02\n-0.02\n');
+write(EREPO, 'model.txt', '0.40\n');
+git(EREPO, 'init', '-q', '-b', 'main');
+git(EREPO, 'config', 'user.name', 'Test');
+git(EREPO, 'config', 'user.email', 'test@example.invalid');
+git(EREPO, 'add', '-A');
+git(EREPO, 'commit', '-q', '-m', 'start');
+let ewtN = 0;
+function eworktree(): WorktreeInfo {
+  const p = path.join(tmp, `ewt${++ewtN}`);
+  const branch = `agent/goal-score-${ewtN}`;
+  git(EREPO, 'worktree', 'add', '-q', '-b', branch, p, 'main');
+  return { path: p, branch, base: 'main', repo: EREPO };
+}
+let evS: Evaluation | undefined;
+let stepper: NodeJS.Timeout | undefined;
+/** The evaluation, its baseline measured by the person (0.40 over three seeds), and the queue stepping. */
+async function evaluation(): Promise<Evaluation> {
+  if (evS) return evS;
+  useQueueDeps(deps);
+  setQueueSettings(db, { cpuSlots: 4 });
+  stepper = setInterval(() => void queueTick(), 100);
+  evS = await createEvaluation(deps, { name: 'Relevance', cwd: EREPO, command: 'sh eval.sh {seed}', metric: 'ndcg', better: 'higher', seeds: [1, 2, 3], protect: ['eval.sh', 'noise.txt'], final: { command: 'sh eval.sh 1' }, gpus: 0 });
+  const b = await startScore(deps, evS.id, { kind: 'baseline', by: { who: 'you' } });
+  await until('the baseline', () => getScore(db, b.id)?.status === 'done', 60_000);
+  return evS;
+}
+const scoresOf = (id: string) => listScores(db, id, ['score']);
+const model = (dir: string, v: string) => write(dir, 'model.txt', `${v}\n`);
+/** A goal with a score check (gain 0.05) and a command, agreed by the person and measured: round 1 sent. */
+async function scoreGoal(key: string, ev: Evaluation) {
+  await act(key, { action: 'set', objective: 'Beat the baseline on ndcg by 0.05' });
+  await turn(key, async () => {
+    const r = await tool(key, 'goal_propose', { checks: [{ kind: 'score', label: 'Beats the baseline', evaluation: ev.id, gain: 0.05 }, { kind: 'command', label: 'Model file', run: 'test -f model.txt' }], protect: ['notes/'], limits: { rounds: 6 } });
+    assert.equal(r.isError, false, r.text);
+  });
+  await until('agreeing', () => goal(key).status === 'agreeing');
+  await act(key, { action: 'agree' });
+  await until('round 1', () => goal(key).status === 'working' && goal(key).round === 1, 60_000);
+}
+
+const SC = 'claude:goal-score';
+const swt = eworktree();
+sessions.add(SC, { cwd: swt.path, worktree: swt, title: 'Beat the baseline' });
+
+test('score: proposed with an evaluation the folder does not have, refused in a sentence; agreed, its target fixed from the baseline and the evaluation’s files kept safe; kept, undone (a protected file), reached with no second score, and the report names the final test', async () => {
+  const ev = await evaluation();
+  reviewer = { needs: undefined, claim: true, broke: false, final: { ok: true, reason: 'The change meets the goal: model.txt says 0.50.' } };
+  // An evaluation the folder does not have, said to the agent to fix.
+  await act(SC, { action: 'set', objective: 'Beat the baseline' });
+  const bad = await tool(SC, 'goal_propose', { checks: [{ kind: 'score', label: 'Beats it', evaluation: 'enope' }] });
+  assert.equal(bad.isError, true);
+  assert.match(bad.text, /“Beats it”: there is no evaluation “enope” \(evaluation_get lists those of this folder\)/);
+  await act(SC, { action: 'stop' });
+  await act(SC, { action: 'stop' });
+  await scoreGoal(SC, ev);
+  let g = goal(SC);
+  const c = g.contract.checks[0];
+  assert.deepEqual(c.target, { op: '>=', value: 0.45 }, 'the baseline’s 0.40 and the gain');
+  assert.equal(c.baseline!.seal, 1);
+  assert.equal(c.baseline!.name, 'Relevance');
+  assert.deepEqual(g.contract.protect, ['notes/', 'eval.sh', 'noise.txt'], 'the evaluation’s files join the paths');
+  const r0 = g.rounds[0].results.find((r) => r.id === c.id)!;
+  assert.ok(Math.abs(r0.value! - 0.4) < 1e-9);
+  assert.equal(r0.holds, false);
+  assert.equal(r0.verdict, 'same');
+  assert.equal(getScore(db, r0.score!)!.by.who, 'goal');
+  assert.equal(g.scoring, undefined, 'nothing waits once it is measured');
+  // The round's agent hears how the score stands and that it may score its own work.
+  assert.match(last(SC), /Scored by the project’s evaluation[\s\S]*Beats the baseline: the ndcg of the evaluation “Relevance” \(id e[\w]+\), 0\.4 where the files stand; its baseline is 0\.4, and it holds at ≥ 0\.45, beyond the noise of its seeds\.[\s\S]*evaluation_score/);
+  assert.match(last(SC), /Do not change: notes\/, eval\.sh, noise\.txt/);
+  assert.match(last(SC), /Not yet: Beats the baseline 0\.4 \(needs ≥ 0\.45, beyond the noise\)/);
+  // Round 1: closer, within the noise: kept.
+  await turn(SC, async () => {
+    model(swt.path, '0.43');
+    await tool(SC, 'goal_report', { did: 'Tuned the model to 0.43.' });
+  });
+  g = goal(SC);
+  assert.equal(g.rounds[1].outcome, 'kept', g.rounds[1].why);
+  assert.equal(g.rounds[1].why, 'Beats the baseline 0.4 → 0.43');
+  assert.match(g.rounds[1].results[0].detail!, /^0\.43 against 0\.4: within the noise of 3 seeds/);
+  assert.equal(g.best, 1);
+  // Round 2: the scorer changed (a protected file): undone; its score was refused, and nothing was scored.
+  const before = scoresOf(ev.id).length;
+  await turn(SC, () => {
+    model(swt.path, '0.90');
+    write(swt.path, 'eval.sh', 'echo ndcg=0.99\n');
+  });
+  g = goal(SC);
+  assert.equal(g.rounds[2].outcome, 'undone');
+  assert.equal(g.rounds[2].cause, 'protected');
+  assert.equal(g.rounds[2].why, 'It changed files it may not change: eval.sh');
+  assert.match(g.rounds[2].results[0].error!, /^The scorer or its data changed since it was sealed: eval\.sh, so it was not scored$/);
+  assert.equal(scoresOf(ev.id).length, before);
+  assert.equal(file(swt.path, 'model.txt'), '0.43\n');
+  assert.equal(file(swt.path, 'eval.sh')!.startsWith('m=$(cat model.txt)'), true, 'the scorer is back');
+  // Round 3: beyond the noise and the gain: every check holds; the final check runs the command again, not the score.
+  await turn(SC, () => model(swt.path, '0.50'));
+  g = goal(SC);
+  assert.equal(g.status, 'reached', g.reason ?? g.rounds.at(-1)?.why);
+  assert.equal(scoresOf(ev.id).length, before + 1, 'one score for round 3, none again at the end');
+  assert.equal(g.report!.summary, 'All 2 checks hold: in the last round, and the one that runs a command again on a second run. A review of the whole change found the goal met.');
+  assert.deepEqual(g.report!.finals, [{ evaluation: ev.id, name: 'Relevance' }]);
+  assert.equal(g.rounds[3].results[0].verdict, 'better');
+  // The final reviewer reads the score as the app's own run of the sealed evaluation.
+  const final = asked.filter((a) => a.system.includes('You are the last check')).at(-1)!;
+  assert.match(final.prompt, /- Beats the baseline \(score: the ndcg of the sealed evaluation “Relevance”, run by the app, >= 0\.45: its baseline 0\.4 \+ 0\.05, beyond the noise of its seeds\)/);
+  assert.equal(listScores(db, ev.id, ['final']).length, 0, 'the final test never ran');
+  await act(SC, { action: 'stop' });
+});
+
+const SP = 'claude:goal-score-pause';
+const pwt = eworktree();
+sessions.add(SP, { cwd: pwt.path, worktree: pwt, title: 'Pause a score' });
+
+test('score: the bar says how its runs stand while it waits; Pause stops its runs and pauses at once, the round unchecked; Resume scores it again; Stop stops its runs too', async () => {
+  const ev = await evaluation();
+  await scoreGoal(SP, ev);
+  // The round's turn ends with a slow model: its check waits for the score (not awaited here).
+  await turn(SP, () => model(pwt.path, 'slow'), { tell: false });
+  await tickOnce(deps);
+  await until('scoring', () => !!goal(SP).scoring && goal(SP).status === 'checking', 30_000);
+  const sc = goal(SP).scoring!;
+  assert.equal(sc.check, 'c1');
+  assert.equal(sc.runs, 3);
+  const id = (loadGoal(db, SP)!._.scores ?? {}).c1;
+  assert.ok(id, 'the score is kept with the goal while it is waited for');
+  await until('its runs going', () => getScore(db, id)!.runs.every((r) => getRun(db, r)?.status === 'running'), 30_000);
+  await act(SP, { action: 'pause' });
+  let g = goal(SP);
+  assert.equal(g.status, 'paused');
+  assert.equal(g.reason, SCORE_PAUSED);
+  assert.equal(g.pausing, undefined, 'it does not wait for the score');
+  assert.equal(g.scoring, undefined);
+  await settled();
+  await until('the score stopped', () => getScore(db, id)!.status === 'stopped', 60_000);
+  g = goal(SP);
+  assert.equal(g.round, 1, 'the round is unchecked');
+  assert.equal(g.rounds.length, 1);
+  assert.equal(loadGoal(db, SP)!._.scores, undefined);
+  // Resume: scored again (now quickly), and the round is judged.
+  model(pwt.path, '0.43');
+  await act(SP, { action: 'resume' });
+  await settled();
+  await until('round 1 checked', () => goal(SP).rounds.length === 2, 60_000);
+  assert.equal(goal(SP).rounds[1].outcome, 'kept');
+  assert.notEqual(goal(SP).rounds[1].results[0].score, id);
+  // Stop while it waits: its runs stop, and the report says the round was not checked.
+  await until('round 2', () => goal(SP).status === 'working' && goal(SP).round === 2);
+  await turn(SP, () => model(pwt.path, 'slow'), { tell: false });
+  await tickOnce(deps);
+  await until('scoring again', () => !!loadGoal(db, SP)!._.scores?.c1 && goal(SP).status === 'checking', 30_000);
+  const id2 = loadGoal(db, SP)!._.scores!.c1;
+  await until('its runs going', () => getScore(db, id2)!.runs.every((r) => getRun(db, r)?.status === 'running'), 30_000);
+  await act(SP, { action: 'stop' });
+  assert.equal(goal(SP).status, 'stopped');
+  assert.equal(goal(SP).report!.mid, 2);
+  assert.match(goal(SP).report!.summary, /^Stopped by you during round 2: that round’s work was not checked\./);
+  await settled();
+  await until('the second score stopped', () => getScore(db, id2)!.status === 'stopped', 60_000);
+  assert.equal(goal(SP).rounds.length, 2, 'nothing was recorded for round 2');
+  model(pwt.path, '0.40');
+  await act(SP, { action: 'stop' });
+});
+
+const SR = 'claude:goal-score-restart';
+const rwt = eworktree();
+sessions.add(SR, { cwd: rwt.path, worktree: rwt, title: 'A restart mid-score' });
+
+test('score: a restart while a score is open: the tick waits for that same score again, and starts no other', async () => {
+  const ev = await evaluation();
+  await scoreGoal(SR, ev);
+  await turn(SR, () => model(rwt.path, '0.43'), { tell: false });
+  // As a restart leaves it: checking, the score started and kept with the goal, nothing waiting for it.
+  const left = await startScore(deps, ev.id, { kind: 'score', folder: rwt.path, by: { who: 'goal', session: SR } });
+  const g = loadGoal(db, SR)!;
+  g.status = 'checking';
+  g._.lastTurn = sessions.all.get(SR)!.endedAt;
+  g._.scores = { c1: left.id };
+  saveGoal(db, g);
+  const n = scoresOf(ev.id).length;
+  await tick(deps);
+  await until('round 1 checked', () => goal(SR).rounds.length === 2, 60_000);
+  assert.equal(goal(SR).rounds[1].results[0].score, left.id, 'the score the restart left open');
+  assert.equal(scoresOf(ev.id).length, n, 'no other score started');
+  assert.equal(goal(SR).rounds[1].outcome, 'kept');
+  assert.equal(loadGoal(db, SR)!._.scores, undefined);
+  await act(SR, { action: 'stop' });
+});
+
+const SM = 'claude:goal-score-moved';
+const mwt = eworktree();
+sessions.add(SM, { cwd: mwt.path, worktree: mwt, title: 'Sealed again mid-goal' });
+
+test('score: the evaluation sealed again mid-goal: nothing is scored, the round waits and the goal asks; the answer fixes the check again once there is a baseline, the round is checked and the score starts from it', async () => {
+  const ev = await evaluation();
+  await scoreGoal(SM, ev);
+  await turn(SM, () => model(mwt.path, '0.43'));
+  assert.equal(goal(SM).rounds[1].outcome, 'kept');
+  await until('round 2', () => goal(SM).round === 2);
+  await sealAgain(deps, ev.id);
+  const n = scoresOf(ev.id).length;
+  await turn(SM, () => model(mwt.path, '0.50'));
+  let g = goal(SM);
+  assert.equal(g.status, 'needs-you');
+  assert.equal(g.round, 2, 'the round waits, unchecked');
+  assert.equal(g.question!.kind, 'blocked');
+  assert.equal(g.question!.question, '“Relevance” was sealed again after the goal’s checks were agreed, so its scores can no longer be compared with the baseline “Beats the baseline” was agreed against.');
+  assert.deepEqual(g.question!.ways, [{ name: MOVED_WAY }]);
+  assert.equal(g.reason, g.question!.question);
+  assert.equal(scoresOf(ev.id).length, n, 'nothing was scored');
+  assert.equal(notices.at(-1)!.body.startsWith('The goal needs you: “Relevance” was sealed again'), true);
+  // Answered before a baseline is measured under the new seal: the question says so, and stays.
+  await act(SM, { action: 'answer', ways: [0] });
+  g = goal(SM);
+  assert.equal(g.status, 'needs-you');
+  assert.equal(g.question!.question, '“Beats the baseline”: the baseline of “Relevance” is not measured yet: only you can measure it, on the evaluation’s page.');
+  // The person measures it, and answers again: fixed against the new seal, the old values gone, the round checked.
+  model(EREPO, '0.40');
+  const b2 = await startScore(deps, ev.id, { kind: 'baseline', by: { who: 'you' } });
+  await until('the new baseline', () => getScore(db, b2.id)?.status === 'done', 60_000);
+  await act(SM, { action: 'answer', ways: [0], note: 'Resealed after a fix' });
+  await settled();
+  await until('round 2 checked', () => goal(SM).rounds.length === 3, 60_000);
+  g = goal(SM);
+  const c = g.contract.checks[0];
+  assert.equal(c.baseline!.seal, 2);
+  assert.equal(c.baseline!.score, b2.id);
+  assert.equal(g.rounds[1].results.some((r) => r.id === c.id), false, 'no value of the old seal is kept');
+  const start = g.rounds[0].results.find((r) => r.id === c.id)!;
+  assert.equal(start.since, 2, 'it starts from the round checked after the answer');
+  assert.ok(Math.abs(start.value! - 0.5) < 1e-9);
+  assert.equal(g.rounds[2].results.find((r) => r.id === c.id)!.verdict, 'better');
+  assert.equal(g.answered!.picked[0], MOVED_WAY);
+  await act(SM, { action: 'stop' });
+  await act(SM, { action: 'stop' });
+});
+
+const SF = 'claude:goal-score-full';
+const fwt = eworktree();
+// Bypass: its agent runs commands unasked, so a proposal is measured at once; a score still waits for Start.
+sessions.add(SF, { cwd: fwt.path, worktree: fwt, title: 'Full access', mode: 'bypassPermissions' });
+
+test('score: where the agent runs commands unasked, the proposal is measured at once but no score starts, nor at a change of the checks while agreeing; Start scores it exactly once, as the start, and the first round is judged from it', async () => {
+  const ev = await evaluation();
+  const n0 = scoresOf(ev.id).length;
+  await act(SF, { action: 'set', objective: 'Beat the baseline on ndcg' });
+  await turn(SF, async () => {
+    const r = await tool(SF, 'goal_propose', { checks: [{ kind: 'score', label: 'Beats the baseline', evaluation: ev.id, gain: 0.05 }, { kind: 'command', label: 'Model file', run: 'test -f model.txt' }], limits: { rounds: 6 } });
+    assert.equal(r.text, 'Shown to the user. Stop now: the app measures where things stand, and the rounds start when they agree.');
+  });
+  await until('agreeing', () => goal(SF).status === 'agreeing', 30_000);
+  let g = goal(SF);
+  assert.equal(scoresOf(ev.id).length, n0, 'no score before the person agreed');
+  assert.deepEqual(
+    g.rounds[0].results.map((r) => [r.id, r.holds]),
+    [['c2', true]],
+    'the command was measured, not the score',
+  );
+  assert.deepEqual(loadGoal(db, SF)!._.remeasure, ['c1'], 'the score waits for Start');
+  // A change of the checks while agreeing is measured at once here too: still no score.
+  await act(SF, { action: 'change', contract: { checks: [{ ...g.contract.checks[0], gain: 0.04 }, { ...g.contract.checks[1], run: 'test -f model.txt && test -f eval.sh' }] } });
+  await until('agreeing again', () => goal(SF).status === 'agreeing' && !isDriving(SF), 30_000);
+  g = goal(SF);
+  assert.equal(scoresOf(ev.id).length, n0);
+  assert.deepEqual(g.contract.checks[0].target, { op: '>=', value: 0.44 }, 'the new gain counts from the same baseline');
+  assert.equal(g.rounds[0].results.some((r) => r.id === 'c1'), false);
+  // Start: exactly one score, the start's own.
+  await act(SF, { action: 'agree' });
+  await until('round 1', () => goal(SF).status === 'working' && goal(SF).round === 1, 60_000);
+  g = goal(SF);
+  assert.equal(scoresOf(ev.id).length, n0 + 1, 'one score, at Start');
+  const s0 = g.rounds[0].results.find((r) => r.id === 'c1')!;
+  assert.ok(Math.abs(s0.value! - 0.4) < 1e-9);
+  assert.equal(s0.since, undefined, 'it is where the score starts from, not a check changed later');
+  assert.equal(s0.closeness, 0);
+  assert.match(last(SF), /Beats the baseline 0\.4 \(needs ≥ 0\.44, beyond the noise\)/);
+  // Round 1: 0.43 is three quarters of the way from the start's 0.40 to 0.44: closer, so kept.
+  await turn(SF, () => model(fwt.path, '0.43'));
+  g = goal(SF);
+  assert.equal(g.rounds[1].outcome, 'kept', g.rounds[1].why);
+  assert.equal(g.rounds[1].why, 'Beats the baseline 0.4 → 0.43');
+  const r1 = g.rounds[1].results.find((r) => r.id === 'c1')!;
+  assert.ok(Math.abs(r1.closeness - 0.75) < 1e-9, String(r1.closeness));
+  assert.equal(scoresOf(ev.id).length, n0 + 2);
+  await act(SF, { action: 'stop' });
+  await act(SF, { action: 'stop' });
+});
+
+test('score: the experiments queue and its tmux server stop with the tests', async () => {
+  if (stepper) clearInterval(stepper);
+  await stopTmuxServer();
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

@@ -4,13 +4,15 @@
 import { useMemo, useState } from 'react';
 import { FlaskConical, Plus } from 'lucide-react';
 import type { QueueNow, RunRecord } from '@shared/experiments';
+import type { EvaluationListed } from '@shared/evaluations';
+import type { Evolution } from '@shared/evolve';
 import { Meter } from '../../components/charts';
 import { Button, cx, Empty, inputCls } from '../../components/ui';
 import { bestRun, keyMetricOf, runKey, valueOf } from './analysis';
 import { gpuWords, isActive, keyMetrics, leftWords, num, progressOf, statusTone, statusWords, useSeries } from './api';
 import { Sparkline } from './Charts';
 import { RunsTable, type RunsSort } from './RunsTable';
-import { agoWords, byCategory, type Entry, findEntries, FindBox, fullDate, GpuMeters, lastOf, QueueLine, runsWords } from './Sidebar';
+import { agoWords, byCategory, type Entry, EvaluationLine, findEntries, FindBox, fullDate, GpuMeters, lastOf, QueueLine, runsWords } from './Sidebar';
 
 /** Cards of runs going or waiting shown before "Show all". */
 const FIRST_GOING = 12;
@@ -120,8 +122,35 @@ function ExperimentCard({ e, onOpen }: { e: Entry & { viaRuns?: number }; onOpen
   );
 }
 
+/** On a narrow screen, which has no column: the evaluations as cards. */
+function Evaluations({ evaluations, scoring, evolving, onOpen }: { evaluations: EvaluationListed[]; scoring: Set<string>; evolving: Map<string, Evolution>; onOpen: (id: string) => void }) {
+  if (!evaluations.length) return null;
+  return (
+    <section>
+      <h2 className="mb-2 text-[13px] font-semibold text-fg">Evaluations</h2>
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr))]">
+        {evaluations.map((ev) => (
+          <button key={ev.id} type="button" onClick={() => onOpen(ev.id)} className="flex min-w-0 flex-col gap-1 rounded-xl border border-line bg-panel p-3.5 text-left transition-colors hover:bg-bg-1">
+            <div translate="no" className="line-clamp-2 text-[14px] leading-snug font-semibold break-words text-fg">
+              {ev.name}
+            </div>
+            <div translate="no" className="truncate font-mono text-[12px] text-fg-3">
+              {ev.metric}
+            </div>
+            <EvaluationLine ev={ev} scoring={scoring.has(ev.id)} evolving={evolving.get(ev.id)} />
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function Home({
   runs,
+  evaluations,
+  scoring,
+  evolving,
+  onOpenEvaluation,
   error,
   entries,
   queue,
@@ -153,6 +182,12 @@ export function Home({
   onOpenExperiment: (group: string) => void;
   onNewRun: () => void;
   placeOf: (r: RunRecord) => { id: string; name: string };
+  evaluations: EvaluationListed[];
+  /** The ids of those being scored now. */
+  scoring: Set<string>;
+  /** The evolution working on each evaluation. */
+  evolving: Map<string, Evolution>;
+  onOpenEvaluation: (id: string) => void;
 }) {
   const [sort, setSort] = useState<RunsSort>(null);
   const [allGoing, setAllGoing] = useState(false);
@@ -187,6 +222,7 @@ export function Home({
     return (
       <div className="mx-auto max-w-[1200px] px-5 py-4">
         {narrow && <Top runs={runs} queue={queue} q={q} onQ={onQ} onOpenRun={onOpenRun} />}
+        {narrow && <Evaluations evaluations={evaluations} scoring={scoring} evolving={evolving} onOpen={onOpenEvaluation} />}
         <Empty icon={<FlaskConical size={20} />} title="No runs yet">
           <p>Experiments runs your jobs when a GPU is free, keeps a record of each (its code, settings, log and metrics) and tells you when it is done.</p>
           <div className="mt-4 flex justify-center">
@@ -220,6 +256,8 @@ export function Home({
           )}
         </section>
       )}
+
+      {narrow && <Evaluations evaluations={evaluations} scoring={scoring} evolving={evolving} onOpen={onOpenEvaluation} />}
 
       {/* With a sidebar, the page's tour lights its list instead. */}
       <section data-intro={narrow && cards.length ? 'exp-list' : undefined}>

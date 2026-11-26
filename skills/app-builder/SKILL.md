@@ -124,7 +124,8 @@ pages made for it. The format is in app_guide's API topic (Apps: views).
 - **Events** make it useful: `data-event="name"` on a button, mapped to actions. Go to a detail page with the item;
   tick something off and keep it (`toggle`, `name: "done.@key"`, `keep: true`); filter with `set` and a block's
   `where`; copy the part people paste elsewhere; run it again with one answer changed (`again`: a slower pace,
-  one more day, a more formal letter, new questions); start another app on part of it (`start`). `ask` (a
+  one more day, a more formal letter, new questions); start another app on part of it (`start`); put a list of
+  experiments to an agent (`experiments`: a request on the start page, sent only by the person). `ask` (a
   follow-up that changes the result) works with steps too, once a run is done; for other answers use `again`, or
   a flow (`run`, with `as` to show its answer).
 - Save, then app_try a run with `look: true` and look at the pictures (a computer in the dark and in the light, a

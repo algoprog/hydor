@@ -1,12 +1,13 @@
 // Goals: a session works towards a goal round after round, and the app itself decides how each round went. The person and
 // the agent first agree what "done" means as a short list of checks (a command that must pass, a number that must reach a
-// target, a sentence a reviewer must find true, something the person confirms). After every round the app runs the checks,
+// target, a score from the project's evaluation that must beat its baseline, a sentence a reviewer must find true,
+// something the person confirms). After every round the app runs the checks,
 // keeps the round when things got closer or undoes it (where it can: a session in a worktree), and stops when every check
 // holds, a limit is reached, or it needs the person. The agent cannot end a goal: only the checks can. The person steers
 // at any time (rules for every round, a say on each round), and the agent asks which way to go at turning points.
 // The types here are the goal as the server keeps it and the web shows it (GET /api/goals/:key, feature events "goal").
 
-export type GoalCheckKind = 'command' | 'measure' | 'review' | 'you';
+export type GoalCheckKind = 'command' | 'measure' | 'score' | 'review' | 'you';
 
 /** One of the checks that say when a goal is done ("Done when"). */
 export interface GoalCheck {
@@ -19,18 +20,51 @@ export interface GoalCheck {
   run?: string;
   /** measure: a regular expression whose first group is the number; the last number in the output unless set. */
   read?: string;
-  /** measure: what the number must reach. */
+  /** measure: what the number must reach. score: the same, set by the app from the baseline (its mean plus or minus the gain). */
   target?: { op: '>=' | '<='; value: number };
   /** measure: shown after the number ("ms"). */
   unit?: string;
   /** measure: how far a later round may fall behind the best value and still be kept, as a share of that value (0.1 unless set). */
   slack?: number;
+  /** score: the project's evaluation that scores the work (Experiments → Evaluations), by its id. */
+  evaluation?: string;
+  /** score: how much better than the baseline it must be, in the score's own units; 0 is any gain beyond the noise of its seeds. */
+  gain?: number;
+  /**
+   * score: the baseline it must beat, fixed by the app when the check is agreed, so the goal keeps meaning the same thing:
+   * the baseline score's id and mean, the evaluation's seal then, and its name and its number's name to show. A goal never
+   * compares across seals: an evaluation sealed again, or given another baseline, while the goal runs asks the person.
+   */
+  baseline?: { score: string; mean: number; seal: number; name: string; metric: string };
   /** review: the sentence the reviewer must find true in what it is shown. */
   claim?: string;
   /** review: what the reviewer looks at: what changed since the goal started, files of the folder, a command's output. */
   evidence?: { diff?: boolean; files?: string[]; run?: string };
-  /** command, measure, review with a command: the most seconds it may take (600 unless set, 3600 at most). */
+  /**
+   * command, measure, review with a command: the most seconds it may take (600 unless set, 3600 at most). score: the most
+   * seconds it waits for its score, the queue included (6 hours unless set, 48 at most, and never past the goal's own time).
+   */
   timeoutS?: number;
+}
+
+/** A check whose result is a number against a target: a measured one, or a score. */
+export const numeric = (c: Pick<GoalCheck, 'kind'>): boolean => c.kind === 'measure' || c.kind === 'score';
+
+/** A score check's target: the baseline's mean, better by the gain in the evaluation's direction (rounded off the sum's float noise). */
+export const scoreTarget = (better: 'higher' | 'lower', mean: number, gain: number): NonNullable<GoalCheck['target']> => ({
+  op: better === 'higher' ? '>=' : '<=',
+  value: Number((better === 'higher' ? mean + gain : mean - gain).toPrecision(12)),
+});
+
+/** How a score check runs while the goal waits for it: which check, its runs (one for each seed) and how many have ended. */
+export interface GoalScoring {
+  check: string;
+  runs: number;
+  done: number;
+  /** None of its runs has started yet: they wait in the queue (`why`: what for, as the queue says it). */
+  waiting: boolean;
+  why?: string;
+  since: number;
 }
 
 /** When a goal stops by itself. Rounds always has a number; money and time only when set. */
@@ -81,8 +115,11 @@ export interface GoalResult {
   /** The check's id. */
   id: string;
   holds: boolean;
-  /** measure: the number read. */
+  /** measure: the number read. score: the score's mean. */
   value?: number;
+  /** score: how it compared with the baseline, beyond the noise of its seeds where that could be tested, and the score's id. */
+  verdict?: 'better' | 'worse' | 'same';
+  score?: string;
   /** 0 to 1: how close to holding (closeness() below). */
   closeness: number;
   /** The end of the command's output, or the reviewer's reason, for the person and for the next round. */
@@ -235,9 +272,12 @@ export interface GoalState {
   /** When it is over: what the last check found, in sentences for the report card. */
   /**
    * `mid`: the round that was cut short (a limit, or the person's Stop, in the middle of it): its unfinished work is still
-   * in the folder, so the files do not stand at the best round.
+   * in the folder, so the files do not stand at the best round. `finals`: reached, the evaluations of its score checks that
+   * have a final test, which a goal never runs: the person may, on the evaluation's page.
    */
-  report?: { summary: string; final?: GoalResult[]; review?: string; mid?: number };
+  report?: { summary: string; final?: GoalResult[]; review?: string; mid?: number; finals?: { evaluation: string; name: string }[] };
+  /** A score check waits for its score (measuring or checking): how its runs stand, for the bar. */
+  scoring?: GoalScoring;
   /**
    * Checks or protected paths the person changed while a round ran: that round is judged by the checks it started with,
    * and these take effect (measured first where they changed) once it has been checked.
@@ -273,12 +313,15 @@ export type GoalAction =
 
 /** "≥ 0.80", "≤ 200 ms", "pass", "looks right", "you". */
 export function targetText(c: GoalCheck): string {
-  if (c.kind === 'measure' && c.target) return `${c.target.op === '>=' ? '≥' : '≤'} ${c.target.value}${c.unit ? ` ${c.unit}` : ''}`;
+  if (numeric(c) && c.target) return `${c.target.op === '>=' ? '≥' : '≤'} ${c.target.value}${c.unit ? ` ${c.unit}` : ''}`;
   return c.kind === 'command' ? 'pass' : c.kind === 'review' ? 'reviewer' : c.kind === 'you' ? 'you' : '';
 }
 
 /** Whether a measured value meets its target. */
 export const meets = (c: GoalCheck, v: number): boolean => !!c.target && (c.target.op === '>=' ? v >= c.target.value : v <= c.target.value);
+
+/** Whether a number holds its check: it meets the target, and a score also beats its baseline beyond the noise (its verdict). */
+export const holdsAt = (c: GoalCheck, v: number, verdict?: GoalResult['verdict']): boolean => meets(c, v) && (c.kind !== 'score' || verdict === 'better');
 
 /**
  * How close a check is to holding, 0 to 1. A check that holds is 1. A measured one that does not is the share of the way from
@@ -286,7 +329,7 @@ export const meets = (c: GoalCheck, v: number): boolean => !!c.target && (c.targ
  */
 export function closeness(c: GoalCheck, r: { holds: boolean; value?: number }, start?: number): number {
   if (r.holds) return 1;
-  if (c.kind !== 'measure' || !c.target || r.value == null || start == null) return 0;
+  if (!numeric(c) || !c.target || r.value == null || start == null) return 0;
   const gap = c.target.value - start;
   if (!gap) return 0;
   const done = (r.value - start) / gap;

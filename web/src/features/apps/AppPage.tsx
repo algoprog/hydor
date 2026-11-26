@@ -688,7 +688,7 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
         </div>
       )}
       {own.last || atOnce ? (
-        <AppView ui={recipe.ui!} name={recipe.name} description={recipe.description} appId={id} on="app" last={own.last} answer={recipe.answer} view={view} info={info} can={['keep', 'run', 'start', 'data']} assets={recipe.assets} translate={template} keeps={keeps} onKeys={setKeys} />
+        <AppView ui={recipe.ui!} name={recipe.name} description={recipe.description} appId={id} on="app" last={own.last} answer={recipe.answer} view={view} info={info} can={['keep', 'run', 'start', 'data', 'experiments']} assets={recipe.assets} translate={template} keeps={keeps} onKeys={setKeys} />
       ) : (
         !own.active && (
           <div className="mx-auto flex max-w-[560px] flex-col items-center py-10 text-center sm:py-16">

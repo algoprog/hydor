@@ -1,11 +1,12 @@
-// The LaTeX editor's tools for a paper (Tools → Check before submitting, and Tools → Your paper): the check's dialog;
+// The LaTeX editor's tools for a paper (Tools → Check before submitting, Your paper, Check a proof and Formalise in
+// Lean, the last two requests about the proof at the cursor for the agent beside the editor): the check's dialog;
 // Make it camera-ready and Move to another template, each a request for the agent beside the editor, written from
 // the venue's rules (what its final version changes, its pages, its parts) or the template picked; the arXiv
 // package (Export's, for this document); and three ready-made apps opened with the paper filled in (Review it as
 // reviewers would, Answer reviews, Make a talk, poster and thread): its PDF, or its project's folder, on this
 // computer. What is not saved yet is saved first, so they get the paper as it is in front of you.
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowRightLeft, BadgeCheck, FileArchive, GraduationCap, ListChecks, MessagesSquare, Presentation, Reply, Sparkles } from 'lucide-react';
+import { ArrowRightLeft, BadgeCheck, FileArchive, GraduationCap, ListChecks, MessagesSquare, Presentation, Reply, SearchCheck, Sigma, Sparkles } from 'lucide-react';
 import { TEX_MAIN, type TexComment, type TexDoc } from '@shared/latex';
 import { PAPER_APPS, paperAppPath, venueById, venueSummary, type CheckEdit } from '@shared/latex-submit';
 import { Button, cx, Dialog, inputCls, Segmented } from '../../../components/ui';
@@ -29,8 +30,25 @@ const APP_WORDS: Record<string, string> = {
   'paper-to-talk': 'paper to talk slides poster thread project page present conference',
 };
 
-/** Tools' items for a paper: the check, and Your paper's list. */
-export function paperItems(o: { ask: (a: PaperAsk) => void; readOnly?: boolean; canAsk: boolean; canArxiv: boolean }): MenuEntry[] {
+/** Where the proof asked about is: the file, and the lines picked, else the cursor's line. */
+export interface ProofSpot {
+  file: string;
+  from: number;
+  to: number;
+  picked: boolean;
+}
+
+/** What the agent is asked about a proof; it goes into the box for asking, to be read and sent by the person. */
+export function proofRequest(what: 'check' | 'formalise', at: ProofSpot): string {
+  const lines = at.from === at.to ? `line ${at.from}` : `lines ${at.from}–${at.to}`;
+  const where = at.picked ? `In ${at.file}, ${lines}` : `In ${at.file}, at ${lines}`;
+  return what === 'check'
+    ? `${where}: check the proof ${at.picked ? 'there' : 'around the cursor (with the statement it proves)'} using the proof-check skill. Go through it step by step and report gap by gap, with line numbers: does it hold as written, hold once its gaps are filled, or fail?`
+    : `${where}: state the theorem ${at.picked ? 'there' : 'around the cursor'} in Lean using the lean-proofs skill, and agree the statement with me before you prove anything.`;
+}
+
+/** Tools' items for a paper: the check, Your paper's list, and the two about the proof at the cursor. */
+export function paperItems(o: { ask: (a: PaperAsk) => void; readOnly?: boolean; canAsk: boolean; canArxiv: boolean; proof: (what: 'check' | 'formalise') => void }): MenuEntry[] {
   return [
     { label: 'Check before submitting', icon: <ListChecks size={14} />, also: 'pre-submission venue anonymity anonymous page limit references bibliography citations fonts tables bold', run: () => o.ask({ kind: 'check' }) },
     {
@@ -45,6 +63,8 @@ export function paperItems(o: { ask: (a: PaperAsk) => void; readOnly?: boolean; 
         ...PAPER_APPS.map((a) => ({ label: a.label, icon: APP_ICON[a.id], also: APP_WORDS[a.id], run: () => o.ask({ kind: 'app', app: a.id }) })),
       ],
     },
+    { label: 'Check a proof…', icon: <SearchCheck size={14} />, disabled: !o.canAsk, also: 'theorem lemma mathematics maths gaps verify correct rigorous', run: () => o.proof('check') },
+    { label: 'Formalise in Lean…', icon: <Sigma size={14} />, disabled: !o.canAsk, also: 'theorem lemma proof checker formalize formal verification mathlib', run: () => o.proof('formalise') },
   ];
 }
 

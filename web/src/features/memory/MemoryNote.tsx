@@ -148,6 +148,7 @@ function ChangeRow({ row, entry, here, reload }: { row: Row; entry?: MemoryEntry
         <ChangeBadge c={c} />
         <span className="min-w-0 truncate text-[12px] text-fg-3">
           {profile ? 'Your profile' : placeName(c.scope, c.scopeKey, here)}
+          {c.kind === 'finding' && ' · finding'}
           {c.source === 'agent' && ' · saved by the agent'}
           {steps.length > 1 && ` · ${steps.length} changes`}
         </span>
@@ -157,7 +158,8 @@ function ChangeRow({ row, entry, here, reload }: { row: Row; entry?: MemoryEntry
             <IconButton size="sm" label={steps.length > 1 ? 'Undo these changes' : 'Undo this change'} onClick={() => act(undo())}>
               <Undo2 size={14} />
             </IconButton>
-            {active && (
+            {/* A finding's text is written from its verdict and words: it is changed on its project's Memory tab. */}
+            {active && c.kind !== 'finding' && (
               <IconButton size="sm" label="Edit" onClick={() => (profile ? go('/settings?s=memory&find=Your%20profile') : setEditing(true))}>
                 <Pencil size={14} />
               </IconButton>

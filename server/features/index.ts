@@ -38,6 +38,7 @@ import { media } from '../media/index.ts';
 import { mediaEdit } from '../mediaedit/index.ts';
 import { videoEdit } from '../mediaedit/video.ts';
 import { soundEdit } from '../mediaedit/audio.ts';
+import { findings } from '../memory/findings.ts';
 import { memory } from '../memory/index.ts';
 import { profile } from '../memory/profile.ts';
 import { opinion } from '../opinion/index.ts';
@@ -50,6 +51,7 @@ import { photos } from '../photos/index.ts';
 import { plugins } from '../plugins/index.ts';
 import { releaseNotes } from '../releases/index.ts';
 import { research } from '../research/index.ts';
+import { lean } from '../lean/index.ts';
 import { search } from '../search/index.ts';
 import { shots } from '../shots/index.ts';
 import { signatures } from '../signatures/index.ts';
@@ -73,4 +75,4 @@ import { slack } from '../chatapps/slack.ts';
 
 // The user's guidelines lead what an agent is told, their profile right after them, then what a confidential session
 // may not do; how to format replies follows the pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, profile, confidential, browserHandoff, pages, myThemesFeature, slidesShow, formatting, answers, shots, search, browser, computer, memory, knowledge, wikiSettingsFeature, wikiSession, wiki, wikiBrowse, wikiDigest, spaces, sharing, children, swarm, goals, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, photos, write, media, mediaEdit, videoEdit, soundEdit, connections, outbox, mail, signatures, automations, experiments, voice, suggest, assistants, apps, papers, plugins, skillpack, cleanup, shelltools, steps, custom, arena, language, guide, keep, find, releaseNotes, sidebar, sessionFoldersFeature, tips, telegram, discord, slack];
+export const FEATURES: Feature[] = [guidelines, profile, confidential, browserHandoff, pages, myThemesFeature, slidesShow, formatting, answers, shots, search, browser, computer, memory, findings, knowledge, wikiSettingsFeature, wikiSession, wiki, wikiBrowse, wikiDigest, spaces, sharing, children, swarm, goals, research, lean, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, photos, write, media, mediaEdit, videoEdit, soundEdit, connections, outbox, mail, signatures, automations, experiments, voice, suggest, assistants, apps, papers, plugins, skillpack, cleanup, shelltools, steps, custom, arena, language, guide, keep, find, releaseNotes, sidebar, sessionFoldersFeature, tips, telegram, discord, slack];

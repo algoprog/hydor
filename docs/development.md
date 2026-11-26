@@ -35,9 +35,10 @@ One by hand:
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
 ```
 
-`scripts/agent-tools/` holds three small command-line tools for coding agents: `waitfor` (wait for a job in one call),
-`edits` (several exact search-and-replace edits in one call) and `sym` (a definition with its whole body, found by a
-parser). They are built into the app: every agent session it starts (Claude Code, Codex, Custom and the other ACP agents)
+`scripts/agent-tools/` holds four small command-line tools for coding agents: `waitfor` (wait for a job in one call),
+`edits` (several exact search-and-replace edits in one call), `sym` (a definition with its whole body, found by a
+parser) and `leancheck` (whether a Lean file's proofs hold: `lib/lean/` is also what the server's Lean tools run,
+`server/lean/`). They are built into the app: every agent session it starts (Claude Code, Codex, Custom and the other ACP agents)
 finds them on its PATH and is told about them (`server/shelltools/`, `HYDOR_SHELL_TOOLS=0` turns it off). At each start the
 server writes a launcher for each into `<data folder>/shelltools/bin` (the app's own Node.js on the tool's script in the
 app's own folder), tries each once with no node on the PATH, and puts that folder first on the PATH of each session it starts

@@ -347,6 +347,9 @@ On a Mac, the app puts the command on your PATH by itself.
 - A paper radar and a check before you submit, experiments that wait for a free GPU, failed CI runs looked into,
   issues triaged, and large changes made by a team of agents ([researchers](docs/guide/25-researchers.md),
   [engineering](docs/guide/26-engineering.md)).
+- Research you can trust when agents do it: an evaluation that scores every run and every agent the same way, a check
+  that tries to break a result before it counts, a check for earlier work, and findings kept with their evidence
+  ([experiments](docs/guide/24-experiments.md), [memory](docs/guide/06-memory.md)).
 
 **Everywhere**
 

@@ -1,7 +1,8 @@
 // Checks for the outcome rules of a goal's rounds (verdict.ts), on made-up checks and results: closeness from the start,
 // the score, each reason a round is undone and their order, kept where nothing can be undone ("stays"), a check's own
 // slack, a value that still meets its target, room behind a best of 0, the rounds after a failed final check, rounds
-// without progress, every limit, and new targets judged again (Keep anyway). Nothing here touches files.
+// without progress, every limit, and new targets judged again (Keep anyway). A score check counts as a measured one does,
+// and holds only where it beat its baseline beyond the noise. Nothing here touches files.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/goals/verdict-test.ts
 //   DATA_DIR=/tmp/hydor-test-goal-verdict PRICES_URL= node dist/dev/verdict-test.js
@@ -245,6 +246,45 @@ test('P3: a target changed by the person: the stored values of that check are ju
   assert.equal(r[3], rounds[3], 'a round without one is not scored again');
   assert.equal(rounds[1].results[0].holds, false, 'the original is left as it was');
   assert.equal(rejudged(checks, rounds, []), rounds);
+});
+
+// ---- a score, as a measured number ----------------------------------------------------------------------------------
+
+const SCORE: GoalCheck = { id: 'c6', kind: 'score', label: 'Beats the baseline', evaluation: 'e1', gain: 0.02, target: { op: '>=', value: 0.42 }, baseline: { score: 's0', mean: 0.4, seal: 1, name: 'Relevance', metric: 'ndcg' } };
+const sres = (holds: boolean, value: number, verdict: GoalResult['verdict']): GoalResult => ({ id: 'c6', holds, value, verdict, closeness: holds ? 1 : 0, ms: 1 });
+const S0 = round(0, [sres(false, 0.4, 'same')], 'start');
+
+test('a score counts as a measured number: its closeness from the start, a gain named by its move, far behind its best undone, still meeting its target kept', () => {
+  assert.ok(Math.abs(scored([SCORE], [sres(false, 0.41, 'same')], S0)[0].closeness - 0.5) < 1e-9, 'half the way from 0.40 to 0.42');
+  const up = reckon({ checks: [SCORE], results: [sres(false, 0.41, 'same')], start: S0, best: S0, undo: true });
+  assert.equal(up.outcome, 'kept');
+  assert.equal(up.why, 'Beats the baseline 0.4 → 0.41');
+  // Far behind its best (a tenth of the way from start to target, or of the best): undone, as behind.
+  const best = round(1, [sres(false, 0.415, 'better')]);
+  const behind = reckon({ checks: [SCORE], results: [sres(false, 0.3, 'worse')], start: S0, best, undo: true });
+  assert.equal(behind.outcome, 'undone');
+  assert.equal(behind.cause, 'behind');
+  assert.equal(behind.why, 'Beats the baseline fell far behind its best (0.415 → 0.3)');
+  // A score that held and now does not (within the noise): it stopped holding.
+  const held = round(1, [sres(true, 0.43, 'better')]);
+  const broke = reckon({ checks: [SCORE], results: [sres(false, 0.431, 'same')], start: S0, best: held, undo: true });
+  assert.equal(broke.cause, 'broke');
+  assert.equal(broke.why, 'Beats the baseline stopped holding');
+});
+
+test('a score’s target changed by the person, or relaxed by Keep anyway: its values judged again, holding only beyond the noise; its gain follows the target', () => {
+  const rounds = [S0, round(1, [sres(false, 0.43, 'same')]), round(2, [sres(false, 0.415, 'better')])];
+  const g = { contract: { objective: 'x', checks: [SCORE], protect: [], limits: { rounds: 5 } }, rounds };
+  const r = relaxed(g, { c6: 0.415 });
+  const c = r.contract.checks[0];
+  assert.deepEqual(c.target, { op: '>=', value: 0.415 });
+  assert.ok(Math.abs(c.gain! - 0.015) < 1e-12, String(c.gain));
+  assert.equal(r.rounds[2].results[0].holds, true, 'better beyond the noise, and now at its target');
+  assert.equal(r.rounds[1].results[0].holds, false, 'within the noise holds at no target');
+  const lower = { ...SCORE, target: { op: '>=' as const, value: 0.41 } };
+  const j = rejudged([lower], rounds, ['c6']);
+  assert.equal(j[2].results[0].holds, true);
+  assert.equal(j[1].results[0].holds, false);
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

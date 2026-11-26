@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Browser, sleep } from './cdp.mjs';
-import { awayData, CATALOG, EMAIL, makeData, makeFiles, makeImported, makeSessions, overrides, seedApi, wikiData } from './demo.mjs';
+import { awayData, CATALOG, EMAIL, evolveData, makeData, makeFiles, makeImported, makeSessions, overrides, seedApi, wikiData } from './demo.mjs';
 import { SHOTS as GUIDE_SHOTS } from './shots.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -193,6 +193,7 @@ async function main() {
   for (const x of Object.values(sessions)) own.run(x.key, x.at - 60_000, x.at);
   awayData(db, sessions, now);
   wikiData(db, seeded.spaces, now);
+  evolveData(db, home, now, seeded.evaluationId);
   db.close();
   // The sessions once the app has read their transcripts.
   const keys = [...Object.values(sessions), ...Object.values(imported)].map((s) => s.key);

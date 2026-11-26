@@ -63,6 +63,7 @@ export const CONFIDENTIAL_TOOLS = new Set([
   'knowledge_read',
   'knowledge_list',
   'recall',
+  'findings',
   'search_sessions',
   'memory_search',
   'read_session',
@@ -71,6 +72,9 @@ export const CONFIDENTIAL_TOOLS = new Set([
   'goal_report',
   'goal_ask',
   'goal_note',
+  // Lean's proof checker, run here, without network as the session's own commands are (its search is on the web, so not it).
+  'lean_check',
+  'lean_verify',
   // Hydor subagents (child sessions), confidential too.
   'start_child_session',
   'child_sessions',
@@ -90,6 +94,7 @@ export const CONFIDENTIAL_TOOLS = new Set([
   'experiment_table',
   'experiment_wait',
   'experiment_stop',
+  'evaluation_get',
 ]);
 
 // ---- the models -----------------------------------------------------------------------------------------

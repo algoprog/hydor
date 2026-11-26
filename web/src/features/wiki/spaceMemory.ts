@@ -32,6 +32,8 @@ export interface SpaceMemory {
   key: string | null;
   /** Active notes of its own, once loaded. */
   notes?: number;
+  /** Its findings (what it tried and what came of it), counted apart from its notes. */
+  findings?: number;
   /** Its wiki memory, once loaded. */
   wiki?: ProjectWikiView;
   /** Grows each time the server says the project's wiki changed. */
@@ -47,6 +49,7 @@ export function useSpaceMemory(id: string, folder: string | undefined, memoryKey
   const memoryVersion = useMemory((s) => s.version);
   const [key, setKey] = useState<string | null>(null);
   const [notes, setNotes] = useState<number>();
+  const [findings, setFindings] = useState<number>();
   const [wiki, setWiki] = useState<ProjectWikiView>();
   const [version, setVersion] = useState(0);
   // Notes are kept under the repository's root; a folder that is no repository (or the home folder) is its own place.
@@ -66,10 +69,16 @@ export function useSpaceMemory(id: string, folder: string | undefined, memoryKey
   }, [folder, home, memoryKey]);
   useEffect(() => {
     setNotes(undefined);
+    setFindings(undefined);
     if (!key) return;
     let live = true;
     api<{ entries: MemoryListEntry[] }>(`/api/memory/entries?scope=repo&key=${enc(key)}`).then(
-      (r) => live && setNotes(r.entries.filter((e) => !(isUserProfile(e) && e.status === 'active')).length),
+      (r) => {
+        if (!live) return;
+        const mine = r.entries.filter((e) => !(isUserProfile(e) && e.status === 'active'));
+        setNotes(mine.filter((e) => e.kind !== 'finding').length);
+        setFindings(mine.filter((e) => e.kind === 'finding').length);
+      },
       () => {},
     );
     return () => {
@@ -87,5 +96,5 @@ export function useSpaceMemory(id: string, folder: string | undefined, memoryKey
   useFeatureEvent('wiki', (e) => {
     if ((e.data as { space?: string } | null)?.space === id) setVersion((v) => v + 1);
   });
-  return { key, notes, wiki, version, reload: loadWiki };
+  return { key, notes, findings, wiki, version, reload: loadWiki };
 }

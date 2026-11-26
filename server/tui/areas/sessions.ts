@@ -79,10 +79,14 @@ const numberOf = (n: number) => String(Math.round(n * 1000) / 1000);
 /** One check as the goal stands: whether it holds, and its value against its target. */
 function checkLine(ctx: Pick<Ctx, 'look'>, c: GoalCheck, r: GoalResult | undefined): string {
   const { p } = ctx.look;
-  const state = !r ? 'not measured yet' : r.holds ? 'holds' : r.error ? 'not yet (could not be checked)' : 'not yet';
-  const value = r?.value !== undefined ? `${numberOf(r.value)}${c.unit ? ` ${c.unit}` : ''}` : '';
-  const target = c.target ? `target ${c.target.op} ${numberOf(c.target.value)}${c.unit ? ` ${c.unit}` : ''}` : '';
-  const more = [value && `value ${value}`, target].filter(Boolean).join(', ');
+  // A score is never run before the goal is started: until then its baseline is the reference.
+  const state = !r ? (c.kind === 'score' ? 'scored once you start' : 'not measured yet') : r.holds ? 'holds' : r.error ? 'not yet (could not be checked)' : 'not yet';
+  // A score shows its evaluation's number by name, and the baseline it must beat.
+  const unit = c.unit ?? (c.kind === 'score' ? c.baseline?.metric : undefined);
+  const value = r?.value !== undefined ? `${numberOf(r.value)}${unit ? ` ${unit}` : ''}` : '';
+  const target = c.target ? `target ${c.target.op} ${numberOf(c.target.value)}${unit ? ` ${unit}` : ''}` : '';
+  const base = c.kind === 'score' && c.baseline ? `“${c.baseline.name}”, baseline ${numberOf(c.baseline.mean)}` : '';
+  const more = [value && `value ${value}`, target, base].filter(Boolean).join(', ');
   return `${r?.holds ? mark(p, 'done') : mark(p, 'off')} ${c.label}: ${state}${more ? ` (${more})` : ''}`;
 }
 
@@ -111,6 +115,8 @@ export function goalLines(ctx: Pick<Ctx, 'look'>, g: GoalState, now = Date.now()
     out.push(`  ${q.expiresAt ? `It goes on with its pick in ${Math.max(0, Math.round((q.expiresAt - now) / 60_000))} min unless you answer (--answer 1,3) or hold it (--wait).` : 'It waits for you: --answer 1,3, with --other "a way of your own" if none fits.'}`);
   }
   if (g.report?.summary) out.push('', ctx.look.p.dim('Report'), ...g.report.summary.split('\n').map((x) => `  ${x}`));
+  // The final test of a score's evaluation is the person's: on its page.
+  for (const f of g.report?.finals ?? []) out.push(`  “${f.name}” has a final test, which a goal never runs: you may run it on its page (Experiments → Evaluations).`);
   return out;
 }
 

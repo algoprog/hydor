@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import { holding, tally, type GoalState } from '../../../../shared/goals.ts';
 import { duration } from '../../lib/format.ts';
 import { canSetGoal, goalStartPatch, leadsTeam, swarmStartPatch } from './can.ts';
-import { samples, sampleOf, STATUSES } from './samples.ts';
+import { samples, sampleOf, SCORE, STATUSES } from './samples.ts';
 import {
   agreementHead,
   asksChip,
   atMost,
   biggestMove,
+  cellText,
   changeText,
   clockTick,
   clockWords,
@@ -44,6 +45,15 @@ import {
   roundNo,
   sinceTitle,
   activeNow,
+  baselineOf,
+  evalPage,
+  evalProblem,
+  KIND_LABEL,
+  scoreBasis,
+  scoreNeeds,
+  scoringWords,
+  withinNoise,
+  unscoredText,
   spanText,
   startCellText,
   startResultText,
@@ -434,6 +444,48 @@ test('Set a goal is not offered to a session that leads a team, or that cannot h
   assert.equal(canSetGoal({ ...s, external: 'open' as never }), false);
   assert.equal(canSetGoal({ ...s, subagentOf: 'claude:x' } as never), false);
   assert.equal(canSetGoal({ ...s, goal: { objective: 'x', status: 'active' } }), false);
+});
+
+test('a score check: its kind, what it needs, its value against the target, within the noise, and how its runs stand on the bar', () => {
+  assert.equal(KIND_LABEL.score, 'Score');
+  assert.equal(needsText(SCORE), '≥ 0.432');
+  const r = (value: number, verdict: 'better' | 'same' | 'worse', holds = false) => ({ id: 'c6', holds, value, verdict, closeness: 0, ms: 1 });
+  assert.equal(pillValue(SCORE, r(0.427, 'better')), '0.427 / 0.432', 'no unit: the number’s name is in the title');
+  assert.equal(nowText(SCORE, r(0.441, 'better', true)), '0.441');
+  assert.equal(nowText(SCORE, r(0.427, 'better')), '0.427 now');
+  assert.equal(nowText(SCORE, r(0.433, 'same')), '0.433 now, within the noise');
+  assert.equal(resultText(SCORE, r(0.433, 'same')), '0.433, within the noise');
+  assert.equal(resultText(SCORE, r(0.427, 'better')), '0.427, needs 0.432');
+  assert.equal(withinNoise(SCORE, r(0.433, 'same')), true);
+  assert.equal(withinNoise(SCORE, r(0.427, 'same')), false, 'short of its target is not the noise');
+  assert.equal(scoreBasis(SCORE), 'nDCG@10 of “Search relevance”: its baseline 0.412, better by at least 0.02');
+  assert.equal(scoreBasis({ ...SCORE, gain: 0 }), 'nDCG@10 of “Search relevance”: its baseline 0.412, better beyond the noise');
+  assert.equal(scoreNeeds('higher', 0.412, 0.02), '≥ 0.432');
+  assert.equal(scoreNeeds('lower', 12, 2), '≤ 10');
+  assert.equal(evalPage('e1'), '/experiments?evaluation=e1');
+  const ev = { id: 'e1', name: 'Search relevance', metric: 'nDCG@10', better: 'higher' as const, seal: { n: 2 } };
+  assert.equal(evalProblem({ ...ev, baselineScore: { status: 'done', seal: 2, mean: 0.412, values: [0.41, 0.412, 0.414] } }), null);
+  assert.equal(evalProblem(ev), 'Its baseline is not measured yet: only you can measure it, on the evaluation’s page');
+  assert.equal(evalProblem({ ...ev, baselineScore: { status: 'done', seal: 1, mean: 0.4, values: [0.4] } }), 'Its baseline is not measured yet: only you can measure it, on the evaluation’s page', 'one of an older seal is none');
+  assert.equal(evalProblem(undefined), 'Pick one of this folder’s evaluations');
+  assert.deepEqual(baselineOf({ ...ev, baselineScore: { status: 'done', seal: 2, mean: 0.412, values: [1, 2, 3] } }), { mean: 0.412, n: 3 });
+  // On the bar while it waits.
+  assert.equal(statusWords(g('checking-score')), 'round 7 of 12 · scoring: 1 of 3 runs done');
+  assert.equal(statusWords(g('checking-score-queue')), 'round 7 of 12 · scoring: waiting in the queue · 0 of 3 runs done');
+  assert.equal(scoringWords({ check: 'c6', runs: 1, done: 0, waiting: false, since: 0 }), 'scoring: its run is going');
+  assert.equal(scoringWords({ check: 'c6', runs: 1, done: 0, waiting: true, since: 0 }), 'scoring: waiting in the queue');
+  assert.equal(statusWords({ ...g('measuring'), scoring: { check: 'c6', runs: 3, done: 2, waiting: false, since: 0 } }), 'measuring where things stand · scoring: 2 of 3 runs done');
+  // The rounds and the report read it as a number.
+  const w = g('working-score');
+  assert.equal(biggestMove(w, round(w, 1)), 'Relevance 0.61 → 0.68');
+  assert.equal(cellText(SCORE, round(w, 4).results.find((x) => x.id === 'c6')), '0.433');
+  assert.deepEqual(g('reached-score').report!.finals, [{ evaluation: 'ev1', name: 'Search relevance' }]);
+  assert.equal(g('asking-moved').question!.ways[0].name, 'Go on against it as it is now');
+  // Before Start a score has not run: its baseline is the reference.
+  assert.equal(unscoredText(SCORE), 'Scored once you start · baseline 0.412');
+  assert.equal(unscoredText({ ...SCORE, baseline: undefined }), 'Scored once you start');
+  assert.equal(unscoredText({ id: 'c1', kind: 'command', label: 'T', run: 'true' }), '');
+  assert.equal(g('agreeing-score').rounds[0].results.some((r) => r.id === 'c6'), false, 'the agreement’s sample has no score at the start');
 });
 
 test('the sidebar’s mark says the round and what holds', () => {

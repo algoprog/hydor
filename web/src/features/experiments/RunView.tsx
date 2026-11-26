@@ -3,10 +3,14 @@
 // (a tap opens that curve on the Charts tab), its hyperparameters, the numbers it printed once, and what it ran from
 // (details, code, command, environment) and what happened. Charts: every metric that is a curve over steps. Log: the
 // output, newest at the bottom, following while it goes, with a box to find lines. A run kept on another machine is
-// read through that machine.
+// read through that machine. A run in an evaluation's folder says whether the sealed files were as sealed; a run that
+// scores one leads back to it.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Copy, FolderOpen, MoreHorizontal, Play, RotateCcw, Search, Square, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Copy, FolderOpen, Gauge, Lock, MoreHorizontal, Play, RotateCcw, Search, Square, Trash2 } from 'lucide-react';
+import type { EvalScore, EvaluationListed } from '@shared/evaluations';
 import type { ExperimentGroup, MetricSeries, RunRecord } from '@shared/experiments';
+import { evalUrl, scoredBy } from './evalApi';
+import { pathWords } from './evalWords';
 import { api, ApiError } from '../../lib/api';
 import { LOCALE } from '../../i18n/locale';
 import { machinePath } from '../../lib/machine';
@@ -73,6 +77,35 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 const linkCls = 'text-left text-accent hover:underline';
+
+/** Whether an evaluation's sealed files were as sealed when the run started, one line for each evaluation. */
+function Sealed({ entries, onOpen }: { entries: NonNullable<RunRecord['sealed']>; onOpen: (evaluation: string) => void }) {
+  return (
+    <ul className="space-y-1.5 border-t border-line pt-2 pb-0.5">
+      {entries.map((s) => (
+        <li key={s.evaluation} className={cx('flex items-start gap-2 text-[12px] leading-snug', s.ok ? 'text-fg-3' : 'text-warn')}>
+          {s.ok ? <Lock size={13} className="mt-px shrink-0" /> : <AlertTriangle size={13} className="mt-px shrink-0" />}
+          <p className="min-w-0 break-words">
+            <span>Evaluation</span>{' '}
+            <button type="button" translate="no" onClick={() => onOpen(s.evaluation)} className="font-medium underline-offset-2 hover:underline">
+              {s.name}
+            </button>
+            {s.ok ? (
+              <span>: its scorer and data were as sealed</span>
+            ) : (
+              <>
+                <span>: its scorer and data had changed when this run started: </span>
+                <span translate="no" className="font-mono text-[11.5px] [overflow-wrap:anywhere]">
+                  {(s.changed ?? []).map((p) => pathWords(p).name).join(', ')}
+                </span>
+              </>
+            )}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** The last lines of a log, as the Log tab shows it (the terminal's colours). */
 function Tail({ text }: { text: string }) {
@@ -218,9 +251,12 @@ export interface RunViewProps {
   /** Its experiment's title, description and category, when it has them. */
   info?: ExperimentGroup;
   wide: boolean;
+  /** For a run that scores one, or ran in one's folder. */
+  evaluations: EvaluationListed[];
+  onOpenEvaluation: (id: string, score?: string) => void;
 }
 
-export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, onOpenExperiment, info }: RunViewProps) {
+export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, onOpenExperiment, info, evaluations, onOpenEvaluation }: RunViewProps) {
   const base = baseOf(machine);
   const [v, setV] = useState<View | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -267,6 +303,26 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
     const runs = (e.data as { runs?: string[] })?.runs;
     if (!machine && runs?.includes(id)) load(0);
   });
+
+  // The evaluation this run scores, and which of its scores it is.
+  const scored = !machine && v ? scoredBy(v.run) : undefined;
+  const scoredName = scored ? (evaluations.find((e) => e.id === scored)?.name ?? v?.run.name?.replace(/ · seed -?\d+$/, '') ?? '') : '';
+  const [score, setScore] = useState<string | undefined>();
+  useEffect(() => {
+    setScore(undefined);
+    if (!scored) return;
+    let live = true;
+    const find = (r: { scores: EvalScore[] }) => {
+      const s = r.scores.find((x) => x.runs.includes(id));
+      if (live && s) setScore(s.id);
+    };
+    api<{ scores: EvalScore[] }>(evalUrl(scored))
+      .then(find)
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [scored, id]);
 
   const stop = async () => {
     try {
@@ -315,10 +371,10 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
 
   const head = (
     <div className="shrink-0">
-      <button type="button" onClick={onBack} className="-ml-1 inline-flex max-w-full min-h-8 items-center gap-1 rounded-md px-1 text-[12.5px] text-fg-3 hover:text-fg">
+      <button type="button" onClick={scored ? () => onOpenEvaluation(scored, score) : onBack} className="-ml-1 inline-flex max-w-full min-h-8 items-center gap-1 rounded-md px-1 text-[12.5px] text-fg-3 hover:text-fg">
         <ArrowLeft size={14} className="shrink-0" />
         <span translate="no" className="truncate">
-          {backLabel}
+          {scored ? scoredName : backLabel}
         </span>
       </button>
       <div className="flex items-start gap-2">
@@ -330,7 +386,8 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
             {r.stopping ? 'Stopping' : 'Stop'}
           </Button>
         )}
-        {r && (
+        {/* A run that scored an evaluation is not run again by itself: the evaluation scores again. */}
+        {r && !scored && (
           <Button size="sm" variant="ghost" icon={<RotateCcw size={14} />} onClick={again} className="max-sm:hidden">
             Run again
           </Button>
@@ -341,17 +398,19 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
               <MoreHorizontal size={17} />
             </IconButton>
             <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={240}>
-              <div className="sm:hidden">
-                <MenuItem
-                  icon={<RotateCcw size={14} />}
-                  onClick={() => {
-                    setMenu(false);
-                    again();
-                  }}
-                >
-                  Run again
-                </MenuItem>
-              </div>
+              {!scored && (
+                <div className="sm:hidden">
+                  <MenuItem
+                    icon={<RotateCcw size={14} />}
+                    onClick={() => {
+                      setMenu(false);
+                      again();
+                    }}
+                  >
+                    Run again
+                  </MenuItem>
+                </div>
+              )}
               <MenuItem
                 icon={<Copy size={14} />}
                 onClick={() => {
@@ -431,6 +490,17 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                 )}
               </p>
             </div>
+          )}
+          {scored && (
+            <button type="button" onClick={() => onOpenEvaluation(scored, score)} className="flex max-w-full items-center gap-1.5 text-left text-[13px] text-accent hover:underline">
+              <Gauge size={14} className="shrink-0" />
+              <span className="min-w-0 break-words">
+                <span>{v?.run.env?.HYDOR_EVAL_KIND === 'final' ? 'The final test of' : 'A score of'}</span>{' '}
+                <span translate="no" className="font-medium">
+                  {scoredName}
+                </span>
+              </span>
+            </button>
           )}
           {r.why && (r.status === 'queued' || r.status === 'waiting' || r.status === 'failed' || r.status === 'lost' || r.status === 'stopped') && (
             <p className={cx('rounded-lg border px-3 py-2 text-[13px] leading-relaxed text-fg-2', r.status === 'failed' || r.status === 'lost' ? 'border-err/40 bg-err/5' : 'border-line bg-bg-1')}>{r.why}</p>
@@ -530,11 +600,19 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
           <div className="min-w-0 space-y-5">
             <Block title="Details">
               <div className={CARD}>
-                <Row label="Experiment">
-                  <button type="button" onClick={() => onOpenExperiment(r.group ?? '')} className={linkCls}>
-                    <span translate="no">{r.group ? info?.title || r.group : 'Runs without an experiment'}</span>
-                  </button>
-                </Row>
+                {scored ? (
+                  <Row label="Evaluation">
+                    <button type="button" onClick={() => onOpenEvaluation(scored, score)} className={linkCls}>
+                      <span translate="no">{scoredName}</span>
+                    </button>
+                  </Row>
+                ) : (
+                  <Row label="Experiment">
+                    <button type="button" onClick={() => onOpenExperiment(r.group ?? '')} className={linkCls}>
+                      <span translate="no">{r.group ? info?.title || r.group : 'Runs without an experiment'}</span>
+                    </button>
+                  </Row>
+                )}
                 <Row label="Status">{statusWords(r)}</Row>
                 <Row label={r.startedAt ? 'Started' : 'Added'}>
                   <span className="tnum">{when(r.startedAt ?? r.createdAt)}</span>
@@ -573,6 +651,7 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                     </button>
                   </Row>
                 )}
+                {!!r.sealed?.length && <Sealed entries={r.sealed} onOpen={(e) => onOpenEvaluation(e)} />}
               </div>
             </Block>
             {r.commit && (

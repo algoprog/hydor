@@ -26,7 +26,7 @@ export function GoalDock({ s, className }: { s: SessionSummary; className?: stri
       {over && <Report g={g} rounds={rounds} onRounds={() => setRounds((o) => !o)} className={gap} />}
       {g.status === 'agreeing' && <Agreement g={g} s={s} className={gap} />}
       {!over && g.question && <Question g={g} />}
-      {!over && <GoalBarCard g={g} team={teamOf(s)} rounds={rounds} onRounds={() => setRounds((o) => !o)} className={g.question ? 'mt-2' : undefined} />}
+      {!over && <GoalBarCard g={g} team={teamOf(s)} cwd={s.cwd ?? s.worktree?.path} rounds={rounds} onRounds={() => setRounds((o) => !o)} className={g.question ? 'mt-2' : undefined} />}
     </div>
   );
 }

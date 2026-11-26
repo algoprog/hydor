@@ -631,8 +631,8 @@ const GAP_IDEA = String.raw`<article class="idea v-{{verdict|slug}}">
   <p class="top"><span class="badge vb">{{verdict}}</span><span class="badge f-{{fits|slug}}">{{fits}}</span>{{#crosses}}<span class="x">{{crosses}}</span>{{/crosses}}</p>
   <h3>{{title}}</h3>
   <p class="body">{{idea}}</p>
-  {{#why}}<p class="why">{{why}}</p>{{/why}}
-  {{#closest}}<p class="near">Closest work: {{#closest_url}}<a href="{{closest_url}}" target="_blank" rel="noopener noreferrer">{{closest}}</a>{{/closest_url}}{{^closest_url}}{{closest}}{{/closest_url}}</p>{{/closest}}
+  {{#why}}<p class="why" translate="no">{{why}}</p>{{/why}}
+  {{#closest}}<p class="near">Closest work: {{#closest_url}}<a href="{{closest_url}}" target="_blank" rel="noopener noreferrer" translate="no">{{closest}}</a>{{/closest_url}}{{^closest_url}}<span translate="no">{{closest}}</span>{{/closest_url}}</p>{{/closest}}
   <div class="exp"><b>The first experiment</b><p>{{first}}</p>{{#cost}}<p class="cost">{{cost}}</p>{{/cost}}</div>
   <p class="acts">
     <button type="button" class="n-btn n-primary" data-event="plan" data-question="{{title}}: {{idea}} First experiment: {{first}}">Plan it</button>
@@ -646,7 +646,7 @@ const GAP_IDEA_CSS =
   BADGE_CSS +
   String.raw`
 .idea { display: flex; flex-direction: column; gap: 8px; padding: 15px 17px; border: 1px solid var(--n-line); border-left: 3px solid var(--vc, var(--n-line)); border-radius: var(--n-radius); background: var(--n-card); }
-.v-new { --vc: var(--n-ok); } .v-partly-done { --vc: var(--n-warn); } .v-done { --vc: var(--n-err); }
+.v-new { --vc: var(--n-ok); } .v-partly-done { --vc: var(--n-warn); } .v-done, .v-already-done { --vc: var(--n-err); }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; }
 .vb { background: color-mix(in srgb, var(--vc, var(--n-muted)) 16%, var(--n-card)); color: var(--vc, var(--n-muted)); }
 .f-fits { background: color-mix(in srgb, var(--n-ok) 14%, var(--n-card)); color: var(--n-ok); }

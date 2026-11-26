@@ -11,13 +11,14 @@ import { AsksControls } from './Asks';
 import { say } from './Say';
 import { ChecksEditor, DraftButtons, draftChanges, draftOf, draftProblem, type ContractDraft } from './ChecksEditor';
 import { useAct, useActiveMs } from './state';
-import { asksChip, moneyText, needsPerson, pauseButton, pendingNote, pillValue, shortLabel, statusWords, statusWordsApp, timeText, type Team } from './words';
+import { asksChip, moneyText, needsPerson, pauseButton, pendingNote, pillValue, scoreBasis, shortLabel, statusWords, statusWordsApp, timeText, unscoredText, type Team } from './words';
 
 /** One check where the files stand: a tick, a measured value with its meter, a hollow dot, or an amber mark. */
 function Pill({ c, r }: { c: GoalCheck; r: GoalResult | undefined }) {
   const holds = !!r?.holds;
   const value = r ? pillValue(c, r) : '';
-  const title = [c.label, r?.error ?? r?.detail].filter(Boolean).join('\n');
+  // A score names its evaluation's number and baseline (its unit is empty).
+  const title = [c.label, scoreBasis(c), r ? (r.error ?? r.detail) : unscoredText(c)].filter(Boolean).join('\n');
   return (
     <span title={title} className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-full border border-line bg-bg-1 px-2 text-[12px] text-fg-2">
       {holds ? <Check size={12} strokeWidth={2.5} className="shrink-0 text-ok" /> : r?.error ? <CircleAlert size={12} className="shrink-0 text-warn" /> : <Circle size={11} className="shrink-0 text-fg-3" />}
@@ -119,7 +120,7 @@ export function RuleDialog({ g, open, onClose }: { g: GoalState; open: boolean; 
 }
 
 /** Change the checks of a goal that runs: it takes effect with the next round. */
-function ChangeDialog({ g, open, onClose }: { g: GoalState; open: boolean; onClose: () => void }) {
+function ChangeDialog({ g, open, onClose, cwd }: { g: GoalState; open: boolean; onClose: () => void; cwd?: string }) {
   const [draft, setDraft] = useState<ContractDraft>(() => draftOf(g.contract));
   const [run, busy] = useAct(g.key);
   const problem = draftProblem(draft);
@@ -136,12 +137,12 @@ function ChangeDialog({ g, open, onClose }: { g: GoalState; open: boolean; onClo
   return (
     <Dialog part="goal" open={open} onClose={close} title="Change the checks" width={560} footer={<DraftButtons problem={problem} busy={busy} onSave={save} onCancel={close} save="Save" />}>
       <p className="mb-3 text-[13px] leading-relaxed text-fg-3">A change takes effect with the next round. A check you add or change is measured again first.</p>
-      <ChecksEditor value={draft} onChange={setDraft} />
+      <ChecksEditor value={draft} onChange={setDraft} cwd={cwd} />
     </Dialog>
   );
 }
 
-function Menu({ g }: { g: GoalState }) {
+function Menu({ g, cwd }: { g: GoalState; cwd?: string }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState<'rule' | 'checks' | null>(null);
@@ -162,7 +163,7 @@ function Menu({ g }: { g: GoalState }) {
         )}
       </Popover>
       <RuleDialog g={g} open={shown === 'rule'} onClose={() => setShown(null)} />
-      {shown === 'checks' && <ChangeDialog g={g} open onClose={() => setShown(null)} />}
+      {shown === 'checks' && <ChangeDialog g={g} cwd={cwd} open onClose={() => setShown(null)} />}
     </>
   );
 }
@@ -188,7 +189,7 @@ export function RulesRow({ g, className }: { g: GoalState; className?: string })
   );
 }
 
-export function GoalBarCard({ g, rounds, onRounds, team, className }: { g: GoalState; rounds: boolean; onRounds: () => void; team?: Team; className?: string }) {
+export function GoalBarCard({ g, rounds, onRounds, team, cwd, className }: { g: GoalState; rounds: boolean; onRounds: () => void; team?: Team; cwd?: string; className?: string }) {
   const [run, busy] = useAct(g.key);
   const [confirm, confirmNode] = useConfirm();
   const waits = needsPerson(g.status);
@@ -233,7 +234,7 @@ export function GoalBarCard({ g, rounds, onRounds, team, className }: { g: GoalS
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => void stop()} title="Stop working towards it">
               Stop
             </Button>
-            <Menu g={g} />
+            <Menu g={g} cwd={cwd} />
           </div>
         </div>
       </div>

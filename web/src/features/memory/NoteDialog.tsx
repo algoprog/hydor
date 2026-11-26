@@ -9,8 +9,10 @@ import { isUserProfile } from '@shared/memory';
 import { Button, cx, Dialog, useConfirm } from '../../components/ui';
 import { api, del, patch, post } from '../../lib/api';
 import { ago, tildify } from '../../lib/format';
+import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { BASIS, BASIS_HINT, Children, dayOf, EndDate, GONE, HistoryList, notesCount, SessionLink, when } from './common';
+import { FindingView } from './Finding';
 import { EntryEditor } from './parts';
 import { folderName, SOURCE, useMemory } from './state';
 
@@ -77,7 +79,9 @@ export function useNoteView({ entry, stale, onClose, onChanged, inPlace, onOpenN
   if (!e) return { e: null, kind: 'Note', body: null, actions: null, confirmNode };
 
   const deleted = e.status === 'deleted';
-  const kind = e.kind === 'topic' ? 'Topic' : isUserProfile(e) || e.kind === 'profile' ? 'Profile' : 'Note';
+  const kind = e.kind === 'finding' ? 'Finding' : e.kind === 'topic' ? 'Topic' : isUserProfile(e) || e.kind === 'profile' ? 'Profile' : 'Note';
+  const finding = e.kind === 'finding' ? e.finding : undefined;
+  const summary = e.kind === 'topic' || e.kind === 'profile';
   const changed = e.updatedAt !== e.createdAt;
   const who = SOURCE[e.source];
   const done = (p: Promise<unknown>) => p.then(() => (onChanged(), onClose())).catch(toastError);
@@ -113,7 +117,7 @@ export function useNoteView({ entry, stale, onClose, onChanged, inPlace, onOpenN
   const actions = (
     <>
       <Button size="sm" variant="ghost" onClick={() => void (deleted ? erase() : remove())} className={cx('mr-auto !text-err', !inPlace && '-ml-3')}>
-        {deleted ? 'Erase for good' : 'Delete'}
+        {deleted ? 'Erase for good' : finding ? 'Forget' : 'Delete'}
       </Button>
       {deleted && (
         <Button size="sm" variant="secondary" icon={<ArchiveRestore size={14} />} onClick={() => done(post(`/api/memory/entries/${e.id}/restore`).then(() => toast('Restored')))}>
@@ -135,7 +139,10 @@ export function useNoteView({ entry, stale, onClose, onChanged, inPlace, onOpenN
           {e.title}
         </h3>
       )}
-      {editing ? (
+      {finding ? (
+        // In a project's Memory tab the verdict is in the reader's header; elsewhere it stands with the statement.
+        <FindingView e={e} heading={!inPlace} onSaved={afterEdit} />
+      ) : editing ? (
         <EntryEditor
           text={e.text}
           max={e.kind === 'note' ? 500 : 800}
@@ -156,17 +163,40 @@ export function useNoteView({ entry, stale, onClose, onChanged, inPlace, onOpenN
       )}
       <dl className="mt-4 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-2.5 border-t border-line pt-4 text-[13px] leading-snug">
         {!inPlace && <Fact name="Where">{where}</Fact>}
-        <Fact name="Written">
-          <span title={changed ? `Added ${when(e.createdAt)}\nChanged ${when(e.updatedAt)}` : `Added ${when(e.createdAt)}`}>
-            {deleted ? `Deleted ${ago(e.updatedAt)}` : changed ? `Changed ${ago(e.updatedAt)} by ${who}` : `Added ${ago(e.createdAt)} by ${who}`}
-          </span>
-          {e.session && !deleted && !(e.scope === 'session' && e.session === e.scopeKey) && (
-            <>
-              {' in '}
-              <SessionLink k={e.session} title={e.sessionTitle} />
-            </>
-          )}
-        </Fact>
+        {finding ? (
+          <Fact name="Recorded">
+            <span title={when(e.createdAt)}>{ago(e.createdAt)}</span>
+            {finding.run ? (
+              <>
+                {' by '}
+                <button type="button" onClick={() => go(`/apps/runs/${encodeURIComponent(finding.run!.id)}`)} className="text-fg-2 underline-offset-2 hover:text-fg hover:underline">
+                  {finding.run.app ? <span translate="no">{finding.run.app}</span> : 'an app’s run'}
+                </button>
+              </>
+            ) : e.session ? (
+              <>
+                {' by an agent in '}
+                <SessionLink k={e.session} title={e.sessionTitle} />
+              </>
+            ) : (
+              ' by an agent'
+            )}
+            {e.source === 'user' && !deleted && <span className="block">{tr(`Changed by you ${ago(e.updatedAt)}`)}</span>}
+            {deleted && <span className="block">{tr(`Out of the list since ${ago(e.updatedAt)}`)}</span>}
+          </Fact>
+        ) : (
+          <Fact name="Written">
+            <span title={changed ? `Added ${when(e.createdAt)}\nChanged ${when(e.updatedAt)}` : `Added ${when(e.createdAt)}`}>
+              {deleted ? `Deleted ${ago(e.updatedAt)}` : changed ? `Changed ${ago(e.updatedAt)} by ${who}` : `Added ${ago(e.createdAt)} by ${who}`}
+            </span>
+            {e.session && !deleted && !(e.scope === 'session' && e.session === e.scopeKey) && (
+              <>
+                {' in '}
+                <SessionLink k={e.session} title={e.sessionTitle} />
+              </>
+            )}
+          </Fact>
+        )}
         {e.basis && !deleted && (
           <Fact name="How it is known">
             <span title={BASIS_HINT[e.basis]} className={cx(e.basis === 'inferred' && 'text-fg')}>
@@ -174,7 +204,7 @@ export function useNoteView({ entry, stale, onClose, onChanged, inPlace, onOpenN
             </span>
           </Fact>
         )}
-        {e.drift && !deleted && (
+        {e.drift && !deleted && !finding && (
           <Fact name="In the code">
             {tr(`${e.drift.paths.join(', ')} changed in the project since this was written (seen ${ago(e.drift.at)}). The next tidy-up checks it against the code.`)}
           </Fact>
@@ -199,14 +229,14 @@ export function useNoteView({ entry, stale, onClose, onChanged, inPlace, onOpenN
             'Not yet'
           )}
         </Fact>
-        {!deleted && (
+        {!deleted && !finding && (
           <Fact name="End date">
             <span>{e.expiresAt ? dayOf(e.expiresAt) : 'None'}</span>
             <Toggle onClick={() => show('end')}>{unfold === 'end' ? 'Hide' : 'Change'}</Toggle>
             {unfold === 'end' && <EndDate e={e} onDone={afterEdit} />}
           </Fact>
         )}
-        {e.kind !== 'note' && (
+        {summary && (
           <Fact name="Sums up">
             <span>{notesCount(e.covers ?? 0)}</span>
             <Toggle onClick={() => show('children')}>{unfold === 'children' ? 'Hide' : 'Show'}</Toggle>

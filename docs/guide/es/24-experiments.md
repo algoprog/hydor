@@ -15,6 +15,7 @@ En una computadora, una columna a la izquierda permanece junto a todo lo que abr
 - La línea de la cola de arriba dice qué está pasando ("2 en ejecución · 1 en espera", o "Nada en ejecución ahora"). Debajo, las GPU de esta computadora como pequeños medidores: la memoria que usa cada una, en el color de acento cuando una de tus ejecuciones la ocupa (apunta a una para ver qué tan ocupada está y qué ejecución la ocupa; haz clic para abrir esa ejecución).
 - **Buscar un experimento** filtra la lista según lo que escribas: el título, la descripción, la categoría y el nombre de un experimento, y los nombres y comandos de sus ejecuciones. Si un experimento coincide solo por sus ejecuciones, indica cuántas ("3 ejecuciones coinciden").
 - **Resumen** te lleva de vuelta a la página que se describe a continuación.
+- **Evaluaciones**, cuando tienes alguna, con sus puntuaciones más recientes ([Evaluaciones](#evaluations-keeping-score-the-same-way)).
 - Después, los experimentos, agrupados por categoría (un pequeño encabezado para cada una, con primero la categoría que tiene la ejecución más reciente; los experimentos sin categoría quedan bajo **Otros experimentos**, y no hay encabezados mientras ninguno tenga categoría). Cada uno muestra su título y, debajo, cuántas ejecuciones tiene y cuántas están en curso ("6 ejecuciones · 1 en ejecución"), o cuándo fue su última ejecución ("23 ejecuciones · hace 2 h"). Dentro de una categoría, va primero el experimento con la ejecución más reciente. **Ejecuciones sin experimento** es la última entrada, cuando existen esas ejecuciones.
 
 El **Resumen** muestra:
@@ -172,13 +173,103 @@ Marca la casilla de cada ejecución que quieras en una tabla de ejecuciones (la 
 
 El menú ⋯ de un experimento también tiene **Comparar las últimas 6**, y su pestaña **Hiperparámetros** tiene **Comparar las 6 mejores**.
 
+Antes de dar por buena una mejora, **Intentar refutarlo**, en la parte inferior de esa ventana, hace que un agente que no participó en el trabajo intente encontrarle otra explicación. Revisa **El resultado que se va a poner a prueba** (una frase, rellenada a partir de las ejecuciones elegidas: cámbiala para que diga lo que quieres decir), elige la **Línea base** y quién lo ejecuta (**La ejecuta**), y haz clic en **Empezar**. El agente busca otras explicaciones (semillas con suerte, una línea base sin ajustar, una filtración de datos, un error en una métrica), hace pruebas de control en un experimento aparte, sobre una copia de tu código y pidiendo permiso antes de usar mucho tiempo de GPU, no repara nada y responde “Se sostiene”, “Se sostiene en parte” o “No se sostiene” junto con lo que intentó (las ejecuciones en otras máquinas quedan fuera).
+
+## Evaluaciones: puntuar siempre de la misma forma
+
+Una evaluación es la manera en que un proyecto lleva la puntuación: un comando y un número, sellados, para que cada ejecución y cada agente se puntúen igual. Los archivos que forman el evaluador y los datos con los que se compara quedan sellados, no se da ninguna puntuación mientras difieran, y la app calcula cada puntuación a partir de su propia ejecución del comando sellado, así que puedes comparar dos números sin preguntarte cómo se obtuvo cada uno.
+
+En una computadora, la columna las muestra bajo **Evaluaciones**, encima de los experimentos, cada una con su última puntuación y cómo queda frente a la línea base (“0.431 · 0.019 mejor”), “Todavía sin puntuación”, “Puntuando…” mientras se ejecuta una, “Evolucionando · 37 de 200” mientras [Evolucionar](#evolve-searching-for-a-better-version) trabaja en ella, o “cambiada” con una marca ámbar cuando sus archivos son distintos. En un teléfono son tarjetas en la parte superior de la vista general.
+
+### Configurar una
+
+Haz clic en **Más** (⋯), arriba, y luego en [**Nueva evaluación**](/experiments?new=evaluation). La ventana tiene cuatro partes:
+
+- **Qué puntúa**: su **Nombre**, la **Carpeta** (un proyecto, normalmente un repositorio git), el **Comando que puntúa** (como `python eval.py --split dev --seed {seed}`: escribe `{seed}` donde va la semilla, para puntuar con varias semillas), **El número que cuenta** tal como lo imprime el comando (`ndcg@10` para `ndcg@10=0.412`), y **Más es mejor** o **Menos es mejor**.
+- **Qué no debe cambiar**: los archivos y carpetas que forman el evaluador y sus datos. Escribe uno y haz clic en **Añadir**, o toca los que aparecen en **Sugerido a partir de tu comando**. Con `{seed}` en el comando, **Semillas** indica cuáles (1, 2, 3, a menos que las cambies).
+- **Prueba final** (opcional): su propio comando y una **Carpeta reservada** fuera del proyecto, que solo recibe la prueba final: los agentes que trabajan en el proyecto no la ven allí. El comando la encuentra como `$HYDOR_HELD_OUT`.
+- **Dónde se ejecuta**: las GPU que necesita cada ejecución, su memoria libre y un límite de tiempo. Sus ejecuciones esperan en la cola de esta computadora como cualquier otra.
+
+**Crear y sellar** sella los archivos (las carpetas grandes tardan un rato) y abre la página de la evaluación. ¿No sabes bien qué poner? **Configurarla con un agente**, en la parte superior de la ventana, inicia una petición en esa carpeta: el agente lee cómo entrenas y evalúas y propone la evaluación, que solo se crea si dices que sí.
+
+### La página de la evaluación
+
+Debajo de su nombre están el número, qué sentido es mejor, las semillas y el comando (tócalo para verlo completo), y luego “Sellada el 24 nov: 4 archivos, todo como estaba”. Después hay tres recuadros:
+
+- **Línea base**: la puntuación con la que se comparan las demás. Al principio dice “Aún sin medir”: haz clic en **Medir la línea base**. **Volver a medir** está en su menú.
+- **Última puntuación**: su número, su rama y cómo queda frente a la línea base (“0.019 mejor que la línea base”; “Igual que la línea base, dentro del ruido” cuando la diferencia bien podría ser azar), con la frecuencia con la que el azar por sí solo daría esa diferencia.
+- **Prueba final**: **Añadir uno**, **Ejecutar la prueba final…**, o su número y cuántas veces se ha ejecutado desde que se selló.
+
+Con dos puntuaciones o más, un gráfico muestra cada una a lo largo del tiempo, con su dispersión entre semillas y la línea base como línea discontinua. **Evolucionar…**, en el menú ⋯ de la página, empieza una búsqueda de una versión mejor ([Evolucionar](#evolve-searching-for-a-better-version)), y cuando ya hay alguna, **Evolucionar** las muestra entre el gráfico y las puntuaciones. **Puntuaciones** las muestra, de la más reciente a la más antigua: cuándo, dónde (rama y commit, “con cambios sin commit” si es así), quién la pidió, la puntuación y cómo se compara. El menú de una puntuación abre sus ejecuciones, la usa como línea base (**Usar como línea base**), la detiene o la elimina. Cuando una puntuación falla porque el comando no imprimió el número, se muestran los nombres que sí imprimió: toca uno para usarlo en su lugar (se vuelve a sellar).
+
+**Puntuar ahora** puntúa la carpeta. Cuando el repositorio tiene worktrees de git, pregunta “¿Puntuar lo que hay en qué carpeta?”: la propia carpeta o uno de los worktrees, según su rama. Una evaluación puede puntuar su propia carpeta, una carpeta dentro de ella o un worktree de git del mismo repositorio.
+
+### Cuando cambian los archivos sellados
+
+Si un archivo sellado difiere, un aviso ámbar indica cuál, y las puntuaciones esperan hasta que vuelvan a estar como antes:
+
+- **Ver qué cambió**: cada archivo marcado como Changed, Missing o New file, con lo que cambió en él.
+- **Restaurarlos**: escribe las copias selladas encima y dice qué no pudo restaurar y por qué (los archivos añadidos después se quedan).
+- **Volver a sellar…**: acepta los archivos tal como están ahora. Las puntuaciones anteriores ya no se comparan con las nuevas (se conservan, plegadas bajo **Antes de que se volviera a sellar**), y hay que medir de nuevo la línea base. Cambiar el comando, el número o los archivos sellados con **Editar…** también vuelve a sellar.
+
+### La prueba final
+
+**Ejecutar la prueba final…** (en su recuadro o en el menú de la página) dice qué tan bien funciona realmente tu trabajo con datos sobre los que no se ajustó nada. Cada vez que miras te dice un poco menos, así que ejecútala cuando creas que has terminado; la ventana indica cuántas veces se ha ejecutado desde que se selló. Cuando hay worktrees de git, también pregunta sobre cuál se ejecuta (**Sobre lo que hay en**).
+
+### Lo que pueden hacer los agentes
+
+Los agentes pueden leer las evaluaciones, pedir una puntuación de su carpeta (la app ejecuta ella misma el comando sellado; ellos informan ese número, no uno propio), proponer una evaluación nueva (ves cada parte en una tarjeta y solo se crea si dices que sí) y restaurar los archivos sellados. No pueden crear ni sellar una por su cuenta, fijar la línea base, ni ejecutar o leer la prueba final.
+
+Las ejecuciones iniciadas en la carpeta de una evaluación indican en su página si sus archivos estaban como al sellarse cuando empezaron, y la tabla de ejecuciones marca con un signo ámbar aquellas en las que no lo estaban. Una ejecución que sirvió para puntuar una evaluación lleva de vuelta a ella.
+
+## Evolucionar: buscar una versión mejor
+
+Evolucionar prueba muchos cambios pequeños en los archivos que indiques, puntúa cada uno con la evaluación y conserva el mejor. Tus propios archivos no se tocan: cada cambio se prueba en una copia propia de la app, creada a partir de tu último commit. Usa el [modelo auxiliar](/guide/agents-models#choose-the-helper-model) de la app para escribir los cambios, basando cada uno en una de las mejores versiones encontradas hasta el momento.
+
+Vale la pena para un archivo cuya calidad la evaluación pueda medir bien: una heurística, una función de puntuación, un prompt, una rutina lenta. No la vale cuando la evaluación es débil (pocos ejemplos, un número fácil de manipular): una búsqueda encuentra los puntos débiles de aquello que la puntúa, así que define una [prueba final](#the-final-test) con datos que la búsqueda nunca vea.
+
+### Empezar una
+
+Abre la página de la evaluación, haz clic en ⋯ y en **Evolucionar…**. La ventana pregunta:
+
+- **¿Qué puede cambiar?** Escribe un archivo y haz clic en **Añadir**, o toca los de **Sugeridos**: hasta 8 archivos de texto que estén en un commit y no tengan cambios desde entonces. Un archivo que la evaluación protege no se puede cambiar: se te avisa.
+- **¿Qué debería probar?** (opcional): unas líneas, como “Haz que el reordenador sea más rápido sin perder nDCG@10”.
+- **Cuántos intentos**: 50, 100, 200, u **Otros** para un número propio (de 10 a 2000).
+- En **Más**: **Detener después de (horas)**, **Cuántos a la vez** (de 1 a 4) y **Detener cuando esta cantidad de intentos seguidos no aporte nada mejor** (40 si no lo cambias).
+
+Haz clic en **Empezar**. Primero puntúa tu punto de partida, con todas las semillas de la evaluación, y luego empieza. Una evaluación sin línea base muestra **Medir la línea base** en lugar de **Empezar**.
+
+### Leer su página
+
+Su fila bajo **Evolucionar** en la página de la evaluación dice “En ejecución · 37 de 200 probados”, “Hecho · 0.035 mejor que el punto de partida” o “Detenidas”; haz clic en ella para abrirla. En la parte superior están para qué sirve, su estado (como “Listo: ningún nuevo mejor en los últimos 40”) y **Pausar** o **Reanudar**, **Detener** (después no se puede reanudar) y ⋯ con **Eliminar…** (se van sus intentos, sus puntuaciones y sus copias de trabajo; una rama que hayas tomado se queda). Después vienen tres recuadros:
+
+- **Punto de partida**: la puntuación de tu versión.
+- **Lo mejor hasta ahora**: la mejor puntuación, cuánto mejor que el punto de partida es, una línea sobre qué cambió y **Ver el cambio**.
+- **Probados**: cuántos de cuántos, cuántos fallaron y cuántas veces se consultó a un modelo.
+
+Un gráfico muestra todos los intentos en orden: una primera puntuación rápida (**Solo la primera semilla**) se ve más clara que una comprobada con **Todas las semillas**, los intentos fallidos son marcas en la parte inferior, **Lo mejor hasta ahora** es una línea escalonada y el **Punto de partida** una discontinua. Haz clic en un punto para abrir ese intento.
+
+**Qué probó** los muestra, del más reciente al más antiguo: qué cambió cada uno, su puntuación (o por qué falló), cómo queda frente al punto de partida, en qué versión estaba **Basado en** y el **Modelo** que lo escribió (**Rápido**, o de vez en cuando **Potente**). Un intento recibe primero una puntuación rápida, con una semilla; solo el que supera al mejor de su línea de trabajo se comprueba con todas ellas, y solo esa puntuación completa puede convertirlo en el mejor. **Nuevo mejor** marca los que eran los mejores cuando se puntuaron, y **Mejor** el mejor de ahora. Abre un intento para ver su cambio, archivo por archivo, y **Tomar este**.
+
+### Tomar el mejor
+
+**Tomar el mejor** (y **Tomar este**) pregunta primero y luego crea una rama en tu repositorio con esa versión: los archivos que tienes en tu copia de trabajo no se tocan. La página conserva “Tomado como <branch>”, que la abre en la [página de Git](/git). Si vuelves a tomar una, se añade un commit a la misma rama.
+
+La prueba final no ha visto la versión que tomaste. Para comprobarla allí, cambia tu carpeta a la rama (o crea un worktree de git de ella) y haz clic en **Ejecutar la prueba final…** en la página de la evaluación.
+
+### Lo que cuesta
+
+Cada intento ejecuta la evaluación (una semilla y, cuando es prometedor, todas) y consulta a un modelo una vez, o dos cuando su primera respuesta no se puede usar. Con GPU, sus ejecuciones esperan en la cola como cualquier otra. **Pausar** detiene los intentos nuevos, y **Detener después de (horas)** y el límite de intentos seguidos sin nada mejor evitan que siga sin sentido.
+
+Los agentes pueden empezar una con tu sí en una tarjeta y leer cómo va. No pueden eliminarla.
+
 ## Tablas de resultados para tu artículo
 
 **Crear una tabla** (a partir de ejecuciones marcadas, del menú ⋯ de un experimento o de su pestaña **Hiperparámetros**) muestra la tabla como la eliges:
 
 - **Columnas**: las métricas. Haz clic en una para añadirla o quitarla, y en su flecha para cambiar qué sentido es el mejor.
 - **Filas**: **Una fila por experimento**, o una fila por cada valor de un hiperparámetro que difiere entre las ejecuciones (**Una fila por valor de lr**).
-- **Referencia**: la fila contra la que se prueban las demás (la primera fila, salvo que elijas otra).
+- **Línea base**: la fila contra la que se prueban las demás (la primera fila, salvo que elijas otra).
 - **Prueba frente a la referencia**: **Elegir por mí** (pareada sobre ejemplos cuando las ejecuciones guardaron puntuaciones por ejemplo; si no, pareada sobre semillas cuando las ejecuciones de las filas comparten sus semillas; si no, la prueba t de Welch sobre semillas), **Prueba t de Welch sobre semillas**, **Prueba t pareada (por semilla o por ejemplo)**, **Bootstrap pareado sobre ejemplos** o **Sin prueba**.
 - **Leyenda**.
 
@@ -229,7 +320,7 @@ Un trabajo para un clúster se ejecuta en una carpeta allí (el código ya debe 
 
 ## En un teléfono
 
-No hay columna: el resumen empieza con la cola, las GPU y **Buscar un experimento**, y lista los experimentos como tarjetas. Un experimento y una ejecución se abren en su lugar, con una flecha para volver. Una tabla de ejecuciones se desplaza hacia los lados, y la casilla y el nombre de cada ejecución siguen a la vista; las ejecuciones de los gráficos son una fila de etiquetas encima de ellos, y **Suavizado** está en el menú **Opciones del gráfico**. El log de una ejecución se ajusta al ancho de la pantalla, y **Seguir** funciona como en una computadora. Nueva ejecución, Comparar y las tablas se abren desde la parte inferior de la pantalla.
+No hay columna: la vista general empieza con la cola, las GPU y **Buscar un experimento**, y muestra las evaluaciones (cuando tienes algunas) y los experimentos como tarjetas. Un experimento, una evaluación y una ejecución se abren en su lugar, con una flecha para volver. Una tabla de ejecuciones se desplaza de lado, y la casilla y el nombre de cada ejecución siguen a la vista; las ejecuciones de los gráficos son una fila de etiquetas encima de ellos, y **Suavizado** está en el menú **Opciones del gráfico**. El log de una ejecución se ajusta al ancho de la pantalla, y **Seguir** funciona como en una computadora. New run, Compare y las tablas se abren desde la parte inferior de la pantalla.
 
 ## Pide a un agente
 
@@ -240,6 +331,12 @@ No hay columna: el resumen empieza con la cola, las GPU y **Buscar un experiment
 - "Pon un agente de guardia en este entrenamiento: si se queda sin memoria, reduce a la mitad el tamaño del lote y reanuda desde el último checkpoint."
 - "Haz una tabla LaTeX de los experimentos lora: exactitud y F1 frente a la línea base, con significancia, y ponla en mi artículo."
 - "¿Cuál de mis ejecuciones de esta semana tuvo la mejor pérdida de validación, y cuáles fueron sus hiperparámetros?"
+- “Intenta refutar el resultado de que la nueva función de pérdida supera a la línea base en ndcg@10.”
 - "Ponles títulos y descripciones más claros a mis experimentos y ordénalos en categorías."
 - "En mi barrido de tasa de aprendizaje, ¿qué hiperparámetros importan más para la pérdida de desarrollo?"
 - "Muéstrame las curvas de las 5 mejores ejecuciones del experimento lora."
+- “Configura una evaluación para este repositorio.”
+- “Puntúa mi rama frente a la línea base.”
+- “¿Por qué mi evaluación dice que hay archivos cambiados?”
+- “Haz evolucionar la función de puntuación de rank.py frente a mi evaluación, 100 intentos.”
+- “¿Cómo va la evolución?”

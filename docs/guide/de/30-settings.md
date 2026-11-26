@@ -28,6 +28,8 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Beim Start dieses Computers starten**](/settings?s=general&find=Start%20when%20this%20computer%20starts): Startet die App, wenn der Computer startet.
 - [**Computer wach halten**](/settings?s=general&find=Keep%20the%20computer%20awake): In den Desktop-Apps geht der Computer nicht automatisch in den Ruhezustand, während Agenten arbeiten und vor geplanten Aufgaben.
 - [**Automatisch aktualisieren**](/settings?s=general&find=Update%20automatically): Installiert neue Versionen selbst: Desktop-Apps kurz nach ihrer Veröffentlichung mit einer Minute Vorankündigung; eine Git-Kopie, wenn du sie eine Weile nicht verwendet hast.
+- [**Lean (Beweisprüfer)**](/settings?s=general&find=Lean%20%28proof%20checker%29): Lässt Agenten mathematische Beweise prüfen: Ein Beweis, den Lean akzeptiert, ist korrekt.
+- [**Mathlib hinzufügen**](/settings?s=general&find=Add%20Mathlib): Die Bibliothek zu Lean hinzufügen, die die meiste Mathematik braucht.
 - [**Take a tour**](/settings?s=general&find=Take%20the%20tour): Funktionen der App kennenlernen.
 - [**Tipps**](/settings?s=general&find=Tips): Weist nach der Willkommenstour auf einen App-Bereich hin, wenn du ihn erstmals aufrufst.
 - [**Ideen für den Einstieg**](/settings?s=general&find=Starter%20ideas): Beispiele, deine Apps und eine Automatisierung unter dem leeren Nachrichtenfeld auf der Startseite.

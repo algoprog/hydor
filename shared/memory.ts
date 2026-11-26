@@ -6,14 +6,21 @@
 // and writes a project's short profile; with Learn from conversations on, it first reads the conversations
 // since the last one, to correct the notes they show wrong, check the unchecked and keep what none saved.
 
+import type { FindingData } from './findings.ts';
+
 export type MemoryScope = 'global' | 'repo' | 'session';
 export const MEMORY_SCOPES: MemoryScope[] = ['global', 'repo', 'session'];
 
 /**
- * A note; a topic, which sums up related notes (they stay, for recall); or a profile, which agents always get:
- * the user's own (about the user: one at most, kept by agents and the user) or a project's (the tidy-up's).
+ * A note; a topic, which sums up related notes (they stay, for recall); a profile, which agents always get:
+ * the user's own (about the user: one at most, kept by agents and the user) or a project's (the tidy-up's); or a
+ * finding: one thing a project tried and what came of it, kept with its evidence (shared/findings.ts), dead ends
+ * included. The tidy-up never merges, sums up, moves or removes findings.
  */
-export type MemoryKind = 'note' | 'topic' | 'profile';
+export type MemoryKind = 'note' | 'topic' | 'profile' | 'finding';
+
+/** A topic or a profile: it sums up other notes. A note and a finding stand for themselves. */
+export const isSummary = (e: { kind?: MemoryKind }) => e.kind === 'topic' || e.kind === 'profile';
 
 /** How long the user's profile may grow, in words (Settings → Memory): unless changed, what Settings offers, and the most. */
 export const PROFILE_WORDS_DEFAULT = 1000;
@@ -79,6 +86,8 @@ export interface MemoryEntry {
   anchors?: string[];
   /** Set once files it is anchored to changed after it was written or last checked: which, since which commit, and when. */
   drift?: MemoryDrift;
+  /** A finding's own: what was tried, what came of it and its evidence. Its text is written from it. */
+  finding?: FindingData;
 }
 
 /** Files a note names that changed in the project since the commit its anchors were taken at. */

@@ -1,7 +1,7 @@
 // Script tests for what the Experiments pages work out from runs (analysis.ts): the sections metrics fall into, smoothing
 // (TensorBoard's debiased average), a metric along another one, the y range, the key metrics of an experiment, the
 // hyperparameters that differ, Spearman's ρ and the correlation ratio, how much each hyperparameter matters, the queue's
-// order. Build and run:
+// order, the number a claim against a baseline starts from. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/experiments/analysis-test.ts && node dist/dev/analysis-test.js
 import assert from 'node:assert/strict';
 import type { RunRecord } from '@shared/experiments';
@@ -232,6 +232,22 @@ const run = (more: Partial<RunRecord> & { last?: Record<string, number>; curves?
   assert.equal(A.runKey({ id: 'a', machine: { id: 'm', name: 'M' } }), 'm:a');
   assert.equal(A.runKey({ id: 'a' }), ':a');
   assert.equal(A.RUN_COLORS.length, A.MAX_SHOWN);
+}
+
+// ---- headlineOf (what Try to break it's sentence starts from)
+{
+  const base = run({ last: { 'dev_ndcg@10': 0.412, lr: 2e-5, elapsed_s: 90 }, curves: ['dev_ndcg@10', 'lr'] });
+  const a = run({ last: { 'dev_ndcg@10': 0.431, lr: 3e-5, elapsed_s: 80 }, curves: ['dev_ndcg@10', 'lr'] });
+  const b = run({ last: { 'dev_ndcg@10': 0.42, elapsed_s: 70 }, curves: ['dev_ndcg@10'] });
+  const h = A.headlineOf([base, a, b], base)!;
+  assert.equal(h.metric, 'dev_ndcg@10');
+  assert.equal(h.run.id, a.id, 'the best of the others');
+  assert.deepEqual([h.value, h.against, h.better], [0.431, 0.412, 'max']);
+  assert.equal(A.headlineOf([base, a, b], a)!.run.id, b.id, 'never the baseline against itself');
+  const lo = A.headlineOf([run({ last: { dev_loss: 0.5 } }), run({ last: { dev_loss: 0.4 } })], run({ last: { dev_loss: 0.6 } }))!;
+  assert.deepEqual([lo.value, lo.better], [0.4, 'min']);
+  assert.equal(A.headlineOf([run({ last: { elapsed_s: 1 } }), base], base), null, 'bookkeeping is no claim');
+  assert.equal(A.headlineOf([base, run()], base), null, 'no number they share');
 }
 
 console.log('analysis ok');

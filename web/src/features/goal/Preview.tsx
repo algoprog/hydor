@@ -1,6 +1,7 @@
 // Development only (main.tsx loads it for /goal-preview in a dev server, never in a build): every sample goal
 // (samples.ts) drawn in the dock as it shows above the message box, without the server. ?s=<sample id> picks one,
-// ?rounds=1 opens the rounds, ?more=1 opens Give it more (on the limit sample), ?open=<n> opens that round's row, ?light=1 the light theme,
+// ?rounds=1 opens the rounds, ?more=1 opens Give it more (on the limit sample), ?open=<n> opens that round's row, ?change=1 the
+// agreement's fields (Change…; a score check's evaluations are asked of the server, so they show only beside one), ?light=1 the light theme,
 // ?helpers=2&swarm=1 shows a lead whose own turn has ended while 2 members are at work (the working-swarm sample does by itself), ?bare=1 leaves out the list of samples and ?zoom=0.8 draws smaller (for pictures of one state).
 import { useEffect } from 'react';
 import type { SessionSummary } from '@shared/types';
@@ -37,6 +38,7 @@ export default function GoalPreview() {
     if (zoom > 0) document.documentElement.style.setProperty('zoom', String(zoom));
     const t = setTimeout(() => {
       if (q.get('more')) [...document.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Give it more'))?.click();
+      if (q.get('change')) [...document.querySelectorAll('button')].find((b) => b.textContent === 'Change…')?.click();
       if (q.get('rounds')) [...document.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Rounds ·'))?.click();
       const open = q.get('open');
       if (open)

@@ -1,13 +1,14 @@
 // What a goal's checks, protected paths, limits and the web's actions may hold: the agent's proposal (goal_propose) and
 // the person's changes (POST /api/sessions/:key/goal) pass through here. Each problem is a plain sentence: the agent
-// gets them all to fix, the web the first as a 400.
+// gets them all to fix, the web the first as a 400. What a score check needs of its evaluation (that it exists, can score
+// the folder and has a baseline) is for scores.ts, which reads the evaluations.
 import { GOAL_MAX_CHECKS, GOAL_MAX_WAYS, type GoalAction, type GoalCheck, type GoalCheckKind, type GoalContract, type GoalLimits, type GoalSettings } from '../../shared/goals.ts';
 import { HttpError } from '../auth.ts';
-import { badRead, MAX_TIMEOUT_S } from './checks.ts';
+import { badRead, MAX_SCORE_TIMEOUT_S, MAX_TIMEOUT_S } from './checks.ts';
 
-export const MAX = { objective: 4000, label: 200, command: 1000, note: 2000, claim: 1000, title: 200, path: 300, paths: 50, files: 10, read: 300, unit: 20, way: 500, rounds: 500, usd: 10_000, minutes: 100_000, noAnswerMin: 1440 };
+export const MAX = { objective: 4000, label: 200, command: 1000, note: 2000, claim: 1000, title: 200, path: 300, paths: 50, files: 10, read: 300, unit: 20, way: 500, rounds: 500, usd: 10_000, minutes: 100_000, noAnswerMin: 1440, evaluation: 80 };
 
-const KINDS: GoalCheckKind[] = ['command', 'measure', 'review', 'you'];
+const KINDS: GoalCheckKind[] = ['command', 'measure', 'score', 'review', 'you'];
 
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -23,7 +24,7 @@ function cleanCheck(v: unknown, n: number, errors: string[]): Omit<GoalCheck, 'i
   }
   const kind = v.kind as GoalCheckKind;
   if (!KINDS.includes(kind)) {
-    errors.push(`${where} needs a kind: command, measure, review or you.`);
+    errors.push(`${where} needs a kind: command, measure, score, review or you.`);
     return null;
   }
   const label = text(v.label);
@@ -35,7 +36,9 @@ function cleanCheck(v: unknown, n: number, errors: string[]): Omit<GoalCheck, 'i
   if (v.id !== undefined && v.id !== null && String(v.id).trim() !== '') out.id = String(v.id).trim().slice(0, 40);
   const named = label ? `“${label}”` : where;
   if (v.timeoutS !== undefined) {
-    if (!finite(v.timeoutS) || v.timeoutS < 1 || v.timeoutS > MAX_TIMEOUT_S) errors.push(`${named}: timeoutS is a number of seconds from 1 to ${MAX_TIMEOUT_S}.`);
+    // A score waits for the Experiments queue, which may take hours.
+    const most = kind === 'score' ? MAX_SCORE_TIMEOUT_S : MAX_TIMEOUT_S;
+    if (!finite(v.timeoutS) || v.timeoutS < 1 || v.timeoutS > most) errors.push(`${named}: timeoutS is a number of seconds from 1 to ${most}.`);
     else out.timeoutS = Math.round(v.timeoutS);
   }
   if (kind === 'command' || kind === 'measure') {
@@ -63,6 +66,16 @@ function cleanCheck(v: unknown, n: number, errors: string[]): Omit<GoalCheck, 'i
       if (!finite(v.slack) || v.slack < 0 || v.slack > 1) errors.push(`${named}: slack is a share from 0 to 1.`);
       else out.slack = v.slack;
     }
+  }
+  if (kind === 'score') {
+    // Its target and baseline are the app's to fix from the evaluation (scores.ts): what was sent of them is left out.
+    const evaluation = text(v.evaluation);
+    if (!evaluation) errors.push(`${named} needs evaluation: the id of the project’s evaluation that scores it (evaluation_get gives it).`);
+    else if (evaluation.length > MAX.evaluation) errors.push(`${named}: its evaluation is an id of at most ${MAX.evaluation} characters.`);
+    else out.evaluation = evaluation;
+    if (v.gain === undefined || v.gain === null || v.gain === '') out.gain = 0;
+    else if (!finite(v.gain) || v.gain < 0) errors.push(`${named}: gain is a number of 0 or more, in the score’s own units.`);
+    else out.gain = v.gain;
   }
   if (kind === 'review') {
     const claim = text(v.claim);

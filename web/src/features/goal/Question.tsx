@@ -1,6 +1,7 @@
 // A question the goal has open for you. Which way next: ways to tick (several may be, in the order to follow them), with the
 // agent's own pick marked, a way of your own, a note for the agent, and a clock after which it goes on with its pick. A
-// check only you can confirm: It holds or Not yet. Something only you can give: a note, and Send.
+// check only you can confirm: It holds or Not yet. Something only you can give: a note, and Send (or the way on the app
+// offers, as after a score's evaluation was sealed again).
 import { useEffect, useState, type ReactNode } from 'react';
 import { Check, MessageCircleQuestion, Timer } from 'lucide-react';
 import type { GoalQuestion, GoalState } from '@shared/goals';
@@ -215,7 +216,7 @@ function Yours({ g, q }: { g: GoalState; q: GoalQuestion }) {
   );
 }
 
-/** Something only you can give: say it, and it goes on. */
+/** Something only you can give: say it, and it goes on. Where the app offers a way on (its ways), that is the button, the note optional. */
 function Blocked({ g, q }: { g: GoalState; q: GoalQuestion }) {
   const [run, busy] = useAct(g.key);
   const [note, setNote] = useState('');
@@ -224,9 +225,16 @@ function Blocked({ g, q }: { g: GoalState; q: GoalQuestion }) {
       <Context q={q} />
       <Note value={note} onChange={setNote} />
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button variant="primary" size="sm" disabled={busy || !note.trim()} onClick={() => void run({ action: 'answer', ways: [], note: note.trim() })}>
-          Send
-        </Button>
+        {q.ways.map((w, i) => (
+          <Button key={w.name} variant="primary" size="sm" disabled={busy} onClick={() => void run({ action: 'answer', ways: [i], ...(note.trim() ? { note: note.trim() } : {}) })}>
+            {w.name}
+          </Button>
+        ))}
+        {!q.ways.length && (
+          <Button variant="primary" size="sm" disabled={busy || !note.trim()} onClick={() => void run({ action: 'answer', ways: [], note: note.trim() })}>
+            Send
+          </Button>
+        )}
         <span className="ml-auto flex items-center gap-1.5 text-[12.5px] text-fg-3">
           <Timer size={13} /> waits for you
         </span>

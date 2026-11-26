@@ -97,6 +97,12 @@ export interface GoalPrivate {
   pausedFrom?: GoalState['status'];
   /** By check id, the files a reviewer asked for that the app could read (at most 8 each): part of that check's evidence from the start (checks.ts). */
   asked?: Record<string, string[]>;
+  /** By check id, the score a score check waits for (scores.ts): a restart waits for that score again rather than start another. */
+  scores?: Record<string, string>;
+  /** Score checks whose evaluation moved (sealed again, another baseline, removed) while the goal ran: the open question is about them, and the round in progress waits. */
+  moved?: string[];
+  /** Score checks fixed afresh after their evaluation moved: no value of theirs is kept, and the next round checked gives where they start from. */
+  rebased?: string[];
   /** When it was last paused (M1: news for its lead from work begun before then waits in the lead's held queue). */
   pausedAt?: number;
   /** When it last went on after a pause or its limit (Resume, Give it more…): a stop of its session before then is over (R2). */

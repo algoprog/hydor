@@ -219,7 +219,7 @@ export function defaultInterests(db: DB, memory: boolean): Interest[] {
  * The items in order of how well they fit, best first (`limit` of them): by meaning when the embedding model answers,
  * else by words. `given`: the interests are the step's own (each item says which fits it best, by its place among them).
  */
-export async function rankByInterest(db: DB, o: { items: RankItem[]; interests: Interest[]; liked?: string[]; disliked?: string[]; limit?: number; given?: boolean }): Promise<{ ranked: Ranked[]; by: 'meaning' | 'words' | 'none' }> {
+export async function rankByInterest(db: DB, o: { items: RankItem[]; interests: Interest[]; liked?: string[]; disliked?: string[]; limit?: number; given?: boolean; wordsOnly?: boolean }): Promise<{ ranked: Ranked[]; by: 'meaning' | 'words' | 'none' }> {
   const items = o.items.slice(0, RANK_LIMITS.items).map((x) => ({ id: x.id, text: String(x.text ?? '').slice(0, RANK_LIMITS.text) }));
   const interests = o.interests.filter((x) => x.text.trim()).slice(0, RANK_LIMITS.interests);
   const liked = (o.liked ?? []).map((t) => String(t ?? '').slice(0, RANK_LIMITS.text)).filter((t) => t.trim()).slice(0, RANK_LIMITS.feedback);
@@ -231,7 +231,7 @@ export async function rankByInterest(db: DB, o: { items: RankItem[]; interests: 
   let by: 'meaning' | 'words' = 'words';
   let scorer: Scorer | null = null;
   // By meaning: the interests as queries; the items, and what was liked and disliked, as documents.
-  const asked = await embed(db, interests.map((x) => x.text.slice(0, 2000)), 'query', { wait: true, timeoutMs: 120_000 }).catch(() => null);
+  const asked = o.wordsOnly ? null : await embed(db, interests.map((x) => x.text.slice(0, 2000)), 'query', { wait: true, timeoutMs: 120_000 }).catch(() => null);
   const docs = asked ? await embed(db, [...items.map((x) => x.text), ...liked, ...disliked], 'document', { wait: true, timeoutMs: 180_000 }).catch(() => null) : null;
   if (asked && docs && docs.length === items.length + liked.length + disliked.length && (asked.length || !interests.length)) {
     by = 'meaning';

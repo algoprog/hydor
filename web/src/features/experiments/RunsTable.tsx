@@ -3,7 +3,7 @@
 // header click sorts; the box at the left picks runs; the name stays in view when the table is scrolled sideways.
 // The Columns menu chooses which metrics and hyperparameters show.
 import { useMemo, useRef, useState } from 'react';
-import { Columns3, Search } from 'lucide-react';
+import { AlertTriangle, Columns3, Search } from 'lucide-react';
 import type { RunRecord } from '@shared/experiments';
 import { betterOf } from '@shared/experiments';
 import { LOCALE } from '../../i18n/locale';
@@ -240,6 +240,12 @@ export function RunsTable(props: {
                     <button type="button" translate="no" title={r.name ?? r.id} className="max-w-[180px] truncate text-left font-medium text-fg sm:max-w-[300px]">
                       {r.name ?? r.id}
                     </button>
+                    {/* Files an evaluation protects differed when it started: which ones is on the run's page. */}
+                    {r.sealed?.some((s) => !s.ok) && (
+                      <span role="img" aria-label="Sealed files had changed when it started" title="Sealed files had changed when it started" className="flex shrink-0 text-warn">
+                        <AlertTriangle size={13} />
+                      </span>
+                    )}
                   </span>
                 </td>
                 <td className={cell} title={r.why}>

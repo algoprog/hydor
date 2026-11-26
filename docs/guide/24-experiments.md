@@ -15,6 +15,7 @@ On a computer, a column at the left stays beside everything you open here:
 - The queue line at the top says what is happening ("2 running · 1 waiting", or "Nothing running now"). Under it, this computer's GPUs as small meters: the memory each one uses, in the accent colour when one of your runs holds it (point at one to see how busy it is and which run holds it; click it to open that run).
 - **Find an experiment** filters the list by what you type: an experiment's title, description, category and name, and the names and commands of its runs. One that matches only by its runs says how many ("3 runs match").
 - **Overview** brings you back to the page described below.
+- **Evaluations**, when you have some, with their latest scores ([Evaluations](#evaluations-keeping-score-the-same-way)).
 - Then the experiments, grouped by category (a small heading for each, the category with the newest run first; experiments without one come under **Other experiments**, and there are no headings at all while none has a category). Each shows its title and, under it, how many runs it has and how many are going ("6 runs · 1 running"), or when its last run was ("23 runs · 2 h ago"). In a category the experiment with the newest run is first. **Runs without an experiment** is the last entry, when there are such runs.
 
 The **Overview** shows:
@@ -172,6 +173,96 @@ Tick the box of each run you want in a runs table (the box in the table's head t
 
 An experiment's ⋯ menu also has **Compare the latest 6**, and its **Hyperparameters** tab **Compare the best 6**.
 
+Before you count on a gain, **Try to break it** at the bottom of that window has an agent that did none of the work try to explain it away. Check **The result to test** (one sentence, filled in from the picked runs: change it to say what you mean), choose the **Baseline** and who runs it (**Run by**), and click **Start**. The agent looks for other explanations (lucky seeds, an untuned baseline, a leak, a metric bug), runs controls in an experiment of their own, on a copy of your code and asking before it uses much GPU time, repairs nothing, and reports "It holds", "It holds in part" or "It does not hold" with what it tried (runs on other machines are left out).
+
+## Evaluations: keeping score the same way
+
+An evaluation is how a project keeps score: one command and one number, sealed, so every run and every agent is scored the same way. The files that make up the scorer and the data it scores against are sealed, no score is given while they differ, and every score is worked out by the app from its own run of the sealed command, so two numbers can be compared without wondering how each was made.
+
+On a computer, the column lists them under **Evaluations**, above the experiments, each with its latest score and how it stands to the baseline ("0.431 · 0.019 better"), "No score yet", "Scoring…" while one runs, "Evolving · 37 of 200" while [Evolve](#evolve-searching-for-a-better-version) works on it, or "changed" with an amber mark when its files differ. On a phone they are cards at the top of the Overview.
+
+### Set one up
+
+Click **More** (⋯) at the top, then [**New evaluation**](/experiments?new=evaluation). The window has four parts:
+
+- **What it scores**: its **Name**, the **Folder** (a project, usually a git repository), the **Command that scores** (such as `python eval.py --split dev --seed {seed}`: write `{seed}` where the seed goes, to score with several seeds), **The number that counts** as the command prints it (`ndcg@10` for `ndcg@10=0.412`), and **Higher is better** or **Lower is better**.
+- **What must not change**: the files and folders that make up the scorer and its data. Type one and click **Add**, or tap the ones **Suggested from your command**. With `{seed}` in the command, **Seeds** says which ones (1, 2, 3 unless you change them).
+- **Final test** (optional): its own command, and a **Held-out folder** outside the project, which only the final test gets: agents working in the project do not see it there. The command finds it as `$HYDOR_HELD_OUT`.
+- **Where it runs**: the GPUs each run needs, their free memory and a time limit. Its runs wait in line on this computer like any other.
+
+**Create and seal** seals the files (large folders take a while) and opens the evaluation's page. Not sure what to fill in? **Set it up with an agent**, at the top of the window, starts a request in that folder: the agent reads how you train and evaluate and proposes the evaluation, which is made only if you say yes.
+
+### The evaluation's page
+
+Under its name are the number, which way is better, the seeds and the command (tap it to see all of it), then "Sealed 24 Nov: 4 files, all as they were". Three tiles follow:
+
+- **Baseline**: the score the others are compared with. At first it is "Not measured yet": click **Measure the baseline**. **Measure again** is in its menu.
+- **Latest score**: its number, branch and how it stands to the baseline ("0.019 better than the baseline"; "The same as the baseline, within the noise" when the difference could easily be chance), with how often chance alone would give such a difference.
+- **Final test**: **Add one**, **Run the final test…**, or its number and how often it has run since it was sealed.
+
+With two scores or more, a chart shows each one over time, with its spread across seeds and the baseline as a dashed line. **Evolve…** in the page's ⋯ menu starts a search for a better version ([Evolve](#evolve-searching-for-a-better-version)), and once there is one, **Evolve** lists them between the chart and the scores. **Scores** lists them, newest first: when, where (branch and commit, "with changes not committed" if so), who asked, the score and how it compares. A score's menu opens its runs, uses it as the baseline (**Use as the baseline**), stops or deletes it. When a score failed because the command did not print the number, the names it did print are shown: tap one to use it instead (it seals again).
+
+**Score now** scores the folder. When the repository has git worktrees, it asks "Score what is in which folder?": the folder itself or one of the worktrees, by its branch. An evaluation can score its own folder, a folder inside it, or a git worktree of the same repository.
+
+### When the sealed files change
+
+If a sealed file differs, an amber notice says which, and scores wait until they are back:
+
+- **See what changed**: each file marked Changed, Missing or New file, with what changed in it.
+- **Put them back**: writes the sealed copies over them, and says what it could not put back and why (files added since stay).
+- **Seal again…**: accepts the files as they are now. Earlier scores are no longer compared with new ones (they stay, folded under **Before it was sealed again**), and the baseline has to be measured again. Changing the command, the number or the sealed files with **Edit…** seals again too.
+
+### The final test
+
+**Run the final test…** (on its tile or in the page's menu) says how well your work really does on data nothing was tuned on. Each look tells you a little less, so run it when you think you are done; the window says how often it has run since it was sealed. When there are git worktrees, it also asks which one it runs on (**On what is in**).
+
+### What agents can do
+
+Agents can read the evaluations, ask for a score of their folder (the app runs the sealed command itself; they report that number, not their own), propose a new evaluation (you see every part of it on a card and it is made only if you say yes) and put sealed files back. They cannot create or seal one themselves, set the baseline, or run or read the final test.
+
+Runs started in an evaluation's folder say on their page whether its files were as sealed when they started, and a runs table marks the ones where they were not with an amber sign. A run that scored an evaluation leads back to it.
+
+## Evolve: searching for a better version
+
+Evolve tries many small changes to the files you name, scores each with the evaluation, and keeps the best. Your own files are not touched: every change is tried in a copy of the app's own, made from your last commit. It uses the app's [helper model](/guide/agents-models#choose-the-helper-model) to write the changes, building each on one of the best versions found so far.
+
+It is worth it for a file whose quality the evaluation can measure well: a heuristic, a scoring function, a prompt, a slow routine. It is not when the evaluation is weak (few examples, a number that is easy to game): a search finds the weak spots of whatever scores it, so set a [final test](#the-final-test) on data the search never sees.
+
+### Start one
+
+Open the evaluation's page, click ⋯ and **Evolve…**. The window asks:
+
+- **What may it change?** Type a file and click **Add**, or tap the ones under **Suggested**: up to 8 text files that are committed and have no changes since. A file the evaluation protects cannot be changed: you are told so.
+- **What should it try?** (optional): a few lines, such as "Make the reranker faster without losing nDCG@10".
+- **How many tries**: 50, 100, 200, or **Other** for a number of your own (10 to 2000).
+- Under **More**: **Stop after (hours)**, **How many at once** (1 to 4) and **Stop when this many in a row brought nothing better** (40 unless you change it).
+
+Click **Start**. It scores your start first, with all the evaluation's seeds, then begins. An evaluation with no baseline shows **Measure the baseline** instead of **Start**.
+
+### Read its page
+
+Its row under **Evolve** on the evaluation's page says "Running · 37 of 200 tried", "Done · 0.035 better than the start" or "Stopped"; click it to open it. At the top are what it is for, its state (such as "Done: no new best in the last 40") and **Pause** or **Resume**, **Stop** (it cannot be resumed afterwards) and ⋯ with **Delete…** (its tries, their scores and working copies go; a branch you took stays). Three tiles follow:
+
+- **Start**: your version's score.
+- **Best so far**: the best score, how much better than the start it is, one line on what it changed and **See the change**.
+- **Tried**: how many of how many, how many failed and how many times a model was asked.
+
+A chart shows every try in order: a quick first score (**First seed only**) is lighter than one checked with **All seeds**, failed tries are marks along the bottom, the **Best so far** is a stepped line and the **Start** a dashed one. Click a dot to open that try.
+
+**What it tried** lists them, newest first: what each changed, its score (or why it failed), how it stands to the start, which version it was **Built on** and the **Model** that wrote it (**Quick**, or now and then **Strong**). A try gets a quick score first, on one seed; only one that beats its line of work's best is checked with all of them, and only that full score can make it the best. **New best** marks the ones that were the best when they were scored, **Best** the best now. Open a try to see its change, file by file, and **Take this one**.
+
+### Take the best
+
+**Take the best** (and **Take this one**) asks first, then makes a branch in your repository with that version: the files you have checked out are not touched. The page keeps "Taken as <branch>", which opens it on the [Git page](/git). Taking again adds a commit to the same branch.
+
+The final test has not seen the version you took. To check it there, switch your folder to the branch (or make a git worktree of it) and click **Run the final test…** on the evaluation's page.
+
+### What it costs
+
+Each try runs the evaluation (one seed, then all of them when it is promising) and asks a model once, or twice when its first answer cannot be used. With GPUs, its runs wait in line like any other. **Pause** stops new tries, and **Stop after (hours)** and "nothing better in a row" keep it from going on for nothing.
+
+Agents can start one with your yes on a card, and read how it goes. They cannot delete one.
+
 ## Results tables for your paper
 
 **Make a table** (from ticked runs, an experiment's ⋯ menu or its **Hyperparameters** tab) shows the table as you choose:
@@ -229,7 +320,7 @@ A job for a cluster runs in a folder there (the code must be there already: clon
 
 ## On a phone
 
-There is no column: the Overview starts with the queue, the GPUs and **Find an experiment**, and lists the experiments as cards. An experiment and a run open in its place, with an arrow back. A runs table scrolls sideways, each run's checkbox and name staying in view; the runs on the charts are a row of chips above them, and **Smoothing** is in the **Chart options** menu. A run's log wraps to the screen's width, and **Follow** works as on a computer. New run, Compare and the tables open from the bottom of the screen.
+There is no column: the Overview starts with the queue, the GPUs and **Find an experiment**, and lists the evaluations (when you have some) and the experiments as cards. An experiment, an evaluation and a run open in its place, with an arrow back. A runs table scrolls sideways, each run's checkbox and name staying in view; the runs on the charts are a row of chips above them, and **Smoothing** is in the **Chart options** menu. A run's log wraps to the screen's width, and **Follow** works as on a computer. New run, Compare and the tables open from the bottom of the screen.
 
 ## Ask an agent
 
@@ -240,6 +331,12 @@ There is no column: the Overview starts with the queue, the GPUs and **Find an e
 - "Put an agent on call for this training run: if it runs out of memory, halve the batch size and resume from the last checkpoint."
 - "Make a LaTeX table of the lora experiments: accuracy and F1 against the baseline, with significance, and put it in my paper."
 - "Which of my runs this week had the best validation loss, and what were its hyperparameters?"
+- "Try to break the result that the new loss beats the baseline on ndcg@10."
 - "Give my experiments clearer titles and descriptions, and sort them into categories."
 - "In my learning-rate sweep, which hyperparameters matter most for the dev loss?"
 - "Show me the curves of the best 5 runs of the lora experiment."
+- "Set up an evaluation for this repository."
+- "Score my branch against the baseline."
+- "Why is my evaluation saying files changed?"
+- "Evolve the scoring function in rank.py against my evaluation, 100 tries."
+- "How is the evolution doing?"

@@ -28,6 +28,8 @@
 - [**このコンピューターの起動時に開始**](/settings?s=general&find=Start%20when%20this%20computer%20starts)：コンピューターの起動時にアプリを起動します。
 - [**コンピューターをスリープさせない**](/settings?s=general&find=Keep%20the%20computer%20awake)：デスクトップアプリで、エージェントの作業中とスケジュールタスクの前に、コンピューターが自動でスリープしないようにします。
 - [**自動で更新**](/settings?s=general&find=Update%20automatically)：新しいバージョンを自動でインストールします：デスクトップアプリは公開後すぐに（1分前に通知）、gitのコピーはしばらく使っていないときに。
+- [**Lean（証明チェッカー）**](/settings?s=general&find=Lean%20%28proof%20checker%29)：エージェントが数学の証明をチェックできるようになります。Leanが受理した証明は正しい証明です。
+- [**Mathlibを追加**](/settings?s=general&find=Add%20Mathlib)：多くの数学で必要になるライブラリをLeanに追加。
 - [**ツアーを始める**](/settings?s=general&find=Take%20the%20tour)：アプリの各部分の機能を確認。
 - [**ヒント**](/settings?s=general&find=Tips)：ウェルカムツアーの後、アプリの各部分に初めて来たときにその部分を案内します。
 - [**スターターアイデア**](/settings?s=general&find=Starter%20ideas)：スタートページの空のメッセージ欄の下に表示する例、アプリ、自動化。

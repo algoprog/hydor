@@ -37,6 +37,15 @@ const TOOL_STATES = 'This changes which of a connected account’s tools agents 
 const RULES: Rule[] = [
   // Never an agent's.
   ['POST', /^\/api\/wiki\/migration\/apply$/, 'refuse', 'The user chooses wiki folder moves in Settings.'],
+  // An evaluation is how the person keeps score: agents read it, ask for scores and put sealed files back.
+  ['POST', /^\/api\/experiments\/evaluations$/, 'refuse', 'Only the person creates and seals an evaluation; propose one with evaluation_propose.'],
+  ['PUT|PATCH', /^\/api\/experiments\/evaluations\//, 'refuse', 'Only the person changes an evaluation; propose one with evaluation_propose.'],
+  ['DELETE', /^\/api\/experiments\/evaluations\//, 'refuse', 'Only the person deletes an evaluation or its scores.'],
+  ['W', /^\/api\/experiments\/evaluations\/[^/]+\/seal$/, 'refuse', 'Only the person seals an evaluation; propose one with evaluation_propose.'],
+  ['W', /^\/api\/experiments\/evaluations\/[^/]+\/baseline$/, 'refuse', 'Only the person sets the baseline: tell them which score you would use.'],
+  ['*', /^\/api\/experiments\/evaluations\/[^/]+\/final$/, 'refuse', 'Only the person runs the final test and reads its numbers.'],
+  // Evolve: agents read; starting one, pausing, resuming, stopping and taking the best ask each time (below).
+  ['DELETE', /^\/api\/experiments\/evolutions\//, 'refuse', 'Only the person deletes an evolution: its candidates, their scores and its worktrees go with it.'],
   ['*', /^\/api\/auth\//, 'refuse', 'The password and signing in are the user’s alone (Settings → App → Password).'],
   ['*', /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)(\/|$)/, 'refuse', YOUR_TOOLS],
   ['*', /^\/api\/pdf\//, 'refuse', 'Use your PDF tools for that: pdf_look and pdf_form to see a PDF and its form, pdf_fill, pdf_write and pdf_pages to change it.'],
@@ -98,6 +107,7 @@ const RULES: Rule[] = [
   // A LaTeX reference looked up, a LaTeX document typeset, a document's pages printed: answers, nothing kept changed.
   ['POST', /^\/api\/pages\/(tex\/(reference|compile)|docs\/print)$/, 'free'],
   // Ask every time: risky, costly or hard to undo.
+  ['DELETE', /^\/api\/lean$/, 'refuse', 'Only the user removes Lean: Settings → General → Lean (proof checker).'],
   ['DELETE', /./, 'always'],
   ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|stop-all|interrupt|cancel)(\/|$)/, 'always'],
   ['W', /^\/api\/setup\//, 'always', 'This changes what Claude Code or Codex load in every session; an MCP server runs a program on this computer.'],
@@ -106,6 +116,7 @@ const RULES: Rule[] = [
   ['W', /^\/api\/(update|update\/auto|startup|machines|scm\/accounts|acp-agents|agent-accounts|clients)(\/|$)/, 'always'],
   ['W', /^\/api\/models\/(install|start)$/, 'always', 'This downloads or starts a model on this computer.'],
   ['POST', /^\/api\/images\/local\/setup$/, 'always', 'This sets up the picture tools on this computer: a private Python with what they need (about 145 MB, or about 2.1 GB with an NVIDIA graphics card, to run on it), and each tool’s model (about 200 MB) the first time it is used.'],
+  ['POST', /^\/api\/lean\/setup$/, 'ask', 'This downloads and sets up Lean, the proof checker (about 620 MB, about 3 GB once unpacked), in the app’s own folder; with mathlib, Mathlib too (several GB).'],
   ['POST', /^\/api\/apps\/install$|^\/api\/apps\/[^/]+\/env$/, 'always', 'This installs an app on this computer, with the apps and the Node or Python packages it needs.'],
   ['W', /^\/api\/plugins\/(install|new|[^/]+\/(enable|setup|update|draft|files))$/, 'always', 'A plugin runs programs on this computer, installs what it needs, and gives every agent its skills, tools and instructions.'],
   ['W', /^\/api\/voice$/, 'confirm'],
@@ -119,6 +130,11 @@ const RULES: Rule[] = [
   ['W', /^\/api\/(tasks|apps\/[^/]+\/(runs|batches)|apps\/runs\/[^/]+\/ask|apps\/[^/]+\/run|automations\/(test-run|runs\/[^/]+\/rerun)|opinion\/[^/]+|arena\/[^/]+\/winner)(\/|$)/, 'always', 'This starts agent work that may cost.'],
   ['POST', /^\/api\/experiments\/(jobs|sweeps|runs\/[^/]+\/again)$/, 'always', 'This starts jobs on this computer (its GPUs), another machine or a cluster. Agents in sessions use experiment_run and experiment_sweep.'],
   ['POST', /^\/api\/experiments\/(tables\/preview|clusters\/check)$/, 'free'],
+  ['POST', /^\/api\/experiments\/evaluations\/[^/]+\/scores$/, 'always', 'This starts jobs on this computer (its GPUs). Agents in sessions use evaluation_score.'],
+  ['POST', /^\/api\/experiments\/evaluations\/[^/]+\/restore$/, 'always', 'This writes the sealed copies over the files that changed in that folder: what is in them now is lost.'],
+  ['POST', /^\/api\/experiments\/evolutions$/, 'always', 'This starts a search that runs the evaluation once or more for every change it tries (on this computer, its GPUs too) and asks the helper model for each. Agents in sessions use evolve_start.'],
+  ['POST', /^\/api\/experiments\/evolutions\/[^/]+\/(pause|resume|stop)$/, 'always', 'This pauses, resumes or stops a search that runs the evaluation for every change it tries.'],
+  ['POST', /^\/api\/experiments\/evolutions\/[^/]+\/take$/, 'always', 'This makes a branch (or a new commit on it) in the repository, with the candidate’s files.'],
   // An agent's file read, to show what it would bring: nothing is saved.
   ['POST', /^\/api\/assistants\/install\/check$/, 'free'],
   // Trying an agent's examples starts a session for each, on its tier.

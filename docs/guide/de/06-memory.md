@@ -42,6 +42,23 @@ Agenten speichern Notizen, wenn du sie darum bittest, etwa „Merk dir, dass ich
 
 Über **Notiz hinzufügen** unter [Einstellungen → Memory](/settings?s=memory&find=Add%20a%20note) kannst du selbst Notizen schreiben. Dort findest, bearbeitest, befristest und löschst du alle Einträge; siehe [Notizen](/guide/memory#notes).
 
+## Erkenntnisse: was versucht wurde und was dabei herauskam
+
+Ein Forschungsprojekt vergisst, was es versucht hat: Ein Agent läuft wieder in dieselbe Sackgasse, und die Aussagen eines Papers entfernen sich von dem, was die Läufe gezeigt haben. Eine **Erkenntnis** ist eine Sache, die ein Projekt versucht hat, und was dabei herauskam, aufbewahrt mit ihren Belegen, zum Beispiel „Hard Negatives aus BM25 erhöhen dev nDCG@10 gegenüber In-Batch-Negatives: bestätigt, +0,019 über 3 Seeds, der Gewinn liegt bei langen Suchanfragen.“ Sie ist eine eigene Art von Memory-Notiz. Sie gehört also zu einem Projekt, wird nach Wörtern und nach Bedeutung durchsucht, kommt in neue Sitzungen, wenn sie zu deiner Frage passt, und behält ihren Verlauf.
+
+Jede Erkenntnis hat:
+
+- **Eine Aussage**: die Hypothese oder Behauptung in einem Satz.
+- **Ein Urteil**: **Bestätigt**, **Widerlegt**, **Unklar** oder **Offen** (aufgestellt, noch nicht getestet).
+- **Was gelernt wurde**: ein oder zwei Sätze mit den Zahlen, wo es gilt oder warum es gescheitert ist.
+- **Belege**, höchstens 12 Stück: Läufe, Scores und Ergebnistabellen aus [Experimenten](/guide/experiments), Commits, Dateien, Papers und Sitzungen. Eine Zahl in dem, was gelernt wurde, braucht den Lauf, den Score oder die Tabelle, woher sie stammt, sonst wird die Erkenntnis abgelehnt.
+
+**Agenten halten sie fest.** In einem Projekt werden Agenten angewiesen, dessen Erkenntnisse anzusehen, bevor sie ein Experiment vorschlagen oder starten, und nach jedem Ergebnis eine festzuhalten, auch wenn es nicht funktioniert hat oder unklar war. Der [Forschungssprint](/guide/researchers#research-sprint) hält für jede seiner Hypothesen eine fest, und **Versuchen, es zu widerlegen** hält sein Urteil über die Behauptung fest. **Sackgassen werden absichtlich aufbewahrt**: Das Aufräumen führt Erkenntnisse nie zusammen, bündelt sie nie zu Themen und verschiebt oder entfernt sie nie (auch der Aufbau eines Wikis aus dem Verlauf des Projekts liest sie nicht), und eine Erkenntnis wird nie zum Entfernen vorgeschlagen, nur weil sie zuletzt kein Agent gebraucht hat. Zwei Erkenntnisse, die sich widersprechen, werden beide behalten, bis eine spätere die andere ersetzt: Die neue sagt, was sie ersetzt, und die alte verschwindet aus der Liste, bleibt aber in ihrem Verlauf.
+
+**Wo du sie siehst.** Der Tab **Memory** eines Projekts hat neben **Notizen**, **Wiki** und **Dokumente** einen Chip **Erkenntnisse** (siehe [Der Memory-Tab eines Projekts](/guide/wiki-memory#a-projects-memory-tab)), mit einem kleineren Chip für jedes Urteil. Eine Zeile zeigt die Aussage, das Urteil und ihr Alter. Öffne eine, um sie ganz zu lesen: was gelernt wurde, ihre Belege als Links, die jeden Lauf, Commit, jede Datei, jedes Paper oder jede Sitzung öffnen, wer sie wann festgehalten hat und was sie ersetzt. Hat sich eine als Beleg angegebene Datei seitdem im Git-Repository des Projekts geändert, steht in der Zeile **Code seitdem geändert**, und die Erkenntnis sagt „Der zugrunde liegende Code wurde seitdem geändert.“, mit den Dateien: Teste sie erneut, bevor du dich darauf stützt. Erkenntnisse erscheinen auch unter den Notizen des Projekts in [Einstellungen → Memory](/settings?s=memory), markiert mit **Erkenntnis**.
+
+**Eine ändern oder vergessen.** Öffne sie und drücke **Ändern**, um ihr Urteil, ihre Aussage oder das Gelernte von Hand richtigzustellen. **Vergessen** entfernt sie; sie bleibt 30 Tage lang unter [Gelöschte Notizen](/guide/memory#deleted-notes), um sie wiederherzustellen. Du kannst auch einen Agenten darum bitten: Er hält das spätere Ergebnis anstelle des alten fest oder vergisst es. Schaltest du Memory aus, sind auch die Erkenntnisse aus.
+
 ## Dein Profil
 
 Neben Notizen führt Memory ein persönliches Profil: wer du bist, was du tust und verwendest, welche Antworten du bevorzugst und was vermieden werden soll. Bei aktiviertem Memory erhält jeder Agent es einmal zu Sitzungsbeginn direkt nach deinen [Agentenrichtlinien](/guide/guidelines). Es prägt seine Arbeitsweise, bleibt aber deinen Richtlinien und aktuellen Nachrichten untergeordnet. Notizen enthalten situativ relevantes Wissen; das Profil beschreibt, was jeder Agent grundsätzlich über dich wissen sollte.
@@ -170,7 +187,7 @@ Bereichsseiten öffnen sich innerhalb der Einstellungen. **Memory** oben oder di
 
 **Notizen finden**: Tippe in die Gruppensuche oder Bereichssuche mit dem Hinweis „33 Notizen durchsuchen“ beziehungsweise bei bereiter semantischer Suche „33 Notizen nach Wörtern oder Bedeutung durchsuchen“. Alle eingegebenen Wörter müssen passen; das letzte darf ein Wortanfang sein. Bei aktivierter semantischer Suche kommen sinngleiche Einträge hinzu. Die besten Treffer stehen oben, jeweils mit Bereich. **Mehr anzeigen** lädt die nächsten 20. Ohne Treffer steht „Keine passenden Notizen“. Escape oder **×** leert die Suche und zeigt die Übersicht wieder. Gibt es noch keine Notizen, stehen dort ein Hinweis, **Von anderen Assistenten importieren** und **Gelöschte Notizen**.
 
-Jeder Eintrag zeigt die ersten zwei Zeilen, bei Zusammenfassungen mit **Thema** oder **Profil**, und darunter Metadaten: in gemischten Listen wie Suche, **Sitzungen**, **Länger nicht verwendet** und **Gelöschte Notizen** den Bereich; **Hinzugefügt** oder **Geändert** mit relativer Zeit und exaktem Datum beim Darüberfahren; gegebenenfalls **noch nicht überprüft**; **Einmal benötigt** oder **N-mal benötigt**, wie oft ein Agent sie genutzt hat (nachgeschlagen, zitiert oder mit der Datei oder dem Befehl gearbeitet, um den es geht); bei Befristung **Bis** mit Datum. Ein Klick öffnet die Notiz.
+Jede Notiz in einer Liste zeigt ihre ersten zwei Zeilen (mit dem Kennzeichen **Thema**, **Profil** oder **Erkenntnis**, wenn sie so etwas ist; siehe [Erkenntnisse](/guide/memory#findings-what-was-tried-and-what-came-of-it)) und darunter eine Zeile mit Angaben: den Ort, in Listen, die Orte mischen (eine Suche, **Sitzungen**, **Länger nicht verwendet**, **Gelöschte Notizen**); **Hinzugefügt** oder **Geändert** und wie lange das her ist (zeige darauf, um das genaue Datum zu sehen); **noch nicht überprüft**, wenn niemand sie bestätigt hat; **einmal benötigt** oder **N-mal benötigt**, also wie oft ein Agent sie verwendet hat (sie nachgeschlagen, zitiert oder mit der Datei oder dem Befehl gearbeitet hat, um die es geht); und **Bis** mit einem Datum, wenn sie ein Enddatum hat. Klicke auf eine Notiz, um sie zu öffnen.
 
 ### Eine Notiz öffnen
 
@@ -256,8 +273,8 @@ Die Zeile **Letztes Aufräumen** unter **Automatisch aufräumen** meldet das let
 - „Wird bereinigt…“ während der Verarbeitung;
 - etwa „Vor 3 Std.: 2 hinzugefügt, 1 aktualisiert, 3 entfernt“ oder „Vor 3 Std.: keine Änderungen nötig, 14 Notizen geprüft“;
 - „12 Unterhaltungen gelesen“, wenn [Aus Unterhaltungen lernen](/guide/memory#learn-from-conversations) Unterhaltungen verarbeitet hat. Bei einem Fehler steht darunter „Lernen aus Unterhaltungen angehalten:“ mit Grund; die übrige Bereinigung läuft trotzdem;
-- „Einige Wartungsschritte wurden abgebrochen:“ mit Grund in einer Zeile darunter, wenn einer der Schritte nach den Beinahe-Dubletten (Notizen gegen den Code prüfen, Notizen in ihr Projekt verschieben, Entwurfsgeschichte ins Wiki verschieben, Abgleich mit AGENTS.md) fehlgeschlagen ist. Die anderen Schritte liefen trotzdem, und die übrigen Änderungen der Bereinigung bleiben;
 - bei einem ergebnislosen letzten Lauf und zuvor erfolgten Änderungen etwa „Vor 3 Std.: keine Änderungen nötig. Davor, vor 2 Tagen:“ mit der früheren Änderungsliste. Sie bleibt rückgängig machbar, bis ein weiterer Lauf etwas ändert;
+- „Einige Wartungsschritte wurden abgebrochen:“ mit Grund in einer Zeile darunter, wenn einer der Schritte nach den Beinahe-Dubletten (Notizen gegen den Code prüfen, Notizen in ihr Projekt verschieben, Entwurfsgeschichte ins Wiki verschieben, Abgleich mit AGENTS.md) fehlgeschlagen ist. Die anderen Schritte liefen trotzdem, und die übrigen Änderungen der Bereinigung bleiben;
 - bei Fehlern den Grund nach der Zeit, etwa ein nicht antwortendes Hilfsmodell.
 
 **Änderungen** rechts in der Zeile (sichtbar, wenn das letzte Aufräumen etwas geändert hat) öffnet „Was das letzte Aufräumen geändert hat“. Jede Änderung zeigt ein Abzeichen (**Hinzugefügt**, **Aktualisiert**, **Entfernt**, **Verschoben**, **Endet**, **Kein Enddatum**, **Geprüft** oder **Rückgängig gemacht**), **Thema** oder **Profil**, wenn es eines ist, den Ort und den Grund („Mit #12 zusammengeführt“, „Fasst 5 verwandte Notizen zusammen“, „Schon in AGENTS.md“, „Aus ‚Upload-Seite‘ gelernt“) und den Text, den alten durchgestrichen über dem neuen. Eine Änderung **Verschoben** zeigt den Text der Notiz und „Verschoben von Über dich nach“ dem Projekt. Die Sprechblasen-Schaltfläche (**Öffne die Unterhaltung**) öffnet die Unterhaltung, aus der eine Änderung gelernt wurde. Die Pfeil-Schaltfläche (**Diese Änderung rückgängig machen**) macht eine rückgängig: Was sie hinzugefügt hat, verschwindet, was sie geändert hat, bekommt seinen alten Text zurück, was sie gelöscht hat, kommt zurück, ein von ihr gesetztes Enddatum wird entfernt, eine Notiz, die sie geprüft hat, gilt wieder als ungeprüft (und wird, wenn sie gegen den Code geprüft wurde, erneut markiert), und eine Notiz, die sie verschoben hat, geht zurück zu „Über dich“. Schließe den Dialog, wenn du fertig bist.
@@ -358,24 +375,26 @@ Du kannst selbst mit Strg+K beziehungsweise ⌘K frühere Sitzungen nach Titeln 
 ## Einen Agenten fragen
 
 - „Was weißt du über mich? Lösche alles über meinen alten Arbeitsplatz.“
+- „Was haben wir bei langen Abfragen schon ausprobiert?“
+- „Halte fest, dass die Curriculum-Idee nicht geholfen hat, mit den Durchläufen.“
 - „Ergänze mein Profil: Ich arbeite in der Krankenpflege und bevorzuge Antworten in Stichpunkten.“
 - „Zeig mir mein Profil und kürze es auf etwa 300 Wörter.“
 - „Starte jede Sitzung mit 20 statt 10 Notizen.“
 - „Lass die semantische Suche auf der CPU laufen, damit die Grafikkarte frei bleibt.“
 - „Bereinige Memory jetzt und erkläre anschließend, was zusammengeführt und was in ein Projekt verschoben wurde.“
-- „Welche Notizen hat seit Monaten kein Agent benötigt? Lösche die zur alten Website.“
-- „Die Notiz zur Lissabon-Reise gilt nur bis 12. Mai. Setze dieses Enddatum.“
-- „Welche Notizen zu diesem Projekt sind noch ungeprüft? Gleiche sie mit dem Code ab.“
 - „Welche Notizen sind markiert, weil sich der Code geändert hat? Gleiche sie mit dem Code ab.“
 - „Was schlägt die Bereinigung für AGENTS.md vor? Zeig es mir und füge den ersten Vorschlag hinzu.“
 - „Welche Notizen wurden Agenten oft übergeben, aber nie benötigt?“
 - „Die Notiz zum Build-Befehl betrifft das Projekt Hydor, nicht mich: Verschiebe sie dorthin.“
 - „Starte jede Sitzung mit weniger Notizen: nur die 5, die zu meiner Anfrage passen.“
-- „Deaktiviere das Lernen aus Unterhaltungen, aber behalte die Bereinigung bei.“
-- „Schalte Memory für die Sitzung Steuererklärung aus.“
-- „Importiere, was Claude Code und Codex über mich wissen, und zeige mir die Vorschläge vor dem Hinzufügen.“
-- „Ich habe vorher einen anderen Agenten verwendet. Übernimm sein Wissen über mich und meine eigenen Skills und zeige mir zuerst die Liste.“
 - „Schalte Wiki-Memory nur für das Projekt Taxes 2026 aus und lasse es für die übrigen Projekte eingeschaltet.“
 - „Durchsuche alle meine Projekte danach, wie wir den Release-Workflow eingerichtet haben.“
 - „Wie sind wir in meinem Shop-Projekt mit Deploys umgegangen? Schau in sein Wiki und seine Unterhaltungen.“
 - „Welche meiner früheren Unterhaltungen in diesem Projekt erwähnen die Rechnungsvorlage? Lass die anderen Projekte weg.“
+- „Welche Notizen hat seit Monaten kein Agent benötigt? Lösche die zur alten Website.“
+- „Die Notiz zur Lissabon-Reise gilt nur bis 12. Mai. Setze dieses Enddatum.“
+- „Welche Notizen zu diesem Projekt sind noch ungeprüft? Gleiche sie mit dem Code ab.“
+- „Deaktiviere das Lernen aus Unterhaltungen, aber behalte die Bereinigung bei.“
+- „Schalte Memory für die Sitzung Steuererklärung aus.“
+- „Importiere, was Claude Code und Codex über mich wissen, und zeige mir die Vorschläge vor dem Hinzufügen.“
+- „Ich habe vorher einen anderen Agenten verwendet. Übernimm sein Wissen über mich und meine eigenen Skills und zeige mir zuerst die Liste.“

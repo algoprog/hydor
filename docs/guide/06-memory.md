@@ -42,6 +42,23 @@ Agents save notes in two cases: when you ask ("Remember that I'm vegetarian", "R
 
 You can also write a note yourself with **Add a note** in [Settings → Memory](/settings?s=memory&find=Add%20a%20note), and find, edit, date and delete every note there (see [Notes](/guide/memory#notes)).
 
+## Findings: what was tried and what came of it
+
+A research project forgets what it tried: an agent walks into the same dead end again, and a paper's claims drift from what the runs showed. A **finding** is one thing a project tried and what came of it, kept with its evidence, for example "Hard negatives from BM25 raise dev nDCG@10 over in-batch negatives: supported, +0.019 over 3 seeds, the gain is in long queries." It is a memory note of its own kind, so it belongs to a project, is searched by words and by meaning, comes to new sessions when it bears on what you ask, and keeps its history.
+
+Each finding has:
+
+- **A statement**: the hypothesis or claim, in one sentence.
+- **A verdict**: **Supported**, **Refuted**, **Unclear**, or **Open** (stated, not tested yet).
+- **What was learned**: a sentence or two with the numbers, where it holds, or why it failed.
+- **Evidence**, at most 12 pieces: runs, scores and results tables of [Experiments](/guide/experiments), commits, files, papers and sessions. A number in what was learned needs the run, score or table it comes from, or the finding is refused.
+
+**Agents record them.** In a project, agents are told to look at its findings before they propose or start an experiment, and to record one after each result, also when it did not work or was unclear. The [Research sprint](/guide/researchers#research-sprint) records one for each of its hypotheses, and **Try to break it** records its verdict on the claim. **Dead ends are kept on purpose**: the tidy-up never merges, sums up, moves or removes a finding (nor does building a wiki from the project's history read them), and a finding is never suggested for removal because no agent needed it lately. Two findings that disagree are both kept, until a later one replaces the other: the new one says what it replaces, and the old one leaves the list but stays in its history.
+
+**Where to see them.** A project's **Memory** tab has a **Findings** chip beside **Notes**, **Wiki** and **Documents** (see [A project's Memory tab](/guide/wiki-memory#a-projects-memory-tab)), with a smaller chip for each verdict. A row shows the statement, the verdict and its age. Open one to read it whole: what was learned, its evidence as links that open each run, commit, file, paper or session, who recorded it and when, and what it replaces. When a file given as evidence has changed since in the project's Git repository, the row says **code changed since** and the finding says "The code under this has changed since.", with the files: test it again before you lean on it. Findings also show among the project's notes in [Settings → Memory](/settings?s=memory), marked **Finding**.
+
+**Changing or forgetting one.** Open it and press **Change** to put its verdict, statement or what was learned right by hand. **Forget** removes it; it stays under [Deleted notes](/guide/memory#deleted-notes) for 30 days, to restore. You can also ask an agent: it records the later result in the old one's place, or forgets it. Turning memory off turns findings off with it.
+
 ## Your profile
 
 Besides notes, memory keeps one profile of you: who you are and what you do, what you use, how you like answers, and what to avoid. While memory is on, every agent gets it once, at the start of a session, right after your [Agent Guidelines](/guide/guidelines), and lets it shape how it works with you; your guidelines and what you say in a session still come first. Notes hold what matters now and then; the profile holds what every agent should always know.
@@ -170,7 +187,7 @@ A place's page opens within the section, with the link **Memory** at the top to 
 
 **To find a note**, type in the search field of the group (or of a place's page): "Search 33 notes", or "Search 33 notes by words or meaning" when search by meaning is ready. It finds notes with every word you type, the last one as the start of a word, and with search by meaning on, notes that mean the same. The best come first, each with the place it belongs to, and **Show more** gives the next twenty. "No notes match" says there are none. Escape or the **×** clears the search, and the index comes back. While memory holds no notes, the group says so, with a **Bring in from other assistants** button and the row **Deleted notes**.
 
-Each note in a list shows its first two lines (with a **Topic** or **Profile** badge when it is one) and a line of facts under it: the place, in a list that mixes places (a search, **Sessions**, **Not needed lately**, **Deleted notes**); **Added** or **Changed** and how long ago (point at it for the exact dates); **not checked yet**, when no one has confirmed it; **needed once** or **needed N times**, how often an agent used it (looked it up, cited it, or worked with the file or command it is about); and **until** a date, when it has an end date. Click a note to open it.
+Each note in a list shows its first two lines (with a **Topic**, **Profile** or **Finding** badge when it is one; see [Findings](/guide/memory#findings-what-was-tried-and-what-came-of-it)) and a line of facts under it: the place, in a list that mixes places (a search, **Sessions**, **Not needed lately**, **Deleted notes**); **Added** or **Changed** and how long ago (point at it for the exact dates); **not checked yet**, when no one has confirmed it; **needed once** or **needed N times**, how often an agent used it (looked it up, cited it, or worked with the file or command it is about); and **until** a date, when it has an end date. Click a note to open it.
 
 ### Open a note
 
@@ -358,6 +375,8 @@ You can search past sessions yourself with the search box (Ctrl+K, or ⌘K on a 
 ## Ask an agent
 
 - "What do you remember about me? Delete anything about my old job."
+- "What have we already tried for long queries?"
+- "Record that the curriculum idea did not help, with the runs."
 - "Add to my profile that I'm a nurse and like answers in bullet points."
 - "Show me my profile, and shorten it to about 300 words."
 - "Start every session with 20 notes instead of 10."

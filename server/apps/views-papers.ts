@@ -44,6 +44,16 @@ const NUM_CSS = String.raw`
 .n { flex: none; display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 8px; background: var(--n-accent-soft); color: var(--n-accent); font-size: 12.5px; font-weight: 700; }
 `;
 
+/** Run these…, quietly at the end of a list of experiments. */
+const RUN_CSS = String.raw`
+.run { display: flex; justify-content: flex-end; }
+`;
+const runThese = (description: string) => ({
+  description,
+  html: String.raw`<div class="run"><button type="button" class="n-btn" data-event="run_these">Run these…</button></div>`,
+  css: RUN_CSS,
+});
+
 /** Three choices side by side, the one picked standing out (a paper's status). */
 const SEG_CSS = String.raw`
 .seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--n-soft); }
@@ -661,7 +671,7 @@ const REVIEWS: AppUi = {
         { title: 'What could sink it, the most dangerous first', element: 'rv-risk', data: 'result.risks', each: true, if: 'result.risks' },
       ],
     },
-    { id: 'asks', title: 'Baselines and ablations', if: 'result.asks', blocks: [{ element: 'rv-ask', data: 'result.asks', each: true }] },
+    { id: 'asks', title: 'Baselines and ablations', if: 'result.asks', blocks: [{ element: 'rv-ask', data: 'result.asks', each: true }, { element: 'rv-run', if: 'result.asks' }] },
     {
       id: 'fix',
       title: 'Before you submit',
@@ -764,6 +774,7 @@ h4 { margin: 0 0 4px; color: var(--n-muted); font-size: 12px; font-weight: 600; 
 @media (max-width: 520px) { .ask { grid-template-columns: auto 1fr; } .eff { grid-column: 2; } }
 `,
     },
+    'rv-run': runThese('Run these…: a request for an agent to run what reviewers will ask for, on the start page to send'),
     'rv-answer': {
       description: 'The way to rehearse the rebuttal: the Rebuttal workbench, started with these reviews',
       html: String.raw`<div class="answer"><div><b>Rehearse your rebuttal</b><span>The Rebuttal workbench groups these reviews’ points, drafts a reply to each within the limit, and lists the experiments to run.</span></div><button type="button" class="n-btn n-primary" data-event="answer_reviews">Answer these reviews</button></div>`,
@@ -777,6 +788,7 @@ h4 { margin: 0 0 4px; color: var(--n-muted); font-size: 12px; font-weight: 600; 
   events: {
     copy_meta: [{ do: 'copy', text: '{{result.verdict}}\n\n{{result.meta}}' }],
     copy_reviews: [{ do: 'copy', text: '{{result.reviews_text}}' }],
+    run_these: [{ do: 'experiments', inputs: { source: 'reviewers', items: '{{result.asks}}', paper: '{{inputs.paper}}', venue: '{{result.venue}}' } }],
     answer_reviews: [
       {
         do: 'start',
@@ -806,6 +818,7 @@ const REBUTTAL: AppUi = {
       title: 'To do',
       blocks: [
         { title: 'Experiments to run', element: 'rb-exp', data: 'result.experiments', each: true, empty: 'No experiment to run: every point is answered in words.' },
+        { element: 'rb-run', if: 'result.experiments' },
         { title: 'Changes to make in the paper', element: 'rb-change', data: 'result.changes', each: true, empty: 'No change to the paper.' },
         { html: '<p class="n-muted" style="margin:0;font-size:13.5px">Tick each one off as it is done: the ticks stay with this rebuttal.</p>' },
       ],
@@ -895,6 +908,7 @@ p { margin: 2px 0 0; font-size: 14.5px; line-height: 1.45; }
 small { display: block; margin-top: 3px; color: var(--n-muted); font-size: 12.5px; }
 `,
     },
+    'rb-run': runThese('Run these…: a request for an agent to run these experiments, on the start page to send'),
     'rb-change': {
       description: 'A change to make in the paper, for which point, to tick off when done',
       html: String.raw`<div class="todo{{#state.chg.@key}} done{{/state.chg.@key}}"><button type="button" class="tick" data-event="change_done" title="Done">✓</button><div><p>{{what}}</p><small>For point {{n}}: {{point}}</small></div></div>`,
@@ -933,6 +947,7 @@ tbody tr:last-child td { border-bottom: 0; }
     kind: [{ do: 'set', name: 'kind', value: '{{event.kind}}' }],
     copy_reply: [{ do: 'copy', text: '{{reply}}' }],
     exp_done: [{ do: 'toggle', name: 'exp.@key', keep: true }],
+    run_these: [{ do: 'experiments', inputs: { source: 'rebuttal', items: '{{result.experiments}}', paper: '{{inputs.paper}}' } }],
     change_done: [{ do: 'toggle', name: 'chg.@key', keep: true }],
     copy_all: [{ do: 'copy', text: '{{result.rebuttal}}' }],
   },

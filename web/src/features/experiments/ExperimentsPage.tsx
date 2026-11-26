@@ -1,15 +1,17 @@
 // Experiments, a section of its own on the rail: jobs that wait for a free GPU on any of your machines (or a cluster's
 // queue), run on their own, and are kept so you can compare them. The address says what shows: /experiments is the
 // Overview (what runs now, the experiments as cards, the latest runs), ?e=<experiment> one experiment (its runs,
-// charts and hyperparameters; ?e= alone is the runs without one), /experiments/<id> one run. A wide screen has a
-// sidebar with the queue, the GPUs and the experiments by category; a narrow one stacks the views. Ticked runs
-// (by their key) stay ticked from view to view, in a bar at the bottom to compare them or make a table.
-// Addresses open things too, once: ?new=1 (or sweep), ?sweep=<id> (its experiment's Hyperparameters), ?table=<id>
-// (or new), ?places=1, ?cluster=new.
+// charts and hyperparameters; ?e= alone is the runs without one), ?evaluation=<id> one evaluation (&score=<id> one of
+// its scores), ?evolution=<id> one evolution (&try=<id> one of its tries), /experiments/<id> one run. A wide screen has
+// a sidebar with the queue, the GPUs, the evaluations and the experiments by category; a narrow one stacks the views.
+// Ticked runs (by their key) stay ticked from view to view, in a bar at the bottom to compare them or make a table.
+// Addresses open things too, once: ?new=1 (or sweep, or evaluation), ?sweep=<id> (its experiment's Hyperparameters),
+// ?table=<id> (or new), ?places=1, ?cluster=new.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { FlaskConical, MoreHorizontal, Plus, Server, Table2, Waypoints, X } from 'lucide-react';
+import { FlaskConical, Gauge, MoreHorizontal, Plus, Server, Table2, Waypoints, X } from 'lucide-react';
 import type { ClusterSpec, ResultsTable, RunRecord, SweepSpec } from '@shared/experiments';
+import type { Evaluation } from '@shared/evaluations';
 import { api, enc } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toast } from '../../lib/store';
@@ -19,6 +21,12 @@ import { PageTour, TourButton } from '../tips/PageTour';
 import { differingParams, runKey } from './analysis';
 import { experimentPath, type ExperimentTab, type RunTab, runPath, useGroups, useQueue, useRuns } from './api';
 import { Compare } from './Compare';
+import { evaluationPath, useEvaluations } from './evalApi';
+import { EvaluationEditor, type EditorSection } from './EvaluationEditor';
+import { EvaluationView } from './EvaluationView';
+import { evolutionPath, useEvolutions } from './evolveApi';
+import { EvolutionView } from './EvolutionView';
+import { evolvingBy } from './evolveWords';
 import { ExperimentView } from './Experiment';
 import { Home } from './Home';
 import { NewRun } from './NewRun';
@@ -68,8 +76,19 @@ export function ExperimentsPage() {
   // What the address shows.
   const openId = /^\/experiments\/([a-z0-9]{4,32})$/.exec(loc)?.[1] ?? null;
   const openMachine = q.get('m');
-  const experiment = !openId && q.has('e') ? (q.get('e') ?? '') : null;
-  const view: 'overview' | 'experiment' | 'run' = openId ? 'run' : experiment !== null ? 'experiment' : 'overview';
+  const evaluation = !openId ? q.get('evaluation') || null : null;
+  const evolution = !openId && !evaluation ? q.get('evolution') || null : null;
+  const experiment = !openId && !evaluation && !evolution && q.has('e') ? (q.get('e') ?? '') : null;
+  const view: 'overview' | 'experiment' | 'evaluation' | 'evolution' | 'run' = openId ? 'run' : evaluation ? 'evaluation' : evolution ? 'evolution' : experiment !== null ? 'experiment' : 'overview';
+  const { evaluations, scoring, reload: reloadEvaluations } = useEvaluations();
+  const evals = evaluations ?? [];
+  const evolutions = useEvolutions();
+  const evolving = useMemo(() => evolvingBy(evolutions), [evolutions]);
+  // The evaluation of the evolution open: the column keeps it marked.
+  const evolutionOf = evolution ? (evolutions.find((e) => e.id === evolution)?.evaluation ?? null) : null;
+  // New evaluation, or Edit (of one, maybe at a section); `evalSaved` has its page read again.
+  const [editor, setEditor] = useState<{ evaluation?: Evaluation; section?: EditorSection } | null>(null);
+  const [evalSaved, setEvalSaved] = useState(0);
 
   useEffect(() => {
     api<{ clusters: ClusterSpec[] }>('/api/experiments/clusters')
@@ -81,7 +100,10 @@ export function ExperimentsPage() {
   useEffect(() => {
     const p = new URLSearchParams(search);
     let done = false;
-    if (p.get('new')) {
+    if (p.get('new') === 'evaluation') {
+      setEditor({});
+      done = true;
+    } else if (p.get('new')) {
       setNewRun({ sweep: p.get('new') === 'sweep', group: p.get('e') || undefined });
       done = true;
     }
@@ -108,7 +130,7 @@ export function ExperimentsPage() {
     }
     if (done) {
       const keep = new URLSearchParams();
-      for (const k of ['e', 'tab', 'm']) if (p.has(k) && !sweep) keep.set(k, p.get(k)!);
+      for (const k of ['e', 'tab', 'm', 'evaluation', 'score', 'evolution', 'try']) if (p.has(k) && !sweep) keep.set(k, p.get(k)!);
       const rest = keep.toString();
       go(`${loc}${rest ? `?${rest}` : ''}`, true);
     }
@@ -166,6 +188,7 @@ export function ExperimentsPage() {
   const overview = () => go('/experiments');
   const openRun = (r: Pick<RunRecord, 'id' | 'machine'>) => go(runPath(r));
   const openExperiment = (g: string) => go(experimentPath(g));
+  const openEvaluation = (id: string, score?: string) => go(evaluationPath(id, score));
 
   // The experiment open: its runs, its tab (in the address, else the one picked last on this device).
   const expInfo = experiment ? groups.get(experiment) : undefined;
@@ -231,6 +254,15 @@ export function ExperimentsPage() {
           New sweep
         </MenuItem>
         <MenuItem
+          icon={<Gauge size={14} />}
+          onClick={() => {
+            setMenu(false);
+            setEditor({});
+          }}
+        >
+          New evaluation
+        </MenuItem>
+        <MenuItem
           icon={<Table2 size={14} />}
           onClick={() => {
             setMenu(false);
@@ -265,13 +297,37 @@ export function ExperimentsPage() {
           backLabel={run?.group ? runInfo?.title?.trim() || run.group : 'Overview'}
           onAgain={(r) => setNewRun({ from: r })}
           onOpenExperiment={openExperiment}
+          evaluations={evals}
+          onOpenEvaluation={openEvaluation}
           info={runInfo}
           wide={wide}
         />
       </div>
     ) : (
-      <div key={view === 'experiment' ? `e:${experiment}` : 'overview'} className="min-h-0 flex-1 overflow-y-auto">
-        {view === 'experiment' ? (
+      <div key={view === 'experiment' ? `e:${experiment}` : view === 'evaluation' ? `v:${evaluation}` : view === 'evolution' ? `ev:${evolution}` : 'overview'} className="min-h-0 flex-1 overflow-y-auto">
+        {view === 'evolution' ? (
+          <EvolutionView
+            id={evolution!}
+            open={q.get('try') ?? undefined}
+            onTry={(c) => go(evolutionPath(evolution!, c ?? undefined), true)}
+            onBack={wide ? undefined : (of) => (of ? openEvaluation(of) : overview())}
+            onDeleted={(of) => openEvaluation(of)}
+          />
+        ) : view === 'evaluation' ? (
+          <EvaluationView
+            id={evaluation!}
+            marked={q.get('score') ?? undefined}
+            onBack={wide ? undefined : overview}
+            onEdit={(ev, section) => setEditor({ evaluation: ev, section })}
+            onOpenRun={(id) => openRun({ id })}
+            onMark={(score) => go(evaluationPath(evaluation!, score), true)}
+            onDeleted={() => {
+              reloadEvaluations();
+              overview();
+            }}
+            version={evalSaved}
+          />
+        ) : view === 'experiment' ? (
           runs && !expRuns.length && !expPending ? (
             <Empty icon={<FlaskConical size={20} />} title="No runs in this experiment">
               <p>It has no runs on this computer or its connected machines now.</p>
@@ -318,6 +374,10 @@ export function ExperimentsPage() {
             onOpenExperiment={openExperiment}
             onNewRun={() => setNewRun({})}
             placeOf={placeOf}
+            evaluations={evals}
+            scoring={scoring}
+            evolving={evolving}
+            onOpenEvaluation={openEvaluation}
           />
         )}
       </div>
@@ -328,7 +388,24 @@ export function ExperimentsPage() {
     <div data-i18n="experiments" className="flex h-full min-h-0 flex-col">
       {!detailOnPhone && <PageHeader title="Experiments" actions={actions} />}
       <div className="flex min-h-0 flex-1">
-        {wide && <Sidebar runs={runs} entries={entries} queue={queue} q={find} onQ={setFind} current={current} onOverview={overview} onOpen={openExperiment} onOpenRun={(id) => openRun({ id })} />}
+        {wide && (
+          <Sidebar
+            runs={runs}
+            entries={entries}
+            queue={queue}
+            q={find}
+            onQ={setFind}
+            current={current}
+            onOverview={overview}
+            onOpen={openExperiment}
+            onOpenRun={(id) => openRun({ id })}
+            evaluations={evals}
+            scoring={scoring}
+            evolving={evolving}
+            evaluation={evaluation ?? evolutionOf}
+            onOpenEvaluation={openEvaluation}
+          />
+        )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {body}
           {picked.size > 0 && (
@@ -363,6 +440,17 @@ export function ExperimentsPage() {
         onStarted={(r) => {
           if (r.run) openRun(r.run);
           else if (r.group) openExperiment(r.group);
+        }}
+      />
+      <EvaluationEditor
+        open={!!editor}
+        evaluation={editor?.evaluation}
+        section={editor?.section}
+        onClose={() => setEditor(null)}
+        onSaved={(ev) => {
+          reloadEvaluations();
+          setEvalSaved((n) => n + 1);
+          openEvaluation(ev.id);
         }}
       />
       <Compare runs={compare} onClose={() => setCompare([])} />

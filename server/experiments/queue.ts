@@ -21,10 +21,11 @@ import { startSettings } from '../startSettings.ts';
 import { captureEnvironment, captureGit, localShell, q, type Shell } from './capture.ts';
 import { endOfSlurm, getCluster, listClusters, parseSacct, parseSbatch, parseSqueue, reasonWords, remoteDir, rq, runSsh, sbatchScript, slurmEnded, sshWhy } from './clusters.ts';
 import { describeAfterSubmit } from './describe.ts';
+import { stampRun } from './evaluations.ts';
 import { chooseGpus, gpuList, gpusVia, readGpus, type GpuReading } from './gpus.ts';
 import { aliveLocal, exitOf, files, startLocal, stopLocal, wrapperScript } from './local.ts';
 import { nanText, oomText, parseLine, readFrom, tailLines, Tracker } from './metrics.ts';
-import { addEvent, eventsOf, eventsSince, getRun, getSweep, insertRun, listRuns, newId, offsetsOf, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
+import { addEvent, eventsOf, eventsSince, getRun, getSweep, insertRun, isScoringRun, listRuns, newId, offsetsOf, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
 import { repairRecord, repairRecordSoon } from './repair.ts';
 import { remoteMachine, type RemoteRun } from './remote.ts';
 import { earlyStop, fillCommand, paramsOf, settingsLine, type Value } from './sweeps.ts';
@@ -254,6 +255,8 @@ export async function submit(d: Deps, spec: JobSpec, o: { startedBy?: RunInfo['s
 export async function runAgain(d: Deps, id: string, changes: Record<string, unknown> = {}, startedBy?: RunInfo['startedBy']): Promise<RunRecord> {
   const r = getRun(d.db, id);
   if (!r) throw new HttpError(404, 'There is no such run');
+  // A run of a score is not run again on its own: it would not count, and a final test is run from its evaluation.
+  if (isScoringRun(r)) throw new HttpError(400, 'This run scored an evaluation: score it again from the evaluation');
   const base = specOf(r);
   const spec = await cleanJob(d.db, { ...base, ...(r.remote ? { where: `m:${r.remote.machine}` } : {}), ...changes, sweep: undefined });
   return submit(d, spec, { startedBy, from: r.id });
@@ -895,6 +898,8 @@ async function begin(d: Deps, r: RunRecord, gpuIds: number[], reading?: GpuReadi
       info.patchPath = files(folder).patch;
     }
     updateRun(d.db, r.id, { info });
+    // The evaluations of this folder: a scoring run does not start on changed files, any other is marked.
+    await stampRun(d, r);
     await startLocal({ id: r.id, folder, cwd: r.cwd, command: r.command, env });
     const now = Date.now();
     updateRun(d.db, r.id, { status: 'running', info: { outputAt: now } });

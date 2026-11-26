@@ -25,7 +25,14 @@ export interface RunQuery {
   q?: string;
   /** Oldest first (the queue's order), instead of newest first. */
   oldest?: boolean;
+  /** Leave out the runs that score an evaluation (what lists experiments does). */
+  plain?: boolean;
 }
+
+/** A run the app made to score an evaluation: its tag, and the variable that names the evaluation. */
+export const isScoringRun = (r: Pick<RunRecord, 'tags' | 'env'>) => !!r.tags?.includes('evaluation') && r.env?.HYDOR_EVALUATION !== undefined;
+/** A run of a final test: only the person reads it. */
+export const isFinalRun = (r: Pick<RunRecord, 'tags' | 'env'>) => isScoringRun(r) && r.env?.HYDOR_EVAL_KIND === 'final';
 
 /** Where every run keeps its folder (log, patch, exit code, metrics, scores). */
 export const RUNS_ROOT = path.join(config.dataDir, 'experiments');
@@ -34,11 +41,20 @@ export const runFolder = (id: string) => path.join(RUNS_ROOT, id);
 const ID = /^[a-z0-9]{4,32}$/;
 export const okId = (id: string) => ID.test(id);
 
-/** A new id: a letter for its kind, then the time and a little chance, so ids sort by when they were made. */
-export const newId = (kind: 'r' | 't' | 's') => `${kind}${Date.now().toString(36)}${crypto.randomBytes(2).toString('hex')}`;
+let idCount = 0;
+/**
+ * A new id: a letter for its kind, then the time, a count and a little chance, so ids sort by when they were made. The
+ * count keeps ids made in the same millisecond apart (a score starts a run for each seed at once): chance alone met
+ * itself now and then.
+ */
+export const newId = (kind: 'r' | 't' | 's' | 'e' | 'c') => {
+  idCount = (idCount + 1) % 1296;
+  return `${kind}${Date.now().toString(36)}${idCount.toString(36).padStart(2, '0')}${crypto.randomBytes(2).toString('hex')}`;
+};
 
 const made = new WeakSet<DB>();
-function tables(db: DB) {
+/** Makes the tables on first use (evaluations.ts has its own among them). */
+export function tables(db: DB) {
   if (made.has(db)) return;
   db.exec(`
     create table if not exists exp_runs (
@@ -58,6 +74,11 @@ function tables(db: DB) {
     create table if not exists exp_sweeps (id text primary key, grp text not null, spec text not null, created_at integer not null);
     create table if not exists exp_waits (key text primary key, started_at integer not null);
     create table if not exists exp_groups (name text primary key, title text, description text, category text, by text, runs integer, at integer);
+    create table if not exists exp_evals (id text primary key, cwd text not null, name text not null, spec text not null, seal text not null, state text not null, baseline text, finals integer not null default 0, created_at integer not null, updated_at integer not null);
+    create table if not exists exp_eval_files (eval text not null, seal integer not null, path text not null, sha text not null, size integer not null, mtime_ms real not null, ctime_ms real not null, mode integer not null default 0, link text, copied integer not null default 0, primary key (eval, seal, path)) without rowid;
+    create table if not exists exp_scores (id text primary key, eval text not null, seal integer not null, kind text not null, status text not null, info text not null, created_at integer not null, ended_at integer);
+    create index if not exists exp_scores_eval on exp_scores(eval, created_at desc);
+    create index if not exists exp_scores_status on exp_scores(status);
   `);
   made.add(db);
 }
@@ -132,6 +153,8 @@ export function listRuns(db: DB, q: RunQuery = {}): RunRecord[] {
     where.push(`status in (${q.status.map(() => '?').join(', ')})`);
     args.push(...q.status);
   }
+  // The job as given is JSON: a variable's name followed by a colon is only found where it is one of its variables.
+  if (q.plain) where.push(`not (instr(spec, '"HYDOR_EVALUATION":') > 0 and instr(spec, '"evaluation"') > 0)`);
   const limit = Math.min(Math.max(Math.round(q.limit ?? 200), 1), 5000);
   // Tags and words are looked for in the job itself; more rows are read so the limit still fills.
   const loose = !!q.tag || !!q.q?.trim();
@@ -338,7 +361,8 @@ export function deleteTable(db: DB, id: string) {
 /** The runs a table's spec names: its runs by id (those still kept), or every finished run of its group. */
 export function runsOfSpec(db: DB, spec: ResultsTableSpec): RunRecord[] {
   if (spec.runs?.length) return spec.runs.map((id) => getRun(db, id)).filter((r): r is RunRecord => !!r);
-  if (spec.group) return listRuns(db, { group: spec.group, status: ['done'], limit: 2000, oldest: true });
+  // A final test's numbers come into a table only when its run is named.
+  if (spec.group) return listRuns(db, { group: spec.group, status: ['done'], limit: 2000, oldest: true }).filter((r) => !isFinalRun(r));
   return [];
 }
 

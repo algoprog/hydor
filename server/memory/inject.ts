@@ -17,7 +17,7 @@
 // An agent gets this once, in the instructions it starts with: Custom too, which keeps it until its conversation is
 // condensed (index.ts), so the provider's cache of the conversation holds. Custom with a model of a small context gets
 // a smaller block (memClass: lean, tiny), so memory never crowds out its work.
-import type { MemoryEntry } from '../../shared/memory.ts';
+import { isSummary, type MemoryEntry } from '../../shared/memory.ts';
 import type { DB } from '../db.ts';
 import type { WikiLine } from '../wiki/deliver.ts';
 import { BLOCK_SHARE, entryLine, inView, LEAN_INDEX_CHARS, LEAN_K, lineCost, originsOf, pick, placeText, TINY_K, WIKI_HEAD, type MemClass, type Origin, type PlaceLines } from './deliver.ts';
@@ -207,7 +207,7 @@ export async function memoryBlock(
     (origin ? g.quoted : g.own).push(l);
     left -= cost;
     taken.add(e.id);
-    if (e.kind !== 'note') for (const c of childrenOf(db, e.id)) covered.add(c);
+    if (isSummary(e)) for (const c of childrenOf(db, e.id)) covered.add(c);
     return true;
   };
   const at = (p: { scope: MemoryEntry['scope']; scopeKey: string }) => ({ scope: p.scope, scopeKey: p.scopeKey, live: now });
@@ -227,10 +227,11 @@ export async function memoryBlock(
     for (const e of list) take(e);
     left += keep;
   }
-  // What bears on the request, in every place (not for one of a word or two: "thanks", "go on").
+  // What bears on the request, in every place (not for one of a word or two: "thanks", "go on"): notes, topics and
+  // findings (what the project tried before).
   const found =
     o.query && words(o.query).length >= 2
-      ? (await findNotes(db, { places: lasting, query: o.query, limit: k * 3, kinds: ['note', 'topic'], now, vector: await requestVector(db, o.query) })).filter((f) => f.relevant).map((f) => f.entry)
+      ? (await findNotes(db, { places: lasting, query: o.query, limit: k * 3, kinds: ['note', 'topic', 'finding'], now, vector: await requestVector(db, o.query) })).filter((f) => f.relevant).map((f) => f.entry)
       : [];
   // 3. A small place whole, what bears on the request first.
   const small = lasting.filter((p) => {
@@ -247,7 +248,8 @@ export async function memoryBlock(
     learn(list);
     for (const e of list) take(e);
   }
-  // 4. From the bigger places, the k that bear most on it.
+  // 4. From the bigger places, the k that bear most on it. (A small place whole is its notes: its findings come only
+  // when they bear on the request, as above.)
   let n = 0;
   for (const e of picked) {
     if (n >= k) break;
@@ -319,7 +321,7 @@ export async function memoryParts(
     (origin ? g.quoted : g.own).push(l);
     left -= cost;
     given.add(e.id);
-    if (e.kind !== 'note') for (const c of childrenOf(db, e.id)) covered.add(c);
+    if (isSummary(e)) for (const c of childrenOf(db, e.id)) covered.add(c);
   };
   for (const p of lasting) if (p.scope === 'repo') for (const e of entries(db, { ...at(p), kinds: ['profile'], limit: 1 })) give(e);
   for (const p of lasting)
@@ -369,14 +371,15 @@ export async function memoryParts(
   }
   const found =
     o.query && words(o.query).length >= 2
-      ? (await findNotes(db, { places: lasting, query: o.query, limit: k * 3, kinds: ['note', 'topic'], now, vector: await requestVector(db, o.query) })).filter((f) => f.relevant).map((f) => f.entry)
+      ? (await findNotes(db, { places: lasting, query: o.query, limit: k * 3, kinds: ['note', 'topic', 'finding'], now, vector: await requestVector(db, o.query) })).filter((f) => f.relevant).map((f) => f.entry)
       : [];
   const picked = pick(db, found, inView(db, [], [...given, ...exclude, ...taken]));
   learn(picked);
   let n = 0;
   for (const e of picked) {
     if (n >= k) break;
-    if (!isSmall(e) && take(e)) n++;
+    // A small place is in the instructions whole, its notes that is: its findings come here, with the request.
+    if ((!isSmall(e) || e.kind === 'finding') && take(e)) n++;
   }
   const body = groups.flatMap((g) => placeText(g));
   if (wiki.length) body.push('', WIKI_HEAD, ...wiki.map((l) => l.text));

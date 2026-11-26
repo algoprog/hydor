@@ -27,7 +27,7 @@ import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import type { RunTool } from '../features/types.ts';
 import { listRuns, recomputeTable, type RunQuery } from '../experiments/records.ts';
-import { readSecret, touchSecret } from '../connections/vault.ts';
+import { serviceKey } from '../connections/vault.ts';
 import { spaceById } from '../spaces/index.ts';
 import { normalizeTex, TEX_MAIN, texFileText, texPlain, type TexDoc, type TexIssue } from '../../shared/latex.ts';
 import { CHECK_GROUPS, LEVEL_LABEL, VENUES, venueSummary, venueWith, detectVenue, type CheckEdit, type CheckFinding, type CheckState, type Venue } from '../../shared/latex-submit.ts';
@@ -1346,20 +1346,6 @@ export async function runCheck(db: DB, input: CheckInput, st: CheckState, o: { s
   set({ stage: undefined });
 }
 
-/**
- * The user's key for a service, from Keys where it may go to that service's host (its domains say so), else from the
- * server's environment; none when there is neither.
- */
-function serviceKey(db: DB, name: string, host: string): string | undefined {
-  try {
-    const s = readSecret(db, name);
-    if (s && s.view.domains.some((d) => host === d || host.endsWith(`.${d}`))) {
-      touchSecret(db, name);
-      return s.value;
-    }
-  } catch {}
-  return process.env[name] || undefined;
-}
 
 /** The headings the check reads (the document's, through texSources). */
 const texHeadings = (c: Ctx) => headingsIn(c.sources);

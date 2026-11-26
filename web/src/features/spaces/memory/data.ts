@@ -1,7 +1,8 @@
-// What a project's Memory tab lists, and how it loads: its notes, its wiki's articles and its own documents as one kind of row,
-// the rows of a search of all three, and the hooks that keep each current (notes with the memory store, documents with their
-// bases, a search with what is typed, the last answer of an earlier one dropped).
+// What a project's Memory tab lists, and how it loads: its notes and findings, its wiki's articles and its own documents as
+// one kind of row, the rows of a search of them all, and the hooks that keep each current (notes and findings with the memory
+// store, documents with their bases, a search with what is typed, the last answer of an earlier one dropped).
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FINDING_VERDICTS, type FindingVerdict } from '@shared/findings';
 import { isUserProfile, type MemoryListEntry } from '@shared/memory';
 import type { KnowledgeBase, KnowledgeDoc, KnowledgeHit, KnowledgeState } from '@shared/knowledge';
 import type { ProjectMemorySearch } from '@shared/project-memory';
@@ -11,11 +12,12 @@ import { ago, bytes } from '../../../lib/format';
 import { toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { BASIS, shortDay } from '../../memory/common';
+import { verdictLabel } from '../../memory/Finding';
 
 /** The kinds the chips narrow the list to (the same words as the address's `?part=`). */
-export type Kind = 'all' | 'notes' | 'wiki' | 'documents';
-export type RowKind = 'note' | 'topic' | 'profile' | 'article' | 'hub' | 'source' | 'plan' | 'document';
-/** A second row of chips: what narrows a kind further (a note's basis, a wiki area, sources, plans). */
+export type Kind = 'all' | 'notes' | 'wiki' | 'documents' | 'findings';
+export type RowKind = 'note' | 'topic' | 'profile' | 'finding' | 'article' | 'hub' | 'source' | 'plan' | 'document';
+/** A second row of chips: what narrows a kind further (a note's basis, a wiki area, sources, plans, a verdict). */
 export type Sub = string | null;
 
 export interface DocRef {
@@ -39,9 +41,12 @@ export interface Row {
   /** A note's text found by a search, as its meta (two lines). */
   excerpt?: boolean;
   note?: MemoryListEntry;
+  /** A finding's: shown as a pill before its age, and whether the code under it changed. */
+  verdict?: FindingVerdict;
+  changed?: boolean;
 }
 
-export const groupOf = (k: RowKind): Exclude<Kind, 'all'> => (k === 'note' || k === 'topic' || k === 'profile' ? 'notes' : k === 'document' ? 'documents' : 'wiki');
+export const groupOf = (k: RowKind): Exclude<Kind, 'all'> => (k === 'note' || k === 'topic' || k === 'profile' ? 'notes' : k === 'finding' ? 'findings' : k === 'document' ? 'documents' : 'wiki');
 
 const join = (parts: (string | false | undefined | null)[]) => parts.filter(Boolean).join(' · ');
 
@@ -55,7 +60,14 @@ export const baseName = (p: string) => p.slice(p.lastIndexOf('/') + 1);
 
 // ---- rows ---------------------------------------------------------------------------------------------------------
 
+/** A finding's row: its statement, then its verdict and age. */
+function findingRow(e: MemoryListEntry): Row {
+  const f = e.finding!;
+  return { id: `n:${e.id}`, key: `n:${e.id}`, kind: 'finding', title: f.statement, meta: ago(e.updatedAt), at: e.updatedAt, note: e, verdict: f.verdict, changed: !!e.drift };
+}
+
 export function noteRow(e: MemoryListEntry, found?: boolean): Row {
+  if (e.kind === 'finding' && e.finding) return findingRow(e);
   const kind: RowKind = e.kind === 'profile' ? 'profile' : e.kind === 'topic' ? 'topic' : 'note';
   const title = kind === 'profile' ? tr('Project profile') : e.title || e.text.slice(0, 90);
   // A search shows a note's text under its title; a note with no title yet already shows its text as one.
@@ -126,6 +138,9 @@ export const NOTE_SUBS: { id: string; label: () => string; test: (e: MemoryListE
   { id: 'topics', label: () => tr('Topics'), test: (e) => e.kind === 'topic' },
   { id: 'soon', label: () => tr('Ends soon'), test: (e, now) => !!e.expiresAt && e.expiresAt - now <= SOON },
 ];
+
+/** The second row under Findings: by verdict. */
+export const FINDING_SUBS: { id: FindingVerdict; label: () => string; test: (e: MemoryListEntry) => boolean }[] = FINDING_VERDICTS.map((v) => ({ id: v, label: () => verdictLabel(v), test: (e) => e.finding?.verdict === v }));
 
 /** The wiki's rows for a second-row choice: an area (its hub first, then its articles), the sources, the plans; none: every article. */
 export function wikiRows(view: ProjectWikiView | undefined, sub: Sub): Row[] {

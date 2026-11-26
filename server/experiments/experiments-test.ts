@@ -922,7 +922,7 @@ test('the tools: JSON answers; a step runs without asking, Plan mode refuses, a 
   const step = ctxOf({ step: true, runId: 'flow-app1', key: 'acp:flow-app1', agent: 'acp' });
   assert.deepEqual(
     experimentTools(step).map((t) => t.name),
-    ['experiment_run', 'experiment_sweep', 'experiment_list', 'experiment_get', 'experiment_stop', 'experiment_table', 'experiment_describe', 'experiment_wait'],
+    ['experiment_run', 'experiment_sweep', 'experiment_list', 'experiment_get', 'experiment_stop', 'experiment_table', 'experiment_describe', 'evaluation_get', 'evaluation_score', 'experiment_wait'],
   );
   assert.ok(!experimentTools(ctxOf()).some((t) => t.name === 'experiment_wait'), 'waiting hours is for steps');
   const run = await call('experiment_run', { command: 'echo "f1=0.5"', gpus: 0, group: 'tools', report: true }, step);

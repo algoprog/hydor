@@ -10,7 +10,7 @@ import { AsksControls } from './Asks';
 import { say } from './Say';
 import { ChecksEditor, draftChanges, draftOf, draftProblem, type ContractDraft } from './ChecksEditor';
 import { useAct } from './state';
-import { agreementHead, atMost, KIND_LABEL, limitMinutes, nowText, plural, startLabel, UNMEASURED_NOTE, unmeasured } from './words';
+import { agreementHead, atMost, KIND_LABEL, limitMinutes, nowText, num, plural, startLabel, UNMEASURED_NOTE, unmeasured, unscoredText } from './words';
 
 export const SECTION = 'mb-1.5 text-[11px] font-semibold tracking-wide text-fg-3 uppercase';
 
@@ -21,8 +21,34 @@ function Dot({ holds, error }: { holds: boolean; error?: string }) {
   return <span className={cx(cls, 'border border-line-2')} />;
 }
 
-/** What a check is about, under its label: its command, or the sentence the reviewer weighs. */
+/** What a check is about, under its label: its command, its evaluation, or the sentence the reviewer weighs. */
 function Basis({ c }: { c: GoalCheck }) {
+  if (c.kind === 'score')
+    return (
+      <div className="text-[12px] text-fg-3">
+        {c.baseline ? (
+          <>
+            <span translate="no">{`${c.baseline.metric} · “${c.baseline.name}”`}</span>
+            {' · its baseline '}
+            <span translate="no" className="tnum">
+              {num(c.baseline.mean)}
+            </span>
+            {c.gain ? (
+              <>
+                {', better by at least '}
+                <span translate="no" className="tnum">
+                  {num(c.gain)}
+                </span>
+              </>
+            ) : (
+              ', better beyond the noise'
+            )}
+          </>
+        ) : (
+          'scored by its evaluation'
+        )}
+      </div>
+    );
   if (c.kind === 'command' || c.kind === 'measure') {
     return (
       <div translate="no" className="truncate font-mono text-[11.5px] text-fg-3">
@@ -64,7 +90,7 @@ export function Agreement({ g, s, className }: { g: GoalState; s: SessionSummary
 
         {draft ? (
           <div className="mt-3">
-            <ChecksEditor value={draft} onChange={setDraft} />
+            <ChecksEditor value={draft} onChange={setDraft} cwd={s.cwd ?? s.worktree?.path} />
           </div>
         ) : (
           <>
@@ -86,7 +112,8 @@ export function Agreement({ g, s, className }: { g: GoalState; s: SessionSummary
                       <Basis c={c} />
                     </div>
                     <span className={cx('max-w-[40%] shrink-0 text-right text-[12.5px] tnum', r?.holds ? 'text-ok' : r?.error ? 'text-warn' : 'text-fg-3')}>
-                      {r ? say(nowText(c, r)) : ''}
+                      {/* A score is never run before Start: its baseline is the reference until then. */}
+                      {r ? say(nowText(c, r)) : unscoredText(c)}
                     </span>
                   </li>
                 );

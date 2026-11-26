@@ -151,7 +151,7 @@ function NameList({ value, onChange, suggestions, placeholder }: { value: string
  * A pane that scrolls, and says so: a shade at the top once it has scrolled, and while there is more below a fade at
  * the bottom with a "More below" button that scrolls on. `className` is for what sits inside (its padding).
  */
-function ScrollPane({ children, className }: { children: ReactNode; className?: string }) {
+export function ScrollPane({ children, className }: { children: ReactNode; className?: string }) {
   const box = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [more, setMore] = useState(false);

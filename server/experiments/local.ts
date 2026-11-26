@@ -83,7 +83,15 @@ export async function startLocal(o: { id: string; folder: string; cwd: string; c
   fs.writeFileSync(f.wrapper, wrapperScript(o), { mode: 0o700 });
   if (await tmuxThere()) {
     fs.mkdirSync(path.dirname(socketPath()), { recursive: true, mode: 0o700 });
-    const r = await tmux(['new-session', '-d', '-s', session(o.id), '-x', '200', '-y', '50', '-c', o.cwd, `bash ${q(f.wrapper)}`]);
+    // tmux's server leaves when its last session ends: a run that starts just then meets a server on its way out
+    // ("server exited unexpectedly", "lost server", "no server running"). That passes in a moment, so it is tried
+    // again, unless the session is there after all.
+    let r = await tmux(['new-session', '-d', '-s', session(o.id), '-x', '200', '-y', '50', '-c', o.cwd, `bash ${q(f.wrapper)}`]);
+    for (let again = 1; r.code !== 0 && again <= 4 && /server exited|lost server|no server running|error connecting/i.test(r.err); again++) {
+      await new Promise((done) => setTimeout(done, 150 * again));
+      if ((await tmux(['has-session', '-t', session(o.id)])).code === 0) return;
+      r = await tmux(['new-session', '-d', '-s', session(o.id), '-x', '200', '-y', '50', '-c', o.cwd, `bash ${q(f.wrapper)}`]);
+    }
     if (r.code !== 0) throw new Error(`tmux could not start it: ${r.err.trim() || `exit code ${r.code}`}`);
     return;
   }

@@ -9,6 +9,7 @@ import { confidentialKey, privateHelper } from '../confidential/index.ts';
 import type { Deps } from '../features/types.ts';
 import { helperJson, type HelperAsk } from '../helper.ts';
 import { clipMiddle, EVIDENCE_MAX, fitParts, withFiles } from './checks.ts';
+import { num } from './verdict.ts';
 
 export const NO_LOCAL_REVIEWER = 'No model on this computer to review with';
 
@@ -139,8 +140,16 @@ export async function reviewRules(d: Deps, key: string, rules: string[], change:
  * The final check's review of the whole change against the goal and its checks; an error when the reviewer could not answer.
  * `also`: the files the checks name as evidence and those their reviewers asked to read, as blocks (checks.ts alsoBlocks).
  */
+/** A check as the final reviewer reads it in the list: its kind, what it runs or claims, and its target. */
+export function checkItem(c: GoalCheck): string {
+  // A score is the app's own run of the sealed evaluation: its command is not the agent's to change, nor the reviewer's to see.
+  if (c.kind === 'score' && c.baseline && c.target)
+    return `- ${c.label} (score: the ${c.baseline.metric} of the sealed evaluation “${c.baseline.name}”, run by the app, ${c.target.op} ${num(c.target.value)}: its baseline ${num(c.baseline.mean)} ${c.target.op === '>=' ? '+' : '−'} ${num(c.gain ?? 0)}, beyond the noise of its seeds)`;
+  return `- ${c.label} (${c.kind}${c.run ? `: ${c.run}` : c.claim ? `: ${c.claim}` : ''}${c.target ? `, ${c.target.op} ${c.target.value}${c.unit ? ` ${c.unit}` : ''}` : ''})`;
+}
+
 export async function finalReview(d: Deps, key: string, objective: string, checks: GoalCheck[], change: string, also: string[] = []): Promise<{ ok: boolean; reason: string } | { error: string }> {
-  const list = checks.map((c) => `- ${c.label} (${c.kind}${c.run ? `: ${c.run}` : c.claim ? `: ${c.claim}` : ''}${c.target ? `, ${c.target.op} ${c.target.value}${c.unit ? ` ${c.unit}` : ''}` : ''})`).join('\n');
+  const list = checks.map(checkItem).join('\n');
   try {
     const v = await ask(
       d,

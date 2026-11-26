@@ -42,6 +42,23 @@ Les agents enregistrent des notes dans deux cas : quand vous le demandez (« Ret
 
 Vous pouvez aussi écrire une note vous-même avec **Ajouter une note** dans [Paramètres → Mémoire](/settings?s=memory&find=Add%20a%20note), et y retrouver, modifier, dater et supprimer chaque note (voir [Notes](/guide/memory#notes)).
 
+## Les résultats : ce qui a été essayé et ce que cela a donné
+
+Un projet de recherche oublie ce qu’il a essayé : un agent s’engage à nouveau dans la même impasse, et les affirmations d’un article s’éloignent de ce que les exécutions ont montré. Un **résultat** est une chose qu’un projet a essayée et ce qu’elle a donné, conservée avec ses preuves, par exemple « Les exemples négatifs difficiles issus de BM25 améliorent le nDCG@10 de développement par rapport aux négatifs du lot : confirmé, +0,019 sur 3 graines, le gain porte sur les requêtes longues. » C’est une note de la mémoire d’un genre particulier : elle appartient à un projet, se recherche par les mots et par le sens, parvient aux nouvelles sessions quand elle touche à votre demande et garde son historique.
+
+Chaque résultat comporte :
+
+- **Un énoncé** : l’hypothèse ou l’affirmation, en une phrase.
+- **Un verdict** : **Confirmé**, **Réfuté**, **Pas clair** ou **Ouvert** (énoncé, pas encore testé).
+- **Ce qui a été appris** : une ou deux phrases avec les chiffres, le domaine où cela vaut, ou la raison de l’échec.
+- **Preuves**, 12 au maximum : des exécutions, des scores et des tableaux de résultats des [Expériences](/guide/experiments), des commits, des fichiers, des articles et des sessions. Un chiffre cité dans ce qui a été appris doit être accompagné de l’exécution, du score ou du tableau dont il provient, sans quoi le résultat est refusé.
+
+**Les agents les consignent.** Dans un projet, il est demandé aux agents de consulter ses résultats avant de proposer ou de lancer une expérience, et d’en consigner un après chaque issue, y compris quand cela n’a pas marché ou n’était pas clair. Le [sprint de recherche](/guide/researchers#research-sprint) en consigne un pour chacune de ses hypothèses, et **Essayer de le réfuter** consigne son verdict sur l’affirmation. **Les impasses sont gardées à dessein** : le rangement ne fusionne, ne résume, ne déplace ni ne retire jamais un résultat (et la construction d’un wiki à partir de l’historique du projet ne les lit pas non plus), et le retrait d’un résultat n’est jamais suggéré au motif qu’aucun agent n’en a eu besoin récemment. Deux résultats qui se contredisent sont tous deux gardés, jusqu’à ce qu’un résultat ultérieur remplace l’autre : le nouveau indique ce qu’il remplace, et l’ancien quitte la liste mais reste dans son historique.
+
+**Où les voir.** L’onglet **Mémoire** d’un projet comporte un filtre **Résultats** à côté de **Notes**, **Wiki** et **Documents** (voir [L’onglet Mémoire d’un projet](/guide/wiki-memory#a-projects-memory-tab)), avec un filtre plus petit pour chaque verdict. Une ligne affiche l’énoncé, le verdict et son ancienneté. Ouvrez-en un pour le lire en entier : ce qui a été appris, ses preuves sous forme de liens qui ouvrent chaque exécution, commit, fichier, article ou session, qui l’a consigné et quand, et ce qu’il remplace. Quand un fichier donné comme preuve a changé depuis dans le dépôt Git du projet, la ligne indique **code modifié depuis** et le résultat précise « Le code sur lequel cela repose a changé depuis. », avec les fichiers : testez-le à nouveau avant de vous y fier. Les résultats apparaissent aussi parmi les notes du projet dans [Paramètres → Mémoire](/settings?s=memory), avec la mention **Résultat**.
+
+**Modifier ou oublier un résultat.** Ouvrez-le et appuyez sur **Modifier** pour corriger à la main son verdict, son énoncé ou ce qui a été appris. **Oublier** le retire ; il reste dans les [notes supprimées](/guide/memory#deleted-notes) pendant 30 jours, pour être restauré. Vous pouvez aussi le demander à un agent : il consigne l’issue la plus récente à la place de l’ancienne, ou l’oublie. Désactiver la mémoire désactive aussi les résultats.
+
 ## Votre profil
 
 En plus des notes, la mémoire conserve un profil de vous : qui vous êtes et ce que vous faites, ce que vous utilisez, comment vous aimez les réponses et ce qu’il faut éviter. Tant que la mémoire est activée, chaque agent le reçoit une fois, au début d’une session, juste après vos [Consignes des agents](/guide/guidelines), et s’en sert pour adapter sa façon de travailler avec vous ; vos consignes et ce que vous dites dans une session passent toujours avant. Les notes contiennent ce qui compte de temps à autre ; le profil contient ce que chaque agent doit toujours savoir.
@@ -170,7 +187,7 @@ La page d’un lieu s’ouvre dans la section, avec le lien **Mémoire** en haut
 
 **Pour trouver une note**, saisissez votre recherche dans le champ du groupe (ou de la page d’un lieu) : « Rechercher dans 33 notes », ou « Rechercher dans 33 notes par mots ou par le sens » lorsque la recherche par le sens est prête. Elle trouve les notes contenant tous les mots saisis, le dernier étant pris comme début de mot, et, si la recherche par le sens est activée, les notes qui veulent dire la même chose. Les meilleurs résultats viennent en premier, chacun avec le lieu auquel il appartient, et **Afficher plus** donne les vingt suivants. « Aucune note ne correspond » signale qu’il n’y en a aucune. Échap ou la croix **×** efface la recherche, et l’index revient. Tant que la mémoire ne contient aucune note, le groupe l’indique, avec un bouton **Importer depuis d’autres assistants** et la ligne **Notes supprimées**.
 
-Chaque note d’une liste affiche ses deux premières lignes (avec un badge **Sujet** ou **Profil** lorsque c’en est un) et, en dessous, une ligne d’informations : le lieu, dans une liste qui mélange plusieurs lieux (une recherche, **Sessions**, **Pas utile récemment**, **Notes supprimées**) ; **Ajouté** ou **Modifiée** et il y a combien de temps (survolez-le pour voir les dates exactes) ; **pas encore vérifiée**, quand personne ne l’a confirmée ; **utile une fois** ou **utile N fois**, selon le nombre de fois où un agent s’en est servi (en la consultant, en la citant ou en travaillant avec le fichier ou la commande dont elle parle) ; et **jusqu’à** une date, lorsqu’elle a une date de fin. Cliquez sur une note pour l’ouvrir.
+Dans une liste, chaque note montre ses deux premières lignes (avec un badge **Sujet**, **Profil** ou **Résultat** le cas échéant ; voir [Résultats](/guide/memory#findings-what-was-tried-and-what-came-of-it)) et, en dessous, une ligne d’informations : l’emplacement, dans une liste qui en mélange plusieurs (une recherche, **Sessions**, **Pas utile récemment**, **Notes supprimées**) ; **Ajouté** ou **Modifiée** et depuis combien de temps (survolez pour voir les dates exactes) ; **pas encore vérifiée**, quand personne ne l’a confirmée ; **utile une fois** ou **utile N fois**, le nombre de fois où un agent s’en est servi (en la consultant, en la citant ou en travaillant avec le fichier ou la commande dont elle parle) ; et **jusqu’à** une date, quand elle a une date de fin. Cliquez sur une note pour l’ouvrir.
 
 ### Ouvrir une note
 
@@ -358,6 +375,8 @@ Vous pouvez aussi rechercher vous-même dans les sessions passées avec la zone 
 ## Demander à un agent
 
 - « Que retiens-tu de moi ? Supprime tout ce qui concerne mon ancien travail. »
+- « Qu’avons-nous déjà essayé pour les requêtes longues ? »
+- « Note que l’idée du curriculum n’a rien apporté, avec les exécutions. »
 - « Ajoute à mon profil que je suis infirmière et que j’aime les réponses sous forme de listes à puces. »
 - « Montre-moi mon profil et raccourcis-le à environ 300 mots. »
 - « Démarre chaque session avec 20 notes au lieu de 10. »

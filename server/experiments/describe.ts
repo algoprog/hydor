@@ -60,7 +60,8 @@ function wanted(info: StoredInfo | null, runs: number): boolean {
   return info.by === 'helper' && runs >= 4 && runs >= 2 * Math.max(info.runs, 1) && Date.now() - (info.at ?? 0) >= timing.again;
 }
 
-const countRuns = (d: D, name: string) => listRuns(d.db, { group: name, limit: 5000 }).length;
+// The runs that score evaluations are not experiments: they are never written about on its own.
+const countRuns = (d: D, name: string) => listRuns(d.db, { group: name, limit: 5000, plain: true }).length;
 
 /** A run was submitted to this experiment: it gets its info written soon, when it has none or has grown. */
 export function describeAfterSubmit(d: D, name: string | undefined) {
@@ -79,7 +80,7 @@ export function describeBackfill(d: D) {
   if (!enabled) return;
   const t = setTimeout(() => {
     const names: string[] = [];
-    for (const r of listRuns(d.db, { limit: 5000 })) if (r.group && !names.includes(r.group) && !getInfo(d.db, r.group)) names.push(r.group);
+    for (const r of listRuns(d.db, { limit: 5000, plain: true })) if (r.group && !names.includes(r.group) && !getInfo(d.db, r.group)) names.push(r.group);
     for (const n of names.slice(0, 30)) queue(d, n);
   }, timing.backfill);
   t.unref?.();
@@ -195,7 +196,7 @@ export function parseInfo(raw: string): Pick<ExperimentInfo, 'title' | 'descript
  * helper on this computer, or an answer with none of the three). With `force` those throw why.
  */
 export async function describeGroup(d: D, name: string, o: { force?: boolean; out?: { empty: boolean } } = {}, ask: typeof helper = asker): Promise<StoredInfo | null> {
-  const all = listRuns(d.db, { group: name, limit: 5000 });
+  const all = listRuns(d.db, { group: name, limit: 5000, plain: !o.force });
   if (!all.length) {
     if (o.force) throw new HttpError(404, 'There is no experiment with that name: no run has it');
     return null;

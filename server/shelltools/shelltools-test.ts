@@ -1,4 +1,4 @@
-// The commands every agent gets on its PATH (waitfor, edits, sym: server/shelltools): the launchers the server writes
+// The commands every agent gets on its PATH (waitfor, edits, sym, leancheck: server/shelltools): the launchers the server writes
 // (quoted for any path, rewritten only when a path changes, run with no node on the PATH), the test runs that decide which
 // tools agents hear of, the PATH and instructions a starting session gets (shim folder first, once, only the tools that
 // work, nothing before the test runs end or when all failed), the switch HYDOR_SHELL_TOOLS=0, that no other capability
@@ -76,6 +76,11 @@ test('the launcher text: exec of the node and the tool, both quoted, and for sym
   assert.match(sym, /^#!\/bin\/sh\n/);
   assert.match(sym, /\nexport HYDOR_RG="\/opt\/app\/rg"\nexec "\/opt\/n ode\/bin\/node" "\/opt\/app\/scripts\/agent-tools\/bin\/sym" "\$@"\n$/);
   assert.doesNotMatch(launcherText('edits', l), /HYDOR_RG/);
+  // leancheck is told where the app keeps its own Lean, which a goal's check (no session's variables) finds it by.
+  const check = launcherText('leancheck', { ...l, script: '/opt/app/scripts/agent-tools/bin/leancheck', leanDir: '/data dir/lean' });
+  assert.match(check, /\nexport HYDOR_LEAN_DIR="\/data dir\/lean"\nexec /);
+  assert.doesNotMatch(check, /HYDOR_RG/);
+  assert.doesNotMatch(launcherText('sym', { ...l, leanDir: '/data/lean' }), /HYDOR_LEAN_DIR/);
   assert.equal(shQuote('a"b$c`d\\e'), '"a\\"b\\$c\\`d\\\\e"');
 });
 
@@ -107,22 +112,22 @@ test('launchers run with spaces, quotes, dollars and backslashes in the paths, a
 test('launchers are written 0755, atomically, and again only when a path changed', () => {
   const dir = path.join(tmp, 'shim-rewrite');
   const a = { node: '/n/node', root: '/app/one' };
-  assert.deepEqual(writeLaunchers(dir, TOOLS, a), ['waitfor', 'edits', 'sym']);
+  assert.deepEqual(writeLaunchers(dir, TOOLS, a), ['waitfor', 'edits', 'sym', 'leancheck']);
   for (const t of TOOLS) assert.equal(fs.statSync(path.join(dir, t)).mode & 0o777, WIN ? fs.statSync(path.join(dir, t)).mode & 0o777 : 0o755);
   assert.deepEqual(writeLaunchers(dir, TOOLS, a), [], 'the same paths: nothing written');
   const before = fs.statSync(path.join(dir, 'sym')).ino;
   writeLaunchers(dir, TOOLS, a);
   assert.equal(fs.statSync(path.join(dir, 'sym')).ino, before, 'the same file');
-  assert.deepEqual(writeLaunchers(dir, TOOLS, { ...a, root: '/app/two' }), ['waitfor', 'edits', 'sym'], 'the app moved');
+  assert.deepEqual(writeLaunchers(dir, TOOLS, { ...a, root: '/app/two' }), ['waitfor', 'edits', 'sym', 'leancheck'], 'the app moved');
   assert.match(fs.readFileSync(path.join(dir, 'edits'), 'utf8'), /"\/app\/two\/scripts\/agent-tools\/bin\/edits"/);
-  assert.deepEqual(writeLaunchers(dir, TOOLS, { node: '/other/node', root: '/app/two' }), ['waitfor', 'edits', 'sym'], 'another node');
+  assert.deepEqual(writeLaunchers(dir, TOOLS, { node: '/other/node', root: '/app/two' }), ['waitfor', 'edits', 'sym', 'leancheck'], 'another node');
   assert.deepEqual(writeLaunchers(dir, TOOLS, { node: '/other/node', root: '/app/two', rg: anyFile }), ['sym'], 'a ripgrep appears: only sym changes');
   if (!WIN) {
     fs.chmodSync(path.join(dir, 'waitfor'), 0o644);
     assert.deepEqual(writeLaunchers(dir, TOOLS, { node: '/other/node', root: '/app/two', rg: anyFile }), [], 'a lost executable bit is put back, not counted as a rewrite');
     assert.equal(fs.statSync(path.join(dir, 'waitfor')).mode & 0o777, 0o755);
   }
-  assert.deepEqual(fs.readdirSync(dir).sort(), ['edits', 'sym', 'waitfor'], 'no temporary files left');
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['edits', 'leancheck', 'sym', 'waitfor'], 'no temporary files left');
   assert.deepEqual(writeLaunchers(path.join(tmp, 'shim-win'), ['sym'], { node: 'C:\\n\\node.exe', root: 'C:\\app', win: true }), ['sym', 'sym.cmd']);
   assert.equal(fs.readFileSync(path.join(tmp, 'shim-win', 'sym.cmd'), 'utf8'), `@"C:\\n\\node.exe" "${path.join('C:\\app', 'scripts', 'agent-tools', 'bin', 'sym')}" %*\r\n`);
 });
@@ -145,7 +150,7 @@ test('the real tools run from the launchers with no node on the PATH, and sym re
     else console.log('  (this system has a node in /usr/bin: the no-node check proves less here)');
   }
   const r = await tryLaunchers(dir, TOOLS);
-  assert.deepEqual(r, { waitfor: null, edits: null, sym: null });
+  assert.deepEqual(r, { waitfor: null, edits: null, sym: null, leancheck: null });
   assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith('hydor-shelltools-') && fs.existsSync(path.join(os.tmpdir(), f, 'check.ts'))), [], 'the test runs clean up their folder');
   // edits through the launcher changes a file.
   if (!WIN) {
@@ -181,7 +186,7 @@ test('spawn: nothing before the test runs end; then the shim folder first on the
     assert.equal(fs.existsSync(path.join(dir, 'sym')), true, 'the launchers are written at once');
     await f.ready();
   });
-  assert.deepEqual(f.passed(), ['waitfor', 'sym']);
+  assert.deepEqual(f.passed(), ['waitfor', 'sym', 'leancheck']);
   assert.equal(logged.filter((l) => /edits does not run/.test(l) && /broken on purpose/.test(l)).length, 1, 'one line for the failure');
   assert.equal(logged.filter((l) => /does not run/.test(l)).length, 1, 'and none for the tools that work');
   const a = (await f.spawn!(info(), fakeDeps(null)))!;
@@ -192,7 +197,7 @@ test('spawn: nothing before the test runs end; then the shim folder first on the
   assert.match(a.instructions![0], /^Shell commands this app adds to your PATH \(each has --help\):\n- waitfor: /);
   assert.match(a.instructions![0], /\n- sym NAME\.\.\.: /);
   assert.doesNotMatch(a.instructions![0], /edits/);
-  assert.equal(a.instructions![0], shellToolsText(['waitfor', 'sym']));
+  assert.equal(a.instructions![0], shellToolsText(['waitfor', 'sym', 'leancheck']));
   // The PATH the session's start says it would get wins over the login shell's, and a shim folder already in it is not doubled.
   const b = (await f.spawn!(info({ path: `/mine${path.delimiter}${dir}${path.delimiter}/bin` }), fakeDeps(null)))!;
   assert.equal(b.env!.PATH, `${dir}${path.delimiter}/mine${path.delimiter}/bin`);
@@ -203,11 +208,11 @@ test('spawn: nothing before the test runs end; then the shim folder first on the
   assert.equal(await f.spawn!(info({ extra: { browserOnly: true } }), fakeDeps(null)), undefined);
 });
 
-test('the text names every tool when all pass, and is built from the three parts', () => {
+test('the text names every tool when all pass, and is built from the four parts', () => {
   const all = shellToolsText(TOOLS);
-  assert.equal(all.split('\n').length, 4);
+  assert.equal(all.split('\n').length, 5);
   assert.equal(all.split('\n')[0], SHELL_TOOLS_HEAD);
-  assert.deepEqual(all.split('\n').slice(1).map((l) => l.split(':')[0]), ['- waitfor', '- edits', '- sym NAME...']);
+  assert.deepEqual(all.split('\n').slice(1).map((l) => l.split(':')[0]), ['- waitfor', '- edits', '- sym NAME...', '- leancheck FILE.lean']);
   assert.ok(all.length < 1700, `${all.length} characters`);
 });
 
@@ -219,7 +224,7 @@ test('all tools failed: nothing is returned', async () => {
     await f.ready();
   });
   assert.deepEqual(f.passed(), []);
-  assert.equal(logged.filter((l) => /does not run/.test(l)).length, 3);
+  assert.equal(logged.filter((l) => /does not run/.test(l)).length, 4);
   assert.equal(await f.spawn!(info(), fakeDeps(null)), undefined);
 });
 
@@ -312,7 +317,7 @@ test('the PATH reaches the environment of Claude Code, Codex and Custom, and the
       if (kind === 'claude') assert.ok(spec!.args.join('\n').includes(SHELL_TOOLS_HEAD), 'Claude Code is told in its system prompt');
       if (!WIN) {
         // …and the shell the agent runs commands in (it inherits that environment; sh -c as Custom's tool does).
-        const r = spawnSync('/usr/bin/env', ['-i', ...Object.entries(got).map(([k, v]) => `${k}=${v}`), 'bash', '-c', 'command -v waitfor edits sym'], { encoding: 'utf8' });
+        const r = spawnSync('/usr/bin/env', ['-i', ...Object.entries(got).map(([k, v]) => `${k}=${v}`), 'bash', '-c', 'command -v waitfor edits sym leancheck'], { encoding: 'utf8' });
         assert.deepEqual(r.stdout.trim().split('\n'), TOOLS.map((t) => path.join(dir, t)), `${kind}'s shell finds the tools: ${r.stderr}`);
       }
     }
@@ -339,6 +344,7 @@ test('the desktop apps ship the tools: stage.sh names both folders (not the test
   // The tools are what the checks run: the shipped files exist here as stage.sh would copy them.
   for (const t of TOOLS) assert.ok(fs.existsSync(path.join(APP_ROOT, 'scripts/agent-tools/bin', t)), t);
   assert.ok(fs.existsSync(path.join(APP_ROOT, 'scripts/agent-tools/lib/sym/cli.mjs')));
+  assert.ok(fs.existsSync(path.join(APP_ROOT, 'scripts/agent-tools/lib/lean/cli.mjs')) && fs.existsSync(path.join(APP_ROOT, 'scripts/agent-tools/lib/lean/core.mjs')));
   assert.match(fs.readFileSync(path.join(APP_ROOT, 'desktop/scripts/smoke.mjs'), 'utf8'), /shelltools[\s\S]*waitfor[\s\S]*sym --outline/);
   // Docker and a checkout have the folder: the image copies the whole repository, and .dockerignore keeps it.
   assert.match(fs.readFileSync(path.join(APP_ROOT, 'Dockerfile'), 'utf8'), /^COPY --chown=node:node \. \.$/m);

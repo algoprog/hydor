@@ -2,7 +2,7 @@
 // out the checks), the reminder when it did not, the message that starts each round, and the one that asks which way
 // next. Each starts with goalHead(…) on its own line, which the conversation draws as one slim row, and ends by saying
 // the app sent it. brief-test.ts checks every rule.
-import { goalHead, goalMessageOf, standing, targetText, type GoalCheck, type GoalResult, type GoalRound, type GoalState, type GoalWay } from '../../shared/goals.ts';
+import { goalHead, goalMessageOf, numeric, standing, targetText, type GoalCheck, type GoalResult, type GoalRound, type GoalState, type GoalWay } from '../../shared/goals.ts';
 import { num } from './verdict.ts';
 
 export const GOAL_FOOT = '(This message is from the app’s goal loop, not typed by the user.)';
@@ -53,8 +53,28 @@ export function reminderMessage(objective: string, o: ForTeam = {}): string {
 function stand(c: GoalCheck, r: GoalResult | undefined, holds: boolean): string {
   if (!r) return `${c.label} (not measured yet)`;
   if (r.error) return `${c.label} (could not run: ${r.error})`;
-  if (c.kind === 'measure' && r.value != null) return `${c.label} ${num(r.value)}${c.unit ? ` ${c.unit}` : ''}${holds ? '' : ` (needs ${targetText(c)})`}`;
+  if (numeric(c) && r.value != null) return `${c.label} ${num(r.value)}${c.unit ? ` ${c.unit}` : ''}${holds ? '' : ` (needs ${targetText(c)}${c.kind === 'score' ? ', beyond the noise' : ''})`}`;
   return c.label;
+}
+
+/**
+ * For a round's agent, when the goal has score checks: how each score stands where the files stand against the baseline it
+ * was agreed against, that the app scores it itself after the turn, and that evaluation_score lets it score while it works.
+ */
+export function scoresNote(g: Pick<GoalState, 'contract' | 'rounds' | 'best'>): string {
+  const cs = g.contract.checks.filter((c) => c.kind === 'score' && c.baseline);
+  if (!cs.length) return '';
+  const res = standing(g);
+  const lines = cs.map((c) => {
+    const r = res.find((x) => x.id === c.id);
+    const now = r?.value != null && !r.error ? `${num(r.value)} where the files stand` : 'not scored yet where the files stand';
+    return `- ${c.label}: the ${c.baseline!.metric} of the evaluation “${c.baseline!.name}” (id ${c.evaluation}), ${now}; its baseline is ${num(c.baseline!.mean)}, and it holds at ${targetText(c)}, beyond the noise of its seeds.`;
+  });
+  return [
+    'Scored by the project’s evaluation, which the app runs itself when your turn ends (its runs may wait in the queue):',
+    ...lines,
+    'Score your work while you go with evaluation_score (the same sealed way, in your folder, with how it compares with the baseline). Never change the files it protects (its score is refused while they differ, and the round is undone), and never run or read its final test: that is the user’s.',
+  ].join('\n');
 }
 
 /** Holds and Not yet, as the files stand, and the detail of each check that does not hold. */
@@ -191,6 +211,7 @@ export function roundMessage(g: Pick<GoalState, 'contract' | 'rounds' | 'best' |
     o.fix ? fixText(o.fix) : '',
     st.holds,
     o.from != null ? wentBack(g, o.from) : lastRound(g),
+    scoresNote(g),
     st.details,
     st.dropped,
     fromUser,

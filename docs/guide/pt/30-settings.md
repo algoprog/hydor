@@ -28,6 +28,8 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 - [**Iniciar quando este computador ligar**](/settings?s=general&find=Start%20when%20this%20computer%20starts): Inicia o app quando o computador liga.
 - [**Manter o computador ativo**](/settings?s=general&find=Keep%20the%20computer%20awake): Nos apps de computador, o computador não entra em suspensão sozinho enquanto os agentes trabalham e antes das tarefas agendadas.
 - [**Atualizar automaticamente**](/settings?s=general&find=Update%20automatically): Instala novas versões sozinho: os apps de computador assim que saem, com um minuto de aviso; uma cópia do git quando você não a usa há algum tempo.
+- [**Lean (verificador de demonstrações)**](/settings?s=general&find=Lean%20%28proof%20checker%29): Permite que os agentes verifiquem demonstrações matemáticas: uma demonstração que o Lean aceita está correta.
+- [**Adicionar Mathlib**](/settings?s=general&find=Add%20Mathlib): Adicionar ao Lean a biblioteca de que a maior parte da matemática precisa.
 - [**Fazer o tour**](/settings?s=general&find=Take%20the%20tour): Veja o que cada parte do app faz.
 - [**Dicas**](/settings?s=general&find=Tips): Mostra uma parte do app na primeira vez que você chega a ela, depois do tour de boas-vindas.
 - [**Ideias para começar**](/settings?s=general&find=Starter%20ideas): Exemplos, seus apps e uma automação abaixo da caixa de mensagem vazia na página inicial.

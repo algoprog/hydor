@@ -32,7 +32,7 @@ export async function checkDrift(db: DB, now = Date.now()): Promise<number> {
     if (!head || kvGet(db, headKey(root)) === head) continue;
     const rows = db
       .prepare(
-        "select id, anchor_commit as commit_ from memory_entries where scope = 'repo' and scope_key = ? and status = 'active' and kind in ('note', 'topic') and anchor_commit is not null and anchor_commit != ? and drift is null",
+        "select id, anchor_commit as commit_ from memory_entries where scope = 'repo' and scope_key = ? and status = 'active' and kind in ('note', 'topic', 'finding') and anchor_commit is not null and anchor_commit != ? and drift is null",
       )
       .all(root, head) as { id: number; commit_: string }[];
     const byCommit = new Map<string, number[]>();
@@ -70,7 +70,8 @@ export function setDriftState(db: DB, id: number, drift: MemoryDrift | null, com
   db.prepare('update memory_entries set drift = ?, anchor_commit = ? where id = ?').run(drift ? JSON.stringify(drift) : null, commit, id);
 }
 
-/** Project notes and topics with a drift, the oldest flag first. */
+/** Project notes and topics with a drift, the oldest flag first. Findings are not among them: the tidy-up never rewrites
+ * or removes one, so its mark stays until a person or a later result changes it. */
 export function driftedNotes(db: DB, limit: number, now = Date.now()): MemoryEntry[] {
   memorySchema(db);
   const ids = (

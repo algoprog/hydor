@@ -13,6 +13,44 @@ export const CHECKS: GoalCheck[] = [
   { id: 'c5', kind: 'review', label: 'The search page still shows filters and sorting', claim: 'The search page still shows filters and sorting', evidence: { diff: true } },
 ];
 
+/** A score check: the project's evaluation must beat its baseline (0.412) by 0.02, beyond the noise of its 3 seeds. */
+export const SCORE: GoalCheck = {
+  id: 'c6',
+  kind: 'score',
+  label: 'Beats the baseline on nDCG@10 by 0.02',
+  evaluation: 'ev1',
+  gain: 0.02,
+  target: { op: '>=', value: 0.432 },
+  baseline: { score: 'sc0', mean: 0.412, seal: 2, name: 'Search relevance', metric: 'nDCG@10' },
+};
+
+/** The evaluation's files, which a goal with the score check may not change. */
+const EVAL_PATHS = ['eval/score.py', 'eval/queries/'];
+
+/** A score check's result: its mean, how it compared with the baseline, and what the evaluation said. */
+function scoreResult(v: number, verdict: 'better' | 'same' | 'worse', n: number): GoalResult {
+  const holds = v >= 0.432 && verdict === 'better';
+  const delta = Math.round((v - 0.412) * 1000) / 1000;
+  const detail =
+    verdict === 'same'
+      ? `${v} against 0.412: within the noise of 3 seeds (p = 0.21).`
+      : verdict === 'worse'
+        ? `${v} against 0.412: −${Math.abs(delta)}, worse (p = 0.03).`
+        : holds
+          ? `${v} against 0.412: +${delta}, beyond the noise of 3 seeds (p = 0.004).`
+          : `${v} against 0.412: +${delta}, beyond the noise of 3 seeds (p = 0.02), but short of the +0.02 it needs.`;
+  return { id: 'c6', holds, value: v, verdict, closeness: holds ? 1 : Math.max(0, Math.min(0.99, (v - 0.412) / 0.02)), score: `sc${n}`, detail, ms: 41 * MIN };
+}
+
+/** A goal with the score check besides the others: each round's score as given (by round), and the evaluation's files kept safe. */
+function withScore(g: GoalState, scores: Record<number, [number, 'better' | 'same' | 'worse']>) {
+  g.contract = { ...g.contract, checks: [...g.contract.checks, SCORE], protect: [...g.contract.protect, ...EVAL_PATHS] };
+  g.rounds = g.rounds.map((r) => (scores[r.n] ? { ...r, results: [...r.results, scoreResult(scores[r.n][0], scores[r.n][1], r.n)] } : r));
+}
+
+/** The score of each round of the history: the start is the baseline; round 4, the best, is better but short of the gain. */
+const SCORES: Record<number, [number, 'better' | 'same' | 'worse']> = { 0: [0.412, 'same'], 1: [0.418, 'same'], 2: [0.424, 'better'], 3: [0.409, 'same'], 4: [0.427, 'better'], 5: [0.425, 'same'], 6: [0.401, 'worse'] };
+
 /** The results of a round: tests and types hold unless said, the page holds, and the two numbers. */
 function results(rel: number, speed: number, o: { tests?: boolean; error?: string } = {}): GoalResult[] {
   const start = { rel: 0.61, speed: 340 };
@@ -303,6 +341,69 @@ export function samples(now = Date.now()): GoalSample[] {
         g.status = 'stopped';
         g.endedAt = now - MIN;
         g.report = { summary: 'You stopped it after round 6.' };
+      }),
+      // A score check: the project's evaluation scores each round (it may wait in the queue for a GPU).
+      mk('agreeing-score', 'Agreeing, with a score', undo, (g) => {
+        g.status = 'agreeing';
+        const rs = results(0.61, 340);
+        g.rounds = [{ n: 0, startedAt: t0, endedAt: now - 3 * MIN, results: rs, score: score(rs), outcome: 'start', usd: 0.08 }];
+        g.best = 0;
+        // Measured at once (the agent runs commands unasked), but a score waits for Start: no score at the start yet.
+        withScore(g, {});
+        g.spentUsd = 0.08;
+        g.activeMs = 2 * MIN;
+      }),
+      mk('checking-score', 'Checking, the score runs', undo, (g) => {
+        midRun(g);
+        withScore(g, SCORES);
+        g.status = 'checking';
+        g.round = 7;
+        g.scoring = { check: 'c6', runs: 3, done: 1, waiting: false, since: now - 12 * MIN };
+      }),
+      mk('checking-score-queue', 'Checking, the score waits for a GPU', undo, (g) => {
+        midRun(g);
+        withScore(g, SCORES);
+        g.status = 'checking';
+        g.round = 7;
+        g.scoring = { check: 'c6', runs: 3, done: 0, waiting: true, why: 'Waiting for a free GPU', since: now - 3 * MIN };
+      }),
+      mk('working-score', 'Working, the score within the noise', undo, (g) => {
+        midRun(g);
+        withScore(g, { ...SCORES, 4: [0.433, 'same'] });
+        g.status = 'working';
+        g.round = 7;
+      }),
+      mk('asking-moved', 'Asking, the evaluation was sealed again', undo, (g) => {
+        midRun(g);
+        withScore(g, SCORES);
+        g.status = 'needs-you';
+        g.round = 7;
+        const why = '“Search relevance” was sealed again after the goal’s checks were agreed, so its scores can no longer be compared with the baseline “Beats the baseline on nDCG@10 by 0.02” was agreed against.';
+        g.reason = why;
+        g.question = {
+          id: 'q4',
+          kind: 'blocked',
+          question: why,
+          context: 'Measure the evaluation’s baseline again on its page if it has none now, then go on: the check is fixed against the evaluation as it is now, and this round is scored again. Or stop the goal.',
+          ways: [{ name: 'Go on against it as it is now' }],
+          pick: 0,
+          askedAt: now - 2 * MIN,
+        };
+      }),
+      mk('reached-score', 'Reached, with a score and a final test', undo, (g) => {
+        midRun(g);
+        g.rounds = [...rounds, { ...round(7, 84, 12, { rel: 0.82, speed: 187, way: 'Keyword and vector search, fused', did: 'Fused keyword and vector results.', usd: 0.71 }, t0) }];
+        withScore(g, { ...SCORES, 7: [0.441, 'better'] });
+        g.best = 7;
+        g.status = 'reached';
+        g.spentUsd = 5.92;
+        g.activeMs = 84 * MIN;
+        g.endedAt = now - MIN;
+        g.report = {
+          summary: 'All 6 checks hold: in the last round, and the 4 that run commands again on a second run. A review of the whole change found the goal met.',
+          final: g.rounds.at(-1)!.results,
+          finals: [{ evaluation: 'ev1', name: 'Search relevance' }],
+        };
       }),
     );
   }

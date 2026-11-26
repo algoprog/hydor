@@ -4,13 +4,15 @@
 // where the files are, the failing checks' output within its limits, what was dropped, the user's rules, note and way
 // first, the paths not to change, a new approach after rounds without progress, the closing instructions); the
 // message that asks which way next; a message sent again after a restart cut its turn; Last round after the person went
-// another way from a round; and what is left to put right once every check holds. Nothing here touches files.
+// another way from a round; and what is left to put right once every check holds; and a score check: how it stands
+// against its baseline, and that evaluation_score lets the agent score its work. Nothing here touches files.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/goals/brief-test.ts
 //   DATA_DIR=/tmp/hydor-test-goal-brief PRICES_URL= node dist/dev/brief-test.js
 import assert from 'node:assert/strict';
 import { goalMessageOf, type GoalCheck, type GoalResult, type GoalRound, type GoalState } from '../../shared/goals.ts';
-import { askMessage, DETAIL_ALL, DETAIL_EACH, draftMessage, draftNotes, GOAL_FOOT, MEMBERS_NAMED, reminderMessage, RESTARTED, restartedMessage, roundMessage, whereItStands } from './brief.ts';
+import { askMessage, DETAIL_ALL, DETAIL_EACH, draftMessage, draftNotes, GOAL_FOOT, MEMBERS_NAMED, reminderMessage, RESTARTED, restartedMessage, roundMessage, scoresNote, whereItStands } from './brief.ts';
+import { checkItem } from './review.ts';
 
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
@@ -270,6 +272,28 @@ test('sent again after a restart cut the turn short: the same message, its head 
   assert.ok(again.endsWith(GOAL_FOOT), 'and all of the message after it');
   assert.ok(again.includes('“Ship the export”'));
   assert.equal(restartedMessage('plain text'), `${RESTARTED}\n\nplain text`);
+});
+
+test('a score check: Holds and Not yet say its mean and what it needs beyond the noise; the round message says how it stands, that evaluation_score scores the work, and to leave its files and final test alone; the final reviewer reads it as the app’s run', () => {
+  const S: GoalCheck = { id: 'c5', kind: 'score', label: 'Beats the baseline', evaluation: 'e7', gain: 0.02, target: { op: '>=', value: 0.432 }, baseline: { score: 's1', mean: 0.412, seal: 2, name: 'Relevance', metric: 'nDCG@10' } };
+  const g = goal({
+    contract: { objective: 'Beat the baseline', checks: [CHECKS[0], S], protect: ['eval/score.py'], limits: { rounds: 10 } },
+    rounds: [round(0, [res('c1', true), res('c5', false, { value: 0.431, verdict: 'same', detail: '0.431 against 0.412: within the noise of 3 seeds (p = 0.21).' })], 'start')],
+  });
+  const m = roundMessage(g, { n: 1 });
+  assert.match(m, /Not yet: Beats the baseline 0\.431 \(needs ≥ 0\.432, beyond the noise\)/);
+  assert.match(m, /Beats the baseline:\n0\.431 against 0\.412: within the noise of 3 seeds/);
+  const note = scoresNote(g);
+  assert.equal(
+    note,
+    'Scored by the project’s evaluation, which the app runs itself when your turn ends (its runs may wait in the queue):\n- Beats the baseline: the nDCG@10 of the evaluation “Relevance” (id e7), 0.431 where the files stand; its baseline is 0.412, and it holds at ≥ 0.432, beyond the noise of its seeds.\nScore your work while you go with evaluation_score (the same sealed way, in your folder, with how it compares with the baseline). Never change the files it protects (its score is refused while they differ, and the round is undone), and never run or read its final test: that is the user’s.',
+  );
+  assert.ok(m.includes(note), 'in the round message');
+  assert.ok(m.indexOf(note) < m.indexOf('What the checks that do not hold said'), 'before the failing checks’ output');
+  assert.equal(scoresNote(goal()), '', 'nothing without a score check');
+  assert.match(scoresNote({ ...g, rounds: [round(0, [res('c1', true)], 'start')] }), /not scored yet where the files stand/);
+  assert.equal(checkItem(S), '- Beats the baseline (score: the nDCG@10 of the sealed evaluation “Relevance”, run by the app, >= 0.432: its baseline 0.412 + 0.02, beyond the noise of its seeds)');
+  assert.equal(checkItem(CHECKS[2]), '- Speed (measure: bench, <= 300 ms)');
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

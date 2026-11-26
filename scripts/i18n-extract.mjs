@@ -440,6 +440,12 @@ const GOAL_LOOP = {
   'server/goals/validate.ts': {},
   'server/goals/checks.ts': { only: /errorResult\(|\bSLOW_READ =|\br\.(failed|timedOut|code ===)/ },
   'server/goals/review.ts': { only: /NO_LOCAL_REVIEWER =|gave no answer|could not answer|'It holds\.'|meets the goal/ },
+  // A score check: its refusals, why it got no score, and the way on its question offers. Not what only the agent is told,
+  // nor the score's line of numbers (clauses in an order only English has).
+  'server/goals/scores.ts': { skip: /console\.|\.prepare\(|ask them to|evaluation_get/, skipFunctions: /^export function scoreDetail\(/, extra: ['{0}: there is no evaluation “{1}”: pick one of this folder’s evaluations.'] },
+  // Not the goal loop's, but read the same way: why an evolution paused, stopped or failed, and why a try did. "The start
+  // could not be scored" is followed by the end of a log, which the page shows apart.
+  'server/experiments/evolve.ts': { only: /const SEALED_AGAIN =|problem\.protected \?|\b(finish|endWith)\(.*'|\.evo\.why = [`']|why = 'Stopped by you'/, skip: /\} tried`|The start could not be scored: \$\{score|The end of its log/, extra: ['The start could not be scored: {0}'] },
 };
 for (const [f, { skip, only, skipFunctions, lowered, extra }] of Object.entries(GOAL_LOOP)) {
   for (const s of extra ?? []) add(s, f);

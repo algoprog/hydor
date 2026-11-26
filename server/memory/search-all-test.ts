@@ -328,7 +328,7 @@ test('memory off and confidential: nothing for an agent with memory off; a confi
   assert.ok(memoryTools(here).some((t) => t.name === 'memory_search'));
   setSessionExtra(db, 'claude:conf', { confidential: true, memory: false });
   const conf = memoryTools(ctxIn('claude:conf', alphaDir)).map((t) => t.name);
-  assert.deepEqual(conf, ['recall', 'search_sessions', 'memory_search', 'read_session']);
+  assert.deepEqual(conf, ['recall', 'search_sessions', 'memory_search', 'read_session', 'findings']);
   const out = await call(ctxIn('claude:conf', alphaDir), 'memory_search', { query: 'deploys', where: 'all projects' }).catch((e: Error) => e.message);
   assert.ok(!out.includes('Wiki articles'), 'no wiki in a confidential session');
 });

@@ -104,7 +104,7 @@ export function viewCan(d: RunDetail): ViewCan[] {
   return [
     'keep',
     'run',
-    ...(r.source !== 'test' ? (['again', 'start'] as const) : []),
+    ...(r.source !== 'test' ? (['again', 'start', 'experiments'] as const) : []),
     ...(own ? (['data'] as const) : []),
     // Its agent takes follow-ups (a finished run with steps starts its session for them with the first).
     ...(canAsk(d) ? (['ask'] as const) : []),

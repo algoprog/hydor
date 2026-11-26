@@ -61,7 +61,7 @@ function Resolved({ value, commit }: { value: string; commit: GitCommit | null |
 }
 
 /** What a session started here runs with: the agent picked, and the model, permissions and account it last ran with on the start page. */
-function useRun(agent: Agent, acp: string | null) {
+export function useRun(agent: Agent, acp: string | null) {
   const boot = useApp((s) => s.boot);
   const cat = useCatalog(agent, acp ?? undefined);
   const r = startSettings().runs?.[agentKey(agent, acp)] ?? {};

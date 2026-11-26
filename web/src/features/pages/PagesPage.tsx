@@ -51,6 +51,7 @@ import { absolute, usePagesStore } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { tr } from '../../i18n/runtime';
 import { askNow, closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
+import { composeInsert } from '../../lib/featureEvents';
 import { useCommentAi } from './common/commentAi';
 import { loadModelVersion, type AskScope } from './kinds';
 import { useLiveDraft, usePageDraft } from './live';
@@ -461,6 +462,18 @@ function PageView({ id }: { id: string }) {
     if (text !== undefined) setPart(text);
     openPageAsk({ scope: text !== undefined ? (kind ? 'asked' : 'part') : undefined });
   };
+  /** A whole request: the box's own words (of the conversation open about the page, else the first message's), not sent. */
+  const askWhole = (text: string) => {
+    const key = usePageAsk.getState().byPage[id]?.key;
+    if (key) {
+      openPageAsk();
+      composeInsert(text, key);
+      return;
+    }
+    // Emptied first, so the same request asked again fills the box again.
+    usePageAsk.setState({ draft: '' });
+    window.setTimeout(() => openPageAsk({ draft: text, scope: 'doc' }), 0);
+  };
 
   const lead = (
     <>
@@ -557,7 +570,7 @@ function PageView({ id }: { id: string }) {
         tail={tail}
         band={band}
         savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
-        onAsk={(text) => askThis(text)}
+        onAsk={(text, o) => (o?.whole ? askWhole(text) : askThis(text))}
         onRequest={old ? undefined : (r) => askNow(r.prompt, { page: id, make: r.make })}
         onScopes={setScopes}
         saveNowRef={saveFirst}

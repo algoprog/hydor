@@ -707,6 +707,13 @@ const HYPOTHESIS_COLS: Columns = [
   { id: 'hours', label: 'GPU hours', type: 'number' },
 ];
 
+/** The hypotheses once checked for earlier work: with the closest of it, and its address. */
+const CLOSEST_COLS: Columns = [
+  { id: 'closest', label: 'Closest work', type: 'text' },
+  { id: 'closest_url', label: 'Its link', type: 'url' },
+];
+const CHECKED_COLS: Columns = [...HYPOTHESIS_COLS, ...CLOSEST_COLS];
+
 const JOB_COLS: Columns = [
   { id: 'name', label: 'Run', type: 'text' },
   { id: 'hypothesis', label: 'Hypothesis', type: 'text' },
@@ -726,6 +733,7 @@ const VERDICT_COLS: Columns = [
   { id: 'evidence', label: 'Evidence', type: 'text' },
   { id: 'confirm', label: 'What would support it', type: 'text' },
   { id: 'refute', label: 'What would count against it', type: 'text' },
+  ...CLOSEST_COLS,
 ];
 
 const SPRINT_RUN_COLS: Columns = [
@@ -937,11 +945,98 @@ return { hypotheses: hyps, list: text, hours };`,
         failed: 'agent',
       },
       {
+        id: 'prior',
+        title: 'Check each hypothesis for earlier work',
+        do: 'repeat',
+        over: '{{listed.hypotheses}}',
+        as: 'h',
+        atOnce: 3,
+        collect: 'near',
+        steps: [
+          // The check every part of Hydor shares (the prior_work tool), before anyone is asked to spend time on it.
+          { id: 'found', title: 'Look for earlier work', do: 'tool', tool: 'prior_work', with: { idea: '{{h.hypothesis}} {{h.test}}', field: '{{question}}', language: '{{language}}' }, failed: 'skip' },
+          {
+            id: 'near',
+            title: 'Keep the closest work',
+            do: 'code',
+            language: 'javascript',
+            with: { h: '{{h}}', found: '{{found.data}}' },
+            code:
+              LIST +
+              String.raw`// What the check found for this hypothesis: its verdict and the nearest paper.
+const found = obj(input.found);
+const p = obj(rows(found.closest)[0]);
+return {
+  id: String(obj(input.h).id || ''),
+  verdict: String(found.verdict || ''),
+  title: String(p.title || ''),
+  year: Number(p.year) || null,
+  url: /^https?:\/\/\S+$/.test(String(p.url)) ? p.url : null,
+  relation: String(p.relation || ''),
+  same: String(p.same || ''),
+  differs: String(p.differs || ''),
+};`,
+            outputs: [
+              { id: 'id', label: 'Hypothesis', type: 'text' },
+              { id: 'verdict', label: 'Done before?', type: 'text' },
+              { id: 'title', label: 'Closest work', type: 'text' },
+              { id: 'year', label: 'Year', type: 'number' },
+              { id: 'url', label: 'Its link', type: 'url' },
+              { id: 'relation', label: 'How it stands to it', type: 'text' },
+              { id: 'same', label: 'What is the same', type: 'text' },
+              { id: 'differs', label: 'What differs', type: 'text' },
+            ],
+            failed: 'skip',
+          },
+        ],
+      },
+      {
+        id: 'compared',
+        title: 'Put the closest work with each',
+        do: 'code',
+        language: 'javascript',
+        with: { hypotheses: '{{listed.hypotheses}}', near: '{{prior.items}}' },
+        code:
+          LIST +
+          String.raw`// Each hypothesis with the closest earlier work (a column), and the list you are asked about, with it under each one:
+// one that is already known says so, and one nobody could check says that.
+const near = rows(input.near);
+// A title and a sentence as plain words in Markdown, and an address that its brackets do not end.
+const md = (t) => String(t || '').replace(/\s+/g, ' ').trim().replace(/[\\\x60*_\[\]<>]/g, '\\$&');
+const to = (u) => String(u).replace(/\(/g, '%28').replace(/\)/g, '%29');
+const lines = [];
+const hypotheses = rows(input.hypotheses).map((h) => {
+  const n = near.find((x) => x.id === h.id) || {};
+  const year = n.year ? ' (' + n.year + ')' : '';
+  const name = n.title ? (n.url ? '[' + md(n.title) + '](' + to(n.url) + ')' : md(n.title)) + year : '';
+  const known = n.verdict === 'known';
+  const how = n.relation === 'same' ? n.same : n.differs;
+  const line = !n.verdict || (n.verdict === 'unjudged' && !name)
+    ? 'Closest: not checked for earlier work.'
+    : !name
+      ? 'Closest: nothing found, which is not proof that it is new.'
+      : known
+        ? '**Already known:** ' + name + ' does this. ' + md(n.same)
+        : n.verdict === 'unjudged'
+          ? 'Closest: ' + name + ', not compared with it.'
+          : 'Closest: ' + name + (how ? ', ' + md(how) : '');
+  lines.push(h.id + '. ' + h.hypothesis + (h.confirm ? '\n    Supported if: ' + h.confirm : '') + (h.refute ? '\n    Against it: ' + h.refute : '') + (h.test ? '\n    Tested by: ' + h.test : '') + '\n    ' + line);
+  const closest = !n.verdict ? 'Not checked' : n.title ? (known ? 'Already known: ' : '') + n.title + year : n.verdict === 'new' ? 'None found' : 'Not checked';
+  return { ...h, closest, closest_url: n.title && n.url ? n.url : null };
+});
+return { hypotheses, list: lines.join('\n') };`,
+        outputs: [
+          { id: 'hypotheses', label: 'Hypotheses', type: 'table', columns: CHECKED_COLS },
+          { id: 'list', label: 'In a list', type: 'text' },
+        ],
+        failed: 'agent',
+      },
+      {
         id: 'check',
         title: 'Check the hypotheses',
         do: 'ask',
         if: someoneThere('gates'),
-        question: 'The sprint would test these hypotheses, in about {{listed.hours}} of your {{brief.budget}} GPU hours:\n\n{{listed.list}}\n\nKeep them, or write the ones to test instead.',
+        question: 'The sprint would test these hypotheses, in about {{listed.hours}} of your {{brief.budget}} GPU hours:\n\n{{compared.list}}\n\nKeep them, or write the ones to test instead.',
         fields: [{ id: 'hypotheses', label: 'Your hypotheses instead, one a line', type: 'long', help: 'Leave it empty to test the ones above; leave one out to drop it' }],
         waitHours: 72,
         failed: 'skip',
@@ -951,19 +1046,19 @@ return { hypotheses: hyps, list: text, hours };`,
         title: 'Settle the hypotheses',
         do: 'code',
         language: 'javascript',
-        with: { proposed: '{{listed.hypotheses}}', mine: '{{check.hypotheses}}' },
+        with: { proposed: '{{listed.hypotheses}}', compared: '{{compared.hypotheses}}', mine: '{{check.hypotheses}}' },
         code:
           LIST +
           String.raw`// The hypotheses to test: those written in answer to the check, when there are some (each kept with what was
-// proposed for it when it is the same), else those proposed.
-const proposed = rows(input.proposed);
+// proposed for it, and its closest earlier work, when it is the same), else those proposed.
+const proposed = rows(input.compared).length ? rows(input.compared) : rows(input.proposed);
 const mine = list(input.mine).map(String).filter(Boolean).slice(0, 5);
 const same = (a, b) => String(a).trim().toLowerCase().replace(/^h\d+[.:)]\s*/, '') === String(b).trim().toLowerCase();
 const hyps = mine.length ? mine.map((t, i) => ({ ...(proposed.find((p) => same(t, p.hypothesis)) || {}), id: 'H' + (i + 1), hypothesis: t.replace(/^H\d+[.:)]\s*/i, '') })) : proposed;
 const text = hyps.map((h) => h.id + '. ' + h.hypothesis + (h.confirm ? '\n    Supported if: ' + h.confirm : '') + (h.refute ? '\n    Against it: ' + h.refute : '')).join('\n');
 return { hypotheses: hyps, list: text, count: hyps.length };`,
         outputs: [
-          { id: 'hypotheses', label: 'Hypotheses', type: 'table', columns: HYPOTHESIS_COLS },
+          { id: 'hypotheses', label: 'Hypotheses', type: 'table', columns: CHECKED_COLS },
           { id: 'list', label: 'In a list', type: 'text' },
           { id: 'count', label: 'How many', type: 'number' },
         ],
@@ -1123,7 +1218,7 @@ const mark = (v) => {
 const vOf = (id) => verdicts.find((x) => String(x.id || '').trim().toLowerCase() === String(id).toLowerCase()) || {};
 const hypotheses = rows(input.hypotheses).map((h) => {
   const v = vOf(h.id);
-  return { id: String(h.id || ''), hypothesis: String(h.hypothesis || ''), verdict: String(v.verdict || ''), mark: mark(v.verdict), evidence: String(v.evidence || ''), confirm: String(h.confirm || ''), refute: String(h.refute || '') };
+  return { id: String(h.id || ''), hypothesis: String(h.hypothesis || ''), verdict: String(v.verdict || ''), mark: mark(v.verdict), evidence: String(v.evidence || ''), confirm: String(h.confirm || ''), refute: String(h.refute || ''), closest: String(h.closest || ''), closest_url: h.closest_url || null };
 });
 const no = input.approved === false || /^(no|false)$/i.test(String(input.approved));
 const w = input.waited;
@@ -1153,10 +1248,25 @@ const status = no
       ? 'Done: ' + runs.filter((r) => r.status === 'done').length + ' of ' + runs.length + ' runs finished'
       : 'Its runs had not all ended when it stopped waiting';
 const table = obj(input.table);
+// What the project keeps of each hypothesis (a finding): its verdict (not tested is "open"), the sentence of evidence,
+// its runs and the sprint's branch. A sentence with numbers and no run to give them is left out.
+const branch = String(input.branch || '').trim();
+const cut = (t, n) => {
+  const s = String(t || '').replace(/\s+/g, ' ').trim();
+  return s.length > n ? s.slice(0, n - 1).trim() + '…' : s;
+};
+const findings = hypotheses.filter((h) => h.hypothesis.trim()).map((h) => {
+  const mine = runs.filter((r) => r.id && r.hypothesis.toLowerCase() === h.id.toLowerCase()).slice(0, 11);
+  const said = cut(h.evidence || h.verdict.replace(/^[^:]*(:|$)/, ''), 450);
+  const evidence = mine.map((r) => ({ kind: 'run', ref: r.id, label: cut(r.name, 80) }));
+  if (branch) evidence.push({ kind: 'commit', ref: branch, label: cut(branch, 80) });
+  return { statement: cut(h.hypothesis, 300), verdict: h.mark === 'untested' ? 'open' : h.mark, learned: !mine.length && /\d/.test(said) ? '' : said, evidence };
+});
 return {
   question: String(input.question || ''),
   status,
   hypotheses,
+  findings,
   runs,
   results: String(table.markdown || ''),
   results_page: String(table.page || (table.id ? '/experiments?table=' + encodeURIComponent(table.id) : '')),
@@ -1171,6 +1281,7 @@ return {
           { id: 'question', label: 'Question', type: 'text' },
           { id: 'status', label: 'How it went', type: 'text' },
           { id: 'hypotheses', label: 'Hypotheses', type: 'table', columns: VERDICT_COLS },
+          { id: 'findings', label: 'Findings to record', type: 'list' },
           { id: 'runs', label: 'Runs', type: 'table', columns: SPRINT_RUN_COLS },
           { id: 'results', label: 'Results table', type: 'markdown' },
           { id: 'results_page', label: 'The table in Experiments', type: 'text' },
@@ -1182,6 +1293,23 @@ return {
           { id: 'hours', label: 'GPU hours', type: 'number' },
         ],
         failed: 'agent',
+      },
+      {
+        id: 'record',
+        title: 'Record what was found',
+        do: 'repeat',
+        over: '{{wrap.findings}}',
+        as: 'finding',
+        steps: [
+          {
+            id: 'keep',
+            title: 'Record a finding',
+            do: 'tool',
+            tool: 'finding_record',
+            with: { statement: '{{finding.statement}}', verdict: '{{finding.verdict}}', learned: '{{finding.learned}}', evidence: '{{finding.evidence}}', folder: '{{brief.repo}}' },
+            failed: 'skip',
+          },
+        ],
       },
     ],
     outputs: {

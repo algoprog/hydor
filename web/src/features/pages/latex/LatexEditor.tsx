@@ -125,7 +125,7 @@ import { CompareDialog } from './Compare';
 import { FileTree, FileView, kindIcon, NewButton, type TreeActions, type TreeEntry } from './FileTree';
 import { docDefs, type DocDefs } from './complete';
 import { NameDialog, OutlineList, Problems, where } from './parts';
-import { paperItems, PaperTools, type PaperAsk } from './PaperTools';
+import { paperItems, PaperTools, proofRequest, type PaperAsk } from './PaperTools';
 import { Preview, type Flash } from './Preview';
 import { ProjectSearch } from './ProjectSearch';
 import { ReferencesDialog } from './References';
@@ -1278,6 +1278,13 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     const s = scopes[scopes.length - 1];
     onAsk(s.lead || 'In this LaTeX document: ');
   };
+  /** Check a proof, Formalise in Lean: the request about the proof at the cursor, in the box for asking. */
+  const askProof = (what: 'check' | 'formalise') => {
+    if (!onAsk) return;
+    // With a picture in view, the lines are of no file: the document, at its start.
+    const at = isView(file) ? { file: label(TEX_MAIN), from: 1, to: 1, picked: false } : { file: label(file), from: cursor.picked ? cursor.from : cursor.line, to: cursor.picked ? cursor.to : cursor.line, picked: cursor.picked };
+    onAsk(proofRequest(what, at), { whole: true });
+  };
   const askFix = () => {
     const r = resultRef.current;
     if (!onAsk || !r) return;
@@ -2012,7 +2019,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         { label: 'Clear the cached files', also: 'aux bbl cache fresh compile', run: () => void clearCache() },
         { label: 'Typeset with', also: 'engine', disabled: readOnly, items: TEX_ENGINES.map((x) => ({ label: x.label, checked: engine === x.id, run: () => pickEngine(x.id) })) },
         '-',
-        ...paperItems({ ask: setPaperAsk, readOnly, canAsk: !!onAsk, canArxiv: !!pageId && !onDisk }),
+        ...paperItems({ ask: setPaperAsk, readOnly, canAsk: !!onAsk, canArxiv: !!pageId && !onDisk, proof: askProof }),
         '-',
         ...ai.toolsItems,
         { label: 'Tidy the bibliography', icon: <BookPlus size={14} />, disabled: readOnly || !model.files.some((f) => f.name.endsWith('.bib')), also: 'bibtex sort duplicates keys doi unused clean', run: openBibTidy },

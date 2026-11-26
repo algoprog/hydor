@@ -71,7 +71,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - **Goals** (the session's menu → Set a goal, or Options → Goal on the start page), for every agent: the person and the
-  agent first agree what done means as checks (a command that must pass, a measured number with a target, a sentence a
+  agent first agree what done means as checks (a command that must pass, a measured number with a target, a score from the project's evaluation that must beat its baseline beyond the noise (it runs only once you press Start, and never the final test), a sentence a
   reviewer that did none of the work must find true, and may ask to see a file it needs, never one git ignores, something only you confirm), the paths it may not change and limits
   (rounds, money, time); the app measures where things stand, then after every round runs the checks itself, as the
   session's own commands would run (inside the sandbox in a confidential session, or where Custom's or Codex's mode keeps
@@ -240,7 +240,7 @@ agents that speak ACP and take MCP servers.
   Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a project, and
   one session (the start page's Options, or the session's menu); the more specific wins. A changed session's
   agent follows the new ones from the next message. CLAUDE.md and AGENTS.md still work, and can be edited there too.
-- **Three commands in every agent's shell**: `waitfor` (wait for a long job in one call: a program, a file, a line in a
+- **Commands in every agent's shell** (`leancheck`, which says whether a Lean file's proofs hold, is a fourth: For researchers, below): `waitfor` (wait for a long job in one call: a program, a file, a line in a
   log, a web address, a Slurm job, a systemd unit (Linux only) or a command, stopping at the first crash line, with the end of the log
   shown), `edits` (several exact search-and-replace edits across files in one atomic call, printing the changed lines)
   and `sym` (a definition with its whole body and exact line range, its references, or a file's declarations, in
@@ -1629,7 +1629,61 @@ agents that speak ACP and take MCP servers.
   **Lab notebook** with a dated entry for each day you worked, kept apart from memory, searchable and written in your
   language. The sprint and the sweep start from the last repository or folder, and plan within what About you says you
   can run on.
-- New skills for every agent: papers' peer review, reproducing a paper, and figures for papers.
+- **Evaluations: keeping score the same way** (Experiments → ⋯ → **New evaluation**, or ask an agent to set
+  one up): one command and one number, sealed, so every run and every agent is scored the same way. The files that make
+  up the scorer and its data are sealed by their content (a data folder that is a link elsewhere is sealed by what is
+  behind it); a score is always worked out by the app from its own runs of the sealed command, one for each seed, and is
+  refused while a sealed file differs (**See what changed**, **Put them back**, **Seal again…**). An evaluation's page
+  has the **Baseline** (only you measure it), the **Latest score** and how it stands to the baseline in words (better,
+  worse, or the same within the noise, with the chance of such a difference when there are three seeds or more), the
+  **Final test** (only you run it, and it counts how often you looked), a chart of the scores and the scores one by one
+  (which branch, who asked, why one failed and the numbers it did print). **Score now** scores the folder itself or a
+  worktree of the same repository, lending it the data git does not track. Every other run in the folder is stamped
+  with whether the scorer and its data were as sealed when it started. Agents read and score (evaluation_get,
+  evaluation_score) and may propose one on a card you decide (evaluation_propose); they cannot seal, set the baseline,
+  or run or read the final test.
+- **Try to break it** (Experiments → pick runs → **Compare** → **Try to break it**): before you count on a gain, an agent
+  that did none of the work states the claim exactly, lists what else could explain it (lucky seeds, an untuned
+  baseline, a leak, a metric bug, a gain that lives in a few examples), runs the controls in an experiment of their
+  own, on a copy of your code and asking before it uses much GPU time, repairs nothing, and reports "It holds", "It
+  holds in part" or "It does not hold" with what it tried. The break-the-result skill is the method, for every agent.
+- **Is this new?** (ask any agent, or the prior_work tool): one check of an idea or a result for earlier work. It writes
+  several searches that would find the idea under other names, searches arXiv, OpenAlex and Semantic Scholar, ranks
+  what it finds against the idea with the local embedding model and has a model compare the nearest papers with it:
+  already known, partly known, looks new, or not judged when nothing could be compared, with the closest papers, what
+  each shares with the idea and what differs, and the reminder that finding nothing is not proof. Gap finder and the
+  Research sprint use it for every idea and hypothesis.
+- **Findings** (a project's Memory tab → **Findings**): what the project tried and what came of it, dead ends included,
+  each with its verdict (supported, refuted, unclear, open), what was learned and its evidence as links (runs, scores,
+  commits, files, papers, the session). Agents look at them before they propose an experiment and record one after
+  each result (finding_record, findings); a new session is given the findings that bear on its request; the Research
+  sprint records one for each hypothesis and Try to break it one for its verdict. A finding is never merged, summed up
+  or forgotten as stale, a later result replaces an earlier one and keeps it in its history, and a finding says when
+  the code under it has changed since.
+- **Evolve** (an evaluation's ⋯ → **Evolve…**, or ask an agent): Hydor tries many small changes to the files you name,
+  scores each with the evaluation, and keeps the best; your own files are not touched. Quick models propose most
+  changes and a stronger one some (never more than half of any ten), each built on one of the best versions so far
+  along three separate lines of descent; every try is scored by the sealed command in a working copy of the app's own,
+  first cheaply and with all seeds only when it looks better, and a try that touches a protected file is refused. Its
+  page shows the start, the best so far with what it changed, every try with its score, and a chart; **Take the best**
+  puts it on a branch of its own. It stops at the number of tries, the hours, or when nothing better came for a while,
+  and carries on after a restart. Agents start one only with your yes on a card (evolve_start, evolve_get).
+- **Proofs checked with Lean** (Settings → General → **Lean (proof checker)**; the LaTeX editor's Tools → **Check a
+  proof…** and **Formalise in Lean…**): Lean 4 is a proof checker, and a proof it accepts is correct. The app uses your
+  own Lean or sets one up in its own folder when you agree (about 620 MB to download), with Mathlib as a second, larger
+  step. Agents check a file or a snippet (lean_check), search the library (lean_search: Loogle and LeanSearch) and
+  give a verdict you can rely on (lean_verify, and the `leancheck` command for a goal's check): no errors, no gaps
+  marked `sorry`, the standard axioms only, with every declaration replayed through Lean's kernel, so the usual ways
+  of faking a proof are refused. The lean-proofs skill has agents agree the formal statement with you before proving
+  anything (translated back into plain mathematics, with every difference listed), and the proof-check skill reads a
+  proof written in words step by step and reports its gaps. Checking a Lean file can run code in it, so it runs in
+  the app's sandbox where there is one, and asks you once a session where there is none.
+- **The experiments reviewers ask for, in one click**: the Reviewer simulator's "Baselines and ablations" and the
+  Rebuttal workbench's experiments to run each have **Run these…**, which opens the start page with a request for an
+  agent to plan them within your GPU hours, queue them in Experiments, and report each with its numbers in a results
+  table.
+- New skills for every agent: papers' peer review, reproducing a paper, figures for papers, trying to break a result,
+  proofs in Lean, and checking a proof written in words.
 
 ## For engineers
 

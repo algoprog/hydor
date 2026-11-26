@@ -1,5 +1,6 @@
 // Running a goal's checks (shared/goals.ts): a command that must pass, a number a command prints that must reach its
-// target, a sentence the reviewer must find true in what it is shown, and something only the person confirms. The
+// target, a score of the project's evaluation (the driver scores it: scores.ts), a sentence the reviewer must find true in
+// what it is shown, and something only the person confirms. The
 // commands run in the session's folder with bash, as the session's agent's own commands would run (the driver says how:
 // in the app's sandbox, without network, or as they are), in the environment agents get with nothing that waits for a
 // person, killed with everything they started when their time is up, and what they leave running killed when they end.
@@ -19,6 +20,12 @@ import { bashCommand } from '../platform.ts';
 /** Seconds a command may take unless its check says, and at most. */
 export const DEFAULT_TIMEOUT_S = 600;
 export const MAX_TIMEOUT_S = 3600;
+/**
+ * Seconds a score check waits for its score unless it says, and at most: its runs go through the Experiments queue, which
+ * may wait for a GPU and take hours. The goal's own time limit bounds it as well (driver.ts).
+ */
+export const DEFAULT_SCORE_TIMEOUT_S = 6 * 3600;
+export const MAX_SCORE_TIMEOUT_S = 48 * 3600;
 /** How much of a command's output ends up in a result's detail. */
 const DETAIL = 1500;
 /** How much of a command's output is kept to read a number from, and to show a reviewer. */
@@ -465,6 +472,8 @@ export interface CheckEnv {
   asked?(id: string): string[];
   /** Files a reviewer asked for now in this check that were read, to be kept with it (addAsked). */
   askedMore?(id: string, added: string[]): void;
+  /** A score check's result: the driver starts the evaluation's score of the folder and waits for it (scores.ts). */
+  score?(c: GoalCheck): Promise<GoalResult>;
 }
 
 /** How many files a review check keeps that its reviewer asked for. */
@@ -653,6 +662,7 @@ export const withFiles = (text: string) => [changedFilesLine(text), text].filter
 export async function runCheck(c: GoalCheck, env: CheckEnv): Promise<GoalResult> {
   const t0 = Date.now();
   if (c.kind === 'you') return { id: c.id, holds: !!env.confirmed[c.id], closeness: env.confirmed[c.id] ? 1 : 0, ms: 0 };
+  if (c.kind === 'score') return env.score ? env.score(c) : errorResult(c.id, 'It cannot be scored here', 0);
   if (c.kind === 'command' || c.kind === 'measure') {
     if (!c.run?.trim()) return errorResult(c.id, 'It has no command to run', 0);
     if (env.noRun) return errorResult(c.id, env.noRun, 0);
@@ -726,9 +736,9 @@ export async function runCheck(c: GoalCheck, env: CheckEnv): Promise<GoalResult>
   return { id: c.id, holds: v.holds, closeness: v.holds ? 1 : 0, detail: `${v.reason}${also}`, ms: Date.now() - t0 };
 }
 
-/** Runs checks one after another, commands and numbers first, reviews last; the results in the checks' own order. */
+/** Runs checks one after another, commands and numbers first, then scores (they may wait long), reviews last; the results in the checks' own order. */
 export async function runChecks(checks: GoalCheck[], env: CheckEnv): Promise<GoalResult[]> {
-  const rank = (c: GoalCheck) => (c.kind === 'command' || c.kind === 'measure' ? 0 : c.kind === 'you' ? 1 : 2);
+  const rank = (c: GoalCheck) => (c.kind === 'command' || c.kind === 'measure' ? 0 : c.kind === 'score' ? 1 : c.kind === 'you' ? 2 : 3);
   const order = [...checks].sort((a, b) => rank(a) - rank(b));
   const got = new Map<string, GoalResult>();
   for (const c of order) {

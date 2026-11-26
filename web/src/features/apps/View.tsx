@@ -1,11 +1,12 @@
 // An app's view in a page (shared/app-ui.ts): its pages drawn in the sandboxed frame with a run's answer (or, on
 // the app's own page, what it keeps and its latest run), and what its events ask of the app done here: find and
 // change its records (a ready-made app's too), download them, keep a tick, ask the run's agent, run one of its flows, run it again with changed answers,
-// start another app, copy, open an address, say something. Only what `can` allows: a public page's view does
+// start another app, write a request to run experiments (on the start page, not sent), copy, open an address, say something. Only what `can` allows: a public page's view does
 // nothing that reaches the app. A ready-made app's view is put in the app's language first.
 import { useMemo, useState } from 'react';
 import type { AppUi } from '@shared/app-ui';
 import { translateUi, UI_ACTIONS } from '@shared/app-ui';
+import { askedRunsFolder, askedRunsFrom, askedRunsLink, askedRunsRequest } from '@shared/asked-runs';
 import { libsHead, type AppAsset } from '@shared/app-media';
 import { openLightbox, openVideo } from '../../components/Lightbox';
 import type { AnswerField, AppRun } from '@shared/apps';
@@ -14,7 +15,7 @@ import type { AppInfo } from '@shared/app-manifest';
 import { api, enc, post, put } from '../../lib/api';
 import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
-import { toast, toastError } from '../../lib/store';
+import { toast, toastError, useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { currentLang, LOCALE } from '../../i18n/locale';
 import { cx } from '../../components/ui';
@@ -23,7 +24,7 @@ import { runPath } from './api';
 import type { KeyState } from './AppKeys';
 
 /** What a view may ask of its app. */
-export type ViewCan = 'keep' | 'ask' | 'run' | 'again' | 'start' | 'data';
+export type ViewCan = 'keep' | 'ask' | 'run' | 'again' | 'start' | 'data' | 'experiments';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -179,6 +180,17 @@ export function AppView({
           // In the language this page is in, as the app's own page runs it; again keeps the earlier run's.
           const r = await post<{ run: AppRun }>(`/api/apps/${enc(target)}/runs`, { inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, lang: currentLang() });
           go(runPath(r.run.id));
+          return null;
+        }
+        case 'experiments': {
+          // The experiments of a list (reviewers' asks): the start page with the request in its box, not sent, from the
+          // repository or folder the lab apps were last given.
+          need('experiments');
+          const asked = askedRunsFrom(a);
+          if (!asked.items.length) throw new Error(tr('There are no experiments to run.'));
+          const starts = (id: string) => api<{ starts?: Record<string, string> }>(`/api/apps/${enc(`tpl:${id}`)}`).then((x) => x.starts, () => undefined);
+          const [sprint, sweep] = await Promise.all([starts('research-sprint'), starts('sweep-planner')]);
+          go(askedRunsLink(askedRunsRequest(asked), askedRunsFolder(sprint?.repo, sweep?.folder, useApp.getState().boot?.home)));
           return null;
         }
         case 'copy': {

@@ -2,7 +2,7 @@
 // as part of the app: elements (templates of HTML, each with its own CSS, that values fill each time one shows),
 // pages (tabs, and detail pages reached from them) made of blocks that place elements and say what fills them,
 // and events (what a click on an element does: go to a page, tick something off, ask the agent, run a flow, run
-// it again with changed answers, start another app, keep a record, copy…). A run's page shows its answer in the
+// it again with changed answers, start another app, keep a record, copy, write a request to run experiments…). A run's page shows its answer in the
 // view; pages marked "app" show on the app's own page, with what it keeps.
 //
 // Templates use the names a task does: {{result.days}}, {{inputs.city}}, {{.}} (the item itself) and, in an
@@ -126,7 +126,7 @@ export interface UiAction {
   text?: string;
   /** run: one of its flows ("run" is the main one). */
   flow?: string;
-  /** run, again, start: the answers (again: only those that change). */
+  /** run, again, start: the answers (again: only those that change); experiments: { items, source?, paper?, venue? }. */
   inputs?: Record<string, unknown>;
   /** run: the name the run goes by in the view's state ({{state.<as>.result}}, {{state.<as>.working}}). */
   as?: string;
@@ -156,6 +156,7 @@ export const UI_ACTIONS = [
   { value: 'again', label: 'Run it again', remote: true },
   { value: 'start', label: 'Start another app', remote: true },
   { value: 'data', label: 'Change what it keeps', remote: true },
+  { value: 'experiments', label: 'Write a request to run experiments', remote: true },
 ] as const;
 
 /** Elements every view has, by name; the view's own may not take these names. */
@@ -888,6 +889,10 @@ function cleanAction(raw: unknown, where: string, errors: string[]): UiAction | 
       s('app', 80);
       if (!a.app) errors.push(`${where}: name the app to start (app: its id or address, or "tpl:<id>" for a ready-made one)`);
       if (r.inputs !== undefined) a.inputs = plain(r.inputs) as Record<string, unknown>;
+      break;
+    case 'experiments':
+      if (r.inputs !== undefined) a.inputs = plain(r.inputs) as Record<string, unknown>;
+      if (!a.inputs?.items) errors.push(`${where}: give the experiments (inputs.items: a list of rows with “what”, like "{{result.asks}}")`);
       break;
     case 'data': {
       const op = r.op === 'add' || r.op === 'update' || r.op === 'remove' ? r.op : null;

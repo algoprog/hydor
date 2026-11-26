@@ -4,7 +4,7 @@
 // note under a reply, export and clearing all, and bringing in what other assistants know.
 import path from 'node:path';
 import type { MemoryBasis, MemoryChange, MemoryEntry, MemoryKind, MemoryListEntry, MemoryNoteData, MemoryScope, MemoryState } from '../../shared/memory.ts';
-import { isUserProfile, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, scopeName, TOP_K_MAX, wordCount } from '../../shared/memory.ts';
+import { isSummary, isUserProfile, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, scopeName, TOP_K_MAX, wordCount } from '../../shared/memory.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps } from '../features/types.ts';
 import { getNote, updateNote } from '../notes.ts';
@@ -12,6 +12,7 @@ import { meaningState, setMeaning, warmMeaning } from './embed.ts';
 import { fitProfile, helperText, profileFit, saveProfile, userProfile } from './profile.ts';
 import { agentsSuggestions, applySuggestion, conventionsFile, dismissSuggestion } from './agentsmd.ts';
 import { bringinRoutes } from './bringin/index.ts';
+import { findingWords } from './findings.ts';
 import { findNotes } from './search.ts';
 import { secretIn } from './secrets.ts';
 import {
@@ -42,6 +43,7 @@ import {
   tidyOn,
   topK,
   updateEntry,
+  updateFinding,
   words,
   type ChangeBy,
 } from './store.ts';
@@ -108,6 +110,7 @@ function exportMarkdown(list: MemoryListEntry[]): string {
       for (const e of es) {
         const what = [
           e.kind !== 'note' && (isUserProfile(e) ? 'your profile' : e.kind),
+          e.finding?.evidence.length && `evidence: ${e.finding.evidence.map((x) => `${x.kind} ${x.ref}`).join(', ')}`,
           e.basis && BASIS[e.basis],
           `added ${day(e.createdAt)}`,
           e.updatedAt !== e.createdAt && `changed ${day(e.updatedAt)}`,
@@ -217,7 +220,7 @@ export function memoryRoutes(d: Deps) {
     const q = req.query as { q?: string; scope?: string; key?: string; status?: string; ids?: string; kind?: string; stale?: string };
     const scope = SCOPES.includes(q.scope as MemoryScope) ? (q.scope as MemoryScope) : undefined;
     const status = q.status === 'deleted' || q.status === 'all' ? q.status : 'active';
-    const kinds = q.kind === 'note' || q.kind === 'topic' || q.kind === 'profile' ? [q.kind as MemoryKind] : undefined;
+    const kinds = q.kind === 'note' || q.kind === 'topic' || q.kind === 'profile' || q.kind === 'finding' ? [q.kind as MemoryKind] : undefined;
     const ids = q.ids
       ? q.ids
           .split(',')
@@ -254,12 +257,27 @@ export function memoryRoutes(d: Deps) {
     return { entry: labelled(d, [e])[0] };
   });
 
-  /** A new text, a new end date (null: none), or both. */
+  /** A new text, a new end date (null: none), or both. A finding takes its verdict and words (`finding`) instead. */
   app.patch('/api/memory/entries/:id', async (req) => {
     const id = idOf((req.params as { id: string }).id);
-    const b = (req.body ?? {}) as { text?: unknown; expiresAt?: unknown };
+    const b = (req.body ?? {}) as { text?: unknown; expiresAt?: unknown; finding?: { verdict?: unknown; statement?: unknown; learned?: unknown } };
     const cur = getEntry(db, id);
     if (!cur) throw new HttpError(404, 'That entry is gone');
+    if (cur.kind === 'finding') {
+      if (b.text !== undefined || b.expiresAt !== undefined) throw new HttpError(400, 'A finding’s verdict and words can be changed, not its text or an end date');
+      if (b.finding) {
+        if (!cur.finding || cur.status !== 'active') throw new HttpError(404, 'That finding is not there to change: restore it first');
+        let words: ReturnType<typeof findingWords>;
+        try {
+          words = findingWords({ verdict: b.finding.verdict ?? cur.finding.verdict, statement: b.finding.statement ?? cur.finding.statement, learned: b.finding.learned ?? cur.finding.learned });
+        } catch (e) {
+          throw new HttpError(400, (e as Error).message);
+        }
+        // Its evidence, what it replaces and who recorded it stay; learned given as empty is taken away.
+        const { learned: _, ...kept } = cur.finding;
+        updateFinding(db, id, { ...kept, ...words }, byUser());
+      }
+    } else if (b.finding !== undefined) throw new HttpError(400, 'That note is not a finding');
     if (b.text !== undefined) {
       const text = checkText(b.text);
       if (cur.status === 'deleted') {
@@ -345,6 +363,7 @@ export function memoryRoutes(d: Deps) {
       if (cur) deleteEntry(db, c.entry, by);
     } else if (c.action === 'updated') {
       if (!cur) throw new HttpError(404, 'That entry is gone');
+      if (cur.kind === 'finding') throw new HttpError(400, 'A finding is changed on its project’s Memory tab');
       if (cur.status === 'deleted') {
         restoreEntry(db, c.entry, by, c.before);
         oneProfile(c.entry);
@@ -366,7 +385,7 @@ export function memoryRoutes(d: Deps) {
     const day = new Date().toISOString().slice(0, 10);
     reply.header('Content-Disposition', `attachment; filename="hydor-memory-${day}.${md ? 'md' : 'json'}"`);
     if (md) return reply.type('text/markdown; charset=utf-8').send(exportMarkdown(list));
-    const out = { exportedAt: new Date().toISOString(), entries: list.map((e) => ({ ...e, history: history(db, e.id), sumsUp: e.kind !== 'note' ? childrenOf(db, e.id) : undefined })) };
+    const out = { exportedAt: new Date().toISOString(), entries: list.map((e) => ({ ...e, history: history(db, e.id), sumsUp: isSummary(e) ? childrenOf(db, e.id) : undefined })) };
     return reply.type('application/json; charset=utf-8').send(JSON.stringify(out, null, 2));
   });
 

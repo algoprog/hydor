@@ -42,6 +42,23 @@ Los agentes guardan notas en dos casos: cuando lo pides (“Recuerda que soy veg
 
 También puedes escribir una nota tú mismo con **Añadir una nota** en [Configuración → Memoria](/settings?s=memory&find=Add%20a%20note), y allí mismo buscar, editar, fechar y eliminar cada nota (consulta [Notas](/guide/memory#notes)).
 
+## Hallazgos: qué se probó y qué resultó
+
+Un proyecto de investigación olvida lo que probó: un agente vuelve a meterse en el mismo callejón sin salida, y las afirmaciones de un artículo se alejan de lo que mostraron las ejecuciones. Un **hallazgo** es algo que un proyecto probó y lo que resultó, guardado con su evidencia, por ejemplo “Los negativos difíciles de BM25 mejoran el nDCG@10 en desarrollo frente a los negativos dentro del lote: respaldado, +0,019 en 3 semillas, la ganancia está en las consultas largas”. Es una nota de memoria de un tipo propio, así que pertenece a un proyecto, se busca por palabras y por significado, llega a las sesiones nuevas cuando tiene que ver con lo que preguntas, y conserva su historial.
+
+Cada hallazgo tiene:
+
+- **Un enunciado**: la hipótesis o afirmación, en una frase.
+- **Un veredicto**: **Respaldado**, **Refutado**, **Poco claro** o **Abierto** (planteado, aún sin probar).
+- **Lo aprendido**: una o dos frases con las cifras, dónde se cumple o por qué falló.
+- **Evidencia**, 12 elementos como máximo: ejecuciones, puntuaciones y tablas de resultados de [Experimentos](/guide/experiments), commits, archivos, artículos y sesiones. Una cifra en lo aprendido necesita la ejecución, puntuación o tabla de la que sale, o el hallazgo se rechaza.
+
+**Los registran los agentes.** En un proyecto, a los agentes se les indica que miren sus hallazgos antes de proponer o empezar un experimento, y que registren uno después de cada resultado, también cuando no funcionó o no quedó claro. El [sprint de investigación](/guide/researchers#research-sprint) registra uno por cada una de sus hipótesis, e **Intentar refutarlo** registra su veredicto sobre la afirmación. **Los callejones sin salida se conservan a propósito**: la limpieza nunca combina, resume, mueve ni quita un hallazgo (tampoco los lee la creación de una wiki a partir del historial del proyecto), y nunca se sugiere quitar un hallazgo porque ningún agente lo haya necesitado últimamente. Dos hallazgos que se contradicen se conservan ambos, hasta que uno posterior sustituya al otro: el nuevo indica qué sustituye, y el antiguo sale de la lista pero permanece en su historial.
+
+**Dónde verlos.** La pestaña **Memoria** de un proyecto tiene una etiqueta **Hallazgos** junto a **Notas**, **Wiki** y **Documentos** (consulta [La pestaña Memoria de un proyecto](/guide/wiki-memory#a-projects-memory-tab)), con una etiqueta más pequeña para cada veredicto. Una fila muestra el enunciado, el veredicto y su antigüedad. Abre uno para leerlo completo: lo aprendido, su evidencia como enlaces que abren cada ejecución, commit, archivo, artículo o sesión, quién lo registró y cuándo, y qué sustituye. Cuando un archivo dado como evidencia ha cambiado desde entonces en el repositorio Git del proyecto, la fila dice **el código cambió desde entonces** y el hallazgo dice “El código en que se basa ha cambiado desde entonces.”, con los archivos: vuelve a probarlo antes de apoyarte en él. Los hallazgos también aparecen entre las notas del proyecto en [Configuración → Memoria](/settings?s=memory), marcados como **Hallazgo**.
+
+**Cambiar u olvidar uno.** Ábrelo y pulsa **Cambiar** para corregir a mano su veredicto, su enunciado o lo aprendido. **Olvidar** lo quita; permanece en [Notas eliminadas](/guide/memory#deleted-notes) durante 30 días, para restaurarlo. También puedes pedírselo a un agente: registra el resultado posterior en lugar del antiguo, o lo olvida. Desactivar la memoria desactiva también los hallazgos.
+
 ## Tu perfil
 
 Además de las notas, la memoria guarda un perfil tuyo: quién eres y a qué te dedicas, qué usas, cómo te gustan las respuestas y qué evitar. Mientras la memoria está activada, cada agente lo recibe una vez, al comienzo de una sesión, justo después de tus [Pautas de los agentes](/guide/guidelines), y deja que influya en cómo trabaja contigo; tus pautas y lo que dices en una sesión siguen teniendo prioridad. Las notas guardan lo que importa de vez en cuando; el perfil guarda lo que todo agente debe saber siempre.
@@ -170,7 +187,7 @@ La página de un lugar se abre dentro de la sección, con el enlace **Memoria** 
 
 **Para encontrar una nota**, escribe en el campo de búsqueda del grupo (o de la página de un lugar): “Buscar en 33 notas”, o “Buscar en 33 notas por palabras o significado” cuando la búsqueda por significado está lista. Encuentra las notas que contienen todas las palabras que escribes, con la última como inicio de palabra, y, con la búsqueda por significado activada, las notas que significan lo mismo. Las mejores van primero, cada una con el lugar al que pertenece, y **Mostrar más** da las veinte siguientes. “Ninguna nota coincide” indica que no hay resultados. Escape o la **×** borra la búsqueda y vuelve el índice. Mientras la memoria no tiene notas, el grupo lo indica, con un botón **Traer desde otros asistentes** y la fila **Notas eliminadas**.
 
-Cada nota de una lista muestra sus dos primeras líneas (con una insignia **Tema** o **Perfil** cuando lo es) y debajo una línea de datos: el lugar, en una lista que mezcla lugares (una búsqueda, **Sesiones**, **No se necesitaron hace poco**, **Notas eliminadas**); **Añadido** o **Cambiada** y hace cuánto (apunta con el cursor para ver las fechas exactas); **sin revisar aún**, cuando nadie la ha confirmado; **necesitada una vez** o **necesitada N veces**, cuántas veces la usó un agente (la consultó, la citó o trabajó con el archivo o comando del que trata); y **hasta que** una fecha, cuando tiene fecha de fin. Haz clic en una nota para abrirla.
+Cada nota de una lista muestra sus dos primeras líneas (con una insignia **Tema**, **Perfil** o **Hallazgo** cuando lo es; consulta [Hallazgos](/guide/memory#findings-what-was-tried-and-what-came-of-it)) y debajo una línea de datos: el lugar, en una lista que mezcla lugares (una búsqueda, **Sesiones**, **No se necesitaron hace poco**, **Notas eliminadas**); **Añadido** o **Cambiada** y hace cuánto (pasa el puntero por encima para ver las fechas exactas); **sin revisar aún**, cuando nadie la ha confirmado; **necesitada una vez** o **necesitada N veces**, la frecuencia con la que un agente la usó (la consultó, la citó o trabajó con el archivo o el comando del que trata); y **hasta que** una fecha, cuando tiene fecha de fin. Haz clic en una nota para abrirla.
 
 ### Abrir una nota
 
@@ -358,6 +375,8 @@ Tú mismo puedes buscar en sesiones pasadas con el cuadro de búsqueda (Ctrl+K, 
 ## Pregunta a un agente
 
 - "¿Qué recuerdas sobre mí? Elimina todo lo que haya sobre mi antiguo trabajo."
+- “¿Qué hemos probado ya para las consultas largas?”
+- “Deja registrado que la idea del entrenamiento curricular no sirvió, con las ejecuciones.”
 - "Añade a mi perfil que soy enfermera y que prefiero las respuestas con viñetas."
 - "Muéstrame mi perfil y redúcelo a unas 300 palabras."
 - "Empieza cada sesión con 20 notas en lugar de 10."

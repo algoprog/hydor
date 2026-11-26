@@ -1,7 +1,8 @@
 // Deep research: on the start page, an option under Options (with its breadth, depth, search budget and what
 // it delivers); in a session, its menu's Session settings → Deep research, to turn it on, off or change it from
 // the next message; in the lead's session, a bar over the message box with what it is doing, the searches used and
-// its report once delivered; in a researcher's, whose research it is part of.
+// its report once delivered; in a researcher's, whose research it is part of. In any session, what an agent's check
+// of an idea for earlier work (prior_work) found, as a card (PriorWorkCard.tsx).
 import { useEffect, useRef, useState } from 'react';
 import { Telescope } from 'lucide-react';
 import type { SessionExtra } from '@shared/features';
@@ -19,6 +20,7 @@ import { resolveIn } from '../documents/fileTypes';
 import { usePagesStore } from '../pages/state';
 import { nagetTool, type WebFeature } from '../registry';
 import { useCostlyMode } from '../tips/ModeExplainer';
+import { PriorWorkCard } from './PriorWorkCard';
 
 const DOCK = 'mx-3 mb-2 flex items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-1.5 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]';
 /** The settings picked last, for the next research (the mode itself is picked each time: it costs more). */
@@ -302,6 +304,16 @@ function ResearchDocks({ s }: { s: SessionSummary }) {
 
 export const researchFeature: WebFeature = {
   id: 'research',
+  toolViews: {
+    prior_work: {
+      place: 'answer',
+      Row: PriorWorkCard,
+      step: (t) => {
+        const idea = (t.input as { idea?: unknown } | undefined)?.idea;
+        return { verb: t.status === 'running' || t.status === 'pending' ? 'Checking for earlier work' : 'Checked for earlier work', title: typeof idea === 'string' && idea.trim() ? idea.trim().slice(0, 100) : undefined };
+      },
+    },
+  },
   SessionDock: ResearchDocks,
   SessionMenu: ResearchMenuItem,
   SessionOptions: ResearchOption,

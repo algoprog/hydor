@@ -420,6 +420,8 @@ export const STEP_TOOLS = [
   'knowledge_search',
   'knowledge_read',
   'recall',
+  'finding_record',
+  'findings',
   'user_profile',
   'notify_user',
   'rank_by_interest',
@@ -430,6 +432,8 @@ export const STEP_TOOLS = [
   'experiment_get',
   'experiment_wait',
   'experiment_table',
+  'evaluation_get',
+  'evaluation_score',
   'save_sheet',
   'save_doc',
   'save_slides',
@@ -438,6 +442,7 @@ export const STEP_TOOLS = [
   'read_paper',
   'reading_list',
   'zotero_sync',
+  'prior_work',
 ];
 /**
  * Of those, the ones only steps have (agents in sessions don't): what the user is like, from memory and their sessions'

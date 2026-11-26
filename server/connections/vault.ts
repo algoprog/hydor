@@ -190,6 +190,21 @@ export function secretView(db: DB, name: string): SecretView | null {
   return r ? view(r) : null;
 }
 
+/**
+ * The user's key for a service the app asks itself, from Keys where it may go to that service's host (its domains say
+ * so), else from the server's environment; none when there is neither.
+ */
+export function serviceKey(db: DB, name: string, host: string): string | undefined {
+  try {
+    const s = readSecret(db, name);
+    if (s && s.view.domains.some((d) => host === d || host.endsWith(`.${d}`))) {
+      touchSecret(db, name);
+      return s.value;
+    }
+  } catch {}
+  return process.env[name] || undefined;
+}
+
 /** A key and its value, for the server's own use only (http_request). */
 export function readSecret(db: DB, name: string): { view: SecretView; value: string } | null {
   const r = db.prepare('select * from conn_secrets where name = ?').get(name) as SecretRow | undefined;

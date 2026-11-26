@@ -1,5 +1,6 @@
 // Shell commands the app adds to every agent's PATH: waitfor (wait for a job in one call), edits (several exact edits in
-// one call) and sym (a definition with its whole body). They are the programs in scripts/agent-tools/ (its README says
+// one call), sym (a definition with its whole body) and leancheck (whether a Lean file's proofs hold: server/lean).
+// They are the programs in scripts/agent-tools/ (its README says
 // what each does). The app writes a small launcher for each into <data folder>/shelltools/bin at every start, which runs
 // the app's own Node.js on the tool (agents' shells have no node on their PATH: the tools start with
 // `#!/usr/bin/env node`), tries each launcher once, in the background, the way an agent's shell would run it, and
@@ -14,7 +15,7 @@ import { agentBaseEnv } from '../env.ts';
 import type { Feature } from '../features/types.ts';
 import { bashCommand, bashPath, WIN } from '../platform.ts';
 
-export const TOOLS = ['waitfor', 'edits', 'sym'] as const;
+export const TOOLS = ['waitfor', 'edits', 'sym', 'leancheck'] as const;
 export type Tool = (typeof TOOLS)[number];
 
 /** What each session is told, one bullet for each tool that works (the same text every time, so the provider's cache of it holds). */
@@ -25,6 +26,8 @@ export const SHELL_TOOLS_TEXT: Record<Tool, string> = {
   edits:
     '- edits: several exact search/replace edits across files in one atomic call. It reads a script on stdin: `=== path` sections holding <<<<<<< SEARCH / ======= / >>>>>>> REPLACE blocks. Nothing is written unless every block matches exactly once, and it prints the changed lines with their numbers, so there is no need to re-read the files. Use it when changing more than one place.',
   sym: '- sym NAME...: a definition with its whole body and exact line range (TypeScript, JavaScript, Python, Rust). `sym --refs NAME` lists references, `sym --outline FILE` a file\'s declarations. Use grep for text and strings.',
+  leancheck:
+    '- leancheck FILE.lean: whether its proofs hold (it builds, no sorry, standard axioms only, kernel re-check). Exits 0 only then, so a goal\'s command check can be "leancheck Proofs/Main.lean". --theorem NAME, --allow-sorry. Needs Lean set up.',
 };
 
 export const shellToolsText = (tools: readonly Tool[]): string => [SHELL_TOOLS_HEAD, ...TOOLS.filter((t) => tools.includes(t)).map((t) => SHELL_TOOLS_TEXT[t])].join('\n');
@@ -44,14 +47,22 @@ export interface LauncherSpec {
   script: string;
   /** A ripgrep sym may search with (HYDOR_RG), when there is one. */
   rg?: string;
+  /** Where the app keeps its own Lean, for leancheck (HYDOR_LEAN_DIR): a goal's check finds it so too. */
+  leanDir?: string;
 }
+
+/** The variables a tool's launcher sets before it runs it. */
+const launcherEnv = (tool: Tool, l: LauncherSpec): [string, string][] => [
+  ...(tool === 'sym' && l.rg ? [['HYDOR_RG', l.rg] as [string, string]] : []),
+  ...(tool === 'leancheck' && l.leanDir ? [['HYDOR_LEAN_DIR', l.leanDir] as [string, string]] : []),
+];
 
 /** The sh launcher: the app's own Node.js on the tool's script, whatever the caller's PATH holds. */
 export function launcherText(tool: Tool, l: LauncherSpec): string {
   return [
     '#!/bin/sh',
     "# Written by Hydor at every start (the app's own Node.js on the app's own copy of the tool): changes here are overwritten.",
-    ...(tool === 'sym' && l.rg ? [`export HYDOR_RG=${shQuote(l.rg)}`] : []),
+    ...launcherEnv(tool, l).map(([k, v]) => `export ${k}=${shQuote(v)}`),
     `exec ${shQuote(l.node)} ${shQuote(l.script)} "$@"`,
     '',
   ].join('\n');
@@ -59,7 +70,7 @@ export function launcherText(tool: Tool, l: LauncherSpec): string {
 
 /** The same for Windows' cmd.exe and PowerShell (Git's bash runs the extension-less one). */
 export function cmdLauncherText(tool: Tool, l: LauncherSpec): string {
-  return [...(tool === 'sym' && l.rg ? [`@set "HYDOR_RG=${l.rg.replace(/%/g, '%%')}"`] : []), `@${cmdQuote(l.node)} ${cmdQuote(l.script)} %*`, ''].join('\r\n');
+  return [...launcherEnv(tool, l).map(([k, v]) => `@set "${k}=${v.replace(/%/g, '%%')}"`), `@${cmdQuote(l.node)} ${cmdQuote(l.script)} %*`, ''].join('\r\n');
 }
 
 /** Writes a file atomically (a temporary file, then a rename), only when it differs; true when it did. */
@@ -85,11 +96,11 @@ function writeIfChanged(file: string, text: string, mode: number): boolean {
 }
 
 /** Writes the launchers of `tools` into `dir`; the names of those it wrote (the others held the same text already). */
-export function writeLaunchers(dir: string, tools: readonly Tool[], l: { node: string; root: string; rg?: string; win?: boolean }): string[] {
+export function writeLaunchers(dir: string, tools: readonly Tool[], l: { node: string; root: string; rg?: string; leanDir?: string; win?: boolean }): string[] {
   fs.mkdirSync(dir, { recursive: true });
   const wrote: string[] = [];
   for (const t of tools) {
-    const spec: LauncherSpec = { node: l.node, script: path.join(l.root, 'scripts', 'agent-tools', 'bin', t), rg: l.rg && fs.existsSync(l.rg) ? l.rg : undefined };
+    const spec: LauncherSpec = { node: l.node, script: path.join(l.root, 'scripts', 'agent-tools', 'bin', t), rg: l.rg && fs.existsSync(l.rg) ? l.rg : undefined, leanDir: l.leanDir };
     if (writeIfChanged(path.join(dir, t), launcherText(t, spec), 0o755)) wrote.push(t);
     if (l.win ?? WIN) if (writeIfChanged(path.join(dir, `${t}.cmd`), cmdLauncherText(t, spec), 0o644)) wrote.push(`${t}.cmd`);
   }
@@ -164,6 +175,8 @@ export interface ShellToolsOptions {
   /** The folder with scripts/agent-tools in it (default: the app's own). */
   root?: string;
   rg?: string | undefined;
+  /** The app's own Lean's folder (default: <data folder>/lean). */
+  leanDir?: () => string;
   tools?: readonly Tool[];
   /** The PATH a session would get when its start does not say (default: the agents' login PATH). */
   basePath?: () => string | undefined;
@@ -188,7 +201,7 @@ export function createShellTools(o: ShellToolsOptions = {}): ShellTools {
   async function setUp() {
     const bin = dir();
     try {
-      const wrote = writeLaunchers(bin, tools, { node: o.node ?? process.execPath, root: o.root ?? APP_ROOT, rg: 'rg' in o ? o.rg : bundledRg });
+      const wrote = writeLaunchers(bin, tools, { node: o.node ?? process.execPath, root: o.root ?? APP_ROOT, rg: 'rg' in o ? o.rg : bundledRg, leanDir: o.leanDir ? o.leanDir() : path.join(config.dataDir, 'lean') });
       if (wrote.length) console.log(`[shelltools] launchers written in ${bin}: ${wrote.join(', ')}`);
     } catch (e) {
       console.error(`[shelltools] could not write the launchers in ${bin}: ${(e as Error).message}`);

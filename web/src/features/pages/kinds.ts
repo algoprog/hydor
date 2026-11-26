@@ -55,8 +55,11 @@ export interface ModelEditorProps<M> {
   /** Under the save bar: who hears of the change. */
   savedNote?: string;
   onDirty?: (dirty: boolean) => void;
-  /** "Ask the agent about it" on what is picked: the words that say what it is ("In the section “Pricing”: "). */
-  onAsk?: (text: string) => void;
+  /**
+   * "Ask the agent about it" on what is picked: the words that say what it is ("In the section “Pricing”: "). `whole`:
+   * they are a whole request, which goes into the message box itself, to read, change or send as it is.
+   */
+  onAsk?: (text: string, o?: { whole?: boolean }) => void;
   /**
    * A request about it made in the gallery (a slide made with AI): its short line, what to make, the whole of it. Pages
    * sends it through its Ask panel at once (the agent told what to make in full); beside a conversation the whole of it

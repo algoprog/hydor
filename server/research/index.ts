@@ -3,7 +3,8 @@
 // into what they leave open for its rounds (depth), has the key claims cross-checked, and delivers a cited
 // report as a page or a Word document. Here: what the lead and the researchers are told, and the budget kept
 // as they work: web searches counted across the research (the app's web_search, with the agents' own web
-// search off so every search counts), and rounds counted as researchers start.
+// search off so every search counts), and rounds counted as researchers start. Here too, every agent's prior_work
+// tool: whether an idea or a result has been done before (prior-work.ts).
 import { researchOf, type ResearchSettings, type ResearchState } from '../../shared/research.ts';
 import { childKeys } from '../children/family.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
@@ -11,6 +12,7 @@ import { GivenAtStart } from '../features/freshStart.ts';
 import type { Deps, Feature, RunCtx } from '../features/types.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { leadInstructions, RESEARCHER_INSTRUCTIONS } from './instructions.ts';
+import { PRIOR_WORK_GUIDE, priorWorkTool } from './prior-work.ts';
 
 /** The research a session takes part in: its lead's key and settings, and whether it leads or researches. */
 export function researchFor(db: DB, key: string, extra = sessionExtra(db, key)): { lead: string; settings: ResearchSettings; role: 'lead' | 'researcher' } | null {
@@ -78,14 +80,18 @@ export const research: Feature = {
     d.app.get('/api/research/:key', async (req) => researchState(d, (req.params as { key: string }).key) ?? { key: (req.params as { key: string }).key, settings: null });
   },
 
+  // "Is this new?": every agent's and apps' steps' (prior-work.ts), in a research or not.
+  tools: (ctx) => [priorWorkTool(!!ctx.step)],
+
   spawn(s, d) {
     // A new Codex thread has no key yet: its own settings say whether it leads, its parent's whether it researches.
     const r = researchFor(d.db, s.key ?? '', s.extra);
     given.note(s.runId, researchWords(r));
-    if (!r) return undefined;
+    const guides = [{ tools: ['prior_work'], text: PRIOR_WORK_GUIDE }];
+    if (!r) return { guides };
     // Every search goes through web_search, where the budget is kept: the agents' own web search is off.
     const off = s.agent === 'claude' ? { disallowedTools: ['WebSearch'] } : s.agent === 'codex' ? { codexConfig: { web_search: 'disabled' } } : {};
-    return { instructions: [r.role === 'lead' ? leadInstructions(r.settings) : RESEARCHER_INSTRUCTIONS], ...off };
+    return { guides, instructions: [r.role === 'lead' ? leadInstructions(r.settings) : RESEARCHER_INSTRUCTIONS], ...off };
   },
 
   async beforeSend(key, d) {

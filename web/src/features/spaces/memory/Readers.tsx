@@ -6,6 +6,7 @@ import { ChevronLeft, ExternalLink, X } from 'lucide-react';
 import type { MemoryListEntry } from '@shared/memory';
 import type { ProjectWikiView } from '@shared/wiki';
 import { BASIS, shortDay } from '../../memory/common';
+import { VerdictPill } from '../../memory/Finding';
 import { useNoteView } from '../../memory/NoteDialog';
 import { WikiReader } from '../../wiki/WikiReader';
 import { Button, IconButton, Switch, useConfirm } from '../../../components/ui';
@@ -50,7 +51,7 @@ const Fact = ({ name, children }: { name: string; children: ReactNode }) => (
 
 // ---- notes --------------------------------------------------------------------------------------------------------
 
-/** A note, a topic or the project's profile: its text (to edit) and facts, Delete; a note a topic sums up opens here too. */
+/** A note, a topic, a finding or the project's profile: its text (to edit) and facts, Delete; a note a topic sums up opens here too. */
 export function NoteReader({ entry, wide, onClose, onGone, onChanged, onOpenNote }: { entry: MemoryListEntry; wide: boolean; onClose: () => void; onGone: () => void; onChanged: () => void; onOpenNote: (e: MemoryListEntry) => void }) {
   const v = useNoteView({ entry, onClose: onGone, onChanged, inPlace: true, onOpenNote });
   const e = v.e ?? entry;
@@ -62,6 +63,7 @@ export function NoteReader({ entry, wide, onClose, onGone, onChanged, onOpenNote
       pills={
         <>
           <Pill>{profile ? 'Project profile' : v.kind}</Pill>
+          {e.finding && <VerdictPill verdict={e.finding.verdict} />}
           {e.basis && !profile && e.status === 'active' && <Pill tone={e.basis === 'inferred' ? 'warn' : 'ok'}><span className="first-letter:uppercase">{BASIS[e.basis]}</span></Pill>}
           {e.expiresAt && e.status === 'active' && <Pill>{tr(`Ends ${shortDay(e.expiresAt)}`)}</Pill>}
         </>
@@ -193,7 +195,7 @@ export function DocReader({ r, wikiOn, wide, onClose, onChanged, onGone }: { r: 
 // ---- nothing open -------------------------------------------------------------------------------------------------
 
 /** What the project's memory is, for someone new: shown while nothing is open (on a computer). */
-export function MemoryIntro({ name, articles, documents }: { name: string; articles: number | null; documents: number }) {
+export function MemoryIntro({ name, articles, documents, findings }: { name: string; articles: number | null; documents: number; findings: number }) {
   const num = (n: number) => <span className="tnum">{n.toLocaleString()}</span>;
   const who = (
     <span translate="no" className="font-medium text-fg">
@@ -230,6 +232,11 @@ export function MemoryIntro({ name, articles, documents }: { name: string; artic
           <li>
             <span className="font-medium text-fg-2">Documents</span>: your files, which agents search and cite.
           </li>
+          {findings > 0 && (
+            <li>
+              <span className="font-medium text-fg-2">Findings</span>: what was tried and what came of it, dead ends included.
+            </li>
+          )}
         </ul>
       </div>
     </div>

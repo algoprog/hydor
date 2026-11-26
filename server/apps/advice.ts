@@ -27,6 +27,8 @@ const TOOL_TITLE: Record<string, string> = {
   knowledge_search: 'Search the knowledge bases',
   knowledge_read: 'Read from a knowledge base',
   recall: 'Look in memory',
+  finding_record: 'Record a finding',
+  findings: 'Look up findings',
   notify_user: 'Send a notification',
 };
 

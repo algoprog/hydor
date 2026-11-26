@@ -622,6 +622,248 @@ table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e4dc
 <table><tr><th>Month</th><th>Payment</th><th>Interest</th><th>Left to pay</th></tr><tr><td>December</td><td>$164.32</td><td>$12.44</td><td>$1,738.12</td></tr><tr><td>January</td><td>$164.32</td><td>$11.44</td><td>$1,585.24</td></tr><tr><td>February</td><td>$164.32</td><td>$10.44</td><td>$1,431.36</td></tr><tr><td>March</td><td>$164.32</td><td>$9.42</td><td>$1,276.46</td></tr></table>
 </div></body></html>`;
 
+// The retriever's evaluation (Experiments → Evaluations): the folder becomes a git repository whose scorer (eval.py)
+// and dev set are sealed, with a final test on held-out data outside it that is not run. The model's settings
+// (config.json) are not sealed: three worktrees change them, so their scores come out clearly better than the
+// baseline, the same within the noise, and failed (it returns 5 results, so it prints ndcg@5, not ndcg@10). Every run
+// is a few lines of Python on the CPU. The reranking function (rank.py) is not sealed either: it is what the demo's
+// finished evolution changed (evolveData).
+const SCORER = `import json, os, sys
+
+from rank import rerank_score
+
+split = sys.argv[sys.argv.index('--split') + 1]
+seed = int(sys.argv[sys.argv.index('--seed') + 1])
+data = os.environ['HYDOR_HELD_OUT'] if split == 'test' else os.path.join('data', split)
+judged = sum(1 for line in open(os.path.join(data, 'qrels.tsv')) if line.strip())
+config = json.load(open('config.json'))
+k = config['depth']
+noise = config['noise'][(seed - 1) % len(config['noise'])]
+score = 0.412 + config['gain'] + noise - (0.004 if split == 'test' else 0)
+assert judged, 'there is nothing to score against'
+assert rerank_score(1.0, 0.0, 100) > 0
+print(f'ndcg@{k}={score:.4f}')
+print(f'mrr@{k}={score + 0.05:.4f}')
+`;
+
+// rank.py as a version of it is: the start returns the dense score alone, and each try adds to it or changes a line.
+const RANK_ORDER = ['bm25', 'floor', 'title', 'short', 'long', 'exact', 'fresh', 'cap'];
+const rankPy = (parts) => {
+  const lines = RANK_ORDER.filter((k) => parts[k]).map((k) => `    ${parts[k]}`);
+  return `${parts.bm25?.includes('log1p') ? 'import math\n\n\n' : ''}def rerank_score(dense, bm25, length, title_hit=False, exact=0, age_days=0):
+    """How much a passage counts for a query: higher is shown first."""
+${lines.length ? `    score = dense\n${lines.join('\n')}\n    return score\n` : '    return dense\n'}`;
+};
+
+// The finished evolution of that evaluation, which the demo writes straight into its database (no model runs here):
+// 30 tries over three lines of descent, a few failed, the best clearly better than the start, and the best taken onto
+// a branch. Each try: [made from (0: the start), the change to rank.py, the model's line, its first score, its mean
+// with all seeds (only when the first score earned it) or how it failed].
+const BM25 = 'score += 0.08 * bm25';
+const LOG_BM25 = 'score += 0.11 * math.log1p(max(bm25, 0.0))';
+const SHORT = 'score -= 0.05 if length < 20 else 0.0';
+const TITLE = 'score += 0.06 if title_hit else 0.0';
+const NO_CHANGE = 'It is the same as the start: it changed nothing';
+const NOT_APPLIED = 'Its change did not apply: the SEARCH part for rank.py that begins “score = dense” is not in the file: copy the lines exactly as they are';
+const TRIES = [
+  [0, { bm25: BM25 }, 'Add a small BM25 term to the dense score', 0.4209, 0.4224],
+  [0, { short: SHORT }, 'Push very short passages down', 0.4091],
+  [0, { title: TITLE }, 'Boost passages whose title matches the query', 0.4152, 0.4168],
+  [1, { bm25: LOG_BM25 }, 'Take the log of BM25 so long matches do not take over', 0.4268, 0.4281],
+  [2, { short: 'score -= 0.02 if length < 12 else 0.0' }, 'Only push down passages under 12 words, and more gently', 0.4113, 0.4118],
+  [3, { title: 'score += 0.09 if title_hit else 0.0' }, 'Raise the title boost', 0.4141],
+  [0, null, 'Normalise the dense score by the passage length', null, NOT_APPLIED],
+  [4, { cap: 'score = min(score, dense + 0.6)' }, 'Cap how far the extra signals can move a passage', 0.4259],
+  [5, { exact: 'score += 0.01 * min(exact, 5)' }, 'Count exact query words found in the passage', 0.4187, 0.4196],
+  [3, { bm25: BM25 }, 'Add BM25 beside the title boost', 0.4262, 0.4279],
+  [4, { title: TITLE }, 'Add the title boost to the log of BM25', 0.4331, 0.4342],
+  [9, { fresh: 'score *= 1.0 / (1.0 + age_days / 3650)' }, 'Prefer newer passages', 0.4127],
+  [10, { title: 'score += 0.04 if title_hit else 0.0' }, 'Make the title boost smaller', 0.4251],
+  [11, { exact: 'score += 0.012 * min(exact, 4)' }, 'Count exact words as well as BM25 and the title', 0.4389, 0.4398],
+  [8, { cap: 'score = min(score, dense + exact)' }, 'Cap by the number of exact words', null, 'The command failed with exit code 1\n\nThe end of its log:\nTraceback (most recent call last):\n  File "eval.py", line 14, in <module>\n    assert rerank_score(1.0, 0.0, 100) > 0\nAssertionError'],
+  [14, { short: 'score -= 0.03 if length < 25 else 0.0' }, 'Push down short passages here too', 0.4361],
+  [13, { exact: 'score += 0.2 if exact > 2 else 0.0' }, 'A flat bonus when three or more words match exactly', 0.4204],
+  [14, { exact: 'score += 0.018 * min(exact, 4)' }, 'Weigh exact words a little more', 0.4426, 0.4437],
+  [12, { fresh: 'score -= 0.002 * (age_days // 365)' }, 'A very small penalty per year of age', 0.4121],
+  [18, { long: 'score -= 0.00002 * max(length - 300, 0)' }, 'Gently push down very long passages', 0.4451, 0.4462],
+  [18, null, 'Rewrite the scorer to read the labels for each query', null, 'It tried to change eval.py, which the evaluation protects'],
+  [20, { long: 'score -= 0.00004 * max(length - 250, 0)' }, 'Start the length penalty earlier', 0.4468, 0.4474],
+  [16, { cap: 'score = min(score, dense + 0.8)' }, 'Cap the extra signals at 0.8', 0.4358],
+  [17, null, 'Tidy up the function without changing what it returns', null, NO_CHANGE],
+  [22, { bm25: 'score += 0.14 * math.log1p(max(bm25, 0.0))' }, 'A heavier BM25 weight on top of the length penalty', 0.4449],
+  [22, { title: 'score += 0.05 if title_hit and length > 40 else 0.0' }, 'Boost the title only for passages that are long enough', 0.4457],
+  [19, { short: SHORT }, 'Bring back the short-passage penalty', 0.4106],
+  [22, { fresh: 'score -= 0.001 * (age_days // 365)' }, 'A tiny age penalty on the best version', 0.4476, 0.4469],
+  [22, { exact: 'score += 0.02 * min(exact, 3)' }, 'Stop counting exact words after three', 0.4461],
+  [22, { long: 'score -= 0.00004 * max(length - 250, 0)', cap: 'score = min(score, dense + 1.2)' }, 'Add a loose cap for safety', 0.4472, 0.4468],
+];
+const EVOLUTION = 'vdemo7c1f';
+const TAKEN = 'evolve/raise-ndcg-10-reranking-7c1f';
+
+export function evolveData(db, home, now, evaluation) {
+  if (!evaluation) return;
+  const retriever = path.join(home, 'code/retriever');
+  const dataDir = path.join(home, '.hydor/experiments/evolve', EVOLUTION);
+  const startCommit = String(git(retriever, ['rev-parse', 'main'], home)).trim();
+  write(path.join(dataDir, 'start/rank.py'), rankPy({}));
+  const START = [0.4104, 0.4121, 0.4135];
+  const mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+  const std = (v) => Math.sqrt(v.reduce((a, b) => a + (b - mean(v)) ** 2, 0) / (v.length - 1));
+  const round = (x) => Number(x.toFixed(5));
+  const startMean = round(mean(START));
+  const began = now - DAY - 52 * MIN;
+  const parts = [{}];
+  const islands = [];
+  const add = db.prepare('insert into exp_candidates (id, evolution, n, status, data, hash, slot, scoring, created_at, ended_at) values (?, ?, ?, ?, ?, ?, ?, null, ?, ?)');
+  const islandBest = [startMean, startMean, startMean];
+  let best = null;
+  let bestMean = startMean;
+  TRIES.forEach(([from, change, summary, first, then], i) => {
+    const n = i + 1;
+    const id = `kdemo${String(n).padStart(2, '0')}`;
+    // A try without a parent starts the next line of descent in turn; its children stay on it.
+    const island = from ? islands[from - 1] : i % 3;
+    islands.push(island);
+    const own = { ...parts[from], ...(change ?? {}) };
+    parts.push(own);
+    const failed = typeof then === 'string';
+    const createdAt = began + i * 80_000;
+    const c = { id, evolution: EVOLUTION, n, island, status: failed ? 'failed' : 'scored', summary, model: n % 10 === 0 ? 'strong' : 'quick', changed: [], createdAt, endedAt: createdAt + 75_000 };
+    if (from) c.parent = `kdemo${String(from).padStart(2, '0')}`;
+    if (failed) c.why = then;
+    if (change) {
+      const file = path.join(dataDir, 'candidates', id, 'rank.py');
+      write(file, rankPy(own));
+      const before = rankPy({}).split('\n');
+      const after = rankPy(own).split('\n');
+      // The lines both keep, in order (the longest common run of them): the rest were added or removed.
+      const kept = before.reduce((row, line) => after.reduce((next, other, j) => [...next, line === other ? row[j] + 1 : Math.max(row[j + 1], next[j])], [0]), Array(after.length + 1).fill(0)).at(-1);
+      c.changed = [{ path: 'rank.py', added: after.length - kept, removed: before.length - kept }];
+    }
+    if (!failed && first != null) {
+      c.quick = { value: first, score: `cdemoq${n}` };
+      c.gain = round(first - START[0]);
+      if (then !== undefined) {
+        const values = [first, round(then + (then - first) * 0.4), round(then * 3 - first - (then + (then - first) * 0.4))];
+        c.full = { mean: then, std: round(std(values)), values, score: `cdemof${n}` };
+        c.gain = round(then - startMean);
+        if (then > islandBest[island]) {
+          c.islandBest = true;
+          islandBest[island] = then;
+        }
+        if (then > bestMean) {
+          c.bestWhenScored = true;
+          bestMean = then;
+          best = { id, n, own, c };
+        }
+      }
+    }
+    add.run(id, EVOLUTION, n, c.status, JSON.stringify(c), `demo${n}`, i % 2, createdAt, c.endedAt);
+  });
+  // The best, on its branch, as Take the best makes it.
+  const tree = path.join(retriever, '.worktrees/take-demo');
+  git(retriever, ['worktree', 'add', '-q', '-b', TAKEN, tree, 'main'], home);
+  fs.writeFileSync(path.join(tree, 'rank.py'), rankPy(best.own));
+  git(tree, ['commit', '-q', '-am', `Evolve: ${best.c.summary}`], home, now - DAY + 4 * MIN);
+  const commit = String(git(tree, ['rev-parse', 'HEAD'], home)).trim();
+  git(retriever, ['worktree', 'remove', '--force', tree], home);
+  const evo = {
+    id: EVOLUTION,
+    evaluation,
+    from: retriever,
+    files: ['rank.py'],
+    aim: 'Raise nDCG@10 by reranking better, without making it slower',
+    candidates: TRIES.length,
+    atOnce: 2,
+    stallAfter: 40,
+    seal: 1,
+    status: 'done',
+    why: `${TRIES.length} tried`,
+    startCommit,
+    branch: 'main',
+    start: { mean: startMean, std: std(START), values: START, score: 'cdemostart' },
+    best: best.id,
+    tried: TRIES.length,
+    failed: TRIES.filter((t) => typeof t[4] === 'string').length,
+    calls: TRIES.length + 3,
+    createdAt: began - MIN,
+    startedAt: began,
+    endedAt: began + TRIES.length * 80_000,
+    activeMs: TRIES.length * 80_000,
+    taken: { branch: TAKEN, commit, at: now - DAY + 4 * MIN, candidate: best.id },
+    by: { who: 'you' },
+  };
+  const inner = { top: retriever, part: '', evalPart: '', migrants: [[], [], []], sinceBest: TRIES.length - best.n, startHash: 'demo0' };
+  db.prepare('insert into exp_evolutions (id, evaluation, status, data, rng, created_at, updated_at) values (?, ?, ?, ?, 1, ?, ?)').run(EVOLUTION, evaluation, evo.status, JSON.stringify({ evo, inner }), evo.createdAt, evo.endedAt);
+}
+
+const settings = (o) => `${JSON.stringify({ model: 'bert-base bi-encoder', depth: 10, gain: 0, noise: [-0.0016, 0.0001, 0.0015], ...o })}\n`;
+const qrels = (n) => Array.from({ length: n }, (_, i) => `q${i + 1}\t0\td${(i * 37) % 997}\t1`).join('\n') + '\n';
+const VARIANTS = [
+  ['bm25-hard-negatives', { gain: 0.019, noise: [-0.0021, 0.0004, 0.0017] }, 'Mine hard negatives with BM25'],
+  ['longer-passages', { noise: [0.0025, -0.0019, 0.0021] }, 'Passages of up to 256 tokens'],
+  ['rerank-top-5', { depth: 5, gain: 0.011 }, 'Rerank and return the top 5'],
+];
+
+async function retrieverEvaluation(api, home, now, retriever) {
+  const put = (rel, text) => write(path.join(retriever, rel), text);
+  put('eval.py', SCORER);
+  put('rank.py', rankPy({}));
+  put('config.json', settings({}));
+  put('data/dev/qrels.tsv', qrels(120));
+  put('.gitignore', '.worktrees/\n__pycache__/\n');
+  write(path.join(home, '.datasets/msmarco-test/qrels.tsv'), qrels(80));
+  git(retriever, ['init', '-q', '-b', 'main'], home);
+  git(retriever, ['add', '-A'], home);
+  git(retriever, ['commit', '-q', '-m', 'Dense retriever and its scorer'], home, now - 9 * DAY);
+  try {
+    const r = await api('POST', '/api/experiments/evaluations', {
+      name: 'Dev queries, nDCG@10',
+      cwd: retriever,
+      command: 'python3 eval.py --split dev --seed {seed}',
+      metric: 'ndcg@10',
+      better: 'higher',
+      seeds: [1, 2, 3],
+      protect: ['eval.py', 'data/dev/'],
+      final: { command: 'python3 eval.py --split test --seed {seed}', heldOut: path.join(home, '.datasets/msmarco-test') },
+      gpus: 0,
+    });
+    for (const [branch, change, message] of VARIANTS) {
+      const dir = path.join(retriever, '.worktrees', branch);
+      git(retriever, ['worktree', 'add', '-q', '-b', branch, dir], home);
+      fs.writeFileSync(path.join(dir, 'config.json'), settings(change));
+      git(dir, ['commit', '-q', '-am', message], home, now - DAY);
+    }
+    return r.evaluation.id;
+  } catch (e) {
+    console.warn(`  evaluation: ${e.message}`);
+    return null;
+  }
+}
+
+// The baseline (main), then each worktree's score, once the experiments' runs have ended. One at a time: runs this
+// short, started as others end, can trip over tmux, and a score that did is asked for again.
+async function retrieverScores(api, retriever, id) {
+  const url = `/api/experiments/evaluations/${id}`;
+  const pause = () => new Promise((r) => setTimeout(r, 500));
+  try {
+    for (let i = 0; i < 240 && (await api('GET', '/api/experiments/runs?status=queued,waiting,starting,running&limit=100')).runs.length; i++) await pause();
+    for (const [what, body] of [['baseline', {}], ...VARIANTS.map(([branch]) => ['scores', { folder: path.join(retriever, '.worktrees', branch) }])]) {
+      for (let tries = 0; tries < 4; tries++) {
+        let { score } = await api('POST', `${url}/${what}`, body);
+        for (let i = 0; i < 120 && (score.status === 'waiting' || score.status === 'running'); i++) {
+          await pause();
+          ({ score } = await api('GET', `/api/experiments/evaluations/scores/${score.id}`));
+        }
+        if (!/tmux could not start it/.test(score.why ?? '')) break;
+        await api('DELETE', `/api/experiments/evaluations/scores/${score.id}`);
+      }
+    }
+  } catch (e) {
+    console.warn(`  evaluation: ${e.message}`);
+  }
+}
+
 /** Spaces, guidelines, memory, scheduled tasks, pages, apps and the start page's picks. */
 export async function seedApi(api, home, now, s) {
   await api('POST', '/api/tour', { version: 999 });
@@ -834,7 +1076,7 @@ export async function seedApi(api, home, now, s) {
   // a line every 0.1 s; a sweep of learning rate and batch size makes six runs. The three are described (titles, notes,
   // categories) once their runs are submitted. The GPUs the page shows are made up (overrides, run.mjs).
   const retriever = path.join(home, 'code/retriever');
-  fs.mkdirSync(retriever, { recursive: true });
+  const evaluationId = await retrieverEvaluation(api, home, now, retriever);
   // One run's command, for `sh -c`: awk prints a header line, then 40 steps of training curves (deterministic for a
   // seed), then the test scores. `base`, `seed` and `lr` are shell words; a sweep passes `{lr}` and `{batch}` instead.
   const train = (base, seed, lr) =>
@@ -853,6 +1095,10 @@ export async function seedApi(api, home, now, s) {
     { name: 'dense-retriever-lr-sweep', title: 'Learning rate and batch size sweep', description: 'Every combination of three learning rates and two batch sizes for the hard-negatives retriever, to pick the settings for the final runs by dev nDCG@10.', category: 'Retrieval' },
   ])
     await api('PUT', '/api/experiments/groups', g).catch((e) => console.warn(`  experiments: ${e.message}`));
+  // Its baseline and three scores follow the experiments' runs; nothing here waits for them.
+  if (evaluationId) void retrieverScores(api, retriever, evaluationId);
+  // Reading the evolutions once makes their tables, which evolveData then writes into.
+  await api('GET', '/api/experiments/evolutions').catch(() => {});
   for (const t of tasks) {
     if (!away(t.h)) continue;
     await api('POST', '/api/tasks', {
@@ -935,7 +1181,7 @@ export async function seedApi(api, home, now, s) {
 
   // The start page as it opens for someone new: the model on Automatic (the tiers pick it).
   await api('PUT', '/api/start', { agent: 'claude', runs: { claude: { model: 'auto', effort: 'high' } }, assistant: 'general', task: true });
-  return { spaces: { thesis, garden, taxes, shop: shopSpace } };
+  return { spaces: { thesis, garden, taxes, shop: shopSpace }, evaluationId };
 }
 
 /**

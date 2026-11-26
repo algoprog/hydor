@@ -22,7 +22,7 @@ export type Place = { kind: 'global' | 'session' | 'stale' | 'deleted' } | { kin
 const PAGE = 20;
 const FIRST_PROJECTS = 5;
 /** A place's profile first, then its topics, then its notes. */
-const KIND_ORDER: Record<MemoryKind, number> = { profile: 0, topic: 1, note: 2 };
+const KIND_ORDER: Record<MemoryKind, number> = { profile: 0, topic: 1, note: 2, finding: 2 };
 
 /** The address of the section showing a place, or the index. */
 export const placeUrl = (p?: Place) => `/settings?s=memory${p ? `&notes=${p.kind === 'repo' ? `repo:${encodeURIComponent(p.key)}` : p.kind}` : ''}`;
@@ -110,7 +110,7 @@ function NoteRow({ e, showPlace, stale, onOpen, reload }: { e: MemoryListEntry; 
         <div className={cx('line-clamp-2 text-[13.5px] leading-snug break-words', deleted ? 'text-fg-3' : 'text-fg')}>
           {e.kind !== 'note' && (
             <Badge tone="info" className="mr-1.5 align-[1px]">
-              {e.kind === 'topic' ? 'Topic' : isUserProfile(e) ? 'Your profile' : 'Profile'}
+              {e.kind === 'finding' ? 'Finding' : e.kind === 'topic' ? 'Topic' : isUserProfile(e) ? 'Your profile' : 'Profile'}
             </Badge>
           )}
           <span translate="no">{e.text}</span>

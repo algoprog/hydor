@@ -15,6 +15,7 @@ Sur un ordinateur, une colonne à gauche reste à côté de tout ce que vous ouv
 - La ligne de la file d’attente en haut indique ce qui se passe (« 2 en cours · 1 en attente », ou « Rien en cours »). En dessous, les GPU de cet ordinateur sous forme de petits indicateurs : la mémoire utilisée par chacun, dans la couleur d’accent quand l’une de vos exécutions l’occupe (pointez-en un pour voir à quel point il est occupé et quelle exécution l’occupe ; cliquez dessus pour ouvrir cette exécution).
 - **Rechercher une expérience** filtre la liste selon ce que vous tapez : le titre, la description, la catégorie et le nom d’une expérience, ainsi que les noms et les commandes de ses exécutions. Une expérience qui ne correspond que par ses exécutions indique leur nombre (« 3 exécutions correspondent »).
 - **Vue d’ensemble** vous ramène à la page décrite ci-dessous.
+- **Évaluations**, quand vous en avez, avec leurs derniers scores ([Évaluations](#evaluations-keeping-score-the-same-way)).
 - Viennent ensuite les expériences, regroupées par catégorie (un petit titre pour chacune, la catégorie dont l’exécution est la plus récente en premier ; les expériences sans catégorie figurent sous **Autres expériences**, et il n’y a aucun titre tant qu’aucune n’a de catégorie). Chacune affiche son titre et, en dessous, son nombre d’exécutions et combien sont en cours (« 6 exécutions · 1 en cours »), ou la date de sa dernière exécution (« 23 exécutions · il y a 2 h »). Dans une catégorie, l’expérience dont l’exécution est la plus récente vient en premier. **Exécutions sans expérience** est la dernière entrée, quand de telles exécutions existent.
 
 La **Vue d’ensemble** affiche :
@@ -172,6 +173,96 @@ Cochez la case de chaque exécution voulue dans un tableau d’exécutions (la c
 
 Le menu ⋯ d’une expérience propose aussi **Comparer les 6 dernières**, et son onglet **Hyperparamètres** **Comparer les 6 meilleures**.
 
+Avant de vous fier à un gain, utilisez **Essayer de le réfuter**, en bas de cette fenêtre : un agent qui n’a participé en rien au travail tente alors d’expliquer ce gain autrement. Vérifiez **Le résultat à tester** (une phrase, préremplie d’après les exécutions sélectionnées : modifiez-la pour exprimer ce que vous voulez dire), choisissez la **Référence** et qui s’en charge (**Exécuté par**), puis cliquez sur **Démarrer**. L’agent cherche d’autres explications (des graines chanceuses, une référence mal réglée, une fuite de données, un bogue dans une métrique), lance des contrôles dans une expérience distincte, sur une copie de votre code et en demandant votre accord avant d’utiliser beaucoup de temps GPU, ne répare rien, et conclut par « Il tient », « Il tient en partie » ou « Il ne tient pas », en précisant ce qu’il a essayé (les exécutions sur d’autres machines sont laissées de côté).
+
+## Évaluations : toujours noter de la même façon
+
+Une évaluation est la façon dont un projet tient ses scores : une commande et un nombre, scellés, pour que chaque exécution et chaque agent soient notés de la même manière. Les fichiers qui composent le programme de notation et les données sur lesquelles il note sont scellés, aucun score n’est donné tant qu’ils diffèrent, et chaque score est calculé par l’app à partir de sa propre exécution de la commande scellée. Deux nombres peuvent ainsi être comparés sans se demander comment chacun a été obtenu.
+
+Sur ordinateur, la colonne les liste sous **Évaluations**, au-dessus des expériences, chacune avec son dernier score et sa position par rapport à la référence (« 0.431 · 0.019 de mieux »), « Pas encore de score », « Calcul du score… » pendant qu’un calcul est en cours, « Évolution en cours · 37 sur 200 » pendant qu’[Faire évoluer](#evolve-searching-for-a-better-version) y travaille, ou « modifié » avec une marque orange quand ses fichiers diffèrent. Sur téléphone, ce sont des cartes en haut de la vue d’ensemble.
+
+### En mettre une en place
+
+Cliquez sur **Plus** (⋯) en haut, puis sur [**Nouvelle évaluation**](/experiments?new=evaluation). La fenêtre comporte quatre parties :
+
+- **Ce qu’elle note** : son **Nom**, le **Dossier** (un projet, généralement un dépôt git), la **Commande qui calcule le score** (par exemple `python eval.py --split dev --seed {seed}` : écrivez `{seed}` à l’emplacement de la graine, pour calculer le score avec plusieurs graines), **Le nombre qui compte** tel que la commande l’affiche (`ndcg@10` pour `ndcg@10=0.412`), et **Plus c’est élevé, mieux c’est** ou **Plus c’est bas, mieux c’est**.
+- **Ce qui ne doit pas changer** : les fichiers et dossiers qui composent le programme de notation et ses données. Saisissez-en un et cliquez sur **Ajouter**, ou touchez ceux des **Suggestions tirées de votre commande**. Si la commande contient `{seed}`, **Graines** indique lesquelles (1, 2, 3 si vous ne les changez pas).
+- **Test final** (facultatif) : sa propre commande, et un **Dossier réservé** situé hors du projet, que seul le test final reçoit : les agents qui travaillent dans le projet ne l’y voient pas. La commande le trouve dans `$HYDOR_HELD_OUT`.
+- **Où elle s’exécute** : les GPU dont chaque exécution a besoin, leur mémoire libre et une durée maximale. Ses exécutions attendent leur tour sur cet ordinateur comme toutes les autres.
+
+**Créer et sceller** scelle les fichiers (les gros dossiers prennent un moment) et ouvre la page de l’évaluation. Vous ne savez pas quoi indiquer ? **La configurer avec un agent**, en haut de la fenêtre, lance une demande dans ce dossier : l’agent lit la façon dont vous entraînez et évaluez vos modèles et propose l’évaluation, qui n’est créée que si vous acceptez.
+
+### La page de l’évaluation
+
+Sous son nom figurent le nombre, le sens dans lequel il est meilleur, les graines et la commande (touchez-la pour la voir en entier), puis « Scellée le 24 nov. : 4 fichiers, sans aucun changement ». Viennent ensuite trois cases :
+
+- **Référence** : le score auquel les autres sont comparés. Au début, il est indiqué « Pas encore mesurée » : cliquez sur **Mesurer la référence**. **Mesurer à nouveau** se trouve dans son menu.
+- **Dernier score** : son nombre, sa branche et sa position par rapport à la référence (« 0.019 de mieux que la référence » ; « Identique à la référence, au bruit près » quand l’écart pourrait facilement être dû au hasard), avec la fréquence à laquelle le hasard seul produirait un tel écart.
+- **Test final** : **En ajouter un**, **Exécuter le test final…**, ou son nombre et le nombre de fois où il a été exécuté depuis le scellement.
+
+À partir de deux scores, un graphique montre chacun d’eux au fil du temps, avec sa dispersion entre les graines et la référence en pointillés. **Faire évoluer…**, dans le menu ⋯ de la page, lance la recherche d’une meilleure version ([Faire évoluer](#evolve-searching-for-a-better-version)) et, dès qu’il y en a une, **Faire évoluer** les liste entre le graphique et les scores. **Scores** liste ces derniers, du plus récent au plus ancien : quand, où (branche et commit, « avec des modifications sans commit » le cas échéant), qui l’a demandé, le score et la comparaison. Le menu d’un score ouvre ses exécutions, l’utilise comme référence (**Utiliser comme référence**), l’arrête ou le supprime. Quand un score a échoué parce que la commande n’a pas affiché le nombre, les noms qu’elle a bien affichés sont montrés : touchez-en un pour l’utiliser à la place (l’évaluation est alors scellée à nouveau).
+
+**Calculer le score maintenant** note le dossier. Quand le dépôt a des worktrees git, l’app demande « Calculer le score du contenu de quel dossier ? » : le dossier lui-même ou l’un des worktrees, désigné par sa branche. Une évaluation peut noter son propre dossier, un dossier situé à l’intérieur, ou un worktree git du même dépôt.
+
+### Quand les fichiers scellés changent
+
+Si un fichier scellé diffère, un avis orange indique lequel, et les scores attendent que les fichiers soient rétablis :
+
+- **Voir ce qui a changé** : chaque fichier est marqué Changed, Missing ou New file, avec ce qui y a changé.
+- **Les rétablir** : écrit les copies scellées par-dessus, et indique ce qui n’a pas pu être rétabli et pourquoi (les fichiers ajoutés depuis restent en place).
+- **Sceller à nouveau…** : accepte les fichiers dans leur état actuel. Les anciens scores ne sont plus comparés aux nouveaux (ils sont conservés, repliés sous **Avant le nouveau scellement**), et la référence doit être mesurée à nouveau. Changer la commande, le nombre ou les fichiers scellés avec **Modifier…** scelle aussi à nouveau.
+
+### Le test final
+
+**Exécuter le test final…** (sur sa case ou dans le menu de la page) indique la qualité réelle de votre travail sur des données qui n’ont servi à aucun réglage. Chaque consultation vous en apprend un peu moins : exécutez-le quand vous pensez avoir terminé. La fenêtre indique combien de fois il a été exécuté depuis le scellement. Quand il existe des worktrees git, elle demande aussi sur lequel l’exécuter (**Sur le contenu de**).
+
+### Ce que les agents peuvent faire
+
+Les agents peuvent lire les évaluations, demander le score de leur dossier (l’app exécute elle-même la commande scellée ; ils rapportent ce nombre, pas le leur), proposer une nouvelle évaluation (vous en voyez chaque partie sur une carte et elle n’est créée que si vous acceptez) et rétablir les fichiers scellés. Ils ne peuvent pas en créer ni en sceller eux-mêmes, définir la référence, ni exécuter ou lire le test final.
+
+Les exécutions lancées dans le dossier d’une évaluation indiquent sur leur page si ses fichiers étaient conformes au scellement au moment du lancement, et un tableau des exécutions signale d’une marque orange celles où ils ne l’étaient pas. Une exécution qui a servi à calculer le score d’une évaluation renvoie vers celle-ci.
+
+## Faire évoluer : chercher une meilleure version
+
+La fonction Faire évoluer essaie de nombreuses petites modifications des fichiers que vous désignez, note chacune avec l’évaluation et garde la meilleure. Vos propres fichiers ne sont pas touchés : chaque modification est essayée dans une copie propre à l’app, créée à partir de votre dernier commit. Elle utilise le [modèle d’appoint](/guide/agents-models#choose-the-helper-model) de l’app pour écrire les modifications, en partant à chaque fois de l’une des meilleures versions trouvées jusque-là.
+
+Elle vaut la peine pour un fichier dont l’évaluation peut bien mesurer la qualité : une heuristique, une fonction de score, un prompt, une routine lente. Ce n’est pas le cas quand l’évaluation est faible (peu d’exemples, un nombre facile à manipuler) : une recherche trouve les points faibles de ce qui la note. Prévoyez donc un [test final](#the-final-test) sur des données que la recherche ne voit jamais.
+
+### En lancer une
+
+Ouvrez la page de l’évaluation, cliquez sur ⋯ puis sur **Faire évoluer…**. La fenêtre demande :
+
+- **Que peut-elle modifier ?** Saisissez un fichier et cliquez sur **Ajouter**, ou touchez ceux sous **Suggéré** : jusqu’à 8 fichiers texte inclus dans un commit et sans modification depuis. Un fichier protégé par l’évaluation ne peut pas être modifié : l’app vous le signale.
+- **Que doit-elle essayer ?** (facultatif) : quelques lignes, par exemple « Rends le reranker plus rapide sans perdre de nDCG@10 ».
+- **Combien d’essais** : 50, 100, 200, ou **Autre** pour choisir votre propre nombre (de 10 à 2 000).
+- Sous **Plus** : **Arrêter au bout de (heures)**, **Combien à la fois** (de 1 à 4) et **Arrêter quand ce nombre d’essais d’affilée n’a rien apporté de mieux** (40 sauf si vous le modifiez).
+
+Cliquez sur **Démarrer**. L’app note d’abord votre point de départ, avec toutes les graines de l’évaluation, puis commence. Une évaluation sans référence affiche **Mesurer la référence** à la place de **Démarrer**.
+
+### Lire sa page
+
+Sa ligne sous **Faire évoluer**, sur la page de l’évaluation, indique « En cours · 37 sur 200 essayés », « Terminé · 0.035 de mieux qu’au départ » ou « Arrêtées » ; cliquez dessus pour l’ouvrir. En haut figurent son but, son état (par exemple « Terminé : aucun nouveau meilleur résultat parmi les 40 derniers essais ») et **Pause** ou **Reprendre**, **Arrêter** (elle ne pourra plus être reprise ensuite) et ⋯ avec **Supprimer…** (ses essais, leurs scores et leurs copies de travail sont supprimés ; une branche que vous avez retenue reste). Viennent ensuite trois tuiles :
+
+- **Départ** : le score de votre version.
+- **Meilleur résultat jusqu’ici** : le meilleur score, son avance sur le point de départ, une ligne sur ce qu’il a modifié et **Voir la modification**.
+- **Essayés** : combien d’essais sur combien, combien ont échoué et combien de fois un modèle a été sollicité.
+
+Un graphique montre chaque essai dans l’ordre : un premier score rapide (**Première graine seulement**) apparaît plus clair qu’un score vérifié avec **Toutes les graines**, les essais échoués sont des marques en bas, le **Meilleur résultat jusqu’ici** est une ligne en escalier et le **Départ** une ligne en pointillés. Cliquez sur un point pour ouvrir l’essai correspondant.
+
+**Ce qu’elle a essayé** les liste, du plus récent au plus ancien : ce que chacun a modifié, son score (ou la raison de son échec), sa position par rapport au point de départ, la version sur laquelle il était **Basé sur** et le **Modèle** qui l’a écrit (**Rapide**, ou de temps en temps **Puissant**). Un essai reçoit d’abord un score rapide, sur une graine ; seul celui qui bat le meilleur de sa lignée est vérifié avec toutes les graines, et seul ce score complet peut en faire le meilleur. **Nouveau meilleur résultat** signale ceux qui étaient les meilleurs au moment de leur notation, **Meilleur** le meilleur actuel. Ouvrez un essai pour voir sa modification, fichier par fichier, et **Retenir celui-ci**.
+
+### Retenir la meilleure version
+
+**Retenir la meilleure version** (comme **Retenir celui-ci**) demande d’abord confirmation, puis crée dans votre dépôt une branche contenant cette version : les fichiers de votre copie de travail actuelle ne sont pas touchés. La page conserve la mention « Retenu sous le nom <branch> », qui ouvre la branche sur la [page Git](/git). Retenir à nouveau ajoute un commit à la même branche.
+
+Le test final n’a pas vu la version que vous avez retenue. Pour la vérifier avec lui, faites passer votre dossier sur la branche (ou créez-en un worktree git) et cliquez sur **Exécuter le test final…** sur la page de l’évaluation.
+
+### Ce que cela coûte
+
+Chaque essai exécute l’évaluation (une graine, puis toutes s’il est prometteur) et sollicite un modèle une fois, ou deux quand sa première réponse est inutilisable. Avec des GPU, ses exécutions attendent leur tour comme les autres. **Pause** interrompt les nouveaux essais, et **Arrêter au bout de (heures)** ainsi que la limite d’essais d’affilée sans amélioration évitent qu’elle continue pour rien.
+
+Les agents peuvent en lancer une avec votre accord donné sur une carte, et suivre son déroulement. Ils ne peuvent pas en supprimer.
+
 ## Tableaux de résultats pour votre article
 
 **Créer un tableau** (à partir d’exécutions cochées, du menu ⋯ d’une expérience ou de son onglet **Hyperparamètres**) affiche le tableau selon vos choix :
@@ -229,7 +320,7 @@ Un job destiné à un cluster s’exécute dans un dossier sur place (le code do
 
 ## Sur un téléphone
 
-Il n’y a pas de colonne : la vue d’ensemble commence par la file d’attente, les GPU et **Rechercher une expérience**, puis liste les expériences sous forme de cartes. Une expérience et une exécution s’ouvrent à la place de la liste, avec une flèche de retour. Un tableau d’exécutions défile latéralement, la case à cocher et le nom de chaque exécution restant visibles ; les exécutions sur les graphiques forment une rangée de pastilles au-dessus, et **Lissage** se trouve dans le menu **Options du graphique**. Le journal d’une exécution s’adapte à la largeur de l’écran, et **Suivre** fonctionne comme sur un ordinateur. Nouvelle exécution, Comparer et les tableaux s’ouvrent depuis le bas de l’écran.
+Il n’y a pas de colonne : la vue d’ensemble commence par la file d’attente, les GPU et **Rechercher une expérience**, puis liste les évaluations (quand vous en avez) et les expériences sous forme de cartes. Une expérience, une évaluation et une exécution s’ouvrent à sa place, avec une flèche de retour. Un tableau des exécutions défile horizontalement, la case à cocher et le nom de chaque exécution restant visibles ; les exécutions affichées sur les graphiques forment une rangée de pastilles au-dessus de ceux-ci, et **Lissage** se trouve dans le menu **Options du graphique**. Le journal d’une exécution revient à la ligne selon la largeur de l’écran, et **Suivre** fonctionne comme sur un ordinateur. La nouvelle exécution, la comparaison et les tableaux s’ouvrent depuis le bas de l’écran.
 
 ## Demander à un agent
 
@@ -240,6 +331,12 @@ Il n’y a pas de colonne : la vue d’ensemble commence par la file d’attente
 - « Mets un agent d’astreinte sur cet entraînement : s’il manque de mémoire, divise la taille de lot par deux et reprends au dernier point de contrôle. »
 - « Fais un tableau LaTeX des expériences lora : exactitude et F1 par rapport à la référence, avec la significativité, et mets-le dans mon article. »
 - « Parmi mes exécutions de cette semaine, laquelle a la meilleure perte de validation, et quels étaient ses hyperparamètres ? »
+- « Essaie de mettre en défaut le résultat selon lequel la nouvelle fonction de perte bat la référence sur ndcg@10. »
 - « Donne des titres et des descriptions plus clairs à mes expériences, et range-les par catégories. »
 - « Dans mon balayage du taux d’apprentissage, quels hyperparamètres comptent le plus pour la perte de dev ? »
 - « Montre-moi les courbes des 5 meilleures exécutions de l’expérience lora. »
+- « Mets en place une évaluation pour ce dépôt. »
+- « Calcule le score de ma branche par rapport à la référence. »
+- « Pourquoi mon évaluation indique-t-elle que des fichiers ont changé ? »
+- « Fais évoluer la fonction de score de rank.py par rapport à mon évaluation, en 100 essais. »
+- « Où en est l’évolution ? »

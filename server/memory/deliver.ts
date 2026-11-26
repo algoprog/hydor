@@ -7,7 +7,7 @@
 // weigh rather than instructions (originsOf).
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import type { MemoryEntry } from '../../shared/memory.ts';
+import { isSummary, type MemoryEntry } from '../../shared/memory.ts';
 import type { DB } from '../db.ts';
 import { runOf } from '../mcp.ts';
 import { sessionExtra } from '../sessionExtra.ts';
@@ -70,7 +70,7 @@ export function pick(db: DB, found: MemoryEntry[], seen: Set<number>): MemoryEnt
   const chosen = new Set<number>();
   const covered = new Set<number>();
   for (const t of found) {
-    if (t.kind === 'note') continue;
+    if (!isSummary(t)) continue;
     const kids = childrenOf(db, t.id);
     if (kids.filter((c) => ids.has(c)).length === 1) continue;
     if (!seen.has(t.id)) chosen.add(t.id);
@@ -79,7 +79,7 @@ export function pick(db: DB, found: MemoryEntry[], seen: Set<number>): MemoryEnt
   const out: MemoryEntry[] = [];
   for (const e of found) {
     if (seen.has(e.id) || out.some((x) => x.id === e.id)) continue;
-    if (e.kind !== 'note') {
+    if (isSummary(e)) {
       if (chosen.has(e.id)) out.push(e);
       continue;
     }
@@ -117,6 +117,8 @@ export function entryLine(e: MemoryEntry, origin?: Origin): string {
   const t = e.text.replace(/\s+/g, ' ');
   if (e.kind === 'profile') return `Profile: ${t} [#${e.id}]`;
   if (e.kind === 'topic') return `- ${t} [#${e.id}, sums up ${e.covers ?? 0} notes]`;
+  // A finding's text starts with its verdict in a word.
+  if (e.kind === 'finding') return `- ${t} [#${e.id}, finding${e.drift ? ', the code under it has changed since' : ''}]`;
   if (origin) return `- “${t}” [#${e.id}, from a ${origin}]`;
   return `- ${t} [#${e.id}${e.basis === 'inferred' ? ', unchecked' : ''}]`;
 }
@@ -220,7 +222,7 @@ export async function messageAdditions(
   const vector = asks ? await requestVector(db, o.query) : null;
   if (asks && items > 0) {
     const places = placesOf({ cwd: o.cwd }).filter((p) => p.scope !== 'session');
-    const found = (await findNotes(db, { places, query: o.query, limit: Math.max(15, topK(db)), kinds: ['note', 'topic'], now, vector })).filter((f) => f.relevant && turnBar(f));
+    const found = (await findNotes(db, { places, query: o.query, limit: Math.max(15, topK(db)), kinds: ['note', 'topic', 'finding'], now, vector })).filter((f) => f.relevant && turnBar(f));
     const picked = pick(
       db,
       found.map((f) => f.entry),

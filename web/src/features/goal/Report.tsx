@@ -9,7 +9,8 @@ import { AsksChip, RuleDialog, RulesRow } from './Bar';
 import { useAct } from './state';
 import { MoreDialog } from './MoreDialog';
 import { say } from './Say';
-import { cellText, giveMore, needsText, plural, reportLine, shortLabel, sinceTitle, startCellText } from './words';
+import { go } from '../../lib/nav';
+import { cellText, evalPage, giveMore, needsText, plural, reportLine, shortLabel, sinceTitle, startCellText } from './words';
 
 export function Report({ g, rounds, onRounds, className }: { g: GoalState; rounds: boolean; onRounds: () => void; className?: string }) {
   const [run, busy] = useAct(g.key);
@@ -99,6 +100,16 @@ export function Report({ g, rounds, onRounds, className }: { g: GoalState; round
           </p>
         )}
         {where && <p className="mt-3 text-[12.5px] leading-snug text-fg-3">{where}</p>}
+        {/* A score's evaluation with a final test: the goal never runs it; you may, on its page. */}
+        {g.report?.finals?.map((f) => (
+          <p key={f.evaluation} className="mt-2 text-[12.5px] leading-snug text-fg-2">
+            <span translate="no">{`“${f.name}”`}</span>
+            {' has a final test, which a goal never runs: you may run it on the evaluation’s page. '}
+            <button type="button" onClick={() => go(evalPage(f.evaluation))} className="text-accent underline-offset-2 hover:underline">
+              Open the evaluation
+            </button>
+          </p>
+        ))}
       </div>
       {/* At a limit the rules and how much it asks can still change: they count when it goes on. */}
       {g.status === 'limit' && (

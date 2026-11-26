@@ -175,7 +175,7 @@ function uiSchema(): Record<string, unknown> {
       keep: { type: 'boolean', description: 'set, toggle: kept with the run (or the app)' },
       text: str('ask, say, copy: the text, with {{values}}'),
       flow: str('run: one of its flows ("run": the main one)'),
-      inputs: values('run, again, start: the answers (again: only those that change)'),
+      inputs: values('run, again, start: the answers (again: only those that change); experiments: items (a list of rows with what, and why, kind, effort or point: "{{result.asks}}"), source ("reviewers" or "rebuttal"), paper, venue'),
       as: str('run: its run’s name in the view’s state'),
       app: str('start: an app’s id or address, or "tpl:<id>" for a ready-made one'),
       op: { enum: ['add', 'update', 'remove'], description: 'data: what to do' },

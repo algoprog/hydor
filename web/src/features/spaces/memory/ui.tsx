@@ -1,6 +1,6 @@
 // The small pieces of a project's Memory tab: a kind's icon in its tinted square, a chip, a pill, a quiet line with a Throbber.
 import type { ReactNode } from 'react';
-import { BookOpen, ClipboardList, FileInput, FileText, IdCard, Layers, ListTree, StickyNote, type LucideIcon } from 'lucide-react';
+import { BookOpen, ClipboardList, FileInput, FileText, FlaskConical, IdCard, Layers, ListTree, StickyNote, type LucideIcon } from 'lucide-react';
 import { cx, Throbber } from '../../../components/ui';
 import type { RowKind } from './data';
 
@@ -8,6 +8,7 @@ const KIND: Record<RowKind, { icon: LucideIcon; tone: string }> = {
   note: { icon: StickyNote, tone: 'bg-info/12 text-info' },
   topic: { icon: ListTree, tone: 'bg-codex/12 text-codex' },
   profile: { icon: IdCard, tone: 'bg-accent-soft text-accent' },
+  finding: { icon: FlaskConical, tone: 'bg-claude/12 text-claude' },
   article: { icon: BookOpen, tone: 'bg-ok/12 text-ok' },
   hub: { icon: Layers, tone: 'bg-ok/12 text-ok' },
   source: { icon: FileInput, tone: 'bg-ok/12 text-ok' },

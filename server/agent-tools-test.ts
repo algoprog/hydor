@@ -1,4 +1,4 @@
-// The developer tools in scripts/agent-tools/ (waitfor, edits, sym): their own node:test suites, run from here so
+// The developer tools in scripts/agent-tools/ (waitfor, edits, sym, leancheck): their own node:test suites, run from here so
 // `npm test` and `npm run check` fail when one fails. They need no installed packages and no data folder; each leaves
 // the temporary folder as it found it, which this checks with a folder of its own as TMPDIR. waitfor's suite waits on
 // real timers (about a minute alone), and a heavily loaded machine can stretch its short waits.
@@ -11,7 +11,7 @@ import path from 'node:path';
 import { APP_ROOT } from './config.ts';
 
 const dir = path.join(APP_ROOT, 'scripts', 'agent-tools');
-const suites = ['waitfor', 'edits', 'sym'].map((n) => path.join(dir, 'test', `${n}.test.mjs`));
+const suites = ['waitfor', 'edits', 'sym', 'leancheck'].map((n) => path.join(dir, 'test', `${n}.test.mjs`));
 for (const s of suites) assert.ok(fs.existsSync(s), `${s} exists`);
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-agent-tools-'));

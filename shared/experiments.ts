@@ -121,6 +121,11 @@ export interface RunRecord extends JobSpec {
   outputAt?: number;
   /** Per-example scores were kept with it (scoresFile). */
   scores?: boolean;
+  /**
+   * The evaluations whose home its folder belongs to, as its files were when it started: whether the sealed ones
+   * were as sealed, and the first 10 that were not (shared/evaluations.ts).
+   */
+  sealed?: { evaluation: string; name: string; ok: boolean; changed?: string[] }[];
 }
 
 export interface ResultsColumn {

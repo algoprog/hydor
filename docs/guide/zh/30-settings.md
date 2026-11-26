@@ -28,6 +28,8 @@
 - [**开机时启动**](/settings?s=general&find=Start%20when%20this%20computer%20starts)：电脑启动时自动启动本应用。
 - [**让电脑保持唤醒**](/settings?s=general&find=Keep%20the%20computer%20awake)：在桌面应用中，智能体工作时和定时任务运行前，电脑不会自行进入睡眠。
 - [**自动更新**](/settings?s=general&find=Update%20automatically)：自动安装新版本：桌面应用在新版本一发布时安装，并提前一分钟告诉你；从 git 安装的副本则在你一段时间没有使用时安装。
+- [**Lean（证明检查器）**](/settings?s=general&find=Lean%20%28proof%20checker%29)：让智能体可以检查数学证明：Lean 接受的证明就是正确的。
+- [**添加 Mathlib**](/settings?s=general&find=Add%20Mathlib)：为 Lean 添加大多数数学内容所需的库。
 - [**开始导览**](/settings?s=general&find=Take%20the%20tour)：了解应用各部分的作用。
 - [**小贴士**](/settings?s=general&find=Tips)：欢迎导览之后，在你第一次用到应用的某个部分时为你指出它。
 - [**开始建议**](/settings?s=general&find=Starter%20ideas)：开始页空消息框下方的示例、你的应用和一个自动化任务。

@@ -388,6 +388,7 @@ code { padding: 1px 6px; border-radius: 6px; background: var(--n-soft); font: 12
   {{#evidence}}<p class="ev">{{evidence}}</p>{{/evidence}}
   {{#confirm}}<p class="crit"><b>Supported if</b> {{confirm}}</p>{{/confirm}}
   {{#refute}}<p class="crit"><b>Against it</b> {{refute}}</p>{{/refute}}
+  {{#closest}}<p class="crit near"><b>Closest work</b> {{#closest_url}}<a href="{{closest_url}}" target="_blank" rel="noopener noreferrer" translate="no">{{closest}}</a>{{/closest_url}}{{^closest_url}}<span>{{closest}}</span>{{/closest_url}}</p>{{/closest}}
 </article>`,
       css: String.raw`
 .hyp { display: flex; flex-direction: column; gap: 8px; height: 100%; box-sizing: border-box; padding: 14px 16px; border: 1px solid var(--n-line); border-top: 4px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
@@ -402,6 +403,7 @@ code { padding: 1px 6px; border-radius: 6px; background: var(--n-soft); font: 12
 .ev { margin: 0; font-size: 14px; line-height: 1.5; }
 .crit { margin: 0; color: var(--n-muted); font-size: 13px; line-height: 1.45; }
 .crit b { color: var(--n-fg); font-weight: 600; }
+.near { overflow-wrap: anywhere; } .near a { color: var(--n-accent); }
 `,
     },
     'sprint-results': {

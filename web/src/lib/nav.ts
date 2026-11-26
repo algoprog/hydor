@@ -6,7 +6,7 @@ import { useUI } from './store';
 
 /** The tabs of a project's details (its page or its window), and the parts of its Memory tab. */
 export type ProjectTab = 'overview' | 'files' | 'memory' | 'skills' | 'agents' | 'settings';
-export type ProjectPart = 'all' | 'notes' | 'wiki' | 'documents';
+export type ProjectPart = 'all' | 'notes' | 'wiki' | 'documents' | 'findings';
 
 /**
  * The project whose details show in a window over the page (features/spaces/ProjectDialog, held by the shell), if any
@@ -88,7 +88,7 @@ export function projectAddress(path: string): { id?: string; tab: ProjectTab; pa
   let part: ProjectPart | undefined;
   if (t === 'knowledge') part = 'documents';
   else if (t === 'wiki') part = 'wiki';
-  else if (t === 'memory') part = q.get('part') === 'notes' || q.get('part') === 'wiki' || q.get('part') === 'documents' ? (q.get('part') as ProjectPart) : undefined;
+  else if (t === 'memory') part = ['notes', 'wiki', 'documents', 'findings'].includes(q.get('part') ?? '') ? (q.get('part') as ProjectPart) : undefined;
   const tab: ProjectTab = t === 'knowledge' || t === 'wiki' ? 'memory' : PROJECT_TABS.includes(t ?? '') ? (t as ProjectTab) : 'overview';
   return { id, tab, part, share: q.get('share') === '1' || undefined, dir: q.get('dir') || undefined };
 }

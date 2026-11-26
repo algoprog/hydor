@@ -725,6 +725,7 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
         if (a.do === 'ask') await call('ask', { text: E.fill(a.text, s) });
         else if (a.do === 'again') await call('again', { inputs: isObj(a.inputs) ? val(a.inputs) : {} });
         else if (a.do === 'start') await call('start', { app: E.fill(a.app, s), inputs: isObj(a.inputs) ? val(a.inputs) : {} });
+        else if (a.do === 'experiments') await call('experiments', isObj(a.inputs) ? (val(a.inputs) as Record<string, unknown>) : {});
         else if (a.do === 'data') {
           const out = { op: a.op, collection: a.collection, ...(a.record ? { record: val(a.record) } : {}), ...(a.id ? { id: E.fill(a.id, s) } : {}) };
           await call('data', out);

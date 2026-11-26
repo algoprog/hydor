@@ -28,6 +28,8 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Iniciar cuando arranque esta computadora**](/settings?s=general&find=Start%20when%20this%20computer%20starts): Inicia la app cuando se enciende la computadora.
 - [**Mantener la computadora activa**](/settings?s=general&find=Keep%20the%20computer%20awake): En las apps de escritorio, la computadora no se suspende sola mientras los agentes trabajan ni antes de las tareas programadas.
 - [**Actualizar automáticamente**](/settings?s=general&find=Update%20automatically): Instala versiones nuevas por sí sola: las apps de escritorio en cuanto salen, con un minuto de aviso; una copia desde git cuando llevas un tiempo sin usarla.
+- [**Lean (verificador de demostraciones)**](/settings?s=general&find=Lean%20%28proof%20checker%29): Permite que los agentes comprueben demostraciones matemáticas: una demostración que Lean acepta es correcta.
+- [**Añadir Mathlib**](/settings?s=general&find=Add%20Mathlib): Añade a Lean la biblioteca que necesita casi toda la matemática.
 - [**Hacer el recorrido**](/settings?s=general&find=Take%20the%20tour): Ver qué hace cada parte de la app.
 - [**Consejos**](/settings?s=general&find=Tips): Señala una parte de la app la primera vez que llegas a ella, después del recorrido de bienvenida.
 - [**Ideas para empezar**](/settings?s=general&find=Starter%20ideas): Ejemplos, tus apps y una automatización bajo el cuadro de mensaje vacío de la página de inicio.

@@ -78,7 +78,7 @@ interface Section {
 }
 
 /** What a note says in a line: its text, and where it is from and how to name it. */
-const noteLine = (e: MemoryEntry, from: string) => `- ${one(e.text, NOTE_CHARS)} [#${e.id} · ${from}]`;
+const noteLine = (e: MemoryEntry, from: string) => `- ${one(e.text, NOTE_CHARS)} [#${e.id} · ${e.kind === 'finding' ? `finding${e.drift ? ', the code under it has changed since' : ''} · ` : ''}${from}]`;
 
 async function notes(db: DB, ctx: RunCtx, scope: Scope, query: string, limit: number, vector: Float32Array | null): Promise<string[]> {
   const places: Place[] = [{ scope: 'global', scopeKey: '' }];
@@ -215,7 +215,7 @@ export const MEMORY_SEARCH: RunTool = {
   name: 'memory_search',
   annotations: { readOnlyHint: true },
   description: [
-    'Search all of memory at once: memory notes, wiki articles, documents and past conversations, in this project (the default), in all your projects, or in one project by its name.',
+    'Search all of memory at once: memory notes (findings among them: what a project tried and what came of it), wiki articles, documents and past conversations, in this project (the default), in all your projects, or in one project by its name.',
     'Use it when what you need may have been kept or done elsewhere ("how did we set up deploys in the other project?").',
     'Each result says where it is from and how to open it: wiki_read or knowledge_read with that project, read_session with the key. Other projects’ memory is read only.',
   ].join(' '),

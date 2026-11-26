@@ -1,5 +1,5 @@
-// A project's Memory tab: everything its agents remember in one list (its notes, its wiki's articles and its own documents,
-// newest first), narrowed by chips, searched in one box, and read in the pane beside it (in the list's place on a phone). Add
+// A project's Memory tab: everything its agents remember in one list (its notes, its wiki's articles, its own documents and its
+// findings, newest first), narrowed by chips, searched in one box, and read in the pane beside it (in the list's place on a phone). Add
 // puts in a note, files or a folder; ⋯ holds the wiki's jobs, the agents' prompts and the settings. Files dropped anywhere on the tab are
 // added to the project's documents. It fills the window's height; the list and the reader scroll on their own.
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -17,6 +17,7 @@ import { entriesFromDrop, walkEntries, type PickedFile } from '../../../lib/uplo
 import { tr } from '../../../i18n/runtime';
 import { addFiles, DropFiles, MeaningHint, MeaningWait, useKnowledge } from '../../knowledge/parts';
 import { useEntryList } from '../../memory/common';
+import { VerdictPill } from '../../memory/Finding';
 import { AddNoteDialog } from '../../memory/MemoryNotes';
 import { useWikiSettings, type SpaceMemory } from '../../wiki/spaceMemory';
 import { DocumentsNote, useWikiUpdates } from '../../wiki/WikiUpdates';
@@ -24,7 +25,7 @@ import { WikiJobProgress } from '../../wiki/WikiJobProgress';
 import { useBuildOffer, useWikiJob } from '../../wiki/wikiJob';
 import { SpaceMark } from '../parts';
 import { useSpaces } from '../state';
-import { docRow, groupOf, NOTE_SUBS, noteRow, notAFailure, ownBases, searchRows, sortRows, useDocs, useMemorySearch, wikiRows, type DocRef, type Row, type Sub } from './data';
+import { docRow, FINDING_SUBS, groupOf, NOTE_SUBS, noteRow, notAFailure, ownBases, searchRows, sortRows, useDocs, useMemorySearch, wikiRows, type DocRef, type Row, type Sub } from './data';
 import { AddFolder, AddMenu, MoreMenu, UpdatesDialog, useFilePicker } from './Menus';
 import { DocReader, MemoryIntro, NoteReader, WikiPane } from './Readers';
 import { FailedStrip, OfferStrip, WikiErrorStrip } from './Strips';
@@ -34,18 +35,27 @@ import { Chip, KindIcon, Loading } from './ui';
 const PAGE = 100;
 const WEEK = 7 * 86400_000;
 
-/** One row of the list: its kind's icon, its title on one line, and what it is under it. */
+/** One row of the list: its kind's icon, its title on one line, and what it is under it. A finding's statement may take two,
+ * with its verdict, its age and whether the code under it changed. */
 function ListRow({ r, on, onClick }: { r: Row; on: boolean; onClick: () => void }) {
   return (
     <button type="button" aria-current={on || undefined} onClick={onClick} className={cx('flex w-full min-w-0 items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', on ? 'bg-bg-2' : 'hover:bg-bg-1')}>
       <KindIcon kind={r.kind} />
       <span className="min-w-0 flex-1">
-        <span translate="no" className="block truncate text-[13.5px] leading-snug font-medium">
+        <span translate="no" className={cx('text-[13.5px] leading-snug font-medium', r.verdict ? 'line-clamp-2 break-words' : 'block truncate')}>
           {r.title}
         </span>
-        <span translate={r.excerpt ? 'no' : undefined} className={cx('mt-px block text-[12px] leading-snug', r.bad ? 'text-err' : 'text-fg-3', r.excerpt ? 'line-clamp-2 break-words' : 'truncate')}>
-          {r.meta}
-        </span>
+        {r.verdict ? (
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-snug text-fg-3">
+            <VerdictPill verdict={r.verdict} />
+            <span>{r.meta}</span>
+            {r.changed && <span className="text-warn">code changed since</span>}
+          </span>
+        ) : (
+          <span translate={r.excerpt ? 'no' : undefined} className={cx('mt-px block text-[12px] leading-snug', r.bad ? 'text-err' : 'text-fg-3', r.excerpt ? 'line-clamp-2 break-words' : 'truncate')}>
+            {r.meta}
+          </span>
+        )}
       </span>
     </button>
   );
@@ -95,6 +105,14 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
   const { result, busy } = useMemorySearch(s.id, q);
   const searching = !!q.trim() && !!result;
 
+  // On a narrow screen the chips scroll sideways: the open one is brought into view (an address may open the last).
+  const chips = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = chips.current;
+    const on = row?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (row && on) row.scrollLeft = Math.max(0, on.offsetLeft + on.offsetWidth - row.offsetLeft - row.clientWidth + 4);
+  }, [part, s.id, notes]);
+
   // Another project, or another kind of chip, starts afresh.
   useEffect(() => {
     setSel(null);
@@ -112,7 +130,8 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
   const now = Date.now();
   const noteSubs = NOTE_SUBS.filter((x) => notes?.some((e) => x.test(e, now)));
   const wikiSubs = [...(wiki?.areas ?? []).map((a) => ({ id: a.id, label: a.name, count: a.articles.length, user: true })), ...(wiki?.sources?.length ? [{ id: 'sources', label: tr('Sources'), count: wiki.sources.length, user: false }] : []), ...(wiki?.plans?.length ? [{ id: 'plans', label: tr('Plans'), count: wiki.plans.length, user: false }] : [])];
-  const subs: { id: string; label: string; count?: number; user?: boolean }[] = part === 'notes' ? noteSubs.map((x) => ({ id: x.id, label: x.label() })) : part === 'wiki' && wikiOn ? wikiSubs : [];
+  const findingSubs = FINDING_SUBS.map((x) => ({ id: x.id as string, label: x.label(), count: notes?.filter(x.test).length ?? 0 })).filter((x) => x.count);
+  const subs: { id: string; label: string; count?: number; user?: boolean }[] = part === 'notes' ? noteSubs.map((x) => ({ id: x.id, label: x.label() })) : part === 'wiki' && wikiOn ? wikiSubs : part === 'findings' ? findingSubs : [];
   const activeSub = subs.some((x) => x.id === sub) ? sub : null;
 
   const found = useMemo(() => (searching && result ? searchRows(result) : null), [searching, result]);
@@ -121,11 +140,12 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
     if (found) return found.filter(pick);
     let list: Row[] = [];
     if (part === 'all' || part === 'notes') {
-      let n = noteRows ?? [];
+      let n = (noteRows ?? []).filter((r) => groupOf(r.kind) === 'notes');
       const rule = part === 'notes' ? NOTE_SUBS.find((x) => x.id === activeSub) : undefined;
       if (rule) n = n.filter((r) => r.note && rule.test(r.note, now));
       list = list.concat(n);
     }
+    if (part === 'all' || part === 'findings') list = list.concat((noteRows ?? []).filter((r) => groupOf(r.kind) === 'findings' && (part !== 'findings' || !activeSub || r.verdict === activeSub)));
     if (part === 'all' || part === 'wiki') list = list.concat(wikiRows(wiki, part === 'wiki' ? activeSub : null));
     if (part === 'all' || part === 'documents') list = list.concat(docRows ?? []);
     return sortRows(list, sort);
@@ -133,14 +153,19 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
   }, [found, part, noteRows, wiki, docRows, activeSub, sort]);
 
   const counts = {
-    notes: found ? found.filter((r) => groupOf(r.kind) === 'notes').length : noteRows?.length,
+    notes: found ? found.filter((r) => groupOf(r.kind) === 'notes').length : noteRows?.filter((r) => groupOf(r.kind) === 'notes').length,
+    findings: found ? found.filter((r) => groupOf(r.kind) === 'findings').length : noteRows?.filter((r) => groupOf(r.kind) === 'findings').length,
     wiki: found ? found.filter((r) => groupOf(r.kind) === 'wiki').length : wikiOn ? articles.length : undefined,
     documents: found ? found.filter((r) => groupOf(r.kind) === 'documents').length : docRows?.length,
   };
-  const total = found ? found.length : (counts.notes ?? 0) + (counts.wiki ?? 0) + (counts.documents ?? 0);
+  const all = (counts.notes ?? 0) + (counts.wiki ?? 0) + (counts.documents ?? 0) + (counts.findings ?? 0);
+  const total = found ? found.length : all;
   const loaded = !notesLoading && !wikiLoading && !docsLoading;
-  const nothing = loaded && !found && (counts.notes ?? 0) + (counts.wiki ?? 0) + (counts.documents ?? 0) === 0;
-  const pending = !found && ((part !== 'documents' && part !== 'wiki' && notesLoading) || (part !== 'notes' && part !== 'documents' && wikiLoading) || (part !== 'notes' && part !== 'wiki' && docsLoading));
+  const nothing = loaded && !found && all === 0;
+  const wantsNotes = part === 'all' || part === 'notes' || part === 'findings';
+  const wantsWiki = part === 'all' || part === 'wiki';
+  const wantsDocs = part === 'all' || part === 'documents';
+  const pending = !found && ((wantsNotes && notesLoading) || (wantsWiki && wikiLoading) || (wantsDocs && docsLoading));
 
   // ---- adding ----
   /** The project's own base of documents (made when it has none). */
@@ -277,6 +302,7 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
           Short facts agents start with in this project.
         </Blank>
       );
+    if (part === 'findings' && !activeSub && (counts.findings ?? 0) === 0) return <Blank title="No findings yet">What the project tried and what came of it, dead ends included: agents record findings as they work.</Blank>;
     if (part === 'documents' && (counts.documents ?? 0) === 0)
       return (
         <div className="mx-auto flex h-full max-w-[520px] flex-col justify-center gap-3 px-6 py-8">
@@ -324,8 +350,8 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && q && (e.preventDefault(), e.stopPropagation(), setQ(''))}
-            placeholder={wide ? 'Search notes, wiki and documents' : 'Search memory'}
-            aria-label="Search notes, wiki and documents"
+            placeholder={wide ? 'Search notes, wiki, documents and findings' : 'Search memory'}
+            aria-label="Search notes, wiki, documents and findings"
             className={cx(inputCls, 'pr-9 pl-9')}
           />
           {busy ? (
@@ -343,11 +369,12 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <div className="-mx-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-1 py-0.5">
+        <div ref={chips} className="-mx-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-1 py-0.5">
           {kindChip('all', 'All', loaded || found ? total : undefined)}
           {kindChip('notes', 'Notes', counts.notes)}
           {kindChip('wiki', 'Wiki', counts.wiki)}
           {kindChip('documents', 'Documents', counts.documents)}
+          {kindChip('findings', 'Findings', counts.findings)}
         </div>
         {!found && (
           <>
@@ -379,7 +406,7 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
         )}
       </div>
 
-      {(part === 'notes' || part === 'wiki') && subs.length > 0 && (
+      {(part === 'notes' || part === 'wiki' || part === 'findings') && subs.length > 0 && (
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           {subs.map((x) => (
             <Chip key={x.id} small on={activeSub === x.id} count={x.count} onClick={() => setSub(activeSub === x.id ? null : x.id)}>
@@ -448,19 +475,15 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
                     </Button>
                   </div>
                 )}
-                {!found && part !== 'documents' && part !== 'notes' && wiki?.truncated && <p className="px-2.5 py-1.5 text-[12px] text-fg-3">The list is limited; some files are not shown.</p>}
-                {pending && (
-                  <Loading>
-                    {notesLoading && part !== 'wiki' && part !== 'documents' ? 'Loading notes…' : wikiLoading && part !== 'notes' && part !== 'documents' ? 'Loading wiki…' : 'Loading documents…'}
-                  </Loading>
-                )}
+                {!found && wantsWiki && wiki?.truncated && <p className="px-2.5 py-1.5 text-[12px] text-fg-3">The list is limited; some files are not shown.</p>}
+                {pending && <Loading>{notesLoading && wantsNotes ? (part === 'findings' ? 'Loading findings…' : 'Loading notes…') : wikiLoading && wantsWiki ? 'Loading wiki…' : 'Loading documents…'}</Loading>}
               </div>
             )}
           </div>
         </div>
         {wide && !(empty && !sel) && (
           <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-line bg-panel">
-            {reader ?? <MemoryIntro name={s.name} articles={wikiOn ? articles.length : null} documents={docRows?.length ?? view?.docs ?? 0} />}
+            {reader ?? <MemoryIntro name={s.name} articles={wikiOn ? articles.length : null} documents={docRows?.length ?? view?.docs ?? 0} findings={counts.findings ?? 0} />}
           </div>
         )}
       </div>

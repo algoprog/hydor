@@ -168,11 +168,12 @@ To add files from elsewhere in the app, use **Add to a project** on the Files pa
 
 ### Memory
 
-What the project remembers, in one list: its notes, its wiki's articles and its documents. A search box at the top looks through all three at once, **Add** puts in a note, files or a folder to keep up to date, and the chips **All**, **Notes**, **Wiki** and **Documents** narrow the list. Click a row to open it on the right (on a phone it takes the list's place). A link to a chip opens the project on it, and so do the old Knowledge and LLM Wiki tabs' addresses.
+What the project remembers, in one list: its notes, its wiki's articles, its documents and its findings. A search box at the top looks through them all at once, **Add** puts in a note, files or a folder to keep up to date, and the chips **All**, **Notes**, **Wiki**, **Documents** and **Findings** narrow the list. Click a row to open it on the right (on a phone it takes the list's place). A link to a chip opens the project on it, and so do the old Knowledge and LLM Wiki tabs' addresses.
 
 - **Notes**: the memory notes agents kept about the project, as [Settings → Memory](/settings?s=memory) lists them, with the project's profile first. They are the short facts every session in the project starts with (see [Memory](/guide/memory)).
 - **Wiki**: the articles and sources of the project's wiki memory, to read. Agents write it; you read it here. The **⋯** menu has its jobs and **Wiki updates…** (see [Wiki memory](/guide/wiki-memory#a-projects-memory-tab)).
 - **Documents**: the project's own documents, which only its sessions search, and the folders it keeps up to date. See [Give a project documents of its own](#give-a-project-documents-of-its-own). New and changed documents also update the project's notes and wiki while Wiki memory and **Learn from new documents** are on (see [Learn from new documents](/guide/wiki-memory#learn-from-new-documents)). A project with more documents than its wiki reads (100 at first) has the wiki read the pinned ones, the ones agents used most and the newest, up to that number, and the chip says so: "Its wiki reads 100 of its 240 documents: the pinned, the most used and the newest. Agents search all of them." Click a document and turn on **Read into wiki memory** to pin it (see [When a project has too many documents](/guide/wiki-memory#when-a-project-has-too-many-documents)).
+- **Findings**: what the project tried and what came of it, dead ends included, each with its verdict and evidence (see [Findings](/guide/memory#findings-what-was-tried-and-what-came-of-it)).
 
 ### Skills
 

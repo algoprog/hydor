@@ -171,12 +171,22 @@ function finish(read: Record<string, string>): Record<string, string> {
   if (fs.existsSync(grok) && !(env.PATH ?? '').split(':').includes(grok)) env.PATH = `${env.PATH}:${grok}`;
   // Agents' programs the app installed itself (server/clients.ts), after the user's own.
   env.PATH = `${env.PATH}:${path.join(config.dataDir, 'clients/node_modules/.bin')}`;
+  const tools = appTools();
+  if (tools) env.PATH = `${env.PATH}:${tools}`;
   const runtime = `/run/user/${user.uid}`;
   if (!env.XDG_RUNTIME_DIR && fs.existsSync(runtime)) env.XDG_RUNTIME_DIR = runtime;
   if (!env.DBUS_SESSION_BUS_ADDRESS && fs.existsSync(`${runtime}/bus`)) env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${runtime}/bus`;
   env.TERM = 'xterm-256color';
   env.COLORTERM = 'truecolor';
   return env;
+}
+
+/**
+ * The app's shell commands (server/shelltools), last on the PATH so that yours come first: a goal's check command runs in
+ * this environment, and may be one of them (leancheck Proofs/Main.lean). Sessions get the folder first besides.
+ */
+function appTools(): string | null {
+  return /^(0|off|false|no)$/i.test((process.env.HYDOR_SHELL_TOOLS ?? '').trim()) ? null : path.join(config.dataDir, 'shelltools', 'bin');
 }
 
 /**
@@ -238,7 +248,8 @@ function windowsEnv(): Record<string, string> {
   const before = [path.join(os.homedir(), '.local', 'bin')].filter((d) => !have.has(d.toLowerCase()));
   // Grok Build's own installer puts its program in %USERPROFILE%\.grok\bin.
   const grok = path.join(os.homedir(), '.grok', 'bin');
-  const after = [...(!have.has(grok.toLowerCase()) && fs.existsSync(grok) ? [grok] : []), path.join(config.dataDir, 'clients', 'node_modules', '.bin')];
+  const tools = appTools();
+  const after = [...(!have.has(grok.toLowerCase()) && fs.existsSync(grok) ? [grok] : []), path.join(config.dataDir, 'clients', 'node_modules', '.bin'), ...(tools ? [tools] : [])];
   const bash = bashPath();
   if (bash) {
     // …\Git\bin\bash.exe: the commands are in …\Git\usr\bin (and git in …\Git\cmd).

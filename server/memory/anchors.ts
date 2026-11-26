@@ -7,6 +7,7 @@
 // commit yet) simply gets no anchors. (drift.ts builds on this file, never the other way round.)
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
+import { findingOf } from '../../shared/findings.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { memorySchema, onEntriesChanged } from './store.ts';
 
@@ -148,14 +149,25 @@ interface Pending {
   text: string;
   title: string | null;
   updatedAt: number;
+  finding?: string | null;
 }
 
-/** Project notes, topics and profiles whose anchors were never taken, or whose text changed since. */
+/** The files a finding gives as evidence ("path" or "path:line"), as text the paths are resolved in. */
+function evidenceFiles(json: string): string {
+  try {
+    const f = findingOf(JSON.parse(json));
+    return (f?.evidence ?? []).flatMap((e) => (e.kind === 'file' ? [e.ref.replace(/:\d+(-\d+)?$/, '')] : [])).join('\n');
+  } catch {
+    return '';
+  }
+}
+
+/** Project notes, topics, profiles and findings whose anchors were never taken, or whose text changed since. */
 function pending(db: DB, limit: number): Pending[] {
   return db
     .prepare(
-      `select id, scope_key as scopeKey, text, title, updated_at as updatedAt from memory_entries
-       where scope = 'repo' and status = 'active' and kind in ('note', 'topic', 'profile') and (anchored_at is null or anchored_at < updated_at) order by updated_at desc limit ?`,
+      `select id, scope_key as scopeKey, text, title, finding, updated_at as updatedAt from memory_entries
+       where scope = 'repo' and status = 'active' and kind in ('note', 'topic', 'profile', 'finding') and (anchored_at is null or anchored_at < updated_at) order by updated_at desc limit ?`,
     )
     .all(limit) as Pending[];
 }
@@ -165,7 +177,8 @@ async function anchorOne(db: DB, e: Pending, now: number): Promise<boolean> {
   let paths: string[] = [];
   let commit: string | null = null;
   if (fs.existsSync(e.scopeKey)) {
-    paths = await resolvePaths(e.scopeKey, e.text);
+    // A finding is about the code its evidence names, not about what its words happen to mention.
+    paths = await resolvePaths(e.scopeKey, e.finding ? evidenceFiles(e.finding) : e.text);
     if (paths.length) {
       const head = await gitHead(e.scopeKey);
       commit = head && now - e.updatedAt > FRESH_MS ? ((await commitAt(e.scopeKey, e.updatedAt)) ?? head) : head;
@@ -185,7 +198,7 @@ async function anchorOne(db: DB, e: Pending, now: number): Promise<boolean> {
 export async function anchorEntry(db: DB, id: number, now = Date.now()): Promise<void> {
   memorySchema(db);
   const r = db
-    .prepare("select id, scope_key as scopeKey, text, title, updated_at as updatedAt from memory_entries where id = ? and scope = 'repo' and kind in ('note', 'topic', 'profile')")
+    .prepare("select id, scope_key as scopeKey, text, title, finding, updated_at as updatedAt from memory_entries where id = ? and scope = 'repo' and kind in ('note', 'topic', 'profile', 'finding')")
     .get(id) as Pending | undefined;
   if (r) await anchorOne(db, r, now);
 }

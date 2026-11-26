@@ -1,10 +1,15 @@
 // The Experiments page's sidebar, and the pieces the Overview shares with it: the queue line, this computer's GPUs as
 // small meters, the box to find an experiment, and the experiments themselves (one entry for each group the runs
-// share, with its title, description and category) listed by category, the newest first. The sidebar shows on
-// screens 1024px wide and up; the Overview shows the same pieces itself on narrower ones.
+// share, with its title, description and category) listed by category, the newest first. Above them, the evaluations,
+// each with its latest score. The sidebar shows on screens 1024px wide and up; the Overview shows the same pieces
+// itself on narrower ones. While an evolution works on an evaluation, its second line says so instead.
 import { useMemo } from 'react';
 import { Home as HomeIcon, Search, X } from 'lucide-react';
 import type { ExperimentGroup, GpuNow, QueueNow, RunRecord } from '@shared/experiments';
+import type { EvaluationListed } from '@shared/evaluations';
+import type { Evolution } from '@shared/evolve';
+import { entryLine, toneClass } from './evalWords';
+import { columnWords } from './evolveWords';
 import { LOCALE } from '../../i18n/locale';
 import { timeAgo } from '../../lib/format';
 import { Meter } from '../../components/charts';
@@ -223,14 +228,45 @@ function Item({ e, selected, onOpen }: { e: Found; selected: boolean; onOpen: ()
   );
 }
 
+/** An evaluation's second line: its latest score and how it stands to the baseline; "changed", marked, when its files differ. */
+export function EvaluationLine({ ev, scoring, evolving }: { ev: EvaluationListed; scoring: boolean; evolving?: Evolution }) {
+  const entry = entryLine(ev, scoring);
+  const line = evolving ? { changed: entry.changed, text: columnWords(evolving), standing: null } : entry;
+  return (
+    <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-fg-3">
+      {line.changed && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-warn" aria-hidden />}
+      {!line.changed && (scoring || evolving) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />}
+      <span className="tnum min-w-0 truncate">
+        {line.changed && (
+          <>
+            <span className="text-warn">changed</span>
+            <span> · </span>
+          </>
+        )}
+        <span>{line.text}</span>
+        {line.standing && (
+          <>
+            <span> · </span>
+            <span className={toneClass(line.standing.tone)}>{line.standing.short}</span>
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
+const HEADING = 'truncate px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-fg-3 uppercase';
+
 /**
- * The sidebar: the queue and the GPUs, a box to find an experiment, the Overview, and the experiments by category.
- * `current` is the experiment open (its group, '' for the runs without one), null on the Overview.
+ * The sidebar: the queue and the GPUs, a box to find an experiment, the Overview, the evaluations (when there are any)
+ * and the experiments by category. `current` is the experiment open (its group, '' for the runs without one), null on
+ * the Overview and on an evaluation (`evaluation`, its id).
  */
-export function Sidebar({ runs, entries, queue, q, onQ, current, onOverview, onOpen, onOpenRun }: { runs: RunRecord[] | null; entries: Entry[]; queue: QueueNow | null; q: string; onQ: (q: string) => void; current: string | null; onOverview: () => void; onOpen: (group: string) => void; onOpenRun: (id: string) => void }) {
+export function Sidebar({ runs, entries, queue, q, onQ, current, onOverview, onOpen, onOpenRun, evaluations, scoring, evolving, evaluation, onOpenEvaluation }: { runs: RunRecord[] | null; entries: Entry[]; queue: QueueNow | null; q: string; onQ: (q: string) => void; current: string | null; onOverview: () => void; onOpen: (group: string) => void; onOpenRun: (id: string) => void; evaluations: EvaluationListed[]; scoring: Set<string>; evolving: Map<string, Evolution>; evaluation: string | null; onOpenEvaluation: (id: string) => void }) {
   const found = useMemo(() => findEntries(entries, q), [entries, q]);
   const { blocks, none } = useMemo(() => byCategory(found), [found]);
   const hasCategories = blocks.some((b) => b.label !== null);
+  const onOverviewNow = current === null && !evaluation;
   return (
     <aside className="hidden min-h-0 w-[232px] shrink-0 flex-col border-r border-line lg:flex xl:w-[256px]">
       <div className="shrink-0 space-y-3 px-3 pt-3.5 pb-2">
@@ -241,10 +277,32 @@ export function Sidebar({ runs, entries, queue, q, onQ, current, onOverview, onO
         <FindBox value={q} onChange={onQ} />
       </div>
       <nav aria-label="Experiments" data-intro={found.length ? 'exp-list' : undefined} className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
-        <button type="button" onClick={onOverview} aria-current={current === null ? 'page' : undefined} className={cx('mb-2 flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-medium transition-colors', current === null ? 'bg-bg-2 text-fg' : 'text-fg-2 hover:bg-bg-1')}>
+        <button type="button" onClick={onOverview} aria-current={onOverviewNow ? 'page' : undefined} className={cx('mb-2 flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-medium transition-colors', onOverviewNow ? 'bg-bg-2 text-fg' : 'text-fg-2 hover:bg-bg-1')}>
           <HomeIcon size={14} className="shrink-0 text-fg-3" />
           Overview
         </button>
+        {evaluations.length > 0 && (
+          <div className="mb-2">
+            <div className={HEADING}>Evaluations</div>
+            {evaluations.map((ev) => (
+              <button
+                key={ev.id}
+                type="button"
+                onClick={() => onOpenEvaluation(ev.id)}
+                aria-current={evaluation === ev.id ? 'page' : undefined}
+                title={ev.name}
+                className={cx('block w-full min-w-0 rounded-lg px-2.5 py-1.5 text-left transition-colors', evaluation === ev.id ? 'bg-bg-2' : 'hover:bg-bg-1')}
+              >
+                <div translate="no" className="truncate text-[13px] font-medium text-fg">
+                  {ev.name}
+                </div>
+                <EvaluationLine ev={ev} scoring={scoring.has(ev.id)} evolving={evolving.get(ev.id)} />
+              </button>
+            ))}
+          </div>
+        )}
+        {/* Under the evaluations, the experiments need a heading of their own when no category gives them one. */}
+        {evaluations.length > 0 && !hasCategories && (blocks.length > 0 || none) && <div className={HEADING}>Experiments</div>}
         {runs === null ? (
           <div className="space-y-2 px-2.5 pt-1" aria-hidden>
             {[0, 1, 2, 3].map((i) => (

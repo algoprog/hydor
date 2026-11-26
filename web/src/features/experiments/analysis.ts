@@ -2,7 +2,7 @@
 // into sections (dev, train, …), smoothing a curve, plotting one metric along another, the metrics that matter most
 // across an experiment, the hyperparameters that differ between its runs, and how strongly each goes with a metric.
 import { betterOf, type MetricSeries, type RunRecord } from '@shared/experiments';
-import { metricScore, num, rankMetrics } from './api';
+import { metricScore, metricsOf, num, rankMetrics } from './api';
 
 /** Runs drawn on the charts at once, at most: one colour each, in the charts' fixed order, never cycled. */
 export const MAX_SHOWN = 8;
@@ -267,6 +267,24 @@ export function bestRun(runs: RunRecord[], metric: string, which: 'last' | 'best
     }
   }
   return best;
+}
+
+/**
+ * What a claim about runs against a baseline would start from: the first number (as Compare lists them) the baseline
+ * shares with another of them, never bookkeeping, and the best of the others on it with both values. Null when there
+ * is no such number.
+ */
+export function headlineOf(runs: RunRecord[], baseline: RunRecord): { metric: string; run: RunRecord; value: number; against: number; better: 'max' | 'min' } | null {
+  const others = runs.filter((r) => runKey(r) !== runKey(baseline));
+  const repeated = new Set(runs.flatMap((r) => r.metrics?.repeated ?? []));
+  for (const metric of rankMetrics(metricsOf(runs), (k) => repeated.has(k))) {
+    const against = valueOf(baseline, metric);
+    if (against === undefined || metricScore(metric, repeated.has(metric)) < 0) continue;
+    const run = bestRun(others, metric);
+    if (!run) continue;
+    return { metric, run, value: valueOf(run, metric)!, against, better: betterOf(metric, runs.find((r) => r.better?.[metric])?.better) };
+  }
+  return null;
 }
 
 /** A run's hyperparameters: its params, and its seed as "seed" when it has one. */

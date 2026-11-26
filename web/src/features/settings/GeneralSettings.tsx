@@ -1,5 +1,5 @@
-// Settings → General: theme, language, how sessions behave, starting and updating the app, the tour and tips, and
-// what version this is.
+// Settings → General: theme, language, how sessions behave, starting and updating the app, Lean (the proof checker),
+// the tour and tips, and what version this is.
 import { useEffect, useState, type ReactNode } from 'react';
 import { CircleHelp } from 'lucide-react';
 import { isLang, LANGS } from '@shared/i18n';
@@ -25,6 +25,7 @@ import { saveStart } from '../../lib/start';
 import { ThemeMode, ThemePicker } from './Themes';
 import { CPU_CHOICES, MEMORY_CHOICES, type SessionLimits, type SessionResources } from '../system/sessionUse';
 import { openReleaseNotes } from './Releases';
+import { LeanSetting } from '../lean/LeanSetting';
 import { Group, Row, Select, Stack } from './kit';
 
 export function GeneralSettings() {
@@ -77,6 +78,9 @@ export function GeneralSettings() {
         <KeepAwakeSetting />
         <AutoUpdateSetting />
         <VersionRow />
+      </Group>
+      <Group title="Proofs">
+        <LeanSetting />
       </Group>
       <Group title="Help">
         <Row

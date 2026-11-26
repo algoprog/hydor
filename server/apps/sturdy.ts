@@ -246,7 +246,7 @@ export const setBrowserRead = (f: BrowserRead | null) => (readInBrowser = f ?? b
 // ---- one call -------------------------------------------------------------------------------------------------
 
 /** Tools that only read: their calls are safe to send again. */
-const READS = new Set(['web_search', 'read_page', 'find_media', 'read_document', 'knowledge_search', 'knowledge_read', 'recall', 'read_paper', 'experiment_list', 'experiment_get']);
+const READS = new Set(['web_search', 'read_page', 'find_media', 'read_document', 'knowledge_search', 'knowledge_read', 'recall', 'findings', 'read_paper', 'experiment_list', 'experiment_get', 'evaluation_get']);
 
 export type Called = { ok: true; text: string; from?: 'cache' | 'browser'; tries: number } | { ok: false; text: string; failure: Failure; tries: number };
 

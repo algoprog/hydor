@@ -28,6 +28,8 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Démarrer au démarrage de cet ordinateur**](/settings?s=general&find=Start%20when%20this%20computer%20starts) : Lance l’app au démarrage de l’ordinateur.
 - [**Garder l’ordinateur éveillé**](/settings?s=general&find=Keep%20the%20computer%20awake) : Dans les apps de bureau, l’ordinateur ne se met pas en veille tout seul pendant que les agents travaillent et avant les tâches planifiées.
 - [**Mettre à jour automatiquement**](/settings?s=general&find=Update%20automatically) : Installe les nouvelles versions tout seul : les apps de bureau dès leur sortie, après une minute de préavis ; une copie depuis git quand vous ne l’avez pas utilisée depuis un moment.
+- [**Lean (vérificateur de preuves)**](/settings?s=general&find=Lean%20%28proof%20checker%29) : Permet aux agents de vérifier des preuves mathématiques : une preuve acceptée par Lean est correcte.
+- [**Ajouter Mathlib**](/settings?s=general&find=Add%20Mathlib) : Ajouter à Lean la bibliothèque dont la plupart des mathématiques ont besoin.
 - [**Faire la visite**](/settings?s=general&find=Take%20the%20tour) : Découvrir ce que fait chaque partie de l’app.
 - [**Astuces**](/settings?s=general&find=Tips) : Signale une partie de l’app la première fois que vous y accédez, après la visite de bienvenue.
 - [**Idées pour démarrer**](/settings?s=general&find=Starter%20ideas) : Des exemples, vos apps et une automatisation sous la zone de message vide de la page d’accueil.

@@ -15,6 +15,7 @@ No computador, uma coluna à esquerda permanece ao lado de tudo o que você abre
 - A linha da fila, no topo, diz o que está acontecendo ("2 em execução · 1 aguardando" ou "Nada em execução agora"). Abaixo dela, as GPUs deste computador como pequenos medidores: a memória que cada uma usa, na cor de destaque quando uma das suas execuções a ocupa (aponte para uma para ver o quanto está ocupada e qual execução a ocupa; clique nela para abrir essa execução).
 - **Buscar um experimento** filtra a lista pelo que você digitar: o título, a descrição, a categoria e o nome de um experimento, e os nomes e comandos das suas execuções. Um experimento que corresponde apenas por suas execuções informa quantas ("3 execuções correspondem").
 - **Visão geral** leva você de volta à página descrita abaixo.
+- **Avaliações**, quando você tem alguma, com as pontuações mais recentes ([Avaliações](#evaluations-keeping-score-the-same-way)).
 - Depois, os experimentos, agrupados por categoria (um pequeno título para cada uma, com a categoria da execução mais recente primeiro; os experimentos sem categoria ficam em **Outros experimentos**, e não há títulos enquanto nenhum tiver categoria). Cada um mostra seu título e, abaixo, quantas execuções tem e quantas estão em andamento ("6 execuções · 1 em execução") ou quando foi sua última execução ("23 execuções · há 2 h"). Em uma categoria, o experimento com a execução mais recente vem primeiro. **Execuções sem experimento** é a última entrada, quando há essas execuções.
 
 A **Visão geral** mostra:
@@ -172,6 +173,96 @@ Marque a caixa de cada execução que você quer em uma tabela de execuções (a
 
 O menu ⋯ de um experimento também tem **Comparar as 6 mais recentes**, e a aba **Hiperparâmetros** dele tem **Comparar as 6 melhores**.
 
+Antes de contar com um ganho, **Tentar derrubar**, na parte de baixo dessa janela, faz um agente que não participou do trabalho tentar explicar o ganho de outra forma. Confira **O resultado a testar** (uma frase, preenchida a partir das execuções escolhidas: altere para dizer o que você quer dizer), escolha a **Linha de base** e quem faz o teste (**Executado por**) e clique em **Começar**. O agente procura outras explicações (seeds de sorte, uma linha de base sem ajuste, um vazamento, um bug de métrica), faz execuções de controle em um experimento próprio, em uma cópia do seu código e perguntando antes de usar muito tempo de GPU, não conserta nada e informa "Se confirma", "Se confirma em parte" ou "Não se confirma", com o que tentou (execuções em outras máquinas ficam de fora).
+
+## Avaliações: pontuar sempre do mesmo jeito
+
+Uma avaliação é a forma como um projeto marca pontos: um comando e um número, lacrados, para que cada execução e cada agente sejam pontuados do mesmo jeito. Os arquivos que formam o avaliador e os dados usados para pontuar ficam lacrados, nenhuma pontuação é dada enquanto estiverem diferentes, e toda pontuação é calculada pelo próprio app, a partir da execução que ele mesmo faz do comando lacrado. Assim, dois números podem ser comparados sem dúvida sobre como cada um foi obtido.
+
+No computador, a coluna as lista em **Avaliações**, acima dos experimentos, cada uma com sua última pontuação e como ela se compara à linha de base (“0.431 · 0.019 melhor”), “Sem pontuação ainda”, “Pontuando…” enquanto uma pontuação está em andamento, “Evoluindo · 37 de 200” enquanto o [Evoluir](#evolve-searching-for-a-better-version) trabalha nela, ou “alterada” com uma marca âmbar quando os arquivos dela estão diferentes. No celular, elas aparecem como cartões no topo da Visão geral.
+
+### Como criar uma
+
+Clique em **Mais** (⋯) no topo e depois em [**Nova avaliação**](/experiments?new=evaluation). A janela tem quatro partes:
+
+- **O que ela pontua**: o **Nome**, a **Pasta** (um projeto, geralmente um repositório git), o **Comando que pontua** (como `python eval.py --split dev --seed {seed}`: escreva `{seed}` onde entra o seed, para pontuar com vários seeds), **O número que conta** do jeito que o comando o imprime (`ndcg@10` para `ndcg@10=0.412`) e **Quanto maior, melhor** ou **Quanto menor, melhor**.
+- **O que não pode mudar**: os arquivos e pastas que formam o avaliador e seus dados. Digite um e clique em **Adicionar**, ou toque nas **Sugestões a partir do seu comando**. Com `{seed}` no comando, **Sementes** define quais são (1, 2, 3, a menos que você mude).
+- **Teste final** (opcional): um comando próprio e uma **Pasta reservada** fora do projeto, que só o teste final recebe: os agentes que trabalham no projeto não a veem ali. O comando a encontra como `$HYDOR_HELD_OUT`.
+- **Onde executa**: as GPUs de que cada execução precisa, a memória livre delas e um limite de tempo. As execuções esperam na fila deste computador como quaisquer outras.
+
+**Criar e lacrar** lacra os arquivos (pastas grandes demoram um pouco) e abre a página da avaliação. Não sabe o que preencher? **Configurar com um agente**, no topo da janela, começa um pedido naquela pasta: o agente lê como você treina e avalia e propõe a avaliação, que só é criada se você aceitar.
+
+### A página da avaliação
+
+Abaixo do nome aparecem o número, qual direção é melhor, os seeds e o comando (toque nele para ver inteiro), e depois “Lacrada em 24 de nov.: 4 arquivos, tudo como estava”. Em seguida vêm três blocos:
+
+- **Linha de base**: a pontuação com a qual as outras são comparadas. No começo, aparece “Ainda não medida”: clique em **Medir a linha de base**. **Medir de novo** está no menu dela.
+- **Última pontuação**: o número, a branch e como ela está em relação à linha de base (“0.019 melhor que a linha de base”; “Igual à linha de base, dentro do ruído” quando a diferença pode muito bem ser acaso), com a frequência com que o acaso sozinho daria essa diferença.
+- **Teste final**: **Adicionar um**, **Executar o teste final…**, ou o número dele e quantas vezes foi executado desde que foi lacrado.
+
+Com duas pontuações ou mais, um gráfico mostra cada uma ao longo do tempo, com a dispersão entre as sementes e a linha de base como uma linha tracejada. **Evoluir…**, no menu ⋯ da página, inicia a busca por uma versão melhor ([Evoluir](#evolve-searching-for-a-better-version)) e, quando já existe alguma, **Evoluir** as lista entre o gráfico e as pontuações. **Pontuações** as lista, da mais nova para a mais antiga: quando, onde (branch e commit, com “com alterações sem commit” se for o caso), quem pediu, a pontuação e como ela se compara. O menu de uma pontuação permite abrir suas execuções, usá-la como linha de base (**Usar como linha de base**), pará-la ou excluí-la. Quando uma pontuação falha porque o comando não imprimiu o número, aparecem os nomes que ele de fato imprimiu: toque em um para usá-lo no lugar (a avaliação é lacrada de novo).
+
+**Pontuar agora** pontua a pasta. Quando o repositório tem worktrees do git, aparece a pergunta “Pontuar o que está em qual pasta?”: a própria pasta ou uma das worktrees, identificada pela branch. Uma avaliação pode pontuar a própria pasta, uma pasta dentro dela ou uma worktree do mesmo repositório.
+
+### Quando os arquivos lacrados mudam
+
+Se um arquivo lacrado estiver diferente, um aviso âmbar diz qual, e as pontuações esperam até que ele volte ao que era:
+
+- **Ver o que mudou**: cada arquivo marcado como Alterado, Ausente ou Arquivo novo, com o que mudou nele.
+- **Restaurar**: grava as cópias lacradas por cima dos arquivos e diz o que não conseguiu restaurar e por quê (arquivos adicionados depois continuam lá).
+- **Lacrar de novo…**: aceita os arquivos como estão agora. As pontuações anteriores deixam de ser comparadas com as novas (elas continuam lá, recolhidas em **Antes de ser lacrada de novo**), e a linha de base precisa ser medida de novo. Mudar o comando, o número ou os arquivos lacrados com **Editar…** também lacra de novo.
+
+### O teste final
+
+**Executar o teste final…** (no bloco dele ou no menu da página) diz como o seu trabalho se sai de verdade em dados nos quais nada foi ajustado. Cada olhada informa um pouco menos, então execute quando achar que terminou; a janela diz quantas vezes ele foi executado desde que foi lacrado. Quando há worktrees do git, ela também pergunta em qual ele vai ser executado (**Sobre o que está em**).
+
+### O que os agentes podem fazer
+
+Os agentes podem ler as avaliações, pedir uma pontuação da pasta deles (o app executa o próprio comando lacrado; eles informam esse número, não um deles), propor uma nova avaliação (você vê cada parte dela em um cartão, e ela só é criada se você aceitar) e restaurar arquivos lacrados. Eles não podem criar nem lacrar uma avaliação por conta própria, definir a linha de base, nem executar ou ler o teste final.
+
+As execuções iniciadas na pasta de uma avaliação informam, na própria página, se os arquivos dela estavam como foram lacrados quando começaram, e uma tabela de execuções marca com um sinal âmbar aquelas em que não estavam. Uma execução que serviu para pontuar uma avaliação leva de volta a ela.
+
+## Evoluir: a busca por uma versão melhor
+
+O Evoluir testa muitas pequenas mudanças nos arquivos que você indicar, pontua cada uma com a avaliação e fica com a melhor. Os seus arquivos não são tocados: cada mudança é testada em uma cópia própria do app, feita a partir do seu último commit. Ele usa o [modelo auxiliar](/guide/agents-models#choose-the-helper-model) do app para escrever as mudanças, construindo cada uma sobre uma das melhores versões encontradas até então.
+
+Vale a pena para um arquivo cuja qualidade a avaliação consegue medir bem: uma heurística, uma função de pontuação, um prompt, uma rotina lenta. Não vale quando a avaliação é fraca (poucos exemplos, um número fácil de manipular): a busca encontra os pontos fracos de tudo o que a pontua, então configure um [teste final](#the-final-test) com dados que a busca nunca vê.
+
+### Como iniciar uma busca
+
+Abra a página da avaliação, clique em ⋯ e em **Evoluir…**. A janela pergunta:
+
+- **O que pode ser alterado?** Digite um arquivo e clique em **Adicionar**, ou toque nos que aparecem em **Sugeridos**: até 8 arquivos de texto que tenham commit e não tenham mudado desde então. Um arquivo protegido pela avaliação não pode ser alterado: você é avisado disso.
+- **O que deve ser tentado?** (opcional): algumas linhas, como “Deixe o reranker mais rápido sem perder nDCG@10”.
+- **Quantas tentativas**: 50, 100, 200 ou **Outros** para um número à sua escolha (de 10 a 2000).
+- Em **Mais**: **Parar depois de (horas)**, **Quantas ao mesmo tempo** (de 1 a 4) e **Parar quando esta quantidade seguida não trouxer nada melhor** (40, a menos que você mude).
+
+Clique em **Começar**. Primeiro ele pontua o seu ponto de partida, com todas as sementes da avaliação, e depois começa. Uma avaliação sem linha de base mostra **Medir a linha de base** no lugar de **Começar**.
+
+### Como ler a página da busca
+
+A linha dela em **Evoluir**, na página da avaliação, diz “Em execução · 37 de 200 tentativas feitas”, “Concluído · 0.035 melhor que o ponto de partida” ou “Interrompida”; clique nela para abri-la. No topo estão a finalidade, o estado (como “Concluído: nada melhor nas últimas 40”) e **Pausar** ou **Retomar**, **Parar** (depois disso não dá para retomar) e ⋯ com **Excluir…** (as tentativas, as pontuações e as cópias de trabalho são apagadas; um branch que você adotou permanece). Em seguida há três quadros:
+
+- **Ponto de partida**: a pontuação da sua versão.
+- **Melhor até agora**: a melhor pontuação, quanto ela é melhor que o ponto de partida, uma linha sobre o que ela mudou e **Ver a mudança**.
+- **Testadas**: quantas de quantas, quantas falharam e quantas vezes um modelo foi consultado.
+
+Um gráfico mostra todas as tentativas em ordem: uma primeira pontuação rápida (**Só a primeira semente**) aparece mais clara que uma conferida com **Todas as sementes**, as tentativas que falharam são marcas na parte de baixo, **Melhor até agora** é uma linha em degraus e o **Ponto de partida** é uma linha tracejada. Clique em um ponto para abrir aquela tentativa.
+
+**O que foi tentado** lista as tentativas, da mais nova para a mais antiga: o que cada uma mudou, a pontuação (ou por que falhou), como ela se compara ao ponto de partida, sobre qual versão foi **Construída sobre** e o **Modelo** que a escreveu (**Rápido** ou, de vez em quando, **Potente**). Cada tentativa recebe primeiro uma pontuação rápida, com uma semente; só a que supera a melhor da sua linha de trabalho é conferida com todas, e só essa pontuação completa pode torná-la a melhor. **Nova melhor** marca as que eram a melhor no momento em que foram pontuadas, e **Melhor**, a melhor atual. Abra uma tentativa para ver a mudança, arquivo por arquivo, e **Adotar esta**.
+
+### Como adotar a melhor
+
+**Adotar a melhor** (e **Adotar esta**) pede confirmação primeiro e depois cria um branch no seu repositório com aquela versão: os arquivos que estão em checkout não são tocados. A página guarda a indicação “Adotada como <branch>”, que abre o branch na [página do Git](/git). Adotar de novo acrescenta um commit ao mesmo branch.
+
+O teste final não viu a versão que você adotou. Para conferi-la nele, mude sua pasta para o branch (ou crie um worktree git dele) e clique em **Executar o teste final…** na página da avaliação.
+
+### Quanto custa
+
+Cada tentativa executa a avaliação (uma semente e depois todas, quando ela é promissora) e consulta um modelo uma vez, ou duas quando a primeira resposta não pode ser usada. Com GPUs, essas execuções esperam na fila como qualquer outra. **Pausar** interrompe novas tentativas, e **Parar depois de (horas)** e o limite de tentativas seguidas sem nada melhor evitam que a busca continue à toa.
+
+Os agentes podem iniciar uma busca, com a sua aprovação em um cartão, e acompanhar como ela vai. Eles não podem excluir nenhuma.
+
 ## Tabelas de resultados para o seu artigo
 
 **Criar uma tabela** (a partir de execuções marcadas, do menu ⋯ de um experimento ou da aba **Hiperparâmetros** dele) mostra a tabela como você escolher:
@@ -229,7 +320,7 @@ Um job para um cluster roda em uma pasta lá (o código já precisa estar lá: c
 
 ## No celular
 
-Não há coluna: a Visão geral começa com a fila, as GPUs e **Buscar um experimento**, e lista os experimentos como cartões. Um experimento e uma execução abrem no lugar dela, com uma seta para voltar. Uma tabela de execuções rola para o lado, com a caixa de seleção e o nome de cada execução sempre à vista; as execuções nos gráficos ficam em uma fileira de chips acima deles, e a **Suavização** está no menu **Opções do gráfico**. O log de uma execução quebra linhas conforme a largura da tela, e **Acompanhar** funciona como no computador. Nova execução, Comparar e as tabelas abrem a partir da parte de baixo da tela.
+Não há coluna: a Visão geral começa com a fila, as GPUs e **Buscar um experimento**, e lista as avaliações (quando você tem alguma) e os experimentos como cartões. Um experimento, uma avaliação e uma execução abrem no lugar dela, com uma seta para voltar. A tabela de execuções rola para os lados, mantendo à vista a caixa de seleção e o nome de cada execução; as execuções dos gráficos formam uma linha de etiquetas acima deles, e **Suavização** fica no menu **Opções do gráfico**. O log de uma execução quebra as linhas na largura da tela, e **Acompanhar** funciona como no computador. Nova execução, Comparar e as tabelas abrem a partir da parte de baixo da tela.
 
 ## Peça a um agente
 
@@ -240,6 +331,12 @@ Não há coluna: a Visão geral começa com a fila, as GPUs e **Buscar um experi
 - “Coloque um agente de plantão neste treinamento: se faltar memória, reduza o tamanho do lote pela metade e retome a partir do último checkpoint.”
 - “Faça uma tabela em LaTeX dos experimentos lora: acurácia e F1 em comparação com o baseline, com significância, e coloque no meu artigo.”
 - “Quais das minhas execuções desta semana tiveram a melhor perda de validação, e quais eram os hiperparâmetros dela?”
+- “Tente derrubar o resultado de que a nova perda supera a linha de base em ndcg@10.”
 - “Dê títulos e descrições mais claros aos meus experimentos e organize-os em categorias.”
 - “Na minha varredura de taxa de aprendizado, quais hiperparâmetros mais importam para a perda no conjunto de desenvolvimento?”
 - “Mostre as curvas das 5 melhores execuções do experimento lora.”
+- “Configure uma avaliação para este repositório.”
+- “Pontue a minha branch em relação à linha de base.”
+- “Por que a minha avaliação diz que há arquivos alterados?”
+- “Evolua a função de pontuação em rank.py usando minha avaliação, com 100 tentativas.”
+- “Como está indo a evolução?”

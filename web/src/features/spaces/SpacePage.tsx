@@ -100,7 +100,7 @@ function Fact({ icon, label, children, onClick }: { icon: ReactNode; label: stri
 // ---- the top --------------------------------------------------------------------------------------------------
 
 /** How much the project remembers: notes, wiki articles and documents (what is loaded so far). */
-const memoryTotal = (m: SpaceMemory, view?: SpaceView) => (m.notes ?? 0) + (m.wiki?.on ? (m.wiki.articles?.length ?? 0) : 0) + (view?.docs ?? 0) || undefined;
+const memoryTotal = (m: SpaceMemory, view?: SpaceView) => (m.notes ?? 0) + (m.findings ?? 0) + (m.wiki?.on ? (m.wiki.articles?.length ?? 0) : 0) + (view?.docs ?? 0) || undefined;
 
 /** Its mark, name and what it is about over a wash of its colour, New session, its menu, and its tabs; on its page the arrow back to all projects before them, in the window Close after them. */
 function Top({ s, view, tab, onTab, memory, page }: { s: Space; view?: SpaceView; tab: SpaceTab; onTab: (t: SpaceTab) => void; memory: SpaceMemory; page?: boolean }) {
@@ -282,6 +282,7 @@ function memorySummary(m: SpaceMemory, view?: SpaceView) {
   const articles = m.wiki?.on ? (m.wiki.articles?.length ?? 0) : 0;
   if (articles) parts.push(plural(articles, 'article', 'articles'));
   if (view?.docs) parts.push(plural(view.docs, 'document', 'documents'));
+  if (m.findings) parts.push(plural(m.findings, 'finding', 'findings'));
   return parts.join(' · ');
 }
 

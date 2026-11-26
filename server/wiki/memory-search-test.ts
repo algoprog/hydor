@@ -9,7 +9,7 @@ import { kvSet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { progress, scanSoon } from '../knowledge/indexer.ts';
 import { addSource, createBase } from '../knowledge/store.ts';
-import { addEntry } from '../memory/store.ts';
+import { addEntry, deleteEntry } from '../memory/store.ts';
 import { createSpace, updateSpace } from '../spaces/index.ts';
 import { wikiBrowse } from './browse-feature.ts';
 import { ensureWikiKnowledge } from './knowledge/index.ts';
@@ -118,6 +118,14 @@ try {
   assert.deepEqual(other.notes.map((n) => n.scopeKey), [projectB]);
   assert.deepEqual(other.articles, []);
   assert.deepEqual(other.documents, []);
+
+  // A finding is among them: found by its words, with its verdict, and only in its own project.
+  const dead = addEntry(db, { scope: 'repo', scopeKey: projectA, text: '', finding: { statement: 'Stacking short telescope exposures sharpens the planets', verdict: 'refuted', learned: 'The seeing hid any gain.', evidence: [] } }, { source: 'agent' });
+  const withFinding = await body(a.id, 'stacking exposures');
+  assert.deepEqual(withFinding.notes.map((n) => [n.id, n.kind, n.finding?.verdict]), [[dead.id, 'finding', 'refuted']]);
+  assert.equal((await body(a.id, 'refuted')).notes[0]?.id, dead.id, 'by its verdict in a word too');
+  assert.deepEqual((await body(b.id, 'stacking exposures')).notes, []);
+  deleteEntry(db, dead.id, { source: 'user' });
 
   // Wiki memory off: no articles, notes and documents stay.
   updateSpace(db, a.id, { wikiMemory: false });

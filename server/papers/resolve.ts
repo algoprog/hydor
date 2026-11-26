@@ -129,6 +129,8 @@ interface Got {
   type: string;
   body: Buffer;
   text: () => string;
+  /** How long a busy service asked to be left alone (Retry-After in seconds), in milliseconds. */
+  retryAfterMs?: number;
 }
 
 /** Waits so that requests to one host come at most every `ms` milliseconds. */
@@ -139,15 +141,19 @@ async function spaced(host: string, ms: number) {
   if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
 }
 
-/** A public address: redirects followed one by one, each checked; arXiv's API at most every three seconds. */
-export async function get(url: string, o: { accept?: string; max?: number; signal?: AbortSignal; timeoutMs?: number } = {}): Promise<Got> {
+/**
+ * A public address: redirects followed one by one, each checked; arXiv's API at most every three seconds. `headers`
+ * (a service's key) go to the address's own host alone, never on to where it redirects.
+ */
+export async function get(url: string, o: { accept?: string; max?: number; signal?: AbortSignal; timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<Got> {
   const all = AbortSignal.any([o.signal ?? new AbortController().signal, AbortSignal.timeout(o.timeoutMs ?? TIMEOUT)]);
   let u = new URL(url);
+  const first = u.host;
   for (let hop = 0; hop < 8; hop++) {
     if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('not a web address');
     await assertPublic(u);
     if (u.hostname === 'export.arxiv.org') await spaced(u.hostname, 3100);
-    const r = await fetch(u, { redirect: 'manual', signal: all, headers: { 'user-agent': UA, accept: o.accept ?? '*/*' } });
+    const r = await fetch(u, { redirect: 'manual', signal: all, headers: { 'user-agent': UA, accept: o.accept ?? '*/*', ...(u.host === first ? o.headers : {}) } });
     const loc = r.headers.get('location');
     if (r.status >= 300 && r.status < 400 && loc) {
       u = new URL(loc, u);
@@ -163,7 +169,8 @@ export async function get(url: string, o: { accept?: string; max?: number; signa
       chunks.push(b);
     }
     const body = Buffer.concat(chunks);
-    return { status: r.status, url: u.href, type: r.headers.get('content-type') ?? '', body, text: () => body.toString('utf8') };
+    const after = Number(r.headers.get('retry-after'));
+    return { status: r.status, url: u.href, type: r.headers.get('content-type') ?? '', body, text: () => body.toString('utf8'), ...(after > 0 ? { retryAfterMs: after * 1000 } : {}) };
   }
   throw new Error('too many redirects');
 }

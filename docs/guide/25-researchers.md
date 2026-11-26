@@ -63,8 +63,9 @@ An update asks the helper model one or two quick questions (what each paper mean
 [Gap finder](/apps/t/gap-finder) crosses your papers with this month's in an area for project ideas, checks each for prior work and sizes it to the compute you have. It runs from its form, or an agent runs it for you in a session.
 
 - **What you give**: **Your papers** (your name as an author, which brings your latest and most cited papers, or their titles or arXiv ids, one a line; your name starts from **You as an author** in About you, and the ORCID or OpenAlex id kept with it finds you exactly while the name is that one), **The area** (in words, or an arXiv category: conversational search, cs.IR; several between commas are searched together; it starts from **Your fields**), **The compute you have** (one 24 GB GPU unless you say; it starts from **What you can run on**) and **How many ideas** (5).
-- **What it does**: it reads your papers and the past month's in the area, ranks the month's against yours, and has the helper model propose ideas that cross them. For each idea, three at a time, it searches arXiv and Semantic Scholar for prior work and has the helper model judge it: **new**, **partly done** or **already done**, with the closest paper; the first experiment to run, what it takes on your compute, and whether it **fits**, is **tight** or is **too big**.
+- **What it does**: it reads your papers and the past month's in the area, ranks the month's against yours, and has the helper model propose ideas that cross them. Each idea, three at a time, is then checked for prior work: several searches that would find it under other names run on arXiv, OpenAlex and Semantic Scholar, the work citing or related to the nearest papers is added, and the helper model (its stronger one) compares the nearest of them with the idea: **new**, **partly done** or **already done**, with the closest paper. An idea the check could not judge says **not checked**, never new. Then come the first experiment to run, what it takes on your compute, and whether it **fits**, is **tight** or is **too big**.
 - **The view**: **Research ideas**, new ones first (show one verdict at the top), each with what it crosses, why its verdict, the closest work (a link), the first experiment and its cost, and **Plan it** (opens the Research sprint app with the idea as its question), **Dig deeper** (a deep research report on the work near it) and **Copy**. **What it crossed** lists your papers and the month's it used.
+- **The same check in any session**: agents use it on any idea or result before they pursue it or call it new. It takes up to two minutes and shows as a card, **Is this new?**, saying **Looks new**, **Partly known**, **Already known** or **Not judged**, with the closest papers (each a link to its source) and what is the same and what differs. Finding nothing is not proof that it is new. The searches go to those three services, so confidential sessions don't have it.
 
 ## Read and organise papers
 
@@ -176,6 +177,22 @@ Names with spaces get dashes, and the source follows. **Make the package** types
 
 What is not saved yet is saved first, so each gets the paper as you see it.
 
+## Proofs: checking them with Lean
+
+[Lean](https://lean-lang.org) is a proof checker: a program that reads a proof written in its own language and accepts it only if every step follows, so a proof it accepts is correct. Agents write proofs in words that read well and are wrong; with Lean they can check them.
+
+**Set it up** once, in [Settings → General → Lean (proof checker)](/settings?s=general&find=Lean%20%28proof%20checker%29): **Set up** downloads about 620 MB (about 3 GB once on your computer). If you have Lean of your own, yours is used and never changed. Most real mathematics also needs **Mathlib**, Lean's large library: **Add Mathlib** fetches it, several gigabytes (about 6 GB on your computer), which takes a while and needs git. **Remove** in the row's menu takes away what the app added. A Lean project of your own that uses Mathlib keeps its own copy, as usual: the one the app adds is for single files and snippets. An agent that finds Lean missing asks you on a card, with the size, before anything is downloaded. A project that asks for another version of Lean downloads that version the first time.
+
+**What agents do with it**: check a proof as they write it, search Lean's libraries for what is already proved (through [Loogle](https://loogle.lean-lang.org) and [LeanSearch](https://leansearch.net), two public services, so what they search for leaves your computer; a [confidential session](/guide/sessions#keep-a-session-confidential) checks proofs but does not search), and give a verdict. Checking a Lean file runs the code written in it, so it is never done in Plan mode, and where the agent would ask you before running a command, the check runs in a sandbox that keeps it to the session's folder with no network (on a computer without one, you are asked first).
+
+**The statement is agreed first.** Lean can only say that a proof fits the statement as it is written, and a statement written in Lean can differ from what you meant (a whole number where you meant a real one, "less than" for "at most", an assumption that can never hold). So before proving, an agent writes the statement in Lean, says it back to you in plain mathematics from the Lean text alone, lists how it differs from what you asked, and waits for you to answer **It says what I mean** or **Not quite**. It does not change an agreed statement without asking again.
+
+**The verdict** is one of two. Proved: the file builds with no error, nothing is left out, each theorem rests only on Lean's three standard assumptions, and Lean's core checker accepts every step. Or proved except for named gaps. A **sorry** is Lean's word for "proof left out": a file with one in it can still compile, but nothing there is proved yet. The verdict says which statement was proved, not whether it is the right one: that is what you agreed.
+
+**As a goal's check.** Every session has a command for the same verdict, **leancheck**. Set a [goal](/guide/goals) whose command check is `leancheck Proofs/Main.lean` and the agent keeps working until the proof holds; add `--theorem` and a name to check just that one.
+
+**In the LaTeX editor**, **Tools → Check a proof…** asks the agent beside the editor to go through the proof at the cursor (or the lines you picked) and report it gap by gap with line numbers: whether it holds as written, holds once gaps are filled, or fails. **Tools → Formalise in Lean…** asks it to state that theorem in Lean and agree the statement with you before proving it. Both only put the request in the box: you read it and send it. Checking a proof in words needs no Lean.
+
 ## Review, answer and present your paper
 
 Four ready-made apps, under **Writing** on [the Apps page](/apps), help with your own paper: the **Reviewer simulator** reviews your draft as a venue's reviewers would, the **Rebuttal workbench** drafts your answer to the reviews you got, **Paper to talk, poster and thread** makes what you present it with, and the **Figure doctor** makes its plots fit for print. The first three read your paper from a PDF, a .tex file or a LaTeX project's folder on this computer, a link, or a LaTeX document you kept (paste its address); **Or upload it** takes a PDF instead.
@@ -190,7 +207,7 @@ Your venue, as you last picked it, is there again next time. A paper that cannot
 
 It seats the reviewers, each with an angle of their own (in order: the method's expert, the area's expert, a sceptical empiricist, a careful reader from a neighbouring field and a reproducibility reviewer), and each fills in the venue's form, side by side. Then an area chair writes the meta-review with the likely outcome, and the weaknesses are ranked by how likely each is to sink the paper. The reviews come from a model: they find weak spots before real reviewers do, and are no forecast of the decision.
 
-Its view has **The reviews** (the venue, the likely outcome, the average overall score, then each review: its reviewer and angle, scores, summary, strengths, weaknesses and questions), **Meta-review** (with **Copy it** and **Copy every review**; then **What could sink it, the most dangerous first**: each weakness with why, how likely and what fixes it), **Baselines and ablations** (what reviewers will ask for, why, and the work it takes) and **Before you submit** (a list to tick off, and **Answer these reviews**, which starts the Rebuttal workbench with them, to rehearse your rebuttal).
+Its view has **The reviews** (the venue, the likely outcome, the average overall score, then each review: its reviewer and angle, scores, summary, strengths, weaknesses and questions), **Meta-review** (with **Copy it** and **Copy every review**; then **What could sink it, the most dangerous first**: each weakness with why, how likely and what fixes it), **Baselines and ablations** (what reviewers will ask for, why, and the work it takes; **Run these…** under the list opens the start page with a request for an agent to run them, for you to pick the folder of your paper's code and the agent, read it and send it) and **Before you submit** (a list to tick off, and **Answer these reviews**, which starts the Rebuttal workbench with them, to rehearse your rebuttal).
 
 ### Rebuttal workbench
 
@@ -200,7 +217,7 @@ Its view has **The reviews** (the venue, the likely outcome, the average overall
 
 It splits the reviews by reviewer, pulls out each one's points side by side, merges the same point raised by several reviewers, and sorts them: misread (your paper answers it already), needs an experiment, needs words (a clarification, a justification, a citation), or minor. It finds what your paper says on each, drafts each reply within its share of the limit, and puts the rebuttal together, counted against the limit. A reply that needs a new result leaves [placeholders] for you to fill in: it never makes results up.
 
-Its view has **Points raised** (the rebuttal in a line; **All points**, **Misread**, **Need an experiment**, **Need words** and **Minor** show one kind; each point with who raised it, in their words, its draft reply, its length against its share, and **Copy**), **To do** (the experiments to run and the changes to make in the paper, to tick off) and **Whole rebuttal** (each reviewer's reply against the limit, and **Copy the whole rebuttal**).
+Its view has **Points raised** (the rebuttal in a line; **All points**, **Misread**, **Need an experiment**, **Need words** and **Minor** show one kind; each point with who raised it, in their words, its draft reply, its length against its share, and **Copy**), **To do** (the experiments to run and the changes to make in the paper, to tick off; **Run these…** under the experiments opens the start page with a request for an agent to run them, which you send once you have picked the folder of your paper's code) and **Whole rebuttal** (each reviewer's reply against the limit, and **Copy the whole rebuttal**).
 
 ### Paper to talk, poster and thread
 
@@ -249,14 +266,15 @@ Each set is a run of its own, and keeps its texts and your labels as the app's r
 
 **Research sprint** takes a research question through a short sprint on your own code, with you approving each step. Fill in **Your research question**, **The repository** (a Git repository on this computer; it starts from the last one you gave), **What it should know** (the metric that matters, the baseline and its numbers, how to train and evaluate, what not to change), **GPU hours it may use** (8 unless you change it, for all its runs together) and **How many hypotheses** (one to five). What you keep in About you as **What you can run on** goes to the model that proposes the hypotheses and to the agent that plans the runs, so that they fit your machine. Then:
 
-1. The helper model proposes hypotheses from your question and the repository's README, each with what would support it and what would count against it, and the experiment that tests it.
-2. With **Let me approve each step** ticked (it is unless you untick it), the run waits for you: keep them, or write the ones to test instead, one a line. The question shows on the run's page, in your inbox and as a notice.
+1. The helper model proposes hypotheses from your question and the repository's README, each with what would support it and what would count against it, and the experiment that tests it. Each is then checked for prior work, as the Gap finder checks its ideas, and the closest earlier work goes with it; one that is already known says so.
+2. With **Let me approve each step** ticked (it is unless you untick it), the run waits for you: keep them, or write the ones to test instead, one a line. Under each hypothesis is the closest earlier work found. The question shows on the run's page, in your inbox and as a notice.
 3. An agent makes a worktree of the repository on a new branch (sprint/…), beside your checkout, which it never changes. There it writes the plan (SPRINT.md) and the code the runs need, commits them, and lists the runs: a baseline and each hypothesis's, with seeds. Those that would go past your GPU hours are left out, and named.
 4. It waits for you again, before any GPU time is spent: start the runs, or say no, and the sprint stops there (the plan and the code stay on the branch).
 5. Experiments runs them, tagged with the sprint, and the sprint waits for them all to end.
 6. A results table compares each condition with the baseline, with significance; an agent analyses the runs in a Jupyter notebook, kept in the project's files, decides each hypothesis (supported, not supported or unclear, with its evidence) and writes a short report.
+7. Each hypothesis is kept as one of the project's [findings](/guide/memory#findings-what-was-tried-and-what-came-of-it) (supported, refuted, unclear, or open when it was not tested), with its runs and the sprint's branch as evidence, so later sessions know what was tried.
 
-Its view has **The sprint** (the question, how it went, its branch, and each hypothesis with its verdict and evidence), **Runs** (the results table, and each run with its metric) and **Report** (to read and copy, with **Open the notebook** and what to try next). Run from the API or a schedule, nobody is there to approve, so it goes straight through.
+Its view has **The sprint** (the question, how it went, its branch, and each hypothesis with its verdict, evidence and closest work), **Runs** (the results table, and each run with its metric) and **Report** (to read and copy, with **Open the notebook** and what to try next). Run from the API or a schedule, nobody is there to approve, so it goes straight through.
 
 ### Sweep planner
 
@@ -300,6 +318,7 @@ Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you
 - "Watch Hugging Face for new rerankers under 1B parameters with an Apache or MIT licence, and run my evaluation on each: python eval.py --model {model} in ~/rerank-eval, ndcg@10, my best is 0.512."
 - "Start a living related work on learned sparse retrieval, seeded with SPLADE and ColBERT, and draft its related-work section."
 - "Find gaps between my papers and this month's work on conversational search; I have one 24 GB GPU."
+- "Is this idea new: training a dense retriever with a curriculum that goes from short queries to long ones?"
 - "Add 2104.08663 and the ColBERT paper to my reading list, in the project Dense retrieval."
 - "Import ~/papers/refs.bib into my reading list, tagged survey."
 - "Sync my reading list with Zotero."
@@ -309,9 +328,13 @@ Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you
 - "Open Reproduce a paper filled in for 2104.08663, but don't run it yet."
 - "Review my draft in ~/papers/draft as three SIGIR reviewers would, and tell me what could sink it."
 - "Here are my ARR reviews: draft a rebuttal of at most 2,500 characters per reviewer."
+- "Run the ablations the reviewers asked for and put the numbers in a table."
 - "Make a 12-minute talk, an A0 poster and a thread from my paper in ~/papers/colbert, in the project ColBERT."
 - "Fix the plots in ~/papers/colbert/plots for an ACL paper, one column wide, in Times."
 - "Check my paper for ACL before I submit it, and fix what you safely can."
+- "Check the proof of Lemma 2 in my paper."
+- "State this theorem in Lean and prove it."
+- "Set a goal: Proofs/Main.lean passes leancheck."
 - "Are all the references in my LaTeX paper real, with the right authors and years? Correct the ones that are not."
 - "Merge the duplicate entries in my paper's bibliography and fill in what their DOIs know."
 - "Has any preprint my paper cites been published since? Cite the published versions."

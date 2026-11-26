@@ -205,12 +205,13 @@ export async function projectFiles(project: { name: string; description?: string
 }
 
 // ---- the project's memory notes ----------------------------------------------------------------------------------------
+// Not its findings: they are kept whole where they are, each with its evidence, and are never summed up.
 
 /** The project's memory notes as "## <title>\n<text>" blocks, in texts of at most MAX_DOC_CHARS, titled "Memory notes (1 of 2)". */
 export function noteTexts(db: DB, project: { folder: string }, now = Date.now()): { title: string; text: string }[] {
   const place = repoRoot(project.folder);
   if (!place) return [];
-  const blocks = entries(db, { scope: 'repo', scopeKey: place, live: now, limit: 2000 })
+  const blocks = entries(db, { scope: 'repo', scopeKey: place, kinds: ['note', 'topic', 'profile'], live: now, limit: 2000 })
     .map((n) => `## ${titleOf(n)}\n${n.text.trim()}`)
     .filter((b) => b.length > 8);
   const texts: string[] = [];
@@ -230,7 +231,7 @@ export function noteTexts(db: DB, project: { folder: string }, now = Date.now())
 /** How many memory notes the project has (for the offer: no text is made). */
 export function noteCount(db: DB, project: { folder: string }, now = Date.now()): number {
   const place = repoRoot(project.folder);
-  return place ? entries(db, { scope: 'repo', scopeKey: place, live: now, limit: 2000 }).length : 0;
+  return place ? entries(db, { scope: 'repo', scopeKey: place, kinds: ['note', 'topic', 'profile'], live: now, limit: 2000 }).length : 0;
 }
 
 // ---- documents --------------------------------------------------------------------------------------------------------

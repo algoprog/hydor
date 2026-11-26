@@ -78,7 +78,7 @@ test('the lead gets the method with its budget, a researcher its own part; their
   const page = await spawnAdditions({ agent: 'claude', key: 'claude:x', cwd: tmp, runId: 'r3', resume: false, extra: { research: { breadth: 1, depth: 1, queries: 20, format: 'page' } } });
   assert.match(page.instructions.join('\n'), /save_page/);
   const none = await spawnAdditions({ agent: 'claude', key: 'claude:plain', cwd: tmp, runId: 'r4', resume: false, extra: {} });
-  assert.deepEqual(none.instructions, []);
+  assert.deepEqual(none.instructions.filter((t) => !t.startsWith('Before you call an idea or a result new')), [], 'outside a research, only the note on checking for prior work');
   assert.deepEqual(none.disallowedTools, []);
 });
 

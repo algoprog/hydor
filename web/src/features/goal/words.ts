@@ -1,7 +1,7 @@
 // The words of goal mode: where a goal stands, how a round ended, what a check shows, the clock of a question, the labels of
 // its buttons, durations and money. Pure, so a test can read them (words-test.ts); the screens only draw them. Words are the
 // ones of the specification's section 2: Goal, Done when, check, holds, round, way, Kept, Undone, Best so far, Its pick, From you.
-import { holding, standing, type GoalAsks, type GoalLimits, type GoalCheck, type GoalResult, type GoalRound, type GoalSettings, type GoalState, type GoalStatus } from '@shared/goals';
+import { holding, meets, numeric, scoreTarget, standing, type GoalAsks, type GoalLimits, type GoalCheck, type GoalResult, type GoalRound, type GoalScoring, type GoalSettings, type GoalState, type GoalStatus } from '@shared/goals';
 import type { SessionSummary } from '@shared/types';
 import { duration, usd } from '../../lib/format';
 
@@ -49,11 +49,64 @@ export const valueText = (c: GoalCheck, v: number, ...others: (number | undefine
 
 /** What a check needs, in a column: "pass", "≥ 0.80", "looks right", "you"; `others` are values shown beside it. */
 export function needsText(c: GoalCheck, ...others: (number | undefined)[]): string {
-  if (c.kind === 'measure' && c.target) return `${c.target.op === '>=' ? '≥' : '≤'} ${valueText(c, c.target.value, ...others)}`;
+  if (numeric(c) && c.target) return `${c.target.op === '>=' ? '≥' : '≤'} ${valueText(c, c.target.value, ...others)}`;
   return c.kind === 'command' ? 'pass' : c.kind === 'review' ? 'looks right' : c.kind === 'you' ? 'you' : '';
 }
 
-export const KIND_LABEL: Record<GoalCheck['kind'], string> = { command: 'Command', measure: 'Measured', review: 'Reviewer', you: 'You' };
+export const KIND_LABEL: Record<GoalCheck['kind'], string> = { command: 'Command', measure: 'Measured', score: 'Score', review: 'Reviewer', you: 'You' };
+
+// ---- scores ----------------------------------------------------------------------------------------------------------------
+
+/** An evaluation's page (in Experiments), where you measure its baseline and run its final test. */
+export const evalPage = (id: string): string => `/experiments?evaluation=${encodeURIComponent(id)}`;
+
+/** What a score check is about, under its label: "nDCG@10 of “Search relevance”: its baseline 0.412, better by at least 0.02". */
+export function scoreBasis(c: GoalCheck): string {
+  if (c.kind !== 'score') return '';
+  const by = c.gain ? `better by at least ${num(c.gain)}` : 'better beyond the noise';
+  if (!c.baseline) return `scored by its evaluation, ${by} than its baseline`;
+  return `${c.baseline.metric} of “${c.baseline.name}”: its baseline ${num(c.baseline.mean)}, ${by}`;
+}
+
+/** The target a score check will have with an evaluation's baseline, as the editor shows it before the app fixes it: "≥ 0.432". */
+export function scoreNeeds(better: 'higher' | 'lower', mean: number, gain: number): string {
+  const t = scoreTarget(better, mean, gain);
+  return `${t.op === '>=' ? '≥' : '≤'} ${num(t.value)}`;
+}
+
+/** An evaluation as the editor lists it: what it needs before a score check can be agreed. */
+export interface EvalChoice {
+  id: string;
+  name: string;
+  metric: string;
+  better: 'higher' | 'lower';
+  seal: { n: number };
+  final?: unknown;
+  baselineScore?: { status: string; seal: number; mean?: number; values: number[] };
+}
+
+/** The baseline a score check would be fixed against, or null while it is not measured under the evaluation's seal. */
+export const baselineOf = (e: EvalChoice): { mean: number; n: number } | null =>
+  e.baselineScore && e.baselineScore.status === 'done' && e.baselineScore.seal === e.seal.n && e.baselineScore.mean != null ? { mean: e.baselineScore.mean, n: e.baselineScore.values.length } : null;
+
+/** What keeps an evaluation from scoring a check, in a sentence; null when it can. */
+export const evalProblem = (e: EvalChoice | undefined): string | null =>
+  !e ? 'Pick one of this folder’s evaluations' : baselineOf(e) ? null : 'Its baseline is not measured yet: only you can measure it, on the evaluation’s page';
+
+/**
+ * A score check with no score yet where things stand: a score never runs before you start the goal (its runs may take a
+ * GPU), so its row shows its baseline as the reference: "Scored once you start · baseline 0.412".
+ */
+export const unscoredText = (c: GoalCheck): string => (c.kind === 'score' ? `Scored once you start${c.baseline ? ` · baseline ${num(c.baseline.mean)}` : ''}` : '');
+
+/** "scoring: 2 of 3 runs done", "scoring: waiting in the queue": what a score's wait shows on the bar. */
+export function scoringWords(s: GoalScoring): string {
+  if (s.waiting) return s.runs > 1 ? `scoring: waiting in the queue · 0 of ${s.runs} runs done` : 'scoring: waiting in the queue';
+  return s.runs > 1 ? `scoring: ${s.done} of ${s.runs} runs done` : 'scoring: its run is going';
+}
+
+/** A score that meets its target but is no better than the baseline beyond the noise of its seeds. */
+export const withinNoise = (c: GoalCheck, r: GoalResult | undefined): boolean => c.kind === 'score' && !!r && !r.holds && r.value != null && !r.error && meets(c, r.value) && r.verdict !== 'better';
 
 // ---- where a goal stands ---------------------------------------------------------------------------------------------------
 
@@ -92,13 +145,15 @@ export function statusWords(g: GoalState, team?: Team): string {
     case 'agreeing':
       return 'the checks wait for you';
     case 'measuring':
-      return 'measuring where things stand';
+      return g.scoring ? `measuring where things stand · ${scoringWords(g.scoring)}` : 'measuring where things stand';
     // Pause was pressed while the round ran: it is finished and checked first.
     case 'working':
       // The lead's own turn has ended and its subagents (a swarm's members) are still at work: the round is not over.
       if (team) return `${at} · ${waitingWords(team)}${g.pausing ? ' · pausing after this round' : ''}`;
       return g.pausing ? `${at} · working · pausing after this round` : `${at} · working`;
     case 'checking':
+      // A score may take hours: the bar says how its runs stand.
+      if (g.scoring) return `${at} · ${scoringWords(g.scoring)}`;
       return g.pausing ? `${at} · running the checks · pausing after this round` : `${at} · running the checks`;
     case 'asking':
       return `${at} · asking you`;
@@ -253,7 +308,7 @@ export function biggestMove(g: Pick<GoalState, 'rounds' | 'contract'>, r: GoalRo
   if (!was) return undefined;
   let best: { text: string; size: number } | undefined;
   for (const c of g.contract.checks) {
-    if (c.kind !== 'measure') continue;
+    if (!numeric(c)) continue;
     const a = was.results.find((x) => x.id === c.id)?.value;
     const b = r.results.find((x) => x.id === c.id)?.value;
     if (a == null || b == null || a === b) continue;
@@ -324,8 +379,9 @@ export const roundCost = (r: GoalRound): string => `${usd(r.usd)} · ${spanText(
 export function nowText(c: GoalCheck, r: GoalResult | undefined): string {
   if (!r) return '';
   if (r.error) return r.error;
-  if (r.holds) return c.kind === 'measure' && r.value != null ? valueText(c, r.value) : 'holds';
-  if (c.kind === 'measure' && r.value != null) return `${valueText(c, r.value)} now`;
+  if (r.holds) return numeric(c) && r.value != null ? valueText(c, r.value) : 'holds';
+  if (withinNoise(c, r)) return `${valueText(c, r.value!)} now, within the noise`;
+  if (numeric(c) && r.value != null) return `${valueText(c, r.value)} now`;
   return c.kind === 'command' ? 'fails' : 'not yet';
 }
 
@@ -333,7 +389,7 @@ export function nowText(c: GoalCheck, r: GoalResult | undefined): string {
 export function cellText(c: GoalCheck, r: GoalResult | undefined, other?: number): string {
   if (!r) return '';
   if (r.error) return 'could not run';
-  if (c.kind === 'measure' && r.value != null) return valueText(c, r.value, other);
+  if (numeric(c) && r.value != null) return valueText(c, r.value, other);
   return r.holds ? 'holds' : c.kind === 'command' ? 'fails' : 'not yet';
 }
 
@@ -350,14 +406,15 @@ export const startResultText = (c: GoalCheck, r: GoalResult | undefined): string
 export function resultText(c: GoalCheck, r: GoalResult | undefined): string {
   if (!r) return '';
   if (r.error) return 'could not run';
-  if (c.kind === 'measure' && r.value != null) return r.holds || !c.target ? valueText(c, r.value) : `${valueText(c, r.value)}, needs ${valueText(c, c.target.value, r.value)}`;
+  if (withinNoise(c, r)) return `${valueText(c, r.value!)}, within the noise`;
+  if (numeric(c) && r.value != null) return r.holds || !c.target ? valueText(c, r.value) : `${valueText(c, r.value)}, needs ${valueText(c, c.target.value, r.value)}`;
   if (r.holds) return 'holds';
   return c.kind === 'command' ? 'fails' : 'not yet';
 }
 
 /** A check pill's measured part: "0.73 / 0.80" or "208 / 200 ms". */
 export function pillValue(c: GoalCheck, r: GoalResult): string {
-  if (c.kind !== 'measure' || r.value == null || !c.target) return '';
+  if (!numeric(c) || r.value == null || !c.target) return '';
   const d = placesOf(c, r.value);
   return `${fixed(r.value, d)} / ${fixed(c.target.value, d)}${c.unit ? ` ${c.unit}` : ''}`;
 }

@@ -22,26 +22,33 @@ const str = (v: unknown, n: number) => (typeof v === 'string' ? v.trim().slice(0
 const CHECK = {
   type: 'object',
   properties: {
-    kind: { type: 'string', enum: ['command', 'measure', 'review', 'you'], description: 'command: a shell command that must end without an error; measure: a command that prints a number that must reach a target; review: a sentence a reviewer must find true in what it is shown, for what no command can decide (what a command can decide, such as files left unchanged or a build that passes, is a command); you: something only the user can confirm.' },
+    kind: {
+      type: 'string',
+      enum: ['command', 'measure', 'score', 'review', 'you'],
+      description:
+        'command: a shell command that must end without an error; measure: a command that prints a number that must reach a target; score: the project’s evaluation (Experiments → Evaluations: evaluation_get lists those of your folder) scores the work its sealed way, and it must beat the baseline the user measured by at least gain, beyond the noise of its seeds; when the folder has an evaluation, judge by it with a score check rather than a measure of your own, and never propose its final test; review: a sentence a reviewer must find true in what it is shown, for what no command can decide (what a command can decide, such as files left unchanged or a build that passes, is a command); you: something only the user can confirm.',
+    },
     label: { type: 'string', description: 'What it says, in plain words: "Tests pass", "Search p95 latency", "The settings page has a dark mode".' },
     run: { type: 'string', description: 'command, measure: the shell command the app runs with bash in the session’s folder (the project’s own test, type-check, build or benchmark command).' },
     read: { type: 'string', description: 'measure: a regular expression whose first group is the number (its last match counts). Leave it out to read the last number printed.' },
     target: { type: 'object', properties: { op: { type: 'string', enum: ['>=', '<='] }, value: { type: 'number' } }, required: ['op', 'value'], description: 'measure: what the number must reach.' },
     unit: { type: 'string', description: 'measure: shown after the number ("ms").' },
+    evaluation: { type: 'string', description: 'score: the evaluation’s id, as evaluation_get gives it. It must have a baseline, which only the user measures.' },
+    gain: { type: 'number', description: 'score: how much better than the baseline’s mean it must be, in the score’s own units (0, the default: any gain beyond the noise of its seeds). The app fixes the target from the baseline when the user agrees, and adds the files the evaluation protects to the paths you may not change.' },
     claim: { type: 'string', description: 'review: the sentence the reviewer must find true. It judges from the evidence alone and says no when unsure, so write the sentence about what that evidence can show, and name in evidence the files it needs to see.' },
     evidence: {
       type: 'object',
       properties: { diff: { type: 'boolean', description: 'The whole change since the goal started, with every file that changed named first.' }, files: { type: 'array', items: { type: 'string' }, description: 'Files of the folder (the first 8000 characters of each).' }, run: { type: 'string', description: 'A command whose output it reads.' } },
       description: 'review: what the reviewer looks at (the change since the goal started unless set).',
     },
-    timeoutS: { type: 'number', description: 'The most seconds the command may take (600 unless set, 3600 at most).' },
+    timeoutS: { type: 'number', description: 'The most seconds the command may take (600 unless set, 3600 at most); for a score, the most it waits for its score, the queue included (21600, six hours, unless set; 172800 at most).' },
   },
   required: ['kind', 'label'],
 };
 
 const PROPOSE: RunTool = {
   name: 'goal_propose',
-  description: `Propose the checks that say when this session's goal is done, while the app asks you for them: 1 to ${GOAL_MAX_CHECKS} checks (3 to 7 is best; prefer the project's own test, type-check, build and benchmark commands), the paths you must not change, and limits that fit the job. The app runs every check once to measure where things stand and shows the user a card to agree, change or decline them; no round starts before they agree. Call it again to replace the proposal before they agree. Returns what is wrong with the proposal to fix, or that the user sees it now.`,
+  description: `Propose the checks that say when this session's goal is done, while the app asks you for them: 1 to ${GOAL_MAX_CHECKS} checks (3 to 7 is best; prefer the project's own test, type-check, build and benchmark commands, and when the folder has an evaluation, a score check by it), the paths you must not change, and limits that fit the job. The app runs every check once to measure where things stand (a score only once the user agrees) and shows the user a card to agree, change or decline them; no round starts before they agree. Call it again to replace the proposal before they agree. Returns what is wrong with the proposal to fix, or that the user sees it now.`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -55,7 +62,7 @@ const PROPOSE: RunTool = {
   async run(a, ctx) {
     const no = refusal(ctx);
     if (no) return { text: no, isError: true };
-    return out(propose(ctx.deps, ctx.key, a));
+    return out(await propose(ctx.deps, ctx.key, a));
   },
 };
 
