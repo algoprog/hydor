@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 
 const HELP = `waitfor - block until a job reaches a state, then print ONE compact result.
@@ -39,6 +39,7 @@ Options:
   --all  --quiet  --help
 Any REGEX may be written /pattern/flags (flags i, m, s, u); otherwise it is used as given.
 Limits: a log that is truncated and regrown past its old size between two polls is not noticed.
+Platforms: --unit is Linux only; on Windows --until and --slurm need sh (Git for Windows), --proc needs PowerShell.
 Exit: 0 done, 2 failed, 124 timeout, 3 runtime error, 64 usage, 130 interrupted.
       '--' form: the command's own exit code (128+signal if killed).
 
@@ -52,6 +53,155 @@ Examples:
 
 class UsageError extends Error {}
 class RuntimeErr extends Error {}
+class EnvError extends Error {} // the platform cannot do what was asked: exit 3 before waiting
+
+// ---------- platform layer ----------
+// Everything OS-specific lives in this section. WAITFOR_FAKE_PLATFORM (darwin|win32) is a hidden test seam: it makes
+// waitfor take the macOS / Windows code paths on Linux, using whatever `ps` / `powershell` / `taskkill` / `sh` are on PATH.
+const PLATFORM = process.env.WAITFOR_FAKE_PLATFORM || process.platform;
+const IS_WIN = PLATFORM === 'win32';
+
+// 'proc' (Linux /proc), 'ps' (macOS, BSD, Linux without /proc), 'win' (PowerShell + process.kill).
+function procMode() {
+  if (IS_WIN) return 'win';
+  if (PLATFORM === 'linux' && fs.existsSync('/proc/self')) return 'proc';
+  return 'ps';
+}
+
+// `ps -axo pid=,ppid=,stat=,command=` -> [{pid, ppid, state, cmd}]. The command is the rest of the line (it has spaces).
+function parsePs(text) {
+  const rows = [];
+  for (const line of String(text).split(/\r?\n/)) {
+    const m = /^\s*(\d+)\s+(\d+)\s+(\S+)(?:\s+(.*))?$/.exec(line);
+    if (m) rows.push({ pid: +m[1], ppid: +m[2], state: m[3], cmd: (m[4] || '').trim() });
+  }
+  return rows;
+}
+
+// PowerShell `ConvertTo-Json -Compress` of Get-CimInstance Win32_Process: one object when there is a single process,
+// an array otherwise, CommandLine null for system processes. Throws on text that is not JSON.
+function parseCim(text) {
+  const s = String(text).replace(/^\uFEFF/, '').trim();
+  if (!s) return [];
+  let data = JSON.parse(s);
+  if (data === null || data === undefined) return [];
+  if (!Array.isArray(data)) data = [data];
+  const rows = [];
+  for (const x of data) {
+    if (!x || typeof x !== 'object' || !Number.isFinite(Number(x.ProcessId))) continue;
+    rows.push({ pid: Number(x.ProcessId), ppid: Number(x.ParentProcessId) || 0, state: '',
+      cmd: typeof x.CommandLine === 'string' ? x.CommandLine : '' });
+  }
+  return rows;
+}
+
+// Pids --proc must never match: waitfor, its ancestors (the calling shell, whose cmdline contains the regex),
+// and its own descendants (the ps / powershell that is listing the processes).
+function excludedPids(rows, selfPid, selfPpid) {
+  const skip = new Set([selfPid, 1]);
+  const byPid = new Map(rows.map((r) => [r.pid, r]));
+  let p = selfPpid;
+  while (p > 1 && !skip.has(p)) {
+    skip.add(p);
+    const r = byPid.get(p);
+    if (!r) break;
+    p = r.ppid;
+  }
+  const kids = new Map();
+  for (const r of rows) { if (!kids.has(r.ppid)) kids.set(r.ppid, []); kids.get(r.ppid).push(r.pid); }
+  const stack = [selfPid];
+  while (stack.length) {
+    for (const k of kids.get(stack.pop()) || []) if (!skip.has(k)) { skip.add(k); stack.push(k); }
+  }
+  return skip;
+}
+
+// First listed process (not excluded, not a zombie) whose command line matches.
+function matchProc(rows, re, skip) {
+  for (const r of rows) {
+    if (skip.has(r.pid) || r.state.startsWith('Z') || !r.cmd) continue;
+    if (re.test(r.cmd)) return r.pid;
+  }
+  return null;
+}
+
+// Listed and not a zombie.
+function pidsAliveIn(rows, pids) {
+  const byPid = new Map(rows.map((r) => [r.pid, r]));
+  return pids.filter((p) => { const r = byPid.get(p); return r && !r.state.startsWith('Z'); });
+}
+
+const PROC_LIST_LIMIT = 64e6; // a whole process table is much bigger than the 1 MB kept for other commands
+const PS_CMD = 'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress';
+
+// Process table where /proc is not available. Transient failures throw plain Errors (counted by the caller);
+// a missing tool is a RuntimeErr.
+async function procTable() {
+  if (procMode() === 'win') {
+    const r = await runCmd('powershell', ['-NoProfile', '-NonInteractive', '-Command', PS_CMD], 60000, undefined, PROC_LIST_LIMIT);
+    if (r.spawnError) throw new RuntimeErr('--proc needs PowerShell on Windows');
+    if (r.code !== 0 || r.timedOut) throw new Error(r.timedOut ? 'powershell timed out' : firstLine(r.err, r.out) || `powershell exit ${r.code}`);
+    try { return parseCim(r.out); } catch { throw new Error('powershell output is not JSON'); }
+  }
+  // COLUMNS keeps BSD ps from cutting long command lines when its output is a pipe
+  const r = await runCmd('ps', ['-axo', 'pid=,ppid=,stat=,command='], 30000, { ...process.env, COLUMNS: '100000' }, PROC_LIST_LIMIT);
+  if (r.spawnError) throw new RuntimeErr('ps not found (needed to look at processes on this platform)');
+  if (r.code !== 0 || r.timedOut) throw new Error(r.timedOut ? 'ps timed out' : firstLine(r.err, r.out) || `ps exit ${r.code}`);
+  return parsePs(r.out);
+}
+
+// A table, or null for "could not tell this time"; 5 failures in a row end the wait.
+async function procTableCounted(c, what) {
+  try { const t = await procTable(); c.fails = 0; return t; } catch (e) {
+    if (e instanceof RuntimeErr) throw e;
+    c.fails = (c.fails || 0) + 1;
+    if (c.fails >= 5) throw new RuntimeErr(`${what}: listing processes failed 5 times in a row: ${e.message}`);
+    return null;
+  }
+}
+
+function winPidAlive(pid) {
+  try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+}
+
+const onPath = (env = process.env) => String(env.PATH ?? env.Path ?? '').split(path.delimiter).filter(Boolean);
+function isFile(p) { try { return fs.statSync(p).isFile(); } catch { return false; } }
+
+// `sh` on PATH (Git for Windows puts one there).
+function findSh(env = process.env) {
+  for (const d of onPath(env)) for (const n of ['sh.exe', 'sh']) if (isFile(path.join(d, n))) return path.join(d, n);
+  return null;
+}
+
+// How to start the -- command. Windows cannot start .cmd/.bat/extensionless scripts directly (Node refuses without a
+// shell), so when the command resolves to one of those and sh is there, sh starts it; real programs start directly.
+function spawnPlan(cmd, env = process.env, exists = isFile) {
+  const direct = { file: cmd[0], args: cmd.slice(1) };
+  if (!IS_WIN) return direct;
+  const name = cmd[0];
+  const hasDir = /[\\/]/.test(name);
+  const dirs = hasDir ? [''] : ['.', ...onPath(env)];
+  const hasExt = /\.[^\\/.]+$/.test(name);
+  const order = hasExt ? [''] : ['.exe', '.com', '.cmd', '.bat', ''];
+  for (const d of dirs) {
+    for (const e of order) {
+      const f = path.join(d, name + e);
+      if (!exists(f)) continue;
+      if (/\.(exe|com)$/i.test(f)) return direct;
+      const sh = findSh(env);
+      return sh ? { file: sh, args: ['-c', 'exec "$@"', 'sh', ...cmd] } : direct;
+    }
+  }
+  return direct;
+}
+
+// Errors found before waiting starts.
+function preflight(o) {
+  if (IS_WIN) {
+    const flags = [...new Set(o.conds.filter((c) => c.kind === 'until' || c.kind === 'slurm').map((c) => (c.kind === 'until' ? '--until' : '--slurm')))];
+    if (flags.length && !findSh()) throw new EnvError(`${flags.join(' and ')} needs sh on PATH (install Git for Windows and run waitfor from Git Bash)`);
+  }
+}
 
 const T0 = performance.now();
 const elapsed = () => performance.now() - T0;
@@ -220,6 +370,7 @@ function parseArgs(argv) {
       throw new UsageError(`${o.fails.length ? '--fail' : '--progress'} needs a --log (or the '-- COMMAND' form)`);
     }
   }
+  if (PLATFORM !== 'linux' && o.conds.some((c) => c.kind === 'unit')) throw new EnvError('--unit needs systemd (Linux only)');
   o.timeoutGiven = o.timeoutMs !== null;
   if (!o.timeoutGiven && o.cmd === null) {
     o.timeoutMs = process.env.WAITFOR_DEFAULT_TIMEOUT ? parseDur(process.env.WAITFOR_DEFAULT_TIMEOUT, 'WAITFOR_DEFAULT_TIMEOUT') : 600000; // test hook
@@ -239,6 +390,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function killGroup(child, sig) {
   if (!child || !child.pid) return;
+  if (IS_WIN) {
+    // no process groups or signals on Windows: taskkill takes the whole tree down
+    let ok = false;
+    try { ok = spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 10000 }).status === 0; } catch { /* fall back */ }
+    if (!ok) { try { child.kill(); } catch { /* gone */ } }
+    return;
+  }
   try { process.kill(-child.pid, sig); } catch { try { child.kill(sig); } catch { /* gone */ } }
 }
 
@@ -257,12 +415,12 @@ function childDone(child, onSpawnError) {
 }
 
 // Run a command with captured output and a hard timeout (process group is killed).
-function runCmd(file, args, ms) {
+function runCmd(file, args, ms, env, limit = 1e6) {
   return new Promise((resolve) => {
-    const child = spawn(file, args, { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawn(file, args, { stdio: ['ignore', 'pipe', 'pipe'], detached: !IS_WIN, windowsHide: true, ...(env ? { env } : {}) });
     S.children.add(child);
     let out = '', err = '', timedOut = false;
-    const cap = (s, d) => (s.length < 1e6 ? s + d : s);
+    const cap = (s, d) => (s.length < limit ? s + d : s);
     child.stdout.on('data', (d) => { out = cap(out, d); });
     child.stderr.on('data', (d) => { err = cap(err, d); });
     const timer = setTimeout(() => { timedOut = true; killGroup(child, 'SIGKILL'); }, ms);
@@ -273,7 +431,11 @@ function runCmd(file, args, ms) {
     });
   });
 }
-const runSh = (cmd, ms = 30000) => runCmd('sh', ['-c', cmd], ms);
+const runSh = async (cmd, ms = 30000) => {
+  const r = await runCmd('sh', ['-c', cmd], ms);
+  if (r.spawnError?.code === 'ENOENT') throw new RuntimeErr(IS_WIN ? 'sh not found on PATH (install Git for Windows and run waitfor from Git Bash)' : 'sh not found on PATH');
+  return r;
+};
 function firstLine(...ss) { for (const s of ss) { const l = String(s || '').split('\n').map((x) => x.trim()).find(Boolean); if (l) return cut(l, 160); } return ''; }
 
 // ---------- line splitting (shared by log watchers and command output) ----------
@@ -342,7 +504,14 @@ function buildCondition(spec, o) {
       c.alive = spec.pids.slice();
       c.pending = () => `pid ${c.alive.join(',')} running`;
       c.check = async () => {
-        c.alive = spec.pids.filter(pidAlive);
+        const mode = procMode();
+        if (mode === 'proc') c.alive = spec.pids.filter(pidAlive);
+        else if (mode === 'win') c.alive = spec.pids.filter(winPidAlive);
+        else {
+          const rows = await procTableCounted(c, '--pid');
+          if (!rows) return null; // could not list this time: not "gone"
+          c.alive = pidsAliveIn(rows, spec.pids);
+        }
         return c.alive.length ? null : { what: `pid ${spec.pids.join(',')} exited`, suffix: '' };
       };
       break;
@@ -350,8 +519,14 @@ function buildCondition(spec, o) {
     case 'proc': {
       c.hit = null;
       c.pending = () => `proc ${spec.src} still running${c.hit ? ` (pid ${c.hit})` : ''}`;
+      if (procMode() !== 'proc') c.interval = every(IS_WIN ? 5000 : 2000); // PowerShell and CIM are slow to start
       c.check = async () => {
-        c.hit = findProc(spec.re);
+        if (procMode() === 'proc') c.hit = findProc(spec.re);
+        else {
+          const rows = await procTableCounted(c, '--proc');
+          if (!rows) return null;
+          c.hit = matchProc(rows, spec.re, excludedPids(rows, process.pid, process.ppid));
+        }
         return c.hit ? null : { what: `no process matching ${spec.src}`, suffix: '' };
       };
       break;
@@ -668,9 +843,18 @@ async function main() {
     process.stdout.write(lines.join('\n') + '\n');
     process.exit(0);
   }
+  // undocumented helper for the test-suite: --_parse ps|cim  (text on stdin) prints the parsed process rows as JSON
+  if (process.argv[2] === '--_parse') {
+    const text = fs.readFileSync(0, 'utf8');
+    let rows;
+    try { rows = process.argv[3] === 'cim' ? parseCim(text) : parsePs(text); } catch (e) { rows = `ERR ${e.message}`; }
+    process.stdout.write(JSON.stringify(rows) + '\n');
+    process.exit(0);
+  }
   let o;
-  try { o = parseArgs(process.argv.slice(2)); } catch (e) {
+  try { o = parseArgs(process.argv.slice(2)); if (!o.help) preflight(o); } catch (e) {
     if (e instanceof UsageError) printUsageError(e.message);
+    if (e instanceof EnvError) { process.stdout.write(`error: ${e.message}\n`, () => process.exit(3)); return; }
     throw e;
   }
   if (o.help) { process.stdout.write(HELP); process.exit(0); }
@@ -776,12 +960,14 @@ async function main() {
     // a waiting loop with only log conditions and no other work is fine: timers keep the process alive
   } else {
     outPath = o.out || path.join(os.tmpdir(), `waitfor-${process.pid}.log`);
+    if (!o.out && IS_WIN) outPath = outPath.replace(/\\/g, '/'); // forward slashes survive bash
     let fd;
     try { fd = fs.openSync(outPath, 'w'); } catch (e) {
       process.stdout.write(`error: cannot open output file ${outPath}: ${e.message}\n`);
       process.exit(3);
     }
-    const child = spawn(o.cmd[0], o.cmd.slice(1), { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const plan = spawnPlan(o.cmd);
+    const child = spawn(plan.file, plan.args, { stdio: ['ignore', 'pipe', 'pipe'], detached: !IS_WIN, windowsHide: true });
     const exited = childDone(child, (e) => {
       finish({ kind: 'error', code: 3, header: `error: cannot run '${o.cmd[0]}': ${e.code || e.message}` });
     });

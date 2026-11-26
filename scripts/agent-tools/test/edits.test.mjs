@@ -1031,3 +1031,140 @@ test('property: 200 random files/scripts agree with the reference implementation
   }
   assert.ok(failures >= 20 && successes >= 20, `generator balance: ${successes} ok / ${failures} failing`);
 });
+
+// ---------------------------------------------------------------- Windows behaviour (hidden seams, run on Linux)
+// EDITS_FAKE_PLATFORM=win32 turns on the Windows rules; EDITS_FAKE_RENAME_FAILS=N[@NAME] makes the first N renames
+// onto each target whose path contains NAME fail with EPERM; EDITS_FAKE_CHMOD_FAIL=1 makes fchmod fail.
+function runEnv(cwd, env, input, args = []) {
+  const r = spawnSync(process.execPath, [EDITS, ...args], { cwd, input: input ?? '', encoding: 'utf8', env: { ...process.env, ...env } });
+  return { code: r.status, out: r.stdout, err: r.stderr, all: r.stdout + r.stderr };
+}
+const leftovers = (d) => fs.readdirSync(d, { recursive: true }).filter((n) => /\.edits-.*\.tmp$/.test(String(n)));
+
+describe('windows: transient rename failures', () => {
+  test('succeeds when the rename fails twice (EPERM) and then works', () => {
+    const d = mkcase();
+    w(d, 'a.txt', 'a\n');
+    w(d, 'b.txt', 'b\n');
+    fs.chmodSync(path.join(d, 'b.txt'), 0o640);
+    const t0 = Date.now();
+    const r = runEnv(d, { EDITS_FAKE_PLATFORM: 'win32', EDITS_FAKE_RENAME_FAILS: '2' }, sec('a.txt', blk('a', 'A')) + sec('b.txt', blk('b', 'B')));
+    assert.equal(r.code, 0, r.all);
+    assert.match(r.out, /^applied 2 edits in 2 files/);
+    assert.equal(rd(d, 'a.txt'), 'A\n');
+    assert.equal(rd(d, 'b.txt'), 'B\n');
+    assert.equal(fs.statSync(path.join(d, 'b.txt')).mode & 0o777, 0o640);
+    assert.deepEqual(leftovers(d), []);
+    assert.ok(Date.now() - t0 < 5000, 'the backoff is short');
+  });
+
+  test('4 failures still succeed (5 attempts in all); 5 failures report the error', () => {
+    const d = mkcase();
+    w(d, 'a.txt', 'a\n');
+    assert.equal(runEnv(d, { EDITS_FAKE_PLATFORM: 'win32', EDITS_FAKE_RENAME_FAILS: '4' }, sec('a.txt', blk('a', 'A'))).code, 0);
+    assert.equal(rd(d, 'a.txt'), 'A\n');
+    const r = runEnv(d, { EDITS_FAKE_PLATFORM: 'win32', EDITS_FAKE_RENAME_FAILS: '5' }, sec('a.txt', blk('A', 'AA')));
+    assert.equal(r.code, 1);
+    assert.match(r.err, /write failed for a\.txt: EPERM/);
+    assert.match(r.err, /nothing changed/);
+    assert.equal(rd(d, 'a.txt'), 'A\n');
+    assert.deepEqual(leftovers(d), []);
+  });
+
+  test('after 5 failures on a later file the error is reported and every file already written is rolled back', () => {
+    const d = mkcase();
+    w(d, 'one.txt', '1\n');
+    w(d, 'two.txt', '2\n');
+    w(d, 'sub/three.txt', '3\n');
+    fs.chmodSync(path.join(d, 'two.txt'), 0o600);
+    const before = snapshot(d);
+    const script = sec('one.txt', blk('1', 'ONE')) + '=== newdir/n.txt (new)\n<<<<<<< SEARCH\n=======\nx\n>>>>>>> REPLACE\n'
+      + sec('sub/three.txt', blk('3', 'THREE')) + sec('two.txt', blk('2', 'TWO'));
+    const r = runEnv(d, { EDITS_FAKE_PLATFORM: 'win32', EDITS_FAKE_RENAME_FAILS: '5@two.txt' }, script);
+    assert.equal(r.code, 1);
+    assert.match(r.err, /write failed for two\.txt: EPERM/);
+    assert.match(r.err, /restored 3 files already written; nothing changed/);
+    assert.doesNotMatch(r.all, /ROLLBACK INCOMPLETE/);
+    assert.equal(snapshot(d), before, 'every file, mode and directory is as before');
+    assert.deepEqual(leftovers(d), []);
+    assert.ok(!fs.existsSync(path.join(d, 'newdir')));
+  });
+
+  test('without the Windows rules there is a single attempt (Linux behaviour is unchanged)', () => {
+    const d = mkcase();
+    w(d, 'a.txt', 'a\n');
+    const r = runEnv(d, { EDITS_FAKE_RENAME_FAILS: '1' }, sec('a.txt', blk('a', 'A')));
+    assert.equal(r.code, 1);
+    assert.match(r.err, /write failed for a\.txt: EPERM/);
+    assert.equal(rd(d, 'a.txt'), 'a\n');
+    assert.deepEqual(leftovers(d), []);
+  });
+});
+
+describe('windows: chmod and chown', () => {
+  test('a failing chmod does not fail the edit on win32, and does on Linux', () => {
+    const d = mkcase();
+    w(d, 'a.txt', 'a\n');
+    const ok = runEnv(d, { EDITS_FAKE_PLATFORM: 'win32', EDITS_FAKE_CHMOD_FAIL: '1' }, sec('a.txt', blk('a', 'A')));
+    assert.equal(ok.code, 0, ok.all);
+    assert.equal(rd(d, 'a.txt'), 'A\n');
+    const bad = runEnv(d, { EDITS_FAKE_CHMOD_FAIL: '1' }, sec('a.txt', blk('A', 'B')));
+    assert.equal(bad.code, 1);
+    assert.match(bad.err, /write failed for a\.txt: EPERM/);
+    assert.equal(rd(d, 'a.txt'), 'A\n');
+    assert.deepEqual(leftovers(d), []);
+  });
+});
+
+describe('scripts arriving with CRLF line endings (a Windows shell)', () => {
+  const crlf = (s) => s.replace(/\n/g, '\r\n');
+
+  test('stdin script, LF target', () => {
+    const d = mkcase();
+    w(d, 'a.txt', 'one\ntwo\nthree\n');
+    const r = run(d, [], crlf(sec('a.txt', blk('one\ntwo', 'ONE\nTWO'))));
+    assert.equal(r.code, 0, r.all);
+    assert.equal(rd(d, 'a.txt'), 'ONE\nTWO\nthree\n');
+  });
+
+  test('stdin script, CRLF target: the file keeps its CRLF and no stray CR appears', () => {
+    const d = mkcase();
+    w(d, 'a.txt', 'one\r\ntwo\r\nthree\r\n');
+    const r = run(d, [], crlf(sec('a.txt', blk('one\ntwo', 'ONE\nTWO\nMORE'))));
+    assert.equal(r.code, 0, r.all);
+    assert.equal(rd(d, 'a.txt'), 'ONE\r\nTWO\r\nMORE\r\nthree\r\n');
+  });
+
+  test('SEARCH modifiers, several files, (new) and (overwrite) blocks in one CRLF script, read with "-"', () => {
+    const d = mkcase();
+    w(d, 'a.txt', 'x\nx\ny\n');
+    w(d, 'b.txt', 'old\n');
+    const script = crlf(sec('a.txt', blk('x', 'z', 'all')) + sec('b.txt', blk('old', 'new'))
+      + '=== c.txt (new)\n<<<<<<< SEARCH\n=======\nfresh\nfile\n>>>>>>> REPLACE\n'
+      + '=== b2.txt (overwrite)\n<<<<<<< SEARCH\n=======\nover\n>>>>>>> REPLACE\n');
+    w(d, 'b2.txt', 'before\n');
+    const r = run(d, ['-'], script);
+    assert.equal(r.code, 0, r.all);
+    assert.equal(rd(d, 'a.txt'), 'z\nz\ny\n');
+    assert.equal(rd(d, 'b.txt'), 'new\n');
+    assert.equal(rd(d, 'c.txt'), 'fresh\nfile\n');
+    assert.equal(rd(d, 'b2.txt'), 'over\n');
+  });
+
+  test('JSON script with CRLF between its tokens', () => {
+    const d = mkcase();
+    w(d, 'a.txt', 'q\n');
+    const r = run(d, [], '[\r\n  {"file": "a.txt",\r\n   "old": "q",\r\n   "new": "r"}\r\n]\r\n');
+    assert.equal(r.code, 0, r.all);
+    assert.equal(rd(d, 'a.txt'), 'r\n');
+  });
+
+  test('blank lines inside the search text survive a CRLF script; a script file works like stdin', () => {
+    const d = mkcase();
+    w(d, 'a.txt', 'a\n\nb\n');
+    w(d, 'script.txt', crlf(sec('a.txt', blk('a\n\nb', 'a\n\nB'))));
+    const r = run(d, ['script.txt']);
+    assert.equal(r.code, 0, r.all);
+    assert.equal(rd(d, 'a.txt'), 'a\n\nB\n');
+  });
+});
