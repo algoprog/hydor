@@ -51,8 +51,10 @@ agreed, and conjectures explored before anyone tries to prove them.
   which opens a session with the request written for an agent to try the paper's idea in your repository.
 - **Word suggestions** show more of the right words: an answer that arrives while you are still typing shows what
   is left of it, and how sure a suggestion must be is fitted to your own writing.
-- **Smaller things**: under a reply, the files it changed, its commit and its memory show as one row of small
-  chips; a project's **Memory** tab fits a phone (chips in one line that scrolls sideways); money in answer cards
+- **Smaller things**: **All agents** lists every agent as cards, yours and then the ones that come with the app
+  under **Built in**; a dev server's Preview shows the page itself behind Cloudflare too (a tunnel, or a name it
+  proxies), with nothing to set up; under a reply, the files it changed, its commit and its memory show as one row of
+  small chips; a project's **Memory** tab fits a phone (chips in one line that scrolls sideways); money in answer cards
   shows as $, not \$; and while the app loads, a stream of bright water runs through the Ω.
 
 ## 0.116.0 · 26 November 2026
