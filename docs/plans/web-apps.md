@@ -26,6 +26,14 @@ none of it tied to a framework:
 - checks of the pages an app serves (phone layout, contrast, weight, keys in the page), moved the same way;
 - the comparison's judge and descriptions, kept to measure what a build costs as the guide changes.
 
+**Simple by default (asked for on 26 November 2026).** Making an app has to be easy for someone who does not
+code, without taking anything from someone who does. One switch, Technical details, off by default: off, the
+pages speak in plain words (no file names, commands, ports or ids), an app's page is one page with a few actions
+and the rest behind one menu, the agent asks one thing at a time with choices and "You decide", the checks are one
+line with one button that has the agent fix what failed, and putting an app online is one step to a screen; on,
+everything is shown as before, with the app's files, its settings file, raw check lines and logs, and saved steps
+as commits.
+
 **What goes**: the kit's core, blocks, starters and commands; the Features stage and the updates card; the choice
 between the kit and from scratch. Sections 3 to 6, and what sections 7 to 10 say about blocks, starters and the
 kit's commands, describe what was built and measured, not what is planned. Phases 6 to 8 (commerce, community,
