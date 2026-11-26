@@ -131,7 +131,7 @@ export function resetJudged(db: DB): void {
 
 /**
  * The threshold fitted to a plan's judged guesses, for the share of right ones wanted (`p`): the lowest bin edge above
- * which at least FIT_ABOVE guesses were judged and were right that often, kept between a third of the release's
+ * which at least FIT_ABOVE guesses were judged and were right that often (by the lower bound of their share right: lowerBound), kept between a third of the release's
  * threshold and one and a half times it. The release's own when no edge does that. undefined below SUGGEST_FIT_MIN
  * judged guesses.
  */
@@ -143,7 +143,7 @@ export function fitTheta(bins: SuggestBins | undefined, release: number, p: numb
   for (let i = SUGGEST_BINS - 1; i >= 0; i--) {
     right += bins.right[i];
     total += bins.total[i];
-    if (total >= FIT_ABOVE && (right + 2 * p) / (total + 2) >= p) edge = i / SUGGEST_BINS;
+    if (total >= FIT_ABOVE && lowerBound(right, total) >= p) edge = i / SUGGEST_BINS;
   }
   return Math.min(release * 1.5, Math.max(release / 3, edge));
 }
@@ -156,6 +156,17 @@ export function fittedThetas(judged: SuggestJudged, calibration: Calibration, pr
     if (t !== undefined) out[plan] = t;
   }
   return out;
+}
+
+/**
+ * The Wilson score's lower bound of the share right (z = 1, about 84% sure the share is at least this): a threshold is
+ * lowered only as far as the counts show it keeps the share wanted, not as far as luck in a few dozen guesses allows.
+ */
+export function lowerBound(right: number, total: number, z = 1): number {
+  if (total <= 0) return 0;
+  const p = right / total;
+  const z2 = z * z;
+  return (p + z2 / (2 * total) - z * Math.sqrt((p * (1 - p)) / total + z2 / (4 * total * total))) / (1 + z2 / total);
 }
 
 /** What Settings says: the guesses judged in the plans that are fitted, or in the plan nearest to it while none is. */

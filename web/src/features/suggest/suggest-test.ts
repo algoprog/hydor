@@ -723,9 +723,17 @@ async function judging() {
   await t.settle();
   await t.answer(guess('orld'));
   t.type('orld');
-  eq(t.judged, [['mix', 0.5, true]], 'typed through: right at its last letter');
-  t.type('ly ');
+  eq(t.judged, [], 'typed through: not yet, the word may go on');
+  t.type(' ');
+  eq(t.judged, [['mix', 0.5, true]], 'typed through and ended: right');
+  t.type('it ');
   eq(t.judged.length, 1, 'and only once');
+  t.s.reset();
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(guess('orld'));
+  t.type('orldly ');
+  eq(t.judged, [['mix', 0.5, false]], 'typed through, then a longer word: wrong');
   t.s.reset();
   t = slow('Hello w');
   await t.settle();
@@ -745,7 +753,7 @@ async function judging() {
   await t.answer(guess('orld'));
   t.b.back();
   t.s.sync();
-  eq(t.judged, [['mix', 0.5, false]], 'Backspace on a shown one: wrong');
+  eq(t.judged, [], 'Backspace on a shown one: no verdict, as for a hidden one');
   t.s.reset();
   t = slow('Hello w');
   await t.settle();

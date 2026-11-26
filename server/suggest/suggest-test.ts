@@ -29,7 +29,7 @@ import { merge, readSettings, trainThreads, writeSettings } from './settings.ts'
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
 import { SMALL_MODEL, SMALL_MODEL_NEEDS } from './pins.ts';
 import { addUsage, cleanUsage, dayBefore, dayKey, readUsage, resetUsage, USAGE_KEY } from './usage.ts';
-import { addJudged, cleanJudged, fitTheta, fittedThetas, JUDGED_KEY, readJudged, scoreKey, thetaFor, thresholdsOf, withPoints, SCORE_VERSION } from './fit.ts';
+import { addJudged, cleanJudged, fitTheta, fittedThetas, JUDGED_KEY, lowerBound, readJudged, scoreKey, thetaFor, thresholdsOf, withPoints, SCORE_VERSION } from './fit.ts';
 
 const DATA = process.env.DATA_DIR ?? '';
 if (!DATA.startsWith('/tmp/')) {
@@ -2085,6 +2085,9 @@ test('a threshold is fitted from 400 judged guesses on: the lowest edge right of
   near(fitTheta(bins([0.7, 400, 0], [0.9, 100, 90]), release, 0.4), 0.45); // nor over one and a half times it
   // At least 60 guesses at or above the edge: a handful of sure ones does not make it.
   assert.equal(fitTheta(bins([0.05, 400, 0], [0.9, 59, 59]), release, 0.2), release, 'no edge does: the release\u2019s own');
+  // Right exactly as often as wanted, on few guesses, is not enough: the lower bound of the share must reach it.
+  assert.equal(fitTheta(bins([0.05, 340, 0], [0.5, 60, 12]), release, 0.2), release, '12 of 60 right: not shown to reach 20%');
+  assert.ok(lowerBound(1200, 6000) > 0.19 && lowerBound(12, 60) < 0.16, 'the bound tightens with more guesses');
   const f = fittedThetas({ mix: bins([0.15, 500, 250]), slm: bins([0.15, 100, 50]) }, { mix: { '0.2': 0.3 } }, 0.2);
   assert.deepEqual(Object.keys(f), ['mix'], 'a plan without enough keeps the release\u2019s');
   assert.deepEqual(thresholdsOf({}), { judged: 0, needed: 400, fitted: false });

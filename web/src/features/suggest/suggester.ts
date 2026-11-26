@@ -156,11 +156,14 @@ export class Suggester {
         const v = judgeTyped(this.grey, typed);
         if (v.through || v.wrong || v.fresh) this.out.count?.({ typedThrough: v.through, wrong: v.wrong ? 1 : 0, shown: v.fresh ? 1 : 0 });
         if (v.wrong) this.live = false;
-        if (v.wrong || (v.through && this.grey.word)) this.verdict(!v.wrong);
+        // Judged as a hidden guess is (the whole word, then what ends it), so both count alike: a word typed through and
+        // then made longer was not the word. Another letter is wrong at once.
+        if (v.wrong) this.verdict(false);
+        else if (v.through && this.grey.word) this.shownGuess = null;
       } else if (backspaced(prev, f)) {
         this.out.count?.({ wrong: 1 });
         this.live = false;
-        this.verdict(false);
+        // No verdict, as for a hidden guess: Backspace often mends a typo, not the guess (the deletion forgets the guesses below).
       }
     }
     // A deletion, a caret move, a paste or dictation: what the word was meant to be is no longer clear.
