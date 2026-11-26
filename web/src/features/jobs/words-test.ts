@@ -1,6 +1,6 @@
 // Script tests for the words of the Jobs page (words.ts): what a job is, durations and running clocks, the time left
 // and when it is over its estimate, when a waiting one starts, its place in a queue, what it waits for and what waits
-// for it, how an ended one ended, and the summary line. Build and run:
+// for it, how an ended one ended, and when all of it should be done. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/jobs/words-test.ts && node dist/dev/words-test.js
 import assert from 'node:assert/strict';
 import type { JobEntry } from '@shared/jobs';
@@ -123,14 +123,22 @@ const est = (left: number, source: 'progress' | 'output' | 'agent' | 'history' =
   assert.equal(W.stateWords(job({ state: 'queued' })), 'Queued');
 }
 
-// ---- the summary line
+// ---- when it should all be done, and how much of a group runs
 {
-  const list = (running: number, queued: number, allDoneAt?: number) => ({ running: Array.from({ length: running }, () => job()), queued: Array.from({ length: queued }, () => job({ state: 'queued' })), allDoneAt });
-  assert.equal(W.summaryLine(list(0, 0), NOW), null);
-  assert.equal(W.summaryLine(list(3, 2, NOW + 2 * HOUR + 10 * MIN), NOW), '3 running · 2 queued · all done in about 2 h 10 min');
-  assert.equal(W.summaryLine(list(1, 0), NOW), '1 running', 'no end known');
-  assert.equal(W.summaryLine(list(0, 2, NOW + 20_000), NOW), '2 queued · all done in under a minute');
-  assert.equal(W.summaryLine(list(1, 0, NOW - 1000), NOW), '1 running', 'past its estimate: nothing said of the end');
+  assert.equal(W.allDoneWords(undefined, NOW), null, 'no end known');
+  assert.equal(W.allDoneWords(NOW - 1000, NOW), null, 'past its estimate: nothing said of the end');
+  assert.equal(W.allDoneWords(NOW + 20_000, NOW), 'in under a minute');
+  assert.equal(W.allDoneWords(NOW + 26 * MIN, NOW), 'in about 26 min');
+  assert.equal(W.allDoneWords(NOW + 2 * HOUR + 10 * MIN, NOW), 'in about 2 h 10 min');
+  assert.equal(W.allDoneWords(NOW + 76 * HOUR, NOW), 'in about 3 days 4 h');
+  assert.equal(W.allDoneWords(NOW + 2 * 365 * 24 * HOUR, NOW), null, 'more than a year away says nothing');
+  assert.equal(W.groupDoneWords(undefined, NOW), null);
+  assert.equal(W.groupDoneWords(NOW + 20_000, NOW), 'done in under a minute');
+  assert.equal(W.groupDoneWords(NOW + 34 * MIN, NOW), 'done in about 34 min');
+  assert.equal(W.groupDoneWords(NOW + HOUR - 10_000, NOW), 'done in about 1 h 00 min');
+  assert.equal(W.countWords(3, 1), '3 running · 1 queued');
+  assert.equal(W.countWords(0, 2), '2 queued');
+  assert.equal(W.countWords(1, 0), '1 running');
 }
 
 // ---- progress

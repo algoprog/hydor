@@ -6,6 +6,12 @@
 // - a Hydor subagent (a session another session started) while it works.
 // The server (server/jobs) gathers them, reads how far each has got from its output (shared/job-progress.ts), estimates
 // the time left, keeps what ended for a week, and tells the `job` command when a waiting job may start.
+//
+// Tags sort jobs by what they are part of ("intent-data", "word-suggest"): the agent that runs a job gives it tags
+// (`job run --tag`), reusing the tags of past jobs when the work belongs to one. Work with no tags of its own (a
+// session's background commands, its Hydor subagents and runs of Experiments, a job run without --tag) takes its
+// session's: the one a person set for it on the page, else the tag that session's jobs have most, else one the helper
+// model picked once for that session from the tags in use. The page groups and filters by the first tag.
 
 /** command: a background shell command; monitor: a watch on a log or a process; subagent: a "<program> subagent"
  *  (Claude Code's, Codex's); hydor-subagent: a session another session started; experiment: a run of Experiments;
@@ -19,6 +25,44 @@ export type JobKind = 'command' | 'monitor' | 'subagent' | 'hydor-subagent' | 'e
 export type JobState = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'cancelled';
 
 export const JOB_ENDED: readonly JobState[] = ['done', 'failed', 'stopped', 'cancelled'];
+
+/** How many tags a job may have, and how long each may be. */
+export const MAX_TAGS = 3;
+export const MAX_TAG_LENGTH = 32;
+
+/** A tag as it is kept: lower case, its words joined by hyphens, letters and digits of any script ("Intent data" →
+ *  "intent-data", "word_suggest" → "word-suggest"); '' when nothing is left of it. */
+export function normalTag(s: string): string {
+  return s
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s_./:]+/g, '-')
+    .replace(/[^\p{L}\p{N}-]+/gu, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_TAG_LENGTH)
+    .replace(/-+$/, '');
+}
+
+/** Tags as given (a list, or one string; each may hold several split by commas), kept: no empty ones or twice the
+ *  same, the first `MAX_TAGS`, in the order given. */
+export function normalTags(given: unknown): string[] {
+  const raw = Array.isArray(given) ? given : typeof given === 'string' ? [given] : [];
+  const out: string[] = [];
+  for (const piece of raw.flatMap((v) => (typeof v === 'string' ? v.split(',') : []))) {
+    const t = normalTag(piece);
+    if (t && !out.includes(t)) out.push(t);
+    if (out.length >= MAX_TAGS) break;
+  }
+  return out;
+}
+
+/** A tag in use: how many jobs and sessions it was given to, and when last (kept 180 days after its last use). */
+export interface JobTag {
+  name: string;
+  uses: number;
+  lastAt: number;
+}
 
 /** How far a job has got, as last read. */
 export interface JobProgress {
@@ -83,6 +127,10 @@ export interface JobEntry {
   href?: string;
   /** The page can stop it. */
   stoppable?: boolean;
+  /** What it is part of ("intent-data"), the first the one it is grouped under; none when neither it nor its session has any. */
+  tags?: string[];
+  /** own: given to it (`job run --tag`, or on the page); session: its session's. */
+  tagsFrom?: 'own' | 'session';
 }
 
 export interface JobsList {
@@ -96,7 +144,16 @@ export interface JobsList {
   ended: JobEntry[];
   /** When everything running and queued should be done, when each has an estimate. */
   allDoneAt?: number;
+  /** The tags in use, the one used last first (up to 50): what an agent picks from, and the page suggests. */
+  tags?: JobTag[];
   at: number;
+}
+
+/** PUT /api/jobs/:id/tags (and /agent/jobs/:id/tags, the `job tag` command): a `job` job's own tags; for other work, its
+ *  session's, which all of that session's work without tags of its own takes. An empty list clears them. Returns
+ *  `{ job: JobEntry }`. */
+export interface JobTagsSet {
+  tags: string[];
 }
 
 /** The counts the server sends the pages when they change: { t: 'jobs', running, queued } (the rail's badge). */
@@ -143,6 +200,8 @@ export interface JobRegister {
   adoptPid?: number;
   /** `job adopt --log FILE`: the file that process writes its output to, read for its progress and last line. */
   logFile?: string;
+  /** What it is part of (`--tag`, repeatable): kept with normalTags. */
+  tags?: string[];
 }
 
 /** The answer: its id, the file to write its output to, and whether it may start now. */
@@ -152,6 +211,11 @@ export interface JobRegistered {
   start: boolean;
   /** Not starting: what it waits for, in words. */
   waitingFor?: string;
+  /** The tags it was given, as kept. */
+  tags?: string[];
+  /** When it was given no tags, or one no job had before: the tags in use, the one used last first (up to 12), so the
+   *  command can say them and the agent reuse one (`job tag ID TAG` changes them). */
+  tagsInUse?: string[];
 }
 
 /** GET /agent/jobs/:id/go (answers within 25 s): start it, it still waits, or it never will. */

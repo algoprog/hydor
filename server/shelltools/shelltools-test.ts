@@ -214,7 +214,8 @@ test('the text names every tool when all pass, and is built from the five parts'
   assert.equal(all.split('\n')[0], SHELL_TOOLS_HEAD);
   assert.deepEqual(all.split('\n').slice(1).map((l) => l.split(':')[0]), ['- waitfor', '- job', '- edits', '- sym NAME...', '- leancheck FILE.lean']);
   assert.match(all, /- waitfor: .*`--log FILE --match` sees only lines written after it starts, unless `--from-start`\./);
-  assert.ok(all.length < 2300, `${all.length} characters`);
+  assert.match(all, /- job: .*\[--tag WORD\].*reusing a tag from `job tags` whenever the work belongs to one/);
+  assert.ok(all.length < 2450, `${all.length} characters`);
 });
 
 test('all tools failed: nothing is returned', async () => {

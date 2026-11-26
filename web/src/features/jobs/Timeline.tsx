@@ -1,12 +1,15 @@
 // The Jobs page's timeline: a bar for each job that runs or waits, on one time axis with a line at now. What has run is
 // solid, the estimate beyond it striped; a waiting job is dashed where it should start; a bar with no estimate fades out.
-// A thin line joins a job to each one that waits for it. On a narrow screen the chart scrolls sideways, the names staying.
+// A thin line joins a job to each one that waits for it. Each name has its tag's dot before it. On a narrow screen the
+// chart scrolls sideways, the names staying.
 import { useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react';
 import type { JobEntry, JobsList } from '@shared/jobs';
 import { cx } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 import { along, ganttOf, ticks, type GanttRow } from './gantt';
 import { JobDot, JobIcon, toneState } from './JobRow';
+import { TagDot } from './TagPill';
+import { firstTag } from './tags';
 import { startsIn, stateWords, timeLeft } from './words';
 
 const ROW = 34;
@@ -70,6 +73,7 @@ export function Timeline({ list, now, onOpen }: { list: JobsList; now: number; o
   const left = (t: number) => along(g, t);
   const width = (a: number, b: number) => Math.max(0, along(g, b) - along(g, a));
   const mid = (i: number) => i * ROW + ROW / 2;
+  const tagged = g.rows.some((r) => firstTag(r.job) !== null);
 
   // On a narrow screen it opens with now in view.
   const placed = useRef(false);
@@ -114,6 +118,12 @@ export function Timeline({ list, now, onOpen }: { list: JobsList; now: number; o
                 style={{ height: ROW }}
               >
                 <span className="sticky left-0 z-20 flex w-[var(--gantt-names)] shrink-0 items-center gap-2 border-r border-line bg-panel px-3 group-hover:bg-bg-2">
+                  {/* The untagged keep the dot's room, so the names line up. */}
+                  {tagged && (
+                    <span title={firstTag(row.job) ?? undefined} translate="no" className="flex w-2 shrink-0">
+                      {firstTag(row.job) !== null && <TagDot tag={firstTag(row.job)} />}
+                    </span>
+                  )}
                   <span className="relative block shrink-0 text-fg-3">
                     <JobIcon kind={row.job.kind} size={14} />
                     <JobDot state={toneState(row.job)} className="absolute -right-0.5 -bottom-0.5 !h-1.5 !w-1.5" />

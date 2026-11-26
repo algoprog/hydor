@@ -242,7 +242,7 @@ agents that speak ACP and take MCP servers.
   agent follows the new ones from the next message. CLAUDE.md and AGENTS.md still work, and can be edited there too.
 - **Commands in every agent's shell** (`leancheck`, which says whether a Lean file's proofs hold, is a fifth: For researchers, below): `waitfor` (wait for a long job in one call: a program, a file, a line in a
   log, a web address, a Slurm job, a systemd unit (Linux only) or a command, stopping at the first crash line, with the end of the log
-  shown), `job` (long work that shows in Jobs with its progress and time left, after other jobs or in a queue, and
+  shown), `job` (long work that shows in Jobs with its progress and time left, tagged with what it is part of, after other jobs or in a queue, and
   `job adopt` for work already running), `edits` (several exact search-and-replace edits across files in one atomic call, printing the changed lines)
   and `sym` (a definition with its whole body and exact line range, its references, or a file's declarations, in
   TypeScript, JavaScript, Python and Rust). Claude Code, Codex, Custom and the other agents find them on their PATH and
@@ -2096,18 +2096,29 @@ programs shows each program's version and what is out, with Check now, Update no
   past 500 MB in all), so they stay after the agent cleans up its own files.
 - Every file a turn changed, with its diff, and the commits it made, each opening to its message and diff. Screenshots you attach show in the conversation and open full size.
 - **Jobs** (**Jobs** on the rail, `/jobs`, with a count of what runs; [guide](guide/31-jobs.md)): the long work running
-  in the background, all in one place: sessions' background commands, monitors and subagents (those of sessions in VS
-  Code or a terminal too), jobs run with the `job` command, runs of Experiments and Hydor subagents. Each running one
-  shows how long it has run, its progress and last line of output, and the time left, from what the job prints, how
-  fast its progress moves, the agent's estimate or how long the same command took before ("over its estimate" once
-  past it). Servers a session left running (a dev or API server, a notebook, a model server) are listed apart under
-  **Servers**, with no time left and outside the count. Queued ones say what they wait for (other jobs, their turn in a queue that runs one at a time, a free GPU)
-  and when they should start. **Finished** keeps the last 7 days (Done, Failed with the exit code, Stopped, Never
-  started, Ended when nobody saw how). A **Timeline** view draws them along the clock with their dependencies;
-  **Output** shows the end of a job's log, and **Stop** ends it after asking. Agents run long work with `job run`
-  (`--after` another job, `--queue`, `--eta`), as you ask in plain words, and `job adopt` shows work that is already
-  running without restarting it (not on Windows). A session whose jobs or runs still wait or run shows as working
-  ("Working · 1 in background"), not Ready, also after its agent has stopped, and its Finished notice waits for them.
+  in the background, all in one place and organized by tags: sessions' background commands, monitors and subagents
+  (those of sessions in VS Code or a terminal too), jobs run with the `job` command, runs of Experiments and Hydor
+  subagents. Four tiles say what runs, what is queued, when it should all be done and how many finished today (with
+  those that failed); a chip for each tag and a **Filter jobs** field narrow the whole page, and a picked tag is in its
+  address (`/jobs?tag=…`, `/jobs?untagged=1`). **At work** groups what runs and waits by tag, in cards that fold, each
+  with its counts, its session when all of its work comes from one, and when it should be done. A row is compact; a
+  click opens the job's panel (details, its command with a copy button, the end of its output), and its ⋯ menu has
+  **Details and output**, **Open session** or **Open run**, **Edit tags…**, and **Stop** or **Remove from this list**.
+  Each running one shows how long it has run, its progress and last line of output, and the time left, from what the
+  job prints, how fast its progress moves, the agent's estimate or how long the same command took before ("over its
+  estimate" once past it). Servers a session left running (a dev or API server, a notebook, a model server) are listed
+  apart under **Servers**, with no time left and outside the count. Queued ones say what they wait for (other jobs,
+  their turn in a queue that runs one at a time, a free GPU) and when they should start. **Finished** keeps the last 7
+  days under a heading for each day (Done, Failed with the exit code, Stopped, Never started, Ended when nobody saw
+  how), with **All** or **Failed** and **Clear**. A **Timeline** view draws them along the clock with their
+  dependencies, narrowed the same way, and **Stop** ends a job after asking.
+  Agents tag each job (`job run --tag`), reusing the tags in use (`job tags` lists them, `job tag` changes a job's):
+  up to 3, in lower case with hyphens, the first the one it is grouped under. Work with no tags of its own takes its
+  session's: the one you set on the page, else the tag its jobs have most, else one the helper model picks for the
+  session (never for a confidential one). Agents run long work with `job run` (`--after` another job, `--queue`,
+  `--eta`), as you ask in plain words, and `job adopt` shows work that is already running without restarting it (not
+  on Windows). A session whose jobs or runs still wait or run shows as working ("Working · 1 in background"), not
+  Ready, also after its agent has stopped, and its Finished notice waits for them.
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - A message you send shows in the conversation at once, with the agent at work under it (or in the queue, when
   it waits there), before the agent has it, and the box is free for the next; one that does not go through comes

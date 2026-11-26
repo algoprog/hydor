@@ -1,7 +1,7 @@
-// The words of the Jobs page (JobsPage.tsx, Timeline.tsx, OutputPanel.tsx): what a job is, how it stands, how long it
+// The words of the Jobs page (JobsPage.tsx, Timeline.tsx, JobPanel.tsx): what a job is, how it stands, how long it
 // has run and has left, and what a waiting one waits for. Plain functions, so tests need no page (words-test.ts). The
 // pages translate these as they are drawn, so each sentence is one template with its values in it.
-import type { JobEntry, JobEstimate, JobKind, JobsList } from '@shared/jobs';
+import type { JobEntry, JobEstimate, JobKind } from '@shared/jobs';
 import { taskKindLabel } from '../../lib/work';
 
 /** What a job is: "Command", "Claude Code subagent" (`program`: its session's), "Experiment run", "Job"… */
@@ -158,16 +158,33 @@ export function endedReason(job: JobEntry): string | null {
 /** A job's state in a word or two, for its pill. */
 export const stateWords = (job: JobEntry): string => (job.state === 'running' ? 'Running' : job.state === 'queued' ? 'Queued' : endedWords(job));
 
-/** "3 running · 2 queued · all done in about 2 h 10 min"; null while nothing runs or waits. */
-export function summaryLine(list: Pick<JobsList, 'running' | 'queued' | 'allDoneAt'>, now: number): string | null {
-  const { running, queued, allDoneAt } = list;
-  if (!running.length && !queued.length) return null;
-  const parts: string[] = [];
-  if (running.length) parts.push(`${running.length} running`);
-  if (queued.length) parts.push(`${queued.length} queued`);
+// Hours with minutes are sentences of their own below, as in leftWords.
+const hoursAndMinutes = (ms: number): [number, string] | null => {
+  const m = Math.round(ms / 60_000);
+  return m >= 60 && m < 48 * 60 ? [Math.floor(m / 60), two(m % 60)] : null;
+};
+
+/** When all the work should be done (or a waiting job should start): "in about 2 h 10 min"; null without a time still to come. */
+export function allDoneWords(allDoneAt: number | undefined, now: number): string | null {
   const left = allDoneAt ? allDoneAt - now : 0;
-  if (left > 0) parts.push(left < 60_000 ? 'all done in under a minute' : `all done in about ${span(left)}`);
-  return parts.join(' · ');
+  if (left <= 0 || left > MAX_LEFT_MS) return null;
+  if (left < 60_000) return 'in under a minute';
+  const hm = hoursAndMinutes(left);
+  return hm ? `in about ${hm[0]} h ${hm[1]} min` : `in about ${span(left)}`;
+}
+
+/** The same for one group of jobs: "done in about 34 min". */
+export function groupDoneWords(doneAt: number | undefined, now: number): string | null {
+  const left = doneAt ? doneAt - now : 0;
+  if (left <= 0 || left > MAX_LEFT_MS) return null;
+  if (left < 60_000) return 'done in under a minute';
+  const hm = hoursAndMinutes(left);
+  return hm ? `done in about ${hm[0]} h ${hm[1]} min` : `done in about ${span(left)}`;
+}
+
+/** How much of a group runs and waits: "3 running · 1 queued". */
+export function countWords(running: number, queued: number): string {
+  return [running ? `${running} running` : null, queued ? `${queued} queued` : null].filter(Boolean).join(' · ');
 }
 
 /** How far a job has got as a whole percent, when it is known. */

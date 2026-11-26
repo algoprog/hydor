@@ -1,17 +1,19 @@
-// One job as a row of the Jobs page: its kind's icon with a dot for its state, its name, what it is with its session and
-// project, how long it has run and has left (or what it waits for, or how it ended), its progress and last line of
-// output, and on the right Output, Open and Stop (Remove once it ended).
-import type { ReactNode } from 'react';
-import { Activity, Bot, ChevronRight, CircleStop, FlaskConical, Hourglass, Server, SquareTerminal, X, type LucideIcon } from 'lucide-react';
+// One job as a row of the Jobs page, compact: its kind's icon with a dot for its state, its name and tags, how long it
+// has run (or what it waits for, or how it ended) with its session and project, the last line of its output, and on the
+// right (below, on a phone) its progress and time left, or when it should start. The whole row opens its panel; ⋯ has
+// what else can be done with it.
+import { useRef, useState, type ReactNode } from 'react';
+import { Activity, Bot, CircleStop, FlaskConical, Hourglass, MoreHorizontal, PanelRight, Server, SquareArrowOutUpRight, SquareTerminal, Tag, X, type LucideIcon } from 'lucide-react';
 import type { JobEntry, JobKind } from '@shared/jobs';
 import { agentName } from '../../components/AgentIcon';
 import { Meter } from '../../components/charts';
-import { Button, cx, IconButton } from '../../components/ui';
+import { cx, IconButton, MenuItem, MenuSep, Popover } from '../../components/ui';
 import { ago } from '../../lib/format';
 import { go, openProject, openSession } from '../../lib/nav';
 import { useSessions } from '../../lib/store';
 import { LOCALE } from '../../i18n/locale';
-import { endedReason, endedWords, kindLabel, percent, progressText, queuePlace, runClock, startsIn, timeLeft, tookTime, waitingWords } from './words';
+import { TagPills } from './TagPill';
+import { endedReason, endedWords, kindLabel, percent, progressText, queuePlace, runClock, startsIn, timeLeft, tookTime, waitingWords, type TimeLeft } from './words';
 
 const ICONS: Record<JobKind, LucideIcon> = { command: SquareTerminal, monitor: Activity, subagent: Bot, 'hydor-subagent': Bot, experiment: FlaskConical, job: Hourglass, server: Server, task: SquareTerminal };
 
@@ -29,8 +31,8 @@ export function JobDot({ state, className }: { state: JobEntry['state']; classNa
   return <span className={cx('inline-block h-2 w-2 shrink-0 rounded-full', tone, className)} aria-hidden />;
 }
 
-/** A job's kind as text; a subagent's names its session's program ("Claude Code subagent"). */
-export function KindText({ job }: { job: JobEntry }) {
+/** A job's kind in words; a subagent's names its session's program ("Claude Code subagent"). */
+export function useKindLabel(job: JobEntry): string {
   const program = useSessions((s) => {
     if (job.kind !== 'subagent' || !job.session) return undefined;
     const x = s.byKey[job.session.key];
@@ -39,7 +41,7 @@ export function KindText({ job }: { job: JobEntry }) {
     const from = job.session.key.split(':')[0];
     return from === 'claude' || from === 'codex' ? agentName(from) : undefined;
   });
-  return <span>{kindLabel(job.kind, program)}</span>;
+  return kindLabel(job.kind, program);
 }
 
 /** Where Open goes: the job's own page, else its session; nothing when it has neither. */
@@ -49,10 +51,17 @@ export function openJob(job: JobEntry): (() => void) | undefined {
   return undefined;
 }
 
-const linkCls = 'min-w-0 truncate rounded text-left hover:text-fg hover:underline';
+export const openWords = (job: JobEntry): string => (job.kind === 'experiment' ? 'Open run' : 'Open session');
+
+export const isEnded = (job: JobEntry): boolean => job.state !== 'running' && job.state !== 'queued';
+
+/** Whether tags can be given to it: a job of the `job` command, or work of a session (whose tags it then sets). */
+export const taggable = (job: JobEntry): boolean => job.id.startsWith('job:') || !!job.session;
+
+export const linkCls = 'min-w-0 truncate rounded text-left hover:text-fg hover:underline';
 
 /** Names of other jobs, each a way to its row. */
-function JobLinks({ jobs, onShow }: { jobs: JobEntry[]; onShow: (id: string) => void }) {
+export function JobLinks({ jobs, onShow }: { jobs: JobEntry[]; onShow: (id: string) => void }) {
   return (
     <>
       {jobs.map((j, i) => (
@@ -67,92 +76,200 @@ function JobLinks({ jobs, onShow }: { jobs: JobEntry[]; onShow: (id: string) => 
   );
 }
 
-/** Facts in a line, a dot between them (those that are nothing left out). */
-function Facts({ items, className }: { items: (ReactNode | false | null | undefined)[]; className?: string }) {
-  const shown = items.filter(Boolean);
-  if (!shown.length) return null;
-  return (
-    <div className={cx('flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5', className)}>
-      {shown.map((x, i) => (
+type Items = (ReactNode | false | null | undefined)[];
+
+/** Facts with a dot between them (those that are nothing left out): how it stands, then where it is from. On a phone each
+ *  of the two is a line of its own; on a computer they run on as one. */
+function Facts({ how, where }: { how: Items; where: Items }) {
+  const first = how.filter(Boolean);
+  const second = where.filter(Boolean);
+  const line = (items: ReactNode[], more: boolean) => (
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 sm:contents">
+      {items.map((x, i) => (
         <span key={i} className="inline-flex max-w-full min-w-0 items-baseline gap-1.5">
           {x}
           {/* After each but the last, so a line that wraps does not begin with a dot. */}
-          {i < shown.length - 1 && (
-            <span aria-hidden className="text-fg-3">
-              ·
-            </span>
-          )}
+          {i < items.length - 1 ? <span aria-hidden>·</span> : more && <span aria-hidden className="max-sm:hidden">·</span>}
         </span>
       ))}
     </div>
   );
+  return (
+    <div className="mt-0.5 min-w-0 text-[12px] leading-[18px] text-fg-3 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-1.5">
+      {first.length > 0 && line(first, second.length > 0)}
+      {second.length > 0 && line(second, false)}
+    </div>
+  );
 }
 
-const fullDate = (t: number) => new Date(t).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
+/** A session's title and its project, each a link. */
+export function sessionLinks(session: NonNullable<JobEntry['session']>): ReactNode[] {
+  return [
+    <button type="button" title="Open this session" onClick={() => openSession(session.key)} className={linkCls}>
+      {session.title ? <span translate="no">{session.title}</span> : <span>Session</span>}
+    </button>,
+    session.project && (
+      <button type="button" translate="no" onClick={() => openProject(session.project!.id)} className={linkCls}>
+        {session.project.name}
+      </button>
+    ),
+  ].filter(Boolean);
+}
 
-/** How it stands: running for and time left; what it waits for and when it should start; or how it ended, when, and how long it took. */
-function Standing({ job, now, waits, onShow }: { job: JobEntry; now: number; waits: JobEntry[]; onShow: (id: string) => void }) {
+/** The same, as a line with a dot between them (a group's header). */
+export function SessionLinks({ session }: { session: NonNullable<JobEntry['session']> }) {
+  return (
+    <>
+      {sessionLinks(session).map((x, i) => (
+        <span key={i} className="inline-flex min-w-0 items-baseline gap-1.5">
+          {i > 0 && <span aria-hidden>·</span>}
+          {x}
+        </span>
+      ))}
+    </>
+  );
+}
+
+export const fullDate = (t: number) => new Date(t).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
+
+/** How it stands: how long it has run; what it waits for; or how it ended, when, and how long it took. */
+function standing(job: JobEntry, now: number, waits: JobEntry[], onShow: (id: string) => void): ReactNode[] {
   if (job.state === 'running') {
-    const left = timeLeft(job, now);
-    return (
-      <Facts
-        className="mt-1 text-[12.5px] text-fg-2"
-        items={[
-          job.startedAt ? (
-            <span className="tnum">
-              <span>{`running for ${runClock(now - job.startedAt)}`}</span>
-            </span>
-          ) : (
-            <span>Running</span>
-          ),
-          left && (
-            <span className={cx('tnum', left.over ? 'text-warn' : 'text-fg')} title={left.source}>
-              <span>{left.text}</span>
-              {left.guess && <span className="ml-1 text-fg-3">(a guess)</span>}
-            </span>
-          ),
-        ]}
-      />
-    );
+    return [job.startedAt ? <span className="tnum shrink-0">{`running for ${runClock(now - job.startedAt)}`}</span> : <span>Running</span>];
   }
   if (job.state === 'queued') {
     const place = queuePlace(job);
     const other = waitingWords(job, waits.length);
-    const starts = startsIn(job, now);
-    return (
-      <Facts
-        className="mt-1 text-[12.5px] text-fg-2"
-        items={[
-          waits.length > 0 && (
-            <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1">
-              <span>Waits for</span>
-              <JobLinks jobs={waits} onShow={onShow} />
-            </span>
-          ),
-          place && <span>{place}</span>,
-          other && <span>{other}</span>,
-          starts && (
-            <span className="tnum" title={job.estimate ? undefined : fullDate(job.startsAt!)}>
-              {starts}
-            </span>
-          ),
-        ]}
-      />
-    );
+    return [
+      waits.length > 0 && (
+        <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1">
+          <span>Waits for</span>
+          <JobLinks jobs={waits} onShow={onShow} />
+        </span>
+      ),
+      place && <span>{place}</span>,
+      other && <span>{other}</span>,
+    ];
   }
   const reason = endedReason(job);
   const tone = job.state === 'failed' ? 'text-err' : toneState(job) === 'done' ? 'text-ok' : 'text-fg-2';
+  // How it ended, then why, as facts of their own ("Never started · Waited for X, which failed").
+  return [
+    <span className={cx('shrink-0', tone)}>{endedWords(job)}</span>,
+    reason && <span className="min-w-0 break-words">{reason}</span>,
+    job.endedAt && <span title={fullDate(job.endedAt)}>{ago(job.endedAt, now)}</span>,
+    job.state !== 'cancelled' && job.startedAt && job.endedAt ? <span className="tnum">{`took ${tookTime(job.endedAt - job.startedAt)}`}</span> : null,
+  ];
+}
+
+function Left({ left }: { left: TimeLeft }) {
   return (
-    <Facts
-      className="mt-1 text-[12.5px] text-fg-3"
-      items={[
-        // How it ended, then why, as facts of their own ("Never started · Waited for X, which failed").
-        <span className={cx('shrink-0', tone)}>{endedWords(job)}</span>,
-        reason && <span className="min-w-0 break-words">{reason}</span>,
-        job.endedAt && <span title={fullDate(job.endedAt)}>{ago(job.endedAt, now)}</span>,
-        job.state !== 'cancelled' && job.startedAt && job.endedAt ? <span className="tnum">{`took ${tookTime(job.endedAt - job.startedAt)}`}</span> : null,
-      ]}
-    />
+    <span className={cx('tnum', left.over ? 'text-warn' : 'text-fg-2')} title={left.source}>
+      <span>{left.text}</span>
+      {left.guess && <span className="ml-1 text-fg-3">(a guess)</span>}
+    </span>
+  );
+}
+
+/** The right of a row at work: progress and time left, or when a waiting one should start. Nothing when neither is known. */
+function Ahead({ job, now }: { job: JobEntry; now: number }) {
+  // Beside the text on a computer, under it on a phone.
+  const box = 'mt-1.5 text-[12px] sm:mt-0 sm:w-40 sm:shrink-0 sm:self-center sm:text-right';
+  if (job.state === 'queued') {
+    const starts = startsIn(job, now);
+    return starts ? (
+      <div className={cx(box, 'tnum text-fg-3 max-sm:mt-0.5')} title={job.estimate || !job.startsAt ? undefined : fullDate(job.startsAt)}>
+        {starts}
+      </div>
+    ) : null;
+  }
+  if (job.state !== 'running') return null;
+  const pct = percent(job);
+  const left = timeLeft(job, now);
+  const detail = left ? null : progressText(job);
+  if (pct == null && !left && !detail) return null;
+  return (
+    <div className={cx(box, 'max-sm:flex max-sm:max-w-80 max-sm:items-center max-sm:gap-3')}>
+      {pct != null && (
+        <div className="flex items-center gap-2 max-sm:min-w-0 max-sm:flex-1">
+          <div className="min-w-0 flex-1" role="progressbar" aria-label="Progress" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+            {/* The job's own count ("6,200/10,000") on hover, as it wrote it. */}
+            <div translate="no" title={progressText(job) ?? undefined}>
+              <Meter percent={pct} height={5} color="var(--busy)" />
+            </div>
+          </div>
+          <span className="tnum w-8 shrink-0 text-right text-fg-2">{pct}%</span>
+        </div>
+      )}
+      {(left || detail) && (
+        <div className={cx('text-fg-3 max-sm:shrink-0', pct != null && 'sm:mt-1')}>
+          {left ? (
+            <Left left={left} />
+          ) : (
+            <span translate="no" title={detail!} className="tnum block truncate">
+              {detail}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export interface RowActions {
+  onShow: (id: string) => void;
+  onDetails: (job: JobEntry) => void;
+  onTags: (job: JobEntry) => void;
+  onStop: (job: JobEntry) => void;
+  onRemove: (job: JobEntry) => void;
+}
+
+function RowMenu({ job, actions }: { job: JobEntry; actions: RowActions }) {
+  const [open, setOpen] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  const link = openJob(job);
+  const ended = isEnded(job);
+  const pick = (run: () => void) => () => {
+    setOpen(false);
+    run();
+  };
+  return (
+    <>
+      <IconButton ref={btn} size="sm" label="More" aria-haspopup aria-expanded={open} onClick={() => setOpen((o) => !o)} className={cx('hover:!bg-bg-3', open && 'bg-bg-3 text-fg')}>
+        <MoreHorizontal size={16} />
+      </IconButton>
+      <Popover anchor={btn} open={open} onClose={() => setOpen(false)} align="end" width={230}>
+        <MenuItem icon={<PanelRight size={15} />} onClick={pick(() => actions.onDetails(job))}>
+          Details and output
+        </MenuItem>
+        {link && (
+          <MenuItem icon={<SquareArrowOutUpRight size={15} />} onClick={pick(link)}>
+            {openWords(job)}
+          </MenuItem>
+        )}
+        {taggable(job) && (
+          <MenuItem icon={<Tag size={15} />} onClick={pick(() => actions.onTags(job))}>
+            Edit tags…
+          </MenuItem>
+        )}
+        {!ended && job.stoppable && (
+          <>
+            <MenuSep />
+            <MenuItem danger icon={<CircleStop size={15} />} onClick={pick(() => actions.onStop(job))}>
+              Stop
+            </MenuItem>
+          </>
+        )}
+        {ended && (
+          <>
+            <MenuSep />
+            <MenuItem icon={<X size={15} />} onClick={pick(() => actions.onRemove(job))}>
+              Remove from this list
+            </MenuItem>
+          </>
+        )}
+      </Popover>
+    </>
   );
 }
 
@@ -162,10 +279,9 @@ export function JobRow({
   waits,
   then,
   marked,
-  onShow,
-  onOutput,
-  onStop,
-  onRemove,
+  grouped,
+  sessionShown,
+  actions,
 }: {
   job: JobEntry;
   now: number;
@@ -175,96 +291,72 @@ export function JobRow({
   then: JobEntry[];
   /** It was just pointed at from another row. */
   marked: boolean;
-  onShow: (id: string) => void;
-  onOutput: () => void;
-  onStop: () => void;
-  onRemove: () => void;
+  /** It sits under its first tag's header, which says that tag already. */
+  grouped?: boolean;
+  /** Its group's header names its session (all of the group comes from it). */
+  sessionShown?: boolean;
+  actions: RowActions;
 }) {
-  const ended = job.state !== 'running' && job.state !== 'queued';
-  const pct = job.state === 'running' ? percent(job) : null;
-  const detail = job.state === 'running' ? progressText(job) : null;
-  const open = openJob(job);
-  const output = !!job.output && job.state !== 'queued' && job.state !== 'cancelled';
+  const kind = useKindLabel(job);
+  const ended = isEnded(job);
+  const tags = (job.tags ?? []).slice(grouped ? 1 : 0);
   const { session } = job;
+  const nameId = `job-name-${job.id}`;
   return (
-    <div id={`job-${job.id}`} data-job={job.id} className={cx('flex flex-col gap-2 px-3.5 py-3 sm:flex-row sm:items-start sm:gap-3', marked && 'find-flash')}>
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <span className="relative mt-0.5 block shrink-0 text-fg-2">
-          <JobIcon kind={job.kind} />
-          <JobDot state={toneState(job)} className="absolute -right-0.5 -bottom-0.5 ring-2 ring-panel" />
-        </span>
+    <div
+      id={`job-${job.id}`}
+      data-job={job.id}
+      role="button"
+      tabIndex={0}
+      aria-labelledby={nameId}
+      onClick={(e) => {
+        const at = e.target as HTMLElement;
+        // Its links and buttons do their own thing; so does its menu, which is drawn outside the row.
+        if (!e.currentTarget.contains(at) || at.closest('button') || window.getSelection()?.toString()) return;
+        actions.onDetails(job);
+      }}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        actions.onDetails(job);
+      }}
+      className={cx(
+        'flex cursor-pointer items-start gap-3 py-2.5 pr-2 pl-3.5 transition-colors outline-none hover:bg-bg-2/50 focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset',
+        marked && 'find-flash',
+      )}
+    >
+      <span className="relative mt-0.5 block shrink-0 text-fg-2" title={kind}>
+        <JobIcon kind={job.kind} />
+        <JobDot state={toneState(job)} className="absolute -right-0.5 -bottom-0.5 ring-2 ring-panel" />
+      </span>
+      <div className="min-w-0 flex-1 sm:flex sm:gap-4">
         <div className="min-w-0 flex-1">
-          <div translate="no" title={job.command} className="line-clamp-2 text-[13.5px] leading-snug font-medium break-words text-fg">
-            {job.name}
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span id={nameId} translate="no" title={job.command ? `${job.name}\n${job.command}` : job.name} className="max-w-full min-w-0 truncate text-[13.5px] leading-5 font-medium text-fg">
+              {job.name}
+            </span>
+            <TagPills tags={tags} />
           </div>
           <Facts
-            className="mt-0.5 text-[12px] text-fg-3"
-            items={[
-              <KindText job={job} />,
-              session && (
-                <button type="button" title="Open this session" onClick={() => openSession(session.key)} className={linkCls}>
-                  {session.title ? <span translate="no">{session.title}</span> : <span>Session</span>}
-                </button>
-              ),
-              session?.project && (
-                <button type="button" translate="no" onClick={() => openProject(session.project!.id)} className={linkCls}>
-                  {session.project.name}
-                </button>
-              ),
-            ]}
+            how={standing(job, now, waits, actions.onShow)}
+            where={sessionShown || !session ? [] : sessionLinks(session)}
           />
-          <Standing job={job} now={now} waits={waits} onShow={onShow} />
-          {(pct != null || detail) && (
-            <div className="mt-1.5 flex items-center gap-2 text-[12px] text-fg-3">
-              {pct != null && (
-                <>
-                  <div className="max-w-80 min-w-0 flex-1" role="progressbar" aria-label="Progress" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-                    <Meter percent={pct} height={5} color="var(--busy)" />
-                  </div>
-                  <span className="tnum shrink-0 text-fg-2">{pct}%</span>
-                </>
-              )}
-              {detail && (
-                <span translate="no" className="tnum min-w-0 truncate">
-                  {detail}
-                </span>
-              )}
-            </div>
-          )}
           {job.lastLine && (!ended || job.state === 'failed') && (
-            <div translate="no" title={job.lastLine} className="mt-1 truncate font-mono text-[11.5px] text-fg-3">
+            <div translate="no" title={job.lastLine} className="mt-0.5 truncate font-mono text-[11.5px] leading-[18px] text-fg-3">
               {job.lastLine}
             </div>
           )}
           {then.length > 0 && (
-            <div className="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-1 text-[12px] text-fg-3">
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-1 text-[12px] leading-[18px] text-fg-3">
               <span>Then:</span>
-              <JobLinks jobs={then} onShow={onShow} />
+              <JobLinks jobs={then} onShow={actions.onShow} />
             </div>
           )}
         </div>
+        <Ahead job={job} now={now} />
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-0.5 pl-7 sm:pl-0">
-        {output && (
-          <Button size="sm" variant="ghost" icon={<SquareTerminal size={13} />} onClick={onOutput}>
-            Output
-          </Button>
-        )}
-        {open && (
-          <Button size="sm" variant="ghost" icon={<ChevronRight size={13} />} onClick={open}>
-            Open
-          </Button>
-        )}
-        {!ended && job.stoppable && (
-          <Button size="sm" variant="ghost" className="text-err hover:text-err" icon={<CircleStop size={13} />} onClick={onStop}>
-            Stop
-          </Button>
-        )}
-        {ended && (
-          <IconButton size="sm" label="Remove from this list" onClick={onRemove}>
-            <X size={14} />
-          </IconButton>
-        )}
+      <div className="shrink-0 self-center max-sm:self-start">
+        <RowMenu job={job} actions={actions} />
       </div>
     </div>
   );

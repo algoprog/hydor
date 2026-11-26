@@ -43,6 +43,7 @@ async function app(routes = {}) {
     list: [200, { running: [], queued: [], ended: [], at: Date.now() }],
     job: [404, { error: 'No such job' }],
     stop: [200, { ok: true }],
+    tag: [404, { error: 'There is no such job' }],
     ...routes,
   };
   const server = http.createServer((req, res) => {
@@ -52,7 +53,7 @@ async function app(routes = {}) {
       const url = new URL(req.url, 'http://x');
       const parts = url.pathname.replace(/^\/agent\/jobs\/?/, '').split('/').filter(Boolean);
       const route = !parts.length ? (req.method === 'POST' ? 'register' : 'list')
-        : parts[1] === 'go' ? 'go' : parts[1] === 'stop' ? 'stop' : req.method === 'POST' ? 'report' : 'job';
+        : parts[1] === 'go' ? 'go' : parts[1] === 'stop' ? 'stop' : parts[1] === 'tags' ? 'tag' : req.method === 'POST' ? 'report' : 'job';
       const r = { route, method: req.method, id: parts[0] && decodeURIComponent(parts[0]), query: url.search, auth: req.headers.authorization, body: text ? JSON.parse(text) : undefined };
       seen.push(r);
       counts[route] = (counts[route] ?? 0) + 1;
@@ -497,6 +498,103 @@ test('stop: asks the app; its refusal is said', async () => {
   assert.equal(r.stdout, 'asked to stop job:j-1\n');
   assert.equal(a.seen[0].method, 'POST');
   assert.equal(a.seen[0].id, 'job:j-1');
+});
+
+// ---------------------------------------------------------------- tags
+test('--tag: repeatable and split by commas, sent as given; none: nothing is sent', async () => {
+  const a = await app();
+  const r = await run(['run', '--tag', 'Intent data', '--tag=word-suggest, checkout,', '--', 'true'], { env: a.env });
+  assert.equal(r.code, 0, r.stderr);
+  assert.deepEqual(a.seen[0].body.tags, ['Intent data', 'word-suggest', 'checkout']);
+  assert.doesNotMatch(r.stderr, /tag/, 'an app that names no tags in use has nothing said of them');
+  const none = await app();
+  await run(['run', '--', 'true'], { env: none.env });
+  assert.ok(!('tags' in none.seen[0].body));
+  if (process.platform === 'win32') return;
+  const sl = spawn('sleep', ['5'], { stdio: 'ignore' });
+  try {
+    const b = await app({ register: [200, { id: 'j-8', log: tmp('t.log'), start: true, tags: ['a', 'b'], tagsInUse: ['c'] }] });
+    const adopted = await run(['adopt', '--pid', String(sl.pid), '--name', 'Crawl', '--tag', 'a,b'], { env: b.env });
+    assert.equal(adopted.code, 0, adopted.stderr);
+    assert.deepEqual(b.seen[0].body.tags, ['a', 'b']);
+    assert.equal(adopted.stdout, 'job j-8 adopted: Crawl\n');
+    assert.equal(adopted.stderr, 'job: tagged a, b (new); tags in use: c (job tag j-8 TAG to change)\n');
+  } finally {
+    sl.kill();
+  }
+});
+
+test('--tag with an empty value is a usage error', async () => {
+  const marker = tmp('tag-ran');
+  for (const args of [['run', '--tag', '', '--', 'touch', marker], ['run', '--tag=', '--', 'touch', marker], ['run', '--tag', ' , ', '--', 'touch', marker],
+    ['run', '--tag', '--', 'touch', marker], ['adopt', '--pid', '5', '--tag', ',']]) {
+    const r = await run(args);
+    assert.equal(r.code, 64, args.join(' '));
+    assert.match(r.stderr, /^error: --tag needs a value\n/, args.join(' '));
+  }
+  assert.ok(!fs.existsSync(marker));
+});
+
+test('registration: one line says a new tag, or that none was given, with the tags in use', async () => {
+  const said = async (answer) => {
+    const a = await app({ register: [200, { id: 'j-1', log: tmp('n.log'), start: true, ...answer }] });
+    const r = await run(['run', '--name', 'N', '--', 'true'], { env: a.env });
+    assert.equal(r.code, 0, r.stderr);
+    return r.stderr.split('\n').filter((l) => l.startsWith('job: '));
+  };
+  assert.deepEqual(await said({ tags: ['checkout'], tagsInUse: ['intent-data', 'word-suggest'] }), ['job: tagged checkout (new); tags in use: intent-data, word-suggest (job tag j-1 TAG to change)']);
+  assert.deepEqual(await said({ tagsInUse: ['intent-data'] }), ['job: no --tag given; tags in use: intent-data (job tag j-1 TAG to change)']);
+  assert.deepEqual(await said({ tagsInUse: [] }), ['job: no --tag given (job tag j-1 TAG to change)']);
+  assert.deepEqual(await said({ tags: ['intent-data'] }), [], 'a tag already in use needs no word');
+});
+
+test('tags: the tags in use, one a line, with how often and how long ago', async () => {
+  const tags = [{ name: 'intent-data', uses: 12, lastAt: now - 2 * 3600_000 }, { name: 'ui', uses: 1, lastAt: now - 90_000 }];
+  const a = await app({ list: [200, { at: now, running: [], queued: [], ended: [], tags }] });
+  const r = await run(['tags'], { env: a.env });
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(r.stdout, 'intent-data  12 uses, last 2h00m ago\nui           1 use, last 1m30s ago\n');
+  assert.equal(a.seen[0].query, '?ended=0');
+  assert.deepEqual(JSON.parse((await run(['tags', '--json'], { env: a.env })).stdout), tags);
+  assert.equal((await run(['tags'], { env: (await app()).env })).stdout, 'no tags yet\n');
+  assert.equal((await run(['tags'], { env: (await app({ list: [401, { error: 'no' }] })).env })).code, 2);
+  assert.equal((await run(['tags'])).code, 3);
+  assert.equal((await run(['tags', 'x'], { env: a.env })).code, 64);
+});
+
+test('tag: puts a job\'s tags, or clears them; a refusal is said', async () => {
+  const a = await app({
+    tag: (r) => {
+      if (r.id === 'j-9') return [409, { error: 'It belongs to no session, so it cannot be tagged' }];
+      const own = r.body.tags.length > 0;
+      return [200, { job: entry(`job:${r.id}`, 'running', { tags: own ? r.body.tags.map((t) => t.toLowerCase()) : ['the-sessions'], tagsFrom: own ? 'own' : 'session' }) }];
+    },
+  });
+  const r = await run(['tag', 'j-1', 'Intent-Data', 'ui,checkout'], { env: a.env });
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(r.stdout, 'job j-1 tags: intent-data, ui, checkout\n');
+  assert.deepEqual([a.seen[0].method, a.seen[0].id, a.seen[0].body], ['PUT', 'j-1', { tags: ['Intent-Data', 'ui', 'checkout'] }]);
+  const cleared = await run(['tag', 'j-1'], { env: a.env });
+  assert.equal(cleared.stdout, "job j-1 tags: none (it takes its session's)\n");
+  assert.deepEqual(a.seen[1].body, { tags: [] });
+  const refused = await run(['tag', 'j-9', 'x'], { env: a.env });
+  assert.equal(refused.code, 2);
+  assert.equal(refused.stderr, 'job: It belongs to no session, so it cannot be tagged\n');
+  assert.equal((await run(['tag', 'j-1', 'x'])).code, 3);
+  assert.equal((await run(['tag'], { env: a.env })).code, 64);
+  // Work that is not a `job` job is tagged through its session.
+  const task = await app({ tag: [200, { job: { id: 'task:claude:k:b1', kind: 'command', state: 'running', name: 'x', tags: ['ui'], tagsFrom: 'session' } }] });
+  assert.equal((await run(['tag', 'task:claude:k:b1', 'ui'], { env: task.env })).stdout, 'job task:claude:k:b1 tags: ui\n');
+  assert.equal(task.seen[0].id, 'task:claude:k:b1');
+});
+
+test('list and status show the tags', async () => {
+  const j = entry('job:j-1', 'running', { startedAt: now - 1000, tags: ['intent-data', 'ui'], tagsFrom: 'own' });
+  const a = await app({ list: [200, { at: now, running: [j, entry('job:j-2', 'running')], queued: [], ended: [] }], job: [200, { job: j }] });
+  const list = await run(['list'], { env: a.env });
+  assert.match(list.stdout, /^job:j-1 +running +Job job:j-1 \[intent-data, ui\] +- /m);
+  assert.match(list.stdout, /^job:j-2 +running +Job job:j-2 +-$/m, 'nothing after the name of one without');
+  assert.match((await run(['status', 'j-1'], { env: a.env })).stdout, /^ {2}tags: +intent-data, ui$/m);
 });
 
 // ---------------------------------------------------------------- usage

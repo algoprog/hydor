@@ -328,12 +328,12 @@ export const SHOTS = [
     },
   },
   {
-    // Jobs: what runs in the background and how long it has left, what waits (and for what), and a server left running;
-    // what finished lately is below the cut. The demo runs nothing, so the page is answered with made-up jobs (`jobs`:
-    // demo.mjs, run.mjs).
+    // Jobs: the tiles and tag chips, what runs in the background by tag and how long it has left, what waits (and for
+    // what), and a server left running; what finished lately is below the cut. The demo runs nothing, so the page is
+    // answered with made-up jobs (`jobs`: demo.mjs, run.mjs).
     id: 'jobs',
     jobs: true,
-    height: 1300,
+    height: 1480,
     async take(p, ctx) {
       await ctx.go('/jobs', { settle: 1800 });
       await p.park();

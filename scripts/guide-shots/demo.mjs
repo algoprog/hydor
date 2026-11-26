@@ -1323,8 +1323,9 @@ function goalDemo(c, now) {
 
 /**
  * What the Jobs page reads (shared/jobs.ts): nothing in the demo runs in the background, so the page is answered with
- * Alex's research on the shop's search, all in times from `now`: four jobs running, three waiting (after another, and in
- * the queue gpu), a dev server left running, and four that ended, each in another way. `logs` is each job's output, by id.
+ * Alex's work, all in times from `now` and sorted by tags: seven jobs running and four waiting (after another, and in
+ * the queue gpu) under search-index, checkout, thesis and no tag, a dev server left running, and finished ones of today
+ * and yesterday, ended each in another way. `logs` is each job's output, by id.
  */
 function jobsDemo(s, now) {
   const session = (name, title, project) => ({ key: s[name].key, title, ...(project ? { project } : {}) });
@@ -1337,6 +1338,9 @@ function jobsDemo(s, now) {
   /** A background task of a session, or one run with the `job` command. */
   const task = (id, name, x, o) => ({ id: `task:${x.key}:${id}`, name, session: x, cwd: s.search.cwd, output: { kind: 'task', sessionKey: x.key, taskId: id }, href: href(x), ...o });
   const job = (id, name, x, o) => ({ id: `job:${id}`, kind: 'job', name, session: x, cwd: s.search.cwd, output: { kind: 'job' }, href: href(x), ...o });
+  /** Tags of a job's own (`job run --tag`), or its session's. */
+  const own = (...tags) => ({ tags, tagsFrom: 'own' });
+  const ofSession = (tag) => ({ tags: [tag], tagsFrom: 'session' });
 
   const running = [
     {
@@ -1344,6 +1348,7 @@ function jobsDemo(s, now) {
       kind: 'experiment',
       state: 'running',
       name: 'Fine-tune the reranker',
+      ...ofSession('search-index'),
       command: 'python train.py --config configs/reranker.yaml --seed 1',
       session: search,
       startedAt: now - 114 * MIN,
@@ -1356,6 +1361,7 @@ function jobsDemo(s, now) {
     },
     job('j-index', 'Build the search index', search, {
       state: 'running',
+      ...own('search-index'),
       command: 'python build_index.py --passages data/passages.jsonl --out index/',
       queue: 'gpu',
       startedAt: now - 18 * MIN,
@@ -1366,6 +1372,8 @@ function jobsDemo(s, now) {
     }),
     task('b-download', 'Download the passages', search, {
       kind: 'command',
+      tags: ['search-index', 'data'],
+      tagsFrom: 'session',
       state: 'running',
       command: 'python scripts/download.py --set passages --to data/',
       startedAt: now - 17 * MIN,
@@ -1376,16 +1384,52 @@ function jobsDemo(s, now) {
     }),
     task('a-review', 'Review the evaluation script', search, {
       kind: 'subagent',
+      ...ofSession('search-index'),
       state: 'running',
       startedAt: now - 6 * MIN,
       lastLine: 'Checking how eval/ndcg.py counts passages with no judgment',
       stoppable: true,
     }),
+    task('b-e2e', 'Run the checkout tests', shop, {
+      kind: 'command',
+      state: 'running',
+      ...ofSession('checkout'),
+      command: 'npx playwright test checkout/',
+      startedAt: now - 5 * MIN,
+      progress: { fraction: 0.65, text: '34/52 tests', at: now - 4000 },
+      estimate: { endsAt: ahead(3), source: 'progress', confidence: 'medium' },
+      lastLine: '✓ 34 checkout/applepay.spec.ts › pays with a saved card (4.1s)',
+      stoppable: true,
+    }),
+    job('j-pdf', 'Build the thesis PDF', thesis, {
+      state: 'running',
+      ...own('thesis'),
+      command: 'latexmk -pdf thesis.tex',
+      startedAt: now - 2 * MIN,
+      estimate: { endsAt: ahead(2), source: 'history', confidence: 'medium' },
+      lastLine: 'Run number 2 of rule pdflatex',
+      stoppable: true,
+    }),
+    {
+      id: 'job:j-backup',
+      kind: 'job',
+      state: 'running',
+      name: 'Back up the photo library',
+      command: 'rclone sync ~/Photos backup:photos --progress',
+      cwd: '/home/alex',
+      startedAt: now - 51 * MIN,
+      progress: { fraction: 0.73, text: '41.2 of 56.4 GB', at: now - 6000 },
+      estimate: { endsAt: ahead(19), source: 'output', confidence: 'high' },
+      lastLine: 'Transferred: 41.2 GiB / 56.4 GiB, 73%, 12.9 MiB/s, ETA 19m',
+      output: { kind: 'job' },
+      stoppable: true,
+    },
   ];
 
   const queued = [
     job('j-trec', 'Evaluate on TREC DL 2023', search, {
       state: 'queued',
+      ...own('search-index', 'evaluation'),
       command: 'python eval.py --index index/ --topics trec-dl-2023',
       queuedAt: now - 15 * MIN,
       after: ['job:j-index'],
@@ -1397,6 +1441,7 @@ function jobsDemo(s, now) {
     }),
     job('j-lr', 'Sweep: learning rates', search, {
       state: 'queued',
+      ...own('search-index'),
       command: 'python sweep.py --over lr',
       queuedAt: now - 12 * MIN,
       queue: 'gpu',
@@ -1409,6 +1454,7 @@ function jobsDemo(s, now) {
     }),
     job('j-batch', 'Sweep: batch sizes', search, {
       state: 'queued',
+      ...own('search-index'),
       command: 'python sweep.py --over batch',
       queuedAt: now - 11 * MIN,
       queue: 'gpu',
@@ -1419,12 +1465,25 @@ function jobsDemo(s, now) {
       output: undefined,
       stoppable: true,
     }),
+    job('j-cites', 'Check the citations', thesis, {
+      state: 'queued',
+      ...own('thesis'),
+      command: 'python check_citations.py thesis.bib',
+      queuedAt: now - 2 * MIN,
+      after: ['job:j-pdf'],
+      waitingFor: 'Build the thesis PDF',
+      startsAt: ahead(2),
+      estimate: { endsAt: ahead(5), source: 'history', confidence: 'low' },
+      output: undefined,
+      stoppable: true,
+    }),
   ];
 
   const servers = [
     task('b-dev', 'Dev server for the website', shop, {
       kind: 'server',
       state: 'running',
+      ...ofSession('checkout'),
       command: 'npm run dev',
       startedAt: now - 3 * HOUR - 20 * MIN,
       lastLine: 'Shop API listening on http://localhost:3000',
@@ -1433,10 +1492,15 @@ function jobsDemo(s, now) {
   ];
 
   const ended = [
-    job('j-clean', 'Clean the crawl', search, { state: 'done', command: 'python clean.py data/crawl', startedAt: now - 43 * MIN, endedAt: now - 25 * MIN, exitCode: 0 }),
-    job('j-convert', 'Convert the PDFs', thesis, { state: 'failed', command: 'python convert.py sources/*.pdf', startedAt: now - 55 * MIN, endedAt: now - 52 * MIN, exitCode: 1, reason: 'Exit code 1', lastLine: 'ValueError: no text on page 4 of survey-scan-12.pdf' }),
-    job('j-plot', 'Plot the results', thesis, { state: 'cancelled', command: 'python plot.py results/', queuedAt: now - 54 * MIN, endedAt: now - 52 * MIN, after: ['job:j-convert'], reason: 'Waited for Convert the PDFs, which failed', output: undefined }),
-    job('j-negatives', 'Mine hard negatives', search, { state: 'done', command: 'python mine_negatives.py --top 100', startedAt: now - 5 * HOUR, endedAt: now - 2 * HOUR - 6 * MIN, exitUnknown: true }),
+    job('j-clean', 'Clean the crawl', search, { state: 'done', ...own('search-index'), command: 'python clean.py data/crawl', startedAt: now - 43 * MIN, endedAt: now - 25 * MIN, exitCode: 0 }),
+    job('j-convert', 'Convert the PDFs', thesis, { state: 'failed', ...own('thesis'), command: 'python convert.py sources/*.pdf', startedAt: now - 55 * MIN, endedAt: now - 52 * MIN, exitCode: 1, reason: 'Exit code 1', lastLine: 'ValueError: no text on page 4 of survey-scan-12.pdf' }),
+    job('j-plot', 'Plot the results', thesis, { state: 'cancelled', ...own('thesis'), command: 'python plot.py results/', queuedAt: now - 54 * MIN, endedAt: now - 52 * MIN, after: ['job:j-convert'], reason: 'Waited for Convert the PDFs, which failed', output: undefined }),
+    task('b-lint', 'Check the payment code', shop, { kind: 'command', state: 'done', ...ofSession('checkout'), command: 'npm run lint -- checkout/', startedAt: now - 71 * MIN, endedAt: now - 70 * MIN, exitCode: 0 }),
+    job('j-negatives', 'Mine hard negatives', search, { state: 'done', ...own('search-index'), command: 'python mine_negatives.py --top 100', startedAt: now - 5 * HOUR, endedAt: now - 2 * HOUR - 6 * MIN, exitUnknown: true }),
+    task('b-images', 'Resize the product photos', shop, { kind: 'command', state: 'done', command: 'python resize.py public/products', startedAt: now - 3 * HOUR - 4 * MIN, endedAt: now - 3 * HOUR, exitCode: 0 }),
+    job('j-titles', 'Embed the product titles', search, { state: 'done', ...own('search-index'), command: 'python embed.py titles.jsonl', startedAt: now - 27 * HOUR, endedAt: now - 26 * HOUR, exitCode: 0 }),
+    task('b-types', 'Type check the shop', shop, { kind: 'command', state: 'done', ...ofSession('checkout'), command: 'npm run typecheck', startedAt: now - 29 * HOUR - 2 * MIN, endedAt: now - 29 * HOUR, exitCode: 0 }),
+    job('j-words', 'Count the words', thesis, { state: 'done', ...own('thesis'), command: 'texcount -sum thesis.tex', startedAt: now - 31 * HOUR - MIN, endedAt: now - 31 * HOUR, exitCode: 0 }),
   ];
 
   const logs = {
@@ -1451,9 +1515,18 @@ function jobsDemo(s, now) {
       'step 8,400/20,000 · 3,725,000 passages indexed · 3,460 passages/s',
       '',
     ].join('\n'),
+    'job:j-convert': ['$ python convert.py sources/*.pdf', 'survey-2019.pdf: 24 pages', 'survey-scan-12.pdf: 9 pages', 'Traceback (most recent call last):', '  File "convert.py", line 41, in <module>', 'ValueError: no text on page 4 of survey-scan-12.pdf', ''].join('\n'),
   };
 
-  return { list: { running, queued, servers, ended, allDoneAt: ahead(130), at: now }, logs };
+  const tags = [
+    { name: 'search-index', uses: 14, lastAt: now - 11 * MIN },
+    { name: 'thesis', uses: 9, lastAt: now - 2 * MIN },
+    { name: 'checkout', uses: 6, lastAt: now - 5 * MIN },
+    { name: 'evaluation', uses: 3, lastAt: now - 15 * MIN },
+    { name: 'data', uses: 2, lastAt: now - 26 * HOUR },
+  ];
+
+  return { list: { running, queued, servers, ended, allDoneAt: ahead(130), tags, at: now }, logs };
 }
 
 // ---- answered to the page ---------------------------------------------------------------------------

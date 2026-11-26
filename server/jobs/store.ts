@@ -1,11 +1,16 @@
 // What the Jobs section keeps in the app's database (shared/jobs.ts): the jobs run with the `job` command, from the moment
 // they are registered, and what else was seen to end (sessions' background tasks, runs of Experiments, Hydor
-// subagents), for the Finished list and for how long the same thing took before. Ended ones are kept a week.
+// subagents), for the Finished list and for how long the same thing took before. Ended ones are kept a week. Also the
+// tags: those in use, and those of sessions that a person set or the helper model picked.
 import fs from 'node:fs';
-import { JOB_ENDED, type JobEntry, type JobState } from '../../shared/jobs.ts';
+import { JOB_ENDED, type JobEntry, type JobState, type JobTag } from '../../shared/jobs.ts';
 import type { DB } from '../db.ts';
 
 export const KEEP_MS = 7 * 24 * 3600_000;
+/** A tag in use is forgotten this long after it was last given, and so are the tags a person set for a session. */
+export const TAG_KEEP_MS = 180 * 24 * 3600_000;
+/** The tag the helper model picked for a session is kept this long. */
+export const HELPER_TAG_KEEP_MS = 60 * 24 * 3600_000;
 /** How many earlier runs of the same command an estimate takes the middle of. */
 const HISTORY_RUNS = 5;
 
@@ -32,6 +37,8 @@ export interface Registered {
   progressPattern?: string;
   /** What its progress count goes up to (`--total`). */
   progressTotal?: number;
+  /** Its own tags (`--tag`, or given on the page); none: it takes its session's. */
+  tags?: string[];
   /** The session that registered it, and the run of its agent (none: a person's own shell or a script). */
   session?: string;
   runId?: string;
@@ -70,6 +77,8 @@ export function jobsSchema(db: DB) {
     );
     create index if not exists bg_jobs_ended on bg_jobs (ended_at);
     create index if not exists bg_jobs_sig on bg_jobs (sig, cwd, ended_at);
+    create table if not exists bg_job_tags (name text primary key, uses integer not null, last_at integer not null);
+    create table if not exists bg_job_session_tags (session text primary key, tags text not null, "by" text not null, at integer not null);
   `);
 }
 
@@ -180,8 +189,88 @@ export function historyMs(db: DB, sig: string | undefined, cwd: string | undefin
   return ms.length % 2 ? ms[mid] : Math.round((ms[mid - 1] + ms[mid]) / 2);
 }
 
-/** Removes what ended more than a week ago, with its log file; a job something still waits for is kept. */
+// ---- tags ------------------------------------------------------------------------------------------------------------------
+
+/** Counts tags as given once more, now. */
+export function countTags(db: DB, tags: string[], now: number) {
+  const add = db.prepare('insert into bg_job_tags (name, uses, last_at) values (?, 1, ?) on conflict(name) do update set uses = uses + 1, last_at = excluded.last_at');
+  for (const t of tags) add.run(t, now);
+}
+
+export const tagKnown = (db: DB, name: string): boolean => !!db.prepare('select 1 from bg_job_tags where name = ?').get(name);
+
+/** The tags in use, the one used last first. */
+export function tagsInUse(db: DB, limit: number): JobTag[] {
+  return db.prepare('select name, uses, last_at as lastAt from bg_job_tags order by last_at desc, rowid desc limit ?').all(limit) as JobTag[];
+}
+
+/** The tags given most often, for the helper model to pick from. */
+export function topTags(db: DB, limit: number): { name: string; uses: number }[] {
+  return db.prepare('select name, uses from bg_job_tags order by uses desc, last_at desc limit ?').all(limit) as { name: string; uses: number }[];
+}
+
+export function setPersonTags(db: DB, session: string, tags: string[], now: number) {
+  db.prepare(
+    `insert into bg_job_session_tags (session, tags, "by", at) values (?, ?, 'person', ?)
+     on conflict(session) do update set tags = excluded.tags, "by" = excluded."by", at = excluded.at`,
+  ).run(session, JSON.stringify(tags), now);
+}
+
+export function forgetPersonTags(db: DB, session: string) {
+  db.prepare(`delete from bg_job_session_tags where session = ? and "by" = 'person'`).run(session);
+}
+
+/** Keeps the helper model's pick, never over a person's (set perhaps while the model was thinking); false when theirs stays. */
+export function setHelperTag(db: DB, session: string, tag: string, now: number): boolean {
+  return (
+    db
+      .prepare(
+        `insert into bg_job_session_tags (session, tags, "by", at) values (?, ?, 'helper', ?)
+         on conflict(session) do update set tags = excluded.tags, at = excluded.at where "by" = 'helper'`,
+      )
+      .run(session, JSON.stringify([tag]), now).changes > 0
+  );
+}
+
+/**
+ * Each session's tags, for the work that has none of its own: a person's; else the tag that its jobs of the last week
+ * have first most often (of equals, the newest job's); else the helper model's.
+ */
+export function sessionTags(db: DB, now: number): Map<string, string[]> {
+  const rows = db.prepare('select session, tags, "by" from bg_job_session_tags').all() as { session: string; tags: string; by: 'person' | 'helper' }[];
+  const of = new Map<string, string[]>();
+  const take = (by: 'person' | 'helper') => {
+    for (const r of rows) if (r.by === by) of.set(r.session, JSON.parse(r.tags) as string[]);
+  };
+  take('helper');
+  // Newest first, so that of two tags as frequent the newer job's is met first, and stays.
+  const jobs = db.prepare('select * from bg_jobs where mine = 1 and (ended_at is null or ended_at >= ?) order by queued_at desc, rowid desc').all(now - KEEP_MS) as Row[];
+  const counts = new Map<string, Map<string, number>>();
+  for (const { session, tags } of jobs.map(registered)) {
+    if (!session || !tags?.length) continue;
+    const mine = counts.get(session) ?? new Map<string, number>();
+    counts.set(session, mine.set(tags[0]!, (mine.get(tags[0]!) ?? 0) + 1));
+  }
+  for (const [session, mine] of counts) of.set(session, [[...mine].reduce((best, next) => (next[1] > best[1] ? next : best))[0]]);
+  take('person');
+  return of;
+}
+
+/** An entry with its session's tags, when it has none of its own: derived each time it is listed, never stored. */
+export function withSessionTags(e: JobEntry, of: Map<string, string[]>): JobEntry {
+  const tags = !e.tags && e.session ? of.get(e.session.key) : undefined;
+  return tags ? { ...e, tags, tagsFrom: 'session' } : e;
+}
+
+// ---- keeping ---------------------------------------------------------------------------------------------------------------
+
+/**
+ * Removes what ended more than a week ago, with its log file (a job something still waits for is kept), and the tags
+ * and session tags that are too old.
+ */
 export function prune(db: DB, now: number): number {
+  db.prepare('delete from bg_job_tags where last_at < ?').run(now - TAG_KEEP_MS);
+  db.prepare(`delete from bg_job_session_tags where at < case "by" when 'helper' then ? else ? end`).run(now - HELPER_TAG_KEEP_MS, now - TAG_KEEP_MS);
   const waited = new Set(activeRegistered(db).flatMap((j) => j.after));
   const rows = db.prepare('select * from bg_jobs where ended_at is not null and ended_at < ?').all(now - KEEP_MS) as Row[];
   const drop = db.prepare('delete from bg_jobs where id = ?');

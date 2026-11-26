@@ -17,9 +17,13 @@ Usage:
   job status ID [--json]                     one job
   job wait ID... [--timeout DUR]             block until the jobs end
   job stop ID                                stop a job, or cancel one that waits
+  job tags [--json]                          the tags in use, the one used last first
+  job tag ID [TAG...]                        give a job (or its session) tags; none: clear them
 
 Options of run:
   --name TEXT           what it is, in a few words (default: the command, cut to 60 characters)
+  --tag TAG             what it is part of, in a word or two (repeatable, or split by commas; 3 at most). Reuse one
+                        from \`job tags\` when the work belongs to it. Without it, it takes its session's tag.
   --eta DUR             how long you expect it to take: 45 (minutes), 90s, 45m, 2h, 1h30m
   --after ID|NAME       start only when that job is done (repeatable; a name means the newest job with it).
                         If it fails or is stopped, this job never starts.
@@ -30,7 +34,7 @@ Options of run:
                         with a --progress of one capture group, that group is done out of N.
   --session KEY         whose work it is, by its session key (only with the app's own sign-in, not a session's).
 
-Options of adopt: --pid PID, --name TEXT, --eta DUR, --progress REGEX, --total N, --session KEY as above, and
+Options of adopt: --pid PID, --name TEXT, --tag TAG, --eta DUR, --progress REGEX, --total N, --session KEY as above, and
   --log FILE            the file that process writes to, read for its progress and last line
 It prints "job <id> adopted: <name>" and returns at once (--after and --queue are only run's). The job ends when
 the process is gone, with its exit code unknown (for --after that counts as done). job stop sends that one process
@@ -44,13 +48,15 @@ Limits: kill -9 of job alone leaves the command running (Hydor then shows the jo
 Exit: run: the command's own (128+signal if killed), 2 not accepted (e.g. no such --after), 3 never started,
       127/126 cannot run it. wait: 0 all done, 1 any failed, stopped or cancelled, 124 timeout.
       adopt: 0 adopted, 2 refused or no such process, 1 Hydor not reachable or sign-in not accepted.
-      list, status, stop: 0, 2 refused, 3 Hydor not reachable. 64 usage.
+      list, tags, status, stop, tag: 0, 2 refused, 3 Hydor not reachable. 64 usage.
 
 Examples:
   job run --name 'Build the search index' --eta 2h -- python build_index.py --shards 8
+  job run --name 'Train the classifier' --tag intent-data -- python train.py
   job run --name 'Evaluate' --after 'Build the search index' --queue gpu -- 'make eval && make report'
   job adopt --pid 4312 --name 'Crawl the archive' --log crawl.log
   job list
+  job tag j-1a2b intent-data
   job wait j-1a2b --timeout 1h
 `;
 
@@ -95,14 +101,16 @@ function parseDur(v, flag, plain = 's') {
 }
 
 // ---------- arguments ----------
-const VALUE_OPTS = { run: ['name', 'eta', 'after', 'queue', 'progress', 'total', 'session'], adopt: ['pid', 'name', 'log', 'eta', 'progress', 'total', 'session'], list: [], status: [], wait: ['timeout'], stop: [] };
-const BOOL_OPTS = { run: [], adopt: [], list: ['all'], status: ['json'], wait: [], stop: [] };
+const VALUE_OPTS = { run: ['name', 'tag', 'eta', 'after', 'queue', 'progress', 'total', 'session'], adopt: ['pid', 'name', 'tag', 'log', 'eta', 'progress', 'total', 'session'], list: [], status: [], wait: ['timeout'], stop: [], tags: [], tag: [] };
+const BOOL_OPTS = { run: [], adopt: [], list: ['all'], status: ['json'], wait: [], stop: [], tags: ['json'], tag: [] };
+/** The tags in one value: split by commas, no empty ones (the app says how each is kept). */
+const tagsIn = (v) => v.split(',').map((t) => t.trim()).filter(Boolean);
 
 function parseArgs(argv) {
   const sub = argv[0];
   if (sub === undefined || sub === '--help' || sub === '-h' || sub === 'help') return { help: true };
   if (!Object.hasOwn(VALUE_OPTS, sub)) throw new UsageError(`unknown command '${sub}'`);
-  const o = { sub, ids: [], after: [], cmd: null, all: false, json: false };
+  const o = { sub, ids: [], after: [], tags: [], cmd: null, all: false, json: false };
   for (let i = 1; i < argv.length; i++) {
     let tok = argv[i];
     if (tok === '--' && sub === 'run') { o.cmd = argv.slice(i + 1); break; }
@@ -127,6 +135,11 @@ function parseArgs(argv) {
     }
     if (!val.trim()) throw new UsageError(`--${name} needs a value`);
     if (name === 'after') o.after.push(val);
+    else if (name === 'tag') {
+      const tags = tagsIn(val);
+      if (!tags.length) throw new UsageError('--tag needs a value');
+      o.tags.push(...tags);
+    }
     else if (name === 'eta') o.etaMs = parseDur(val, '--eta', 'm');
     else if (name === 'timeout') o.timeoutMs = parseDur(val, '--timeout');
     else if (name === 'total') {
@@ -146,9 +159,12 @@ function parseArgs(argv) {
   if (sub === 'run') {
     if (o.cmd === null) throw new UsageError("job run needs '-- COMMAND'");
     if (!o.cmd.length || !o.cmd[0]) throw new UsageError('no command given after --');
-  } else if (sub === 'list' || sub === 'adopt') {
+  } else if (sub === 'list' || sub === 'adopt' || sub === 'tags') {
     if (o.ids.length) throw new UsageError(`unexpected argument '${o.ids[0]}'`);
     if (sub === 'adopt' && !o.pid) throw new UsageError('job adopt needs --pid');
+  } else if (sub === 'tag') {
+    if (!o.ids.length) throw new UsageError('job tag needs a job id');
+    o.tags = o.ids.splice(1).flatMap(tagsIn);
   } else if (sub === 'wait') {
     if (!o.ids.length) throw new UsageError('job wait needs a job id');
   } else if (o.ids.length !== 1) throw new UsageError(`job ${sub} needs one job id`);
@@ -363,6 +379,14 @@ async function register(app, body) {
   }
 }
 
+/** What is said of the tags when the app names the ones in use: the job got none, or a new one. One line. */
+function noteTags(job) {
+  if (!Array.isArray(job.tagsInUse)) return;
+  const own = Array.isArray(job.tags) && job.tags.length ? `tagged ${job.tags.map(oneLine).join(', ')} (new)` : 'no --tag given';
+  const used = job.tagsInUse.length ? `; tags in use: ${job.tagsInUse.map(oneLine).join(', ')}` : '';
+  note(`job: ${own}${used} (job tag ${oneLine(job.id)} TAG to change)`);
+}
+
 /** Waits for its turn: null to start, else why it never will. Returns early (null) when a signal came. */
 async function waitForGo(app, job) {
   let said = job.waitingFor ?? '';
@@ -401,7 +425,7 @@ async function cmdRun(o) {
   const name = o.name ?? cut(oneLine(command), 60);
   const app = appEnv();
   const reg = app
-    ? await register(app, { name, command, cwd: process.cwd(), pid: process.pid, etaMs: o.etaMs, after: o.after.length ? o.after : undefined, queue: o.queue, progress: o.progress, total: o.total, session: o.session })
+    ? await register(app, { name, command, cwd: process.cwd(), pid: process.pid, etaMs: o.etaMs, after: o.after.length ? o.after : undefined, queue: o.queue, progress: o.progress, total: o.total, session: o.session, tags: o.tags.length ? o.tags : undefined })
     : { unreachable: true };
   if (reg.refused) {
     note(`job: ${reg.refused}`);
@@ -415,6 +439,7 @@ async function cmdRun(o) {
   }
 
   const job = reg.job;
+  noteTags(job);
   if (job.start !== true && !S.signal) {
     const never = await waitForGo(app, job);
     if (never !== null) {
@@ -472,24 +497,25 @@ async function cmdAdopt(o) {
   const log = o.log === undefined ? undefined : path.resolve(o.log);
   const name = o.name ?? cut(oneLine(found.command), 60);
   const reg = app
-    ? await register(app, { name, command: found.command, cwd: found.cwd ?? process.cwd(), pid: o.pid, adoptPid: o.pid, logFile: log, etaMs: o.etaMs, progress: o.progress, total: o.total, session: o.session })
+    ? await register(app, { name, command: found.command, cwd: found.cwd ?? process.cwd(), pid: o.pid, adoptPid: o.pid, logFile: log, etaMs: o.etaMs, progress: o.progress, total: o.total, session: o.session, tags: o.tags.length ? o.tags : undefined })
     : { unreachable: true };
   if (reg.refused) return fail(2, reg.refused);
   if (reg.denied) return fail(1, `Hydor did not accept this session's sign-in; pid ${o.pid} is not adopted`);
   if (reg.unreachable) return fail(1, `Hydor is not reachable; pid ${o.pid} is not adopted`);
   if (log && !isFile(log)) note(`job: ${log} is not there (yet): its progress is read once it is`);
   out(`job ${reg.job.id} adopted: ${oneLine(name)}`);
+  noteTags(reg.job);
   return 0;
 }
 
-// ---------- list, status, wait, stop ----------
+// ---------- list, status, wait, stop, tags ----------
 /** A request of these commands: its data, or the process's end with why not. */
-async function ask(method, tail) {
+async function ask(method, tail, body) {
   const app = appEnv();
   if (!app) throw Object.assign(new Error('HYDOR_JOBS_URL and HYDOR_JOBS_TOKEN are not set: this needs a session Hydor started'), { code: 3 });
   let r;
   try {
-    r = await call(app, method, tail);
+    r = await call(app, method, tail, body);
   } catch (e) {
     throw Object.assign(new Error(`Hydor is not reachable: ${errMsg(e)}`), { code: 3 });
   }
@@ -501,6 +527,7 @@ const ENDED = new Set(['done', 'failed', 'stopped', 'cancelled']);
 // An adopted process that is gone is "done" to the app, but nobody saw how it ended.
 const stateWord = (j) => (j.state === 'done' && j.exitUnknown ? 'ended' : oneLine(j.state));
 
+const tagList = (j) => (Array.isArray(j.tags) ? j.tags.map(oneLine).join(', ') : '');
 const timing = (j, now) => {
   if (j.state === 'running') return j.startedAt ? fmtDur(now - j.startedAt) : '';
   if (j.state === 'queued') return j.queuedAt ? `queued ${fmtDur(now - j.queuedAt)}` : 'queued';
@@ -530,7 +557,7 @@ async function cmdList(o) {
   if (!jobs.length) { out(o.all ? 'no jobs' : 'no jobs running or queued'); return 0; }
   const now = data.at ?? Date.now();
   const rows = jobs.map((j) => [
-    oneLine(j.id), stateWord(j), cut(oneLine(j.name), 40), cut(oneLine(j.session?.title ?? '-'), 30), timing(j, now), left(j, now), cut(oneLine(note2(j)), 60),
+    oneLine(j.id), stateWord(j), `${cut(oneLine(j.name), 40)}${tagList(j) ? ` [${tagList(j)}]` : ''}`, cut(oneLine(j.session?.title ?? '-'), 30), timing(j, now), left(j, now), cut(oneLine(note2(j)), 60),
   ]);
   out(table([['ID', 'STATE', 'NAME', 'SESSION', 'TIME', 'LEFT', ''], ...rows]));
   if (data.allDoneAt && data.allDoneAt > now) out(`all done in about ${fmtDur(data.allDoneAt - now)}`);
@@ -549,6 +576,7 @@ async function cmdStatus(o) {
   const now = Date.now();
   const lines = [`${oneLine(j.id)}  ${stateWord(j)}  ${oneLine(j.name)}`];
   const add = (label, v) => { if (v !== undefined && v !== null && v !== '') lines.push(`  ${`${label}:`.padEnd(11)}${oneLine(v)}`); };
+  add('tags', tagList(j));
   add('command', j.command && cut(j.command, 200));
   add('folder', j.cwd);
   add('session', j.session && `${j.session.title}${j.session.project ? ` (project ${j.session.project.name})` : ''}`);
@@ -606,6 +634,25 @@ async function cmdStop(o) {
   return 0;
 }
 
+async function cmdTags(o) {
+  const data = await ask('GET', '?ended=0');
+  const tags = data.tags ?? [];
+  if (o.json) { out(JSON.stringify(tags, null, 2)); return 0; }
+  if (!tags.length) { out('no tags yet'); return 0; }
+  const now = data.at ?? Date.now();
+  out(table(tags.map((t) => [oneLine(t.name), `${t.uses} use${t.uses === 1 ? '' : 's'}, last ${fmtDur(now - t.lastAt)} ago`])));
+  return 0;
+}
+
+async function cmdTag(o) {
+  const id = o.ids[0];
+  const { job } = await ask('PUT', `/${encodeURIComponent(id)}/tags`, { tags: o.tags });
+  // A `job` job whose own tags were cleared is listed with its session's: those are not its own.
+  const kept = o.tags.length && !(job?.kind === 'job' && job.tagsFrom !== 'own') ? tagList(job ?? {}) : '';
+  out(`job ${oneLine(id)} tags: ${kept || "none (it takes its session's)"}`);
+  return 0;
+}
+
 // ---------- main ----------
 /** Ends once what was written has left: process.exit alone cuts off what is still in a pipe's buffer. */
 function exit(code) {
@@ -629,7 +676,7 @@ async function main() {
     return 64;
   }
   if (o.help) { process.stdout.write(HELP); return 0; }
-  return { run: cmdRun, adopt: cmdAdopt, list: cmdList, status: cmdStatus, wait: cmdWait, stop: cmdStop }[o.sub](o);
+  return { run: cmdRun, adopt: cmdAdopt, list: cmdList, status: cmdStatus, wait: cmdWait, stop: cmdStop, tags: cmdTags, tag: cmdTag }[o.sub](o);
 }
 
 main().then(exit, (e) => {

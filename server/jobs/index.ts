@@ -1,11 +1,11 @@
 // The Jobs section (/jobs): long work that sessions run in the background, all in one place (shared/jobs.ts). This
 // capability gathers it, follows its progress, estimates the time left, keeps what ended for a week, decides when a job
-// run with the `job` command may start, serves the page (/api/jobs) and the command (/agent/jobs), and gives every
-// session's shell the command's address and token.
+// run with the `job` command may start, serves the page (/api/jobs) and the command (/agent/jobs), sorts the work by its
+// tags, and gives every session's shell the command's address and token.
 import fs from 'node:fs';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { commandSig } from '../../shared/job-progress.ts';
-import { JOB_ENDED, JOBS_ENV, type JobCounts, type JobEntry, type JobGo, type JobLog, type JobRegister, type JobRegistered, type JobReport, type JobsList } from '../../shared/jobs.ts';
+import { JOB_ENDED, JOBS_ENV, normalTags, type JobCounts, type JobEntry, type JobGo, type JobLog, type JobRegister, type JobRegistered, type JobReport, type JobsList, type JobTagsSet } from '../../shared/jobs.ts';
 import { AuthManager, HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { files } from '../experiments/local.ts';
@@ -16,8 +16,9 @@ import type { Deps, Feature } from '../features/types.ts';
 import { plain, readTail, readTaskLog, taskOutputPath } from '../tasklog.ts';
 import { jobsRunOf, jobsToken, signedIn } from './auth.ts';
 import { cut, Gatherer, sessionHref, sessionInfo, type Observed, type Seen } from './gather.ts';
-import { adopt, checkRunners, logOfJob, pendingDeps, register, report, schedule, stopRegistered, waitingWords } from './schedule.ts';
-import { activeRegistered, endedRows, entryId, forgetSeen, getRegistered, getSeen, hideEnded, historyMs, isEnded, jobKey, jobsSchema, prune, saveSeen, type Registered } from './store.ts';
+import { adopt, checkRunners, logOfJob, pendingDeps, register, report, save, schedule, stopRegistered, waitingWords } from './schedule.ts';
+import { activeRegistered, countTags, endedRows, entryId, forgetPersonTags, forgetSeen, getRegistered, getSeen, hideEnded, historyMs, isEnded, jobKey, jobsSchema, prune, saveSeen, sessionTags, setPersonTags, tagKnown, tagsInUse, withSessionTags, type Registered } from './store.ts';
+import { confidentialSession, HelperTags, helperTagger, type TagSessions } from './tags.ts';
 import { estimateRunning, Watcher } from './watch.ts';
 
 const LOG_BYTES = 64 << 10;
@@ -25,6 +26,9 @@ const PRUNE_EVERY_MS = 3600_000;
 /** Sessions change often while agents work: however often, they are looked at once in this long. */
 const POKE_MS = 1000;
 const NO_OUTPUT = 'This job has no output to show.';
+/** How many tags in use a list holds, and a registration names. */
+const LISTED_TAGS = 50;
+const NAMED_TAGS = 12;
 
 export interface JobsOptions {
   /** Between looks while something runs or waits, and while nothing does. */
@@ -34,6 +38,8 @@ export interface JobsOptions {
   pollMs?: number;
   /** From asking a command to end to killing it. */
   killMs?: number;
+  /** Picks tags for sessions that have none (default: the helper model). */
+  tagSessions?: TagSessions;
 }
 
 export interface Jobs extends Feature {
@@ -58,6 +64,7 @@ export function createJobs(o: JobsOptions = {}): Jobs {
   const killMs = o.killMs ?? 10_000;
   let d: Deps;
   let gather: Gatherer;
+  let helperTags: HelperTags;
   const watcher = new Watcher();
   /** What was at work at the last look, to notice what ended without saying so. */
   let before = new Map<string, Seen>();
@@ -226,6 +233,8 @@ export function createJobs(o: JobsOptions = {}): Jobs {
       exitUnknown: j.exitUnknown,
       after: j.after.length ? j.after : undefined,
       queue: j.queue,
+      tags: j.tags,
+      tagsFrom: j.tags ? 'own' : undefined,
       progress: read?.progress ?? j.progress,
       lastLine: read?.lastLine ?? j.lastLine,
       reason: j.reason,
@@ -288,7 +297,8 @@ export function createJobs(o: JobsOptions = {}): Jobs {
     return { running, queued };
   }
 
-  function list(limit = 100, now = Date.now()): JobsList {
+  /** The list as it is now, each entry with its tags: its own, else its session's. */
+  function gathered(limit: number, now: number): JobsList {
     const seen = tick(now);
     const sessions = new Map<string, JobEntry['session']>();
     const mine = registeredNow(sessions, now);
@@ -301,22 +311,59 @@ export function createJobs(o: JobsOptions = {}): Jobs {
     // Subagents never say how long they take: the end of everything is told without them.
     const all = [...running, ...queued].filter((e) => e.kind !== 'subagent' && e.kind !== 'hydor-subagent').map((e) => e.estimate?.endsAt);
     const allDoneAt = all.length && all.every((t): t is number => t !== undefined && t > now) ? Math.max(...(all as number[])) : undefined;
-    return { running, queued, servers, ended, allDoneAt, at: now };
+    const of = sessionTags(d.db, now);
+    const tagged = (entries: JobEntry[]) => entries.map((e) => withSessionTags(e, of));
+    return { running: tagged(running), queued: tagged(queued), servers: tagged(servers), ended: tagged(ended), allDoneAt, tags: tagsInUse(d.db, LISTED_TAGS), at: now };
+  }
+
+  /** The list for someone who asked for it: sessions with no tags are then put to the helper model, in the background. */
+  function list(limit = 100, now = Date.now()): JobsList {
+    const l = gathered(limit, now);
+    helperTags.ask([...l.running, ...l.queued, ...l.servers, ...l.ended], now);
+    return l;
   }
 
   /** One job by its id, wherever it is in the list; also one cleared from the Finished list. */
   function find(id: string): JobEntry | null {
-    const now = list(500);
-    const listed = [...now.running, ...now.queued, ...now.ended].find((e) => e.id === id);
+    const now = gathered(500, Date.now());
+    const listed = [...now.running, ...now.queued, ...now.servers, ...now.ended].find((e) => e.id === id);
     if (listed) return listed;
     const j = getRegistered(d.db, id);
-    return j ? registeredEntry(j, new Map()) : getSeen(d.db, id);
+    const e = j ? registeredEntry(j, new Map()) : getSeen(d.db, id);
+    return e && withSessionTags(e, sessionTags(d.db, Date.now()));
   }
 
   function mustFind(id: string): JobEntry {
     const e = find(entryId(id));
     if (!e) throw new HttpError(404, 'There is no such job');
     return e;
+  }
+
+  // ---- tags -----------------------------------------------------------------------------------------------------------------
+
+  /** Counts tags given into those in use; a confidential session's words stay out of them, which others are told. */
+  function count(session: string | undefined, tags: string[], now: number) {
+    if (!session || !confidentialSession(d.db, session)) countTags(d.db, tags, now);
+  }
+
+  /** Tags given on the page or by `job tag`: a `job` job's own; for other work, its session's. */
+  function setTags(id: string, b: Partial<JobTagsSet> | null | undefined): { job: JobEntry } {
+    if (!Array.isArray(b?.tags)) throw new HttpError(400, 'Which tags? A list of them, empty to clear them');
+    const e = mustFind(id);
+    const tags = normalTags(b.tags);
+    const now = Date.now();
+    const job = getRegistered(d.db, e.id);
+    if (job) {
+      job.tags = tags.length ? tags : undefined;
+      save(d.db, job);
+      count(job.session, tags, now);
+    } else if (!e.session) throw new HttpError(409, 'It belongs to no session, so it cannot be tagged');
+    else if (tags.length) {
+      setPersonTags(d.db, e.session.key, tags, now);
+      count(e.session.key, tags, now);
+    } else forgetPersonTags(d.db, e.session.key);
+    d.broadcast({ t: 'jobs', ...counts });
+    return { job: mustFind(id) };
   }
 
   // ---- stopping, clearing, output ----------------------------------------------------------------------------------------
@@ -388,12 +435,23 @@ export function createJobs(o: JobsOptions = {}): Jobs {
       who = { ...who, session: named };
     }
     const job = b.adoptPid === undefined ? register(d.db, b, who, now) : adopt(d.db, b, who, now);
+    // Whether one of its tags is new is asked before they are counted.
+    const given = normalTags(b.tags);
+    const newTag = given.some((t) => !tagKnown(d.db, t));
+    count(job.session, given, now);
+    const tags = job.tags ?? [];
+    const others = () =>
+      tagsInUse(d.db, NAMED_TAGS + tags.length)
+        .map((t) => t.name)
+        .filter((t) => !tags.includes(t))
+        .slice(0, NAMED_TAGS);
+    const tagged = { ...(tags.length ? { tags } : {}), ...(!tags.length || newTag ? { tagsInUse: others() } : {}) };
     const id = jobKey(job.id);
     for (const changed of schedule(d.db, now)) wake(changed);
     const after = getRegistered(d.db, id)!;
     safeTick();
     const waitingFor = after.state === 'queued' ? waitingWords(d.db, after) : after.reason;
-    return { id: job.id, log: job.log, start: after.state === 'running', ...(after.state === 'running' ? {} : { waitingFor }) };
+    return { id: job.id, log: job.log, start: after.state === 'running', ...(after.state === 'running' ? {} : { waitingFor }), ...tagged };
   }
 
   function goNow(id: string): JobGo | null {
@@ -479,6 +537,10 @@ export function createJobs(o: JobsOptions = {}): Jobs {
       await stopJob(idOf(req));
       return { ok: true };
     });
+    app.put('/agent/jobs/:id/tags', { bodyLimit: 16 * 1024 }, async (req) => {
+      who(req, idOf(req));
+      return setTags(idOf(req), req.body as Partial<JobTagsSet>);
+    });
   }
 
   const limitOf = (req: FastifyRequest) => {
@@ -492,6 +554,7 @@ export function createJobs(o: JobsOptions = {}): Jobs {
       d = deps;
       jobsSchema(d.db);
       gather = new Gatherer(d);
+      helperTags = new HelperTags(d, o.tagSessions ?? helperTagger(d.db), () => d.broadcast({ t: 'jobs', ...counts }));
       d.sessions.jobsAtWork = (key) => bySession.get(key) ?? 0;
       const idOf = (req: FastifyRequest) => (req.params as { id: string }).id;
       d.app.get('/api/jobs', async (req) => list(limitOf(req)));
@@ -500,6 +563,7 @@ export function createJobs(o: JobsOptions = {}): Jobs {
         await stopJob(idOf(req));
         return { ok: true };
       });
+      d.app.put('/api/jobs/:id/tags', { bodyLimit: 16 * 1024 }, async (req) => setTags(idOf(req), req.body as Partial<JobTagsSet>));
       d.app.delete('/api/jobs/ended', async () => {
         hideEnded(d.db);
         return { ok: true };

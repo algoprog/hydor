@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { commandSig, lastLine, readProgress } from '../../shared/job-progress.ts';
-import type { JobRegister, JobReport, JobState } from '../../shared/jobs.ts';
+import { normalTags, type JobRegister, type JobReport, type JobState } from '../../shared/jobs.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
@@ -120,6 +120,12 @@ export function logOfJob(j: Registered): string | undefined {
 
 const etaOf = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : undefined);
 
+/** The tags a job is given, as kept; none rather than an empty list. */
+const tagsOf = (v: unknown) => {
+  const tags = normalTags(v);
+  return tags.length ? tags : undefined;
+};
+
 /** The job at work that a process already belongs to: adopted before, or one of `job run`'s. */
 function jobOfProcess(db: DB, pid: number): Registered | undefined {
   return activeRegistered(db).find((j) => (j.pid === pid && processAlive(pid, j.pidStart)) || (j.commandPid === pid && j.state === 'running'));
@@ -132,7 +138,12 @@ export function adopt(db: DB, b: Partial<JobRegister>, who: { session?: string; 
   if (!safePid(pid)) throw new HttpError(400, 'Which process should be adopted?');
   if (!processAlive(pid)) throw new HttpError(400, `There is no running process with pid ${pid}`);
   const had = jobOfProcess(db, pid);
-  if (had) return had;
+  if (had) {
+    // Adopted again with tags: those are its tags now.
+    const tags = tagsOf(b.tags);
+    if (tags) save(db, Object.assign(had, { tags }));
+    return had;
+  }
   const command = text(b.command, 20_000) || `process ${pid}`;
   const logFileGiven = text(b.logFile, 4000);
   // A file not written yet is read once it is there; one that is there must be one that may be read.
@@ -153,6 +164,7 @@ export function adopt(db: DB, b: Partial<JobRegister>, who: { session?: string; 
     after: [],
     progressPattern: cleanPattern(b.progress),
     progressTotal: etaOf(b.total),
+    tags: tagsOf(b.tags),
     session: who.session,
     runId: who.runId,
     adopted: true,
@@ -190,6 +202,7 @@ export function register(db: DB, b: Partial<JobRegister>, who: { session?: strin
     queue: text(b.queue, 100) || undefined,
     progressPattern: cleanPattern(b.progress),
     progressTotal: etaOf(b.total),
+    tags: tagsOf(b.tags),
     session: who.session,
     runId: who.runId,
     queuedAt: now,
