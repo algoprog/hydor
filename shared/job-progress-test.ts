@@ -87,6 +87,20 @@ const unsteady = [0.01, 0.02, 0.03, 0.1, 0.2, 0.3].map((fraction, k) => ({ at: (
 assert.equal(estimateEnd(unsteady, 0, 6 * MIN)?.confidence, 'medium', 'the rate speeds up: not steady');
 assert.deepEqual(estimateEnd([{ at: 100_000, fraction: 0.5 }, { at: 200_000, fraction: 0.5 }], 0, 200_000), { endsAt: 400_000, confidence: 'medium' }, 'a flat rate falls back to the whole run');
 assert.deepEqual(estimateEnd([{ at: 200_000, fraction: 0.4 }, { at: 100_000, fraction: 0.5 }], 0, 200_000), { endsAt: 500_000, confidence: 'medium' }, 'a falling rate falls back too, and the samples are sorted');
+{
+  // Progress that stopped (a round that ended at 150471 of 200000) read every ~30 s at real clock times: rounding in the
+  // fit once gave a rate of ~1e-30 per ms and an end ~1e21 days away. A flat rate falls back to the whole run's.
+  const start = 1_795_000_000_000;
+  const f = 150471 / 200000;
+  for (let t = 0; t < 2000; t++) {
+    const now = start + 37_560_000 + t * 7_919;
+    const n = 3 + (t % 20);
+    const flat = Array.from({ length: n }, (_, i) => ({ at: now - (n - 1 - i) * (30_000 + ((i * 7 + t) % 2_000)), fraction: f }));
+    const e = estimateEnd(flat, start, now)!;
+    const whole = flat.at(-1)!.at + ((1 - f) * (flat.at(-1)!.at - start)) / f;
+    assert.ok(Math.abs(e.endsAt - Math.max(now, Math.round(whole))) <= 1, `stalled progress ends where the whole run's rate says (case ${t})`);
+  }
+}
 
 // The last line that says something: not a progress bar, cut to 300 characters.
 assert.equal(lastLine('ready\n██████████ 100%\n░░░░░░░░'), 'ready');

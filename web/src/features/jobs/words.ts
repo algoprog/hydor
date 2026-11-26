@@ -64,11 +64,16 @@ export interface TimeLeft {
   source: string;
 }
 
-/** "about 1 h 12 min left", "less than a minute left" or "over its estimate"; null without an estimate. */
+/** Further off than this, an estimate says nothing (a job that has all but stopped): none is shown. */
+const MAX_LEFT_MS = 365 * 86_400_000;
+
+/** "about 1 h 12 min left", "less than a minute left" or "over its estimate"; null without an estimate, or with one more
+ *  than a year away. */
 export function timeLeft(job: JobEntry, now: number): TimeLeft | null {
   const e = job.estimate;
   if (job.state !== 'running' || !e) return null;
   const left = e.endsAt - now;
+  if (!Number.isFinite(left) || left > MAX_LEFT_MS) return null;
   const read = e.source === 'progress' || e.source === 'output';
   const source = SOURCE_WORDS[e.source];
   if (left <= 0 && (!read || -left > GRACE_MS)) return { text: 'over its estimate', guess: false, over: true, source };

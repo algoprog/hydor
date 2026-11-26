@@ -221,17 +221,22 @@ export function readProgress(tail: string, custom?: string, total?: number): Pro
   return null;
 }
 
-/** Least-squares slope of fraction over time (per ms), or NaN when the times do not differ. */
+/** Least-squares slope of fraction over time (per ms), or NaN when the times do not differ. Measured from the first
+ *  point, so progress that has not moved gives exactly 0: from raw times (about 1.8e12 ms) and fractions, the means
+ *  round, and a stalled job got a rate of some 1e-30 per ms, an end 10^22 days away, instead of falling back to the
+ *  whole run's rate. */
 function fitRate(points: ProgressSample[]): number {
   const n = points.length;
   if (n < 2) return NaN;
-  const mx = points.reduce((s, p) => s + p.at, 0) / n;
-  const my = points.reduce((s, p) => s + p.fraction, 0) / n;
+  const x0 = points[0]!.at;
+  const y0 = points[0]!.fraction;
+  const mx = points.reduce((s, p) => s + (p.at - x0), 0) / n;
+  const my = points.reduce((s, p) => s + (p.fraction - y0), 0) / n;
   let sxy = 0;
   let sxx = 0;
   for (const p of points) {
-    const dx = p.at - mx;
-    sxy += dx * (p.fraction - my);
+    const dx = p.at - x0 - mx;
+    sxy += dx * (p.fraction - y0 - my);
     sxx += dx * dx;
   }
   return sxx > 0 ? sxy / sxx : NaN;

@@ -56,6 +56,9 @@ const est = (left: number, source: 'progress' | 'output' | 'agent' | 'history' =
   assert.equal(W.timeLeft(job({ estimate: est(26 * MIN) }), NOW)!.text, 'about 26 min left');
   assert.equal(W.timeLeft(job({ estimate: est(HOUR - 10_000) }), NOW)!.text, 'about 1 h 00 min left');
   assert.equal(W.timeLeft(job({ estimate: est(76 * HOUR) }), NOW)!.text, 'about 3 days 4 h left');
+  assert.equal(W.timeLeft(job({ estimate: est(300 * 24 * HOUR) }), NOW)!.text, 'about 300 days 0 h left');
+  assert.equal(W.timeLeft(job({ estimate: est(2 * 365 * 24 * HOUR) }), NOW), null, 'more than a year away says nothing');
+  assert.equal(W.timeLeft(job({ estimate: est(1.5e29) }), NOW), null, 'nor a number of days in the 10^21');
   assert.equal(W.timeLeft(job({ estimate: est(10 * MIN, 'history', 'low') }), NOW)!.guess, true);
   assert.equal(W.timeLeft(job({ estimate: est(10 * MIN, 'progress', 'medium') }), NOW)!.guess, false);
   assert.equal(W.timeLeft(job({ estimate: est(30_000) }), NOW)!.text, 'less than a minute left');
