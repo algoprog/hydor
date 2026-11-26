@@ -156,6 +156,11 @@ test('a token signed for a run, or the app’s sign-in, and nothing else', async
   assert.equal(own.status, 200);
   assert.equal((await entry((own.body as JobRegistered).id)).session, undefined);
   await call('POST', `/agent/jobs/${own.body.id}`, { state: 'done', exitCode: 0 }, cli);
+  // The app's own sign-in may say whose work it is; an unknown session is refused, and a session's run cannot say so.
+  const named = await call('POST', '/agent/jobs', { name: 'for the lead', command: 'true', cwd: tmp, pid: shell.pid, session: KEY }, cli);
+  assert.equal((await entry((named.body as JobRegistered).id)).session?.key, KEY);
+  await call('POST', `/agent/jobs/${named.body.id}`, { state: 'done', exitCode: 0 }, cli);
+  assert.equal((await call('POST', '/agent/jobs', { name: 'x', command: 'true', cwd: tmp, pid: shell.pid, session: 'claude:nobody' }, cli)).status, 400);
   // A run whose agent has ended speaks only for its own jobs.
   const gone = 'ddddeeeeffff';
   runs.set(gone, KEY);

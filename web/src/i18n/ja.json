@@ -28027,5 +28027,6 @@
   "There is no running process with pid {0}": "pidが{0}の実行中のプロセスはありません",
   "Which process should be adopted?": "どのプロセスを引き継ぎますか？",
   "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt": "ジョブ バックグラウンド タスク 長時間 作業 実行中 キュー 順番待ち 待機 完了後 依存関係 1つずつ 進捗 パーセント 残り時間 予測 ETA あとどれくらい 完了まで 完了 終了 失敗 停止 タイムライン ガントチャート 出力 ログ 停止 コマンド モニター サブエージェント サーバー 開発サーバー ビルド トレーニング 実行 インデックス作成 ダウンロード job command adopt 引き継ぎ",
-  "{0} cannot be read as a log": "{0}はログとして読み取れません"
+  "{0} cannot be read as a log": "{0}はログとして読み取れません",
+  "There is no session {0}": "セッション {0} はありません"
 }

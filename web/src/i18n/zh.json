@@ -29877,5 +29877,6 @@
   "There is no running process with pid {0}": "没有 pid 为 {0} 的正在运行的进程",
   "Which process should be adopted?": "要接管哪个进程？",
   "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt": "作业 后台任务 长时间工作 运行中 排队 队列 等待 依赖 之后 一次一个 进度 百分比 剩余时间 预计时间 eta 多久 直到 完成 已结束 失败 已停止 时间线 甘特图 gantt 输出 日志 停止 命令 监视器 子智能体 服务器 开发服务器 dev server 构建 训练 索引 下载 job command adopt 接管",
-  "{0} cannot be read as a log": "无法将 {0} 作为日志读取"
+  "{0} cannot be read as a log": "无法将 {0} 作为日志读取",
+  "There is no session {0}": "没有会话 {0}"
 }

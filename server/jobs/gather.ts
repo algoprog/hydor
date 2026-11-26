@@ -148,7 +148,8 @@ export class Gatherer {
         id,
         kind,
         state: running ? 'running' : stateOfTask(t.status),
-        name: cut(t.description || command || t.id, 200)!,
+        // A description or a command of several lines (a heredoc) is named by its first.
+        name: cut((t.description || command || t.id).split('\n')[0]!.trim() || t.id, 200)!,
         command: cut(command, 500),
         cwd: s.cwd,
         session,

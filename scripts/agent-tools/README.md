@@ -56,6 +56,15 @@ nohup python train.py > train.log &    # earlier: the shell printed its pid, her
 job adopt --pid 4312 --name 'Train the model' --log train.log
 ```
 
+A log that prints only how many are done ("google: 177600 written") says how far it is with `--progress` of one
+capture group and `--total` (what the count goes up to). From your own shell, or an agent through the app's API,
+`--session KEY` says which session the work belongs to:
+
+```bash
+job adopt --pid 2583522 --name 'Retrieve Google results' --log data/google.log \
+  --progress 'google: (\d+) written' --total 200000 --session claude:1222de21-…
+```
+
 ```bash
 job run --name 'Build the search index' --eta 2h -- python build_index.py --shards 8
 job run --name 'Evaluate it' --after 'Build the search index' --queue gpu -- 'make eval && make report'

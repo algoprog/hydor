@@ -28027,5 +28027,6 @@
   "Which process should be adopted?": "Quel processus faut-il adopter ?",
   "jobs background tasks long work running queued queue waiting waits for after dependency one at a time progress percent time left estimate eta how long until done finished failed stopped timeline gantt output log stop commands monitors subagents servers dev server builds training runs indexing downloads job command adopt": "jobs tâches en arrière-plan travail long en cours file d’attente en attente attend après dépendance une à la fois progression pourcentage temps restant estimation eta durée jusqu’à la fin terminé échoué arrêté chronologie gantt sortie journal log arrêter commandes monitors sous-agents serveurs serveur de développement builds compilations entraînements indexation téléchargements tâche commande adopter",
   "{0} cannot be read as a log": "Impossible de lire {0} comme journal",
-  "jobs::Done": "Réussi"
+  "jobs::Done": "Réussi",
+  "There is no session {0}": "Il n’y a pas de session {0}"
 }

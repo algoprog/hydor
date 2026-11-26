@@ -114,7 +114,7 @@ export function createJobs(o: JobsOptions = {}): Jobs {
         }
       } else watcher.read(s.entry.id, s.file, now);
     }
-    for (const j of jobs) if (j.state === 'running') watcher.read(jobKey(j.id), logOfJob(j), now, j.progressPattern);
+    for (const j of jobs) if (j.state === 'running') watcher.read(jobKey(j.id), logOfJob(j), now, j.progressPattern, j.progressTotal);
     const keep = new Set([...seen.running.flatMap((s) => [s.entry.id, `${s.entry.id}:log`]), ...jobs.map((j) => jobKey(j.id))]);
     watcher.keepOnly(keep);
   }
@@ -358,6 +358,12 @@ export function createJobs(o: JobsOptions = {}): Jobs {
 
   function registerJob(b: Partial<JobRegister>, who: Caller): JobRegistered {
     const now = Date.now();
+    // The app's own sign-in may say whose work it is (a person, or an agent adopting another session's); a run is its own.
+    const named = typeof b.session === 'string' ? b.session.trim() : '';
+    if (named && !who.runId) {
+      if (!d.sessions.summary(named)) throw new HttpError(400, `There is no session ${named}`);
+      who = { ...who, session: named };
+    }
     const job = b.adoptPid === undefined ? register(d.db, b, who, now) : adopt(d.db, b, who, now);
     const id = jobKey(job.id);
     for (const changed of schedule(d.db, now)) wake(changed);

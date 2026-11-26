@@ -152,6 +152,7 @@ export function adopt(db: DB, b: Partial<JobRegister>, who: { session?: string; 
     etaMs: etaOf(b.etaMs),
     after: [],
     progressPattern: cleanPattern(b.progress),
+    progressTotal: etaOf(b.total),
     session: who.session,
     runId: who.runId,
     adopted: true,
@@ -188,6 +189,7 @@ export function register(db: DB, b: Partial<JobRegister>, who: { session?: strin
     after: deps,
     queue: text(b.queue, 100) || undefined,
     progressPattern: cleanPattern(b.progress),
+    progressTotal: etaOf(b.total),
     session: who.session,
     runId: who.runId,
     queuedAt: now,
@@ -223,7 +225,7 @@ export function end(db: DB, j: Registered, state: JobState, now: number, o: { re
   try {
     const tail = readTail(logOfJob(j)!, 64 << 10).text;
     j.lastLine = lastLine(tail);
-    const r = readProgress(tail, j.progressPattern);
+    const r = readProgress(tail, j.progressPattern, j.progressTotal);
     if (r) j.progress = { fraction: r.fraction, text: r.text, at: now };
   } catch {
     // No log: it never ran.

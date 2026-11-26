@@ -30,6 +30,8 @@ export interface Registered {
   after: string[];
   queue?: string;
   progressPattern?: string;
+  /** What its progress count goes up to (`--total`). */
+  progressTotal?: number;
   /** The session that registered it, and the run of its agent (none: a person's own shell or a script). */
   session?: string;
   runId?: string;

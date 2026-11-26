@@ -26,8 +26,11 @@ Options of run:
   --queue NAME          one job at a time per queue name, in the order they came
   --progress REGEX      which lines say how far it is (capture groups: done and total, or a percent).
                         Lines like "step 120/500" or "42%" are understood without it.
+  --total N             what the count goes up to, when the lines print only what is done ("177600 written"):
+                        with a --progress of one capture group, that group is done out of N.
+  --session KEY         whose work it is, by its session key (only with the app's own sign-in, not a session's).
 
-Options of adopt: --pid PID, --name TEXT, --eta DUR, --progress REGEX as above, and
+Options of adopt: --pid PID, --name TEXT, --eta DUR, --progress REGEX, --total N, --session KEY as above, and
   --log FILE            the file that process writes to, read for its progress and last line
 It prints "job <id> adopted: <name>" and returns at once (--after and --queue are only run's). The job ends when
 the process is gone, with its exit code unknown (for --after that counts as done). job stop sends that one process
@@ -92,7 +95,7 @@ function parseDur(v, flag, plain = 's') {
 }
 
 // ---------- arguments ----------
-const VALUE_OPTS = { run: ['name', 'eta', 'after', 'queue', 'progress'], adopt: ['pid', 'name', 'log', 'eta', 'progress'], list: [], status: [], wait: ['timeout'], stop: [] };
+const VALUE_OPTS = { run: ['name', 'eta', 'after', 'queue', 'progress', 'total', 'session'], adopt: ['pid', 'name', 'log', 'eta', 'progress', 'total', 'session'], list: [], status: [], wait: ['timeout'], stop: [] };
 const BOOL_OPTS = { run: [], adopt: [], list: ['all'], status: ['json'], wait: [], stop: [] };
 
 function parseArgs(argv) {
@@ -126,6 +129,10 @@ function parseArgs(argv) {
     if (name === 'after') o.after.push(val);
     else if (name === 'eta') o.etaMs = parseDur(val, '--eta', 'm');
     else if (name === 'timeout') o.timeoutMs = parseDur(val, '--timeout');
+    else if (name === 'total') {
+      if (!/^\d+$/.test(val.replace(/[,_]/g, '')) || +val.replace(/[,_]/g, '') < 1) throw new UsageError(`bad number for --total: '${val}'`);
+      o.total = +val.replace(/[,_]/g, '');
+    }
     else if (name === 'pid') {
       if (!/^\d+$/.test(val) || +val < 2) throw new UsageError(`bad process id for --pid: '${val}'`);
       o.pid = +val;
@@ -394,7 +401,7 @@ async function cmdRun(o) {
   const name = o.name ?? cut(oneLine(command), 60);
   const app = appEnv();
   const reg = app
-    ? await register(app, { name, command, cwd: process.cwd(), pid: process.pid, etaMs: o.etaMs, after: o.after.length ? o.after : undefined, queue: o.queue, progress: o.progress })
+    ? await register(app, { name, command, cwd: process.cwd(), pid: process.pid, etaMs: o.etaMs, after: o.after.length ? o.after : undefined, queue: o.queue, progress: o.progress, total: o.total, session: o.session })
     : { unreachable: true };
   if (reg.refused) {
     note(`job: ${reg.refused}`);
@@ -465,7 +472,7 @@ async function cmdAdopt(o) {
   const log = o.log === undefined ? undefined : path.resolve(o.log);
   const name = o.name ?? cut(oneLine(found.command), 60);
   const reg = app
-    ? await register(app, { name, command: found.command, cwd: found.cwd ?? process.cwd(), pid: o.pid, adoptPid: o.pid, logFile: log, etaMs: o.etaMs, progress: o.progress })
+    ? await register(app, { name, command: found.command, cwd: found.cwd ?? process.cwd(), pid: o.pid, adoptPid: o.pid, logFile: log, etaMs: o.etaMs, progress: o.progress, total: o.total, session: o.session })
     : { unreachable: true };
   if (reg.refused) return fail(2, reg.refused);
   if (reg.denied) return fail(1, `Hydor did not accept this session's sign-in; pid ${o.pid} is not adopted`);

@@ -66,13 +66,13 @@ export class Watcher {
    * Reads one job's output (again only when it changed) and notes its progress. Nothing to read (no file, or one that
    * is gone) leaves what was read before.
    */
-  read(id: string, file: string | null | undefined, now: number, pattern?: string): Reading {
+  read(id: string, file: string | null | undefined, now: number, pattern?: string, total?: number): Reading {
     const k = this.kept.get(id) ?? { size: -1, mtime: -1, parsed: 0, samples: [] };
     this.kept.set(id, k);
     if (file) {
       try {
         const st = fs.statSync(file);
-        if (st.size !== k.size || st.mtimeMs !== k.mtime) this.readChanged(k, file, now, pattern, st);
+        if (st.size !== k.size || st.mtimeMs !== k.mtime) this.readChanged(k, file, now, pattern, st, total);
       } catch {
         // Gone or unreadable just now.
       }
@@ -81,7 +81,7 @@ export class Watcher {
     return k;
   }
 
-  private readChanged(k: Kept, file: string, now: number, pattern: string | undefined, st: fs.Stats) {
+  private readChanged(k: Kept, file: string, now: number, pattern: string | undefined, st: fs.Stats, total?: number) {
     if (isTranscript(file)) {
       if (now - k.parsed < AGENT_EVERY_MS) return;
       k.parsed = now;
@@ -89,7 +89,7 @@ export class Watcher {
     } else {
       const { text } = readTail(file, TAIL_BYTES);
       k.lastLine = lastLine(text);
-      const r = readProgress(text, pattern);
+      const r = readProgress(text, pattern, total);
       if (r) {
         // The same time left read again is as old as when it was first read.
         if (r.leftMs !== undefined && (r.leftMs !== k.leftMs || r.text !== k.progress?.text)) k.leftAt = now;

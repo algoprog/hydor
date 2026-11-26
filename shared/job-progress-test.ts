@@ -145,6 +145,10 @@ assert.equal(looksLikeServer(undefined, 'Start the dev server'), true);
 assert.equal(looksLikeServer(undefined, 'Serve the docs on port 4000'), true);
 assert.equal(looksLikeServer(undefined, 'Build the web index'), false);
 
+// A count without its total, out of the total the job was given.
+assert.deepEqual(readProgress('google: 177600 written, 102 failed', 'google: (\\d+) written', 200000), { fraction: 0.888, text: '177600/200000' });
+assert.equal(readProgress('google: 177600 written', 'google: (\\d+) written')?.fraction, undefined, 'without a total, one group is a percent, and 177600 is none');
+
 // A date before a log level is not a count.
 assert.equal(readProgress('2026/11/26 [INFO] loading the model'), null);
 

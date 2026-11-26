@@ -130,12 +130,16 @@ function percentReading(line: string, left: number | undefined): ProgressReading
 }
 
 /** One line's reading, by the rules in order: custom, tqdm, Keras, Epoch, keyword counts, brackets, percentages. */
-function readLine(line: string, epoch: EpochLine | null, custom: RegExp | null): ProgressReading | null {
+function readLine(line: string, epoch: EpochLine | null, custom: RegExp | null, total?: number): ProgressReading | null {
   if (custom) {
     const m = custom.exec(line);
     if (m) {
       const got = m.slice(1).filter((g): g is string => g !== undefined && /^\d[\d,]*(\.\d+)?$/.test(g));
-      if (got.length === 1) {
+      if (got.length === 1 && total) {
+        // A count of what is done, out of the total the job was given.
+        const f = ratio(got[0] ?? '', String(total));
+        if (f !== null) return reading(f, `${got[0]}/${total}`, timeLeft(line));
+      } else if (got.length === 1) {
         const f = percent(got[0] ?? '');
         if (f !== null) return reading(f, `${got[0]}%`, timeLeft(line));
       } else if (got.length >= 2) {
@@ -198,8 +202,8 @@ function newestEpoch(lines: string[]): EpochLine | null {
 
 /** How far a job has got, from the end of its output: the newest of its last 50 non-empty lines that says a fraction.
  *  `custom` is a regex the job's own text may match (case-insensitive): two numbers are done and total, one is a
- *  percentage. A custom regex that does not compile is ignored. */
-export function readProgress(tail: string, custom?: string): ProgressReading | null {
+ *  percentage, or what is done out of `total` when one is given. A custom regex that does not compile is ignored. */
+export function readProgress(tail: string, custom?: string, total?: number): ProgressReading | null {
   const lines = screenLines(tail).filter((l) => l !== '').slice(-50).reverse();
   let re: RegExp | null = null;
   if (custom?.trim()) {
@@ -211,7 +215,7 @@ export function readProgress(tail: string, custom?: string): ProgressReading | n
   }
   const epoch = newestEpoch(lines);
   for (const line of lines) {
-    const r = readLine(line, epoch, re);
+    const r = readLine(line, epoch, re, total && total > 0 ? total : undefined);
     if (r) return r;
   }
   return null;

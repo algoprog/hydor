@@ -127,8 +127,14 @@ export interface JobRegister {
   after?: string[];
   /** One at a time per queue name. */
   queue?: string;
-  /** A regular expression for its progress lines (capture groups: done and total, or a percent). */
+  /** A regular expression for its progress lines (capture groups: done and total, or a percent; or done, with `total`). */
   progress?: string;
+  /** What the count of its progress lines goes up to, when they print only how many are done ("177600 written"): with a
+   *  `progress` of one capture group, that group is done out of this (`--total`). */
+  total?: number;
+  /** The session the job belongs to, by its key: taken only from the app's own sign-in (a person, or an agent through
+   *  the app's API, adopting another session's work); a session's own run is always its own. */
+  session?: string;
   /**
    * `job adopt`: a process already running (started before, not by `job`) to show as this job instead of a command to
    * run: it counts as running from when that process started, and ends when it is gone. `command` is then what that
