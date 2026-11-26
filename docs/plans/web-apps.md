@@ -8,8 +8,9 @@ is built: agent apps stay as that plan made them.*
 
 The comparison in section 13 built six apps both ways and changed two afterwards. Every app passed every check,
 and building on the kit cost two to three times as much as building from scratch each time. So the kit is not
-continued: apps are built from scratch, in whatever stack suits them, and its repository is removed once what
-Hydor still takes from it has been moved over.
+continued: apps are built from scratch, in whatever stack suits them. Its repository was removed the same day,
+after the three things Hydor still took from it had been moved over (launching to a server, the checks of an
+app's pages, and the comparison's judge and descriptions).
 
 **What stays is the logic that guides someone through making and running an app**, all of it on Hydor's side and
 none of it tied to a framework:
