@@ -669,13 +669,13 @@ export function notice(d: Deps, r: RunRecord, kind: NotifyEvent['kind'], body: s
           body: `${n} more notice${n === 1 ? '' : 's'} about your runs: see Experiments`,
           agent: 'claude',
           at: Date.now(),
-          url: '/system/experiments',
+          url: '/experiments',
         } satisfies NotifyEvent);
     }, 10 * 60_000).unref();
     return;
   }
   sent.push(now);
-  d.sessions.emit('notify', { key: `experiment:${r.id}`, kind, title: o.title ?? r.name ?? 'Experiment', body: body.slice(0, 300), agent: 'claude', at: now, url: o.url ?? `/system/experiments/${r.id}` } satisfies NotifyEvent);
+  d.sessions.emit('notify', { key: `experiment:${r.id}`, kind, title: o.title ?? r.name ?? 'Experiment', body: body.slice(0, 300), agent: 'claude', at: now, url: o.url ?? `/experiments/${r.id}` } satisfies NotifyEvent);
 }
 
 const took = (r: RunRecord) => {
@@ -738,7 +738,7 @@ async function sweepEnding(d: Deps, sweep: string) {
   const first = runs[runs.length - 1];
   const line = `${parts.join(', ')}.${best}`;
   if (first.notify?.done !== false || (count('failed') && first.notify?.failed !== false))
-    notice(d, first, count('done') ? 'done' : 'failed', line, { title: `Sweep ${sw?.group ?? first.group ?? ''}`.trim(), url: `/system/experiments?sweep=${sweep}` });
+    notice(d, first, count('done') ? 'done' : 'failed', line, { title: `Sweep ${sw?.group ?? first.group ?? ''}`.trim(), url: `/experiments?sweep=${sweep}` });
   if (first.report && first.startedBy?.session)
     await report(d, first.startedBy.session, `[Experiments] The sweep ${sw?.group ?? sweep} (${sweep}) ended: ${line} experiment_list with group "${sw?.group ?? first.group}" lists its runs; experiment_table compares them.`);
 }

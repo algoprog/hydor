@@ -25,7 +25,7 @@ The guide is also in [German (Deutsch)](de/), [Spanish (Español)](es/), [French
 - [Agents, accounts and models](16-agents-models.md)
 - [Custom, the app's own agent](17-custom.md)
 - [Usage, limits and costs](18-usage.md)
-- [System: files, Git, Terminal and Preview](19-files-git.md)
+- [Files, Git, Terminal and Preview](19-files-git.md)
 - [Phones, other machines and sharing](20-devices.md)
 - [Look, language and updates](21-app.md)
 - [Let agents work the app for you](22-ask-agents.md)

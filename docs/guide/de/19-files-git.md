@@ -1,22 +1,21 @@
-# System: Dateien, Git, Terminal und Vorschau
+# Dateien, Git, Terminal und Vorschau
 
-**System** in der Werkzeugleiste bündelt die Werkzeuge dieses Computers: Dateien finden, öffnen, bearbeiten und ihre Inhalte durchsuchen, zu Projekten oder neuen Sitzungen hinzufügen, Jupyter-Notebooks ausführen, Git-Commits erstellen und pushen, Pull-Requests öffnen und Branchänderungen prüfen. Dazu kommen Terminals, Vorschauen laufender Web-Apps, Vorher-nachher-Aufnahmen von Agentenänderungen und die Systemüberwachung. So kannst du Agentenarbeit innerhalb der App prüfen und abschließen.
+Über **Dateien**, **Git** und **System** in der Werkzeugleiste gelangst du an diesen Computer: Dateien finden, öffnen, bearbeiten und ihre Inhalte durchsuchen, zu Projekten oder neuen Sitzungen hinzufügen, Jupyter-Notebooks ausführen, Git-Commits erstellen und pushen, Pull-Requests öffnen und Branchänderungen prüfen. Dazu kommen Terminals, Vorschauen laufender Web-Apps, Vorher-nachher-Aufnahmen von Agentenänderungen und die Systemüberwachung. So kannst du Agentenarbeit innerhalb der App prüfen und abschließen.
 
-![System → Git: Repositoryänderungen, Dateivergleich, Commitfeld und Synchronisierung](images/files-git.webp)
+![Die Git-Seite: Repositoryänderungen, Dateivergleich, Commitfeld und Synchronisierung](images/files-git.webp)
 
 ## System öffnen
 
 Wähle **System** in der Werkzeugleiste oder öffne [System](/system). Tabs unter dem Titel führen zu den Bereichen mit eigener Adresse:
 
-- **Übersicht** ([öffnen](/system)): Computer und aktueller Inhalt der Werkzeuge; siehe [Übersicht](#the-overview).
-- **Dateien** ([öffnen](/files)): lokale Dateien; siehe [Dateiseite öffnen](#open-the-files-page).
-- **Git** ([öffnen](/git)): Repositorys; siehe [Repositorys auf der Git-Seite](#see-your-repositories-on-the-git-page).
+- **Übersicht** ([öffnen](/system)): Computer und aktueller Inhalt seiner Werkzeuge; siehe [Übersicht](#the-overview).
 - **Terminal** ([öffnen](/terminal)): lokale Shells; siehe [Terminal verwenden](#use-the-terminal).
 - **Vorschau** ([öffnen](/preview)): laufende Web-Apps; siehe [Entwicklungsserver in der Vorschau](#look-at-a-dev-server-with-preview). Dieser Bereich erscheint nur für den aktuellen Computer, nicht beim Zugriff auf einen anderen.
 - **Überwachen** ([öffnen](/system/monitor)): wie ausgelastet der Computer ist (siehe [Computer überwachen](#watch-this-computer-in-monitor)).
-- **Experimente** ([öffnen](/system/experiments)): eigenständige Jobs, die auf freie GPUs warten und mit Ergebnissen gespeichert werden; siehe [Experimente](/guide/experiments).
 
-Auf Smartphones zeigt der Titel den Bereich, etwa **System / Überwachen**. Tippe darauf, um alle Bereiche in Viererreihen auszuwählen. Bereichsaktionen wie **Hinzufügen** in Git oder Aktualisieren in der Vorschau stehen rechts neben dem Titel.
+Auf Smartphones zeigt der Titel den Bereich, etwa **System / Überwachen**. Tippe darauf, um alle Bereiche in Viererreihen auszuwählen. Bereichsaktionen (etwa Aktualisieren in der Vorschau) stehen rechts neben dem Titel.
+
+**Dateien** und **Git** gehören nicht zu System: Jedes hat ein eigenes Symbol in der Werkzeugleiste (auf dem Smartphone bei den Werkzeugen im Menü der Seitenleiste). Klicke darauf oder gehe zu [Dateien](/files) (siehe [Dateiseite öffnen](#open-the-files-page)) oder [Git](/git) (siehe [Repositorys auf der Git-Seite](#see-your-repositories-on-the-git-page)). Auch Experimente hat ein eigenes Symbol (siehe [Experimente](/guide/experiments)).
 
 ## Übersicht
 
@@ -24,15 +23,12 @@ Auf Smartphones zeigt der Titel den Bereich, etwa **System / Überwachen**. Tipp
 
 Darunter öffnet jede Werkzeugkarte über Titel oder **Öffnen** den jeweiligen Tab:
 
-- **Dateien**: Suche ab dem Benutzerordner nach Namen und Inhalten, zuletzt geöffnete Dateien sowie **Persönlicher Ordner**, **Zuletzt geöffnete Dateien** und **Papierkorb**.
-- **Git**: Repositorys mit Branch und Anzahl geänderter Dateien, zuerst solche mit Änderungen oder ausstehenden Pushes. Ein Klick öffnet das Repository im Git-Tab.
 - **Terminal**: laufende Shells und **Neu**.
 - **Vorschau**: die hier laufenden Web-Apps, jede mit ihrem Port. Klicke auf eine, um sie anzusehen.
-- **Experimente**: die Läufe, die gerade laufen, jeder mit seinem Status und seinen Metriken. Klicke auf einen, um ihn zu öffnen.
 
 ## Dateiseite öffnen
 
-Klicke auf **System** und dann auf **Dateien** oder gehe zu [Dateien](/files). Auf einem Computer hat die Seite zwei Bereiche:
+Klicke in der Werkzeugleiste auf **Dateien** oder gehe zu [Dateien](/files). Auf einem Computer hat die Seite zwei Bereiche:
 
 - Links die **Orte**: die Dateien, die du zuletzt geöffnet hast, dein Benutzerordner, angeheftete Ordner, die Ordner deiner Projekte, die Ordner, in denen Sitzungen gearbeitet haben, und der Papierkorb (siehe [Orte](/guide/files-git#places)).
 - Rechts den aktuellen Ordner und seinen Inhalt; siehe [Ordner durchsuchen](/guide/files-git#browse-a-folder). Geöffnete Dateien erscheinen als Tabs; der erste führt zum Ordner zurück.
@@ -464,7 +460,9 @@ Strg+S (⌘S auf dem Mac) speichert. Wie bei anderen Dateien bietet eine Leiste 
 
 ## Repositorys auf der Git-Seite
 
-Klicke auf **System**, dann auf **Git**, oder gehe zu [Git](/git). Links stehen deine Git-Repositorys, die zuletzt verwendeten zuerst: die, in denen deine Sitzungen gearbeitet haben (der Ordner einer Sitzung oder eine Datei, die eine Sitzung bearbeitet hat; flüchtige Orte wie `/tmp` bleiben außen vor), und die, die du selbst hinzugefügt hast. Sobald es mehr als sechs sind, findet ein Feld oben eines über den Namen.
+Klicke in der Werkzeugleiste auf **Git** oder gehe zu [Git](/git). Links stehen deine Git-Repositorys, die zuletzt verwendeten zuerst: die, in denen deine Sitzungen gearbeitet haben (der Ordner einer Sitzung oder eine Datei, die eine Sitzung bearbeitet hat; flüchtige Orte wie `/tmp` bleiben außen vor), und die, die du selbst hinzugefügt hast. Sobald es mehr als sechs sind, findet ein Feld oben eines über den Namen.
+
+Wenn du die Git-Seite zum ersten Mal öffnest, führt dich ein kurzer Rundgang herum, der für Git-Neulinge geschrieben ist. Er kommt, solange Tipps eingeschaltet sind, nach der Willkommenstour. Eine Karte erklärt in einfachen Worten, was Git ist (Speicherpunkte für einen Ordner: Commits, in einem Repository), dann leuchtet jeder Teil der Seite der Reihe nach mit einer eigenen Karte auf: deine Repositorys, **Änderungen**, **Commit**, eine Kopie online aufbewahren (**Push** und **Pull**), **Verlauf**, **Branches** und dass du einfach einen Agenten fragen kannst. Mit **Weiter** und **Zurück** bewegst du dich durch den Rundgang; **Fertig** beendet ihn, und **Überspringen** oder Esc schließt ihn früher. **Rundgang zeigen** (die Kompass-Schaltfläche oben rechts auf der Seite) startet ihn jederzeit erneut.
 
 Jedes Repository zeigt seinen Namen und Branch sowie kleine Markierungen, wenn etwas zu tun ist:
 

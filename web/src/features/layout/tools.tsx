@@ -1,9 +1,9 @@
-// The tools of the app's navigation (Browser, Projects, Agents, Apps, Search, Usage, System, Settings, Help): what
-// each shows and where it goes, with the Usage bar and the Inbox count. The rail (Rail.tsx) shows them in two groups
-// down the left edge; a phone's drawer (Sidebar.tsx) in one grid.
+// The tools of the app's navigation (Browser, Projects, Files, Agents, Apps, Git, Experiments, Search, Usage, System,
+// Settings, Help): what each shows and where it goes, with the Usage bar and the Inbox count. The rail (Rail.tsx) shows
+// them in two groups down the left edge; a phone's drawer (Sidebar.tsx) in one grid.
 import { useEffect, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
-import { CircleHelp, Gauge, MonitorCog, Search, Settings } from 'lucide-react';
+import { CircleHelp, Folder, Gauge, GitBranch, MonitorCog, Search, Settings } from 'lucide-react';
 import type { SidebarTool } from '@shared/sidebar';
 import type { AgentUsage } from '@shared/types';
 import { activityOf } from '../../lib/activity';
@@ -14,6 +14,7 @@ import { useApp, useSessions, useUsage } from '../../lib/store';
 import { cx } from '../../components/ui';
 import { severityColor } from '../../components/charts';
 import { features } from '../registry';
+import { filesPlace } from '../files/place';
 import { useOutbox } from '../outbox/store';
 import { systemTabOf } from '../system/SystemHeader';
 
@@ -88,9 +89,13 @@ export function useTools(nav: (path: string) => void, searching: () => void, com
   const updates = useApp((s) => (s.boot?.update?.behind ?? 0) > 0);
   return [
     ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path), tour: n.id === 'apps' ? 'nav-apps' : undefined }))),
+    // The files on this computer, opened where you left them (a folder, a place, a file).
+    { id: 'files', label: 'Files', icon: <Folder size={17} />, match: loc === '/files' || loc === '/file' || loc === '/search', go: () => nav(filesPlace()) },
+    // The Git repositories your sessions work in.
+    { id: 'git', label: 'Git', icon: <GitBranch size={17} />, match: loc === '/git', go: () => nav('/git') },
     // What the agents' plans have used and have left, with a thin bar for it at a glance.
     { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint compact={compact} /> },
-    // This computer: its files, Git, terminals, previews and monitor, each a tab of System.
+    // This computer: its terminals, previews and monitor, each a tab of System.
     { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), tour: 'nav-system' },
     {
       id: 'settings',

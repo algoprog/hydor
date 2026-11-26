@@ -34,9 +34,9 @@ test('open: the app, and pages by name', async () => {
   assert.equal(await out(), 'http://fake');
   assert.equal(await out('inbox'), 'http://fake/inbox');
   assert.equal(await out('Inbox'), 'http://fake/inbox');
-  assert.equal(await out('experiments'), 'http://fake/system/experiments');
+  assert.equal(await out('experiments'), 'http://fake/experiments');
   assert.equal(await out('connected-apps'), 'http://fake/apps/connected');
-  assert.equal(await out('experi'), 'http://fake/system/experiments', 'the start of one page’s name');
+  assert.equal(await out('experi'), 'http://fake/experiments', 'the start of one page’s name');
   assert.ok(pages().length > 20);
   assert.ok(pageWords().some(([w]) => w === 'inbox') && pageWords().some(([w]) => w === 'settings'));
 });

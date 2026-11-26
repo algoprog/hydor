@@ -1,22 +1,21 @@
-# Système : fichiers, Git, Terminal et Aperçu
+# Fichiers, Git, Terminal et Aperçu
 
-**Système** dans la barre d’icônes, c’est cet ordinateur : parcourir, trouver, ouvrir et modifier ses fichiers, les ajouter aux projets et aux nouvelles sessions, chercher dedans, exécuter des notebooks Jupyter, faire des commits et des push avec Git, ouvrir des pull requests et examiner ce qu’une branche modifie. Vous y trouvez aussi des terminaux, des aperçus des apps web qui tournent ici, des captures d’écran avant et après les modifications d’un agent, et une vue en direct de l’état de l’ordinateur (**Moniteur**), pour que vous puissiez vérifier et terminer le travail d’un agent sans quitter l’app.
+**Fichiers**, **Git** et **Système** dans la barre d’icônes sont votre accès à cet ordinateur : parcourir, trouver, ouvrir et modifier ses fichiers, les ajouter aux projets et aux nouvelles sessions, chercher dedans, exécuter des notebooks Jupyter, faire des commits et des push avec Git, ouvrir des pull requests et examiner ce qu’une branche modifie. Vous y trouvez aussi des terminaux, des aperçus des apps web qui tournent ici, des captures d’écran avant et après les modifications d’un agent, et une vue en direct de l’état de l’ordinateur (**Moniteur**), pour que vous puissiez vérifier et terminer le travail d’un agent sans quitter l’app.
 
-![Système → Git : les modifications d’un dépôt à côté du diff d’un fichier, la zone de commit et la synchronisation](images/files-git.webp)
+![La page Git : les modifications d’un dépôt à côté du diff d’un fichier, la zone de commit et la synchronisation](images/files-git.webp)
 
 ## Ouvrir Système
 
 Cliquez sur **Système** dans la barre d’icônes, ou allez à [Système](/system). Une rangée d’onglets sous son titre vous mène à chaque partie, et chacune a sa propre adresse :
 
-- **Vue d’ensemble** ([l’ouvrir](/system)) : l’ordinateur en un coup d’œil, et ce que contient chaque outil en ce moment (voir [La vue d’ensemble](#the-overview)).
-- **Fichiers** ([l’ouvrir](/files)) : les fichiers de cet ordinateur (voir [Ouvrir la page Fichiers](#open-the-files-page)).
-- **Git** ([l’ouvrir](/git)) : vos dépôts (voir [Voir vos dépôts sur la page Git](#see-your-repositories-on-the-git-page)).
+- **Vue d’ensemble** ([l’ouvrir](/system)) : l’ordinateur en un coup d’œil, et ce que contiennent ses outils en ce moment (voir [La vue d’ensemble](#the-overview)).
 - **Terminal** ([l’ouvrir](/terminal)) : les shells de cet ordinateur (voir [Utiliser le terminal](#use-the-terminal)).
 - **Aperçu** ([l’ouvrir](/preview)) : les apps web qui tournent ici (voir [Examiner un serveur de développement avec Aperçu](#look-at-a-dev-server-with-preview)). Il n’apparaît que sur les pages de cette machine, pas quand vous regardez une autre machine.
 - **Moniteur** ([l’ouvrir](/system/monitor)) : le niveau d’activité de l’ordinateur (voir [Surveiller cet ordinateur dans Moniteur](#watch-this-computer-in-monitor)).
-- **Expériences** ([l’ouvrir](/system/experiments)) : des tâches qui attendent un GPU libre, s’exécutent seules et sont conservées sous forme d’enregistrements (voir [Expériences](/guide/experiments)).
 
-Sur un téléphone, le titre nomme la partie où vous êtes (**Système / Moniteur**) : touchez-le pour afficher toutes les parties de Système, quatre par rangée, puis touchez-en une pour y aller. Les boutons propres à un onglet (**Ajouter** pour Git, l’actualisation pour Aperçu) se trouvent à droite du titre.
+Sur un téléphone, le titre nomme la partie où vous êtes (**Système / Moniteur**) : touchez-le pour afficher toutes les parties de Système, quatre par rangée, puis touchez-en une pour y aller. Les boutons propres à un onglet (comme l’actualisation pour Aperçu) se trouvent à droite du titre.
+
+**Fichiers** et **Git** ne font pas partie de Système : chacun a sa propre icône dans la barre d’icônes (sur un téléphone, parmi les outils du tiroir). Cliquez dessus, ou allez à [Fichiers](/files) (voir [Ouvrir la page Fichiers](#open-the-files-page)) ou à [Git](/git) (voir [Voir vos dépôts dans la page Git](#see-your-repositories-on-the-git-page)). Expériences a aussi sa propre icône (voir [Expériences](/guide/experiments)).
 
 ## La vue d’ensemble
 
@@ -24,15 +23,12 @@ Sur un téléphone, le titre nomme la partie où vous êtes (**Système / Monite
 
 Plus bas, une carte par outil ; son titre, ou **Ouvrir**, ouvre son onglet :
 
-- **Fichiers** : un champ qui cherche dans les noms de fichiers et dans les mots qu’ils contiennent (à partir de votre dossier personnel), les fichiers ouverts récemment, ainsi que **Dossier personnel**, **Fichiers récents** et **Corbeille**.
-- **Git** : vos dépôts, ceux qui ont des modifications ou des commits à envoyer en premier, chacun avec sa branche et le nombre de fichiers modifiés. Cliquez sur l’un d’eux pour l’ouvrir dans l’onglet Git.
 - **Terminal** : les shells en cours, et **Nouveau** pour en ouvrir un autre.
 - **Aperçu** : les apps web qui tournent ici, chacune avec son port. Cliquez sur l’une d’elles pour la regarder.
-- **Expériences** : les exécutions en cours, chacune avec son statut et ses métriques. Cliquez sur l’une d’elles pour l’ouvrir.
 
 ## Ouvrir la page Fichiers
 
-Cliquez sur **Système**, puis sur **Fichiers**, ou allez à [Fichiers](/files). Sur un ordinateur, la page comporte deux parties :
+Cliquez sur **Fichiers** dans la barre d’icônes, ou allez à [Fichiers](/files). Sur un ordinateur, la page comporte deux parties :
 
 - À gauche, les **endroits** : les fichiers ouverts récemment, votre dossier personnel, les dossiers épinglés, les dossiers de vos projets, les dossiers où des sessions ont travaillé, et la corbeille (voir [Emplacements](/guide/files-git#places)).
 - À droite, le dossier où vous êtes, avec son contenu (voir [Parcourir un dossier](/guide/files-git#browse-a-folder)). Les fichiers que vous ouvrez s’y affichent aussi, chacun dans un onglet : le premier onglet ramène au dossier.
@@ -464,7 +460,9 @@ Ctrl+S (⌘S sur Mac) enregistre. Comme pour les autres fichiers, si le notebook
 
 ## Voir vos dépôts dans la page Git
 
-Cliquez sur **Système**, puis sur **Git**, ou allez à [Git](/git). À gauche, la page liste vos dépôts git, le plus récemment utilisé en premier : ceux où vos sessions ont travaillé (le dossier d’une session, ou un fichier qu’une session a modifié ; les emplacements temporaires comme `/tmp` sont écartés) et ceux que vous avez ajoutés vous-même. Au-delà de six, un champ en haut permet d’en trouver un par son nom.
+Cliquez sur **Git** dans la barre d’icônes, ou allez à [Git](/git). À gauche, la page liste vos dépôts git, le plus récemment utilisé en premier : ceux où vos sessions ont travaillé (le dossier d’une session, ou un fichier qu’une session a modifié ; les emplacements temporaires comme `/tmp` sont écartés) et ceux que vous avez ajoutés vous-même. Au-delà de six, un champ en haut permet d’en trouver un par son nom.
+
+La première fois que vous ouvrez la page Git, une courte visite conçue pour les personnes qui découvrent Git vous la fait découvrir. Elle apparaît tant que les astuces sont activées, après la visite de bienvenue. Une carte explique en mots simples ce qu’est Git (des points de sauvegarde pour un dossier : des commits, dans un dépôt), puis chaque partie de la page s’éclaire à son tour avec sa propre carte : vos dépôts, **Modifications**, **Commit**, la conservation d’une copie en ligne (**Pousser** et **Tirer**), **Historique**, **Branches**, et le fait que vous pouvez simplement demander à un agent. Avancez et revenez avec **Suivant** et **Retour** ; **Terminé** y met fin, et **Passer** ou Esc la ferme plus tôt. **Faire la visite** (le bouton boussole en haut à droite de la page) la relance à tout moment.
 
 Chaque dépôt affiche son nom et sa branche, et de petites marques quand il y a quelque chose à faire :
 

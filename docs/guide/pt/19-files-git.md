@@ -1,22 +1,21 @@
-# Sistema: arquivos, Git, Terminal e Prévia
+# Arquivos, Git, Terminal e Prévia
 
-**Sistema** na barra de ícones é este computador: explore, encontre, abra e edite seus arquivos, adicione-os a projetos e a novas sessões, pesquise dentro deles, execute notebooks Jupyter, faça commit e push com o Git, abra pull requests e revise o que um branch altera. Terminais, prévias dos apps web em execução aqui, capturas de tela de antes e depois das mudanças de um agente em um deles, e uma visão ao vivo de como o computador está (Monitor) também ficam aqui, para você conferir e concluir o trabalho de um agente sem sair do app.
+**Arquivos**, **Git** e **Sistema** na barra de ícones são a sua porta de entrada para este computador: explore, encontre, abra e edite seus arquivos, adicione-os a projetos e a novas sessões, pesquise dentro deles, execute notebooks Jupyter, faça commit e push com o Git, abra pull requests e revise o que um branch altera. Terminais, prévias dos apps web em execução aqui, capturas de tela de antes e depois das mudanças de um agente em um deles, e uma visão ao vivo de como o computador está (Monitor) também ficam aqui, para você conferir e concluir o trabalho de um agente sem sair do app.
 
-![Sistema → Git: as mudanças de um repositório ao lado do diff de um arquivo, a caixa de commit e Sync](images/files-git.webp)
+![A página Git: as mudanças de um repositório ao lado do diff de um arquivo, a caixa de commit e Sync](images/files-git.webp)
 
 ## Abrir o Sistema
 
 Clique em **Sistema** na barra de ícones, ou vá para [Sistema](/system). Uma linha de abas sob o título leva a cada parte, e cada uma tem seu próprio endereço:
 
-- **Visão geral** ([abrir](/system)): o computador de relance, e o que cada ferramenta guarda agora (veja [A visão geral](#the-overview)).
-- **Arquivos** ([abrir](/files)): os arquivos deste computador (veja [Abrir a página Arquivos](#open-the-files-page)).
-- **Git** ([abrir](/git)): seus repositórios (veja [Ver seus repositórios na página Git](#see-your-repositories-on-the-git-page)).
+- **Visão geral** ([abrir](/system)): o computador de relance, e o que as ferramentas dele guardam agora (veja [A visão geral](#the-overview)).
 - **Terminal** ([abrir](/terminal)): shells neste computador (veja [Usar o terminal](#use-the-terminal)).
 - **Prévia** ([abrir](/preview)): os apps web em execução aqui (veja [Olhar um servidor de desenvolvimento com a Prévia](#look-at-a-dev-server-with-preview)). Ela só aparece nas páginas desta própria máquina, não enquanto você olha outra máquina.
 - **Monitor** ([abrir](/system/monitor)): o quanto o computador está ocupado (veja [Acompanhar este computador no Monitor](#watch-this-computer-in-monitor)).
-- **Experimentos** ([abrir](/system/experiments)): tarefas que esperam uma GPU livre, executam sozinhas e ficam guardadas como registros (veja [Experimentos](/guide/experiments)).
 
-No celular, o título mostra a parte em que você está (**Sistema / Monitor**): toque nele para ver todas as partes do Sistema, quatro por linha, e toque em uma para ir até ela. Os botões de cada aba (**Adicionar**, no Git, e o de atualizar, na Prévia) ficam à direita do título.
+No celular, o título mostra a parte em que você está (**Sistema / Monitor**): toque nele para ver todas as partes do Sistema, quatro por linha, e toque em uma para ir até ela. Os botões de cada aba (como o de atualizar, na Prévia) ficam à direita do título.
+
+**Arquivos** e **Git** não ficam dentro de Sistema: cada um tem seu próprio ícone na barra de ícones (no celular, entre as ferramentas da gaveta). Clique nele, ou vá para [Arquivos](/files) (veja [Abrir a página Arquivos](#open-the-files-page)) ou [Git](/git) (veja [Ver seus repositórios na página Git](#see-your-repositories-on-the-git-page)). Os Experimentos também têm um ícone próprio (veja [Experimentos](/guide/experiments)).
 
 ## A visão geral
 
@@ -24,15 +23,12 @@ No celular, o título mostra a parte em que você está (**Sistema / Monitor**):
 
 Abaixo, um cartão para cada ferramenta; o título dele, ou **Abrir**, abre a aba correspondente:
 
-- **Arquivos**: uma caixa que busca nomes de arquivos e as palavras dentro deles (a partir da sua pasta pessoal), os arquivos que você abriu recentemente, e **Pasta pessoal**, **Arquivos recentes** e **Lixeira**.
-- **Git**: seus repositórios, primeiro os que têm mudanças ou commits a enviar, cada um com seu branch e quantos arquivos mudaram. Clique em um para abri-lo na aba Git.
 - **Terminal**: os shells em execução, e **Nova** para abrir outro.
 - **Prévia**: os apps web em execução aqui, cada um com sua porta. Clique em um para vê-lo.
-- **Experimentos**: as execuções em andamento, cada uma com seu status e suas métricas. Clique em uma para abri-la.
 
 ## Abrir a página Arquivos
 
-Clique em **Sistema** e depois em **Arquivos**, ou vá para [Arquivos](/files). Em um computador, a página tem duas partes:
+Clique em **Arquivos** na barra de ícones, ou vá para [Arquivos](/files). Em um computador, a página tem duas partes:
 
 - À esquerda, os **lugares**: os arquivos que você abriu recentemente, sua pasta pessoal, as pastas que você fixou, as pastas dos seus projetos, as pastas em que as sessões trabalharam e a lixeira (veja [Lugares](/guide/files-git#places)).
 - À direita, a pasta em que você está, com o que há nela (veja [Explorar uma pasta](/guide/files-git#browse-a-folder)). Os arquivos que você abre também aparecem ali, cada um em uma aba: a primeira aba volta para a pasta.
@@ -464,7 +460,9 @@ Ctrl+S (⌘S no Mac) salva. Como em outros arquivos, se o notebook mudar no disc
 
 ## Ver seus repositórios na página Git
 
-Clique em **Sistema** e depois em **Git**, ou acesse [Git](/git). À esquerda, ela lista seus repositórios git, os usados mais recentemente primeiro: aqueles em que suas sessões trabalharam (a pasta de uma sessão, ou um arquivo que uma sessão editou; lugares temporários como `/tmp` ficam de fora) e aqueles que você mesmo adicionou. Quando há mais de seis, um campo no topo encontra um pelo nome.
+Clique em **Git** na barra de ícones, ou acesse [Git](/git). À esquerda, ela lista seus repositórios git, os usados mais recentemente primeiro: aqueles em que suas sessões trabalharam (a pasta de uma sessão, ou um arquivo que uma sessão editou; lugares temporários como `/tmp` ficam de fora) e aqueles que você mesmo adicionou. Quando há mais de seis, um campo no topo encontra um pelo nome.
+
+Na primeira vez que você abre a página Git, um tour curto, escrito para quem está começando com o Git, mostra como ela funciona. Ele aparece enquanto as dicas estão ativadas, depois do tour de boas-vindas. Um cartão explica em palavras simples o que é o Git (pontos de salvamento de uma pasta: commits, em um repositório), e depois cada parte da página se ilumina, uma de cada vez, com um cartão próprio: seus repositórios, **Alterações**, **Commit**, manter uma cópia online (**Push** e **Pull**), **Histórico**, **Branches** e o fato de que você pode simplesmente pedir a um agente. Avance e volte com **Próxima** e **Voltar**; **Concluído** encerra o tour, e **Pular** ou Esc o fecha antes. **Me mostre como funciona** (o botão de bússola no canto superior direito da página) o inicia de novo a qualquer momento.
 
 Cada repositório mostra seu nome e branch, e pequenas marcas quando há algo a fazer:
 

@@ -1,22 +1,21 @@
-# System: files, Git, Terminal and Preview
+# Files, Git, Terminal and Preview
 
-**System** on the rail is this computer: browse, find, open and edit its files, add them to projects and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the web apps running here, before and after screenshots of an agent's changes to one, and a live view of how the computer is doing (Monitor) are here too, so you can check and finish an agent's work without leaving the app.
+**Files**, **Git** and **System** on the rail are your way into this computer: browse, find, open and edit its files, add them to projects and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the web apps running here, before and after screenshots of an agent's changes to one, and a live view of how the computer is doing (Monitor) are here too, so you can check and finish an agent's work without leaving the app.
 
-![System → Git: a repository’s changes beside one file’s diff, the commit box, and Sync](images/files-git.webp)
+![The Git page: a repository’s changes beside one file’s diff, the commit box, and Sync](images/files-git.webp)
 
 ## Open System
 
 Click **System** on the rail, or go to [System](/system). A row of tabs under its title takes you to each part, and each keeps its own address:
 
-- **Overview** ([open it](/system)): the computer at a glance, and what each tool holds now (see [The overview](#the-overview)).
-- **Files** ([open it](/files)): the files on this computer (see [Open the Files page](#open-the-files-page)).
-- **Git** ([open it](/git)): your repositories (see [See your repositories on the Git page](#see-your-repositories-on-the-git-page)).
+- **Overview** ([open it](/system)): the computer at a glance, and what its tools hold now (see [The overview](#the-overview)).
 - **Terminal** ([open it](/terminal)): shells on this computer (see [Use the terminal](#use-the-terminal)).
 - **Preview** ([open it](/preview)): the web apps running here (see [Look at a dev server with Preview](#look-at-a-dev-server-with-preview)). It shows only on this machine's own pages, not while you look at another machine.
 - **Monitor** ([open it](/system/monitor)): how busy the computer is (see [Watch this computer in Monitor](#watch-this-computer-in-monitor)).
-- **Experiments** ([open it](/system/experiments)): jobs that wait for a free GPU, run on their own and are kept as records (see [Experiments](/guide/experiments)).
 
-On a phone the title names the part you are in (**System / Monitor**): tap it for all of System's parts, four to a row, and tap one to go there. A tab's own buttons (Git's **Add**, Preview's refresh) sit at the right of the title.
+On a phone the title names the part you are in (**System / Monitor**): tap it for all of System's parts, four to a row, and tap one to go there. A tab's own buttons (such as Preview's refresh) sit at the right of the title.
+
+**Files** and **Git** are not under System: each has an icon of its own on the rail (on a phone, among the tools in the drawer). Click it, or go to [Files](/files) (see [Open the Files page](#open-the-files-page)) or [Git](/git) (see [See your repositories on the Git page](#see-your-repositories-on-the-git-page)). Experiments has an icon of its own too (see [Experiments](/guide/experiments)).
 
 ## The overview
 
@@ -24,15 +23,12 @@ On a phone the title names the part you are in (**System / Monitor**): tap it fo
 
 Below, a card for each tool; its title, or **Open**, opens its tab:
 
-- **Files**: a box that searches file names and the words inside them (from your home folder), the files you opened lately, and **Home folder**, **Recent files** and **Trash**.
-- **Git**: your repositories, those with changes or commits to send first, each with its branch and how many files changed. Click one to open it on the Git tab.
 - **Terminal**: the shells running, and **New** for another.
 - **Preview**: the web apps running here, each with its port. Click one to look at it.
-- **Experiments**: the runs going now, each with its status and metrics. Click one to open it.
 
 ## Open the Files page
 
-Click **System**, then **Files**, or go to [Files](/files). On a computer the page has two parts:
+Click **Files** on the rail, or go to [Files](/files). On a computer the page has two parts:
 
 - On the left, the **places**: the files you opened lately, your home folder, folders you pinned, your projects' folders, the folders sessions worked in, and the trash (see [Places](/guide/files-git#places)).
 - On the right, the folder you are in, with what is in it (see [Browse a folder](/guide/files-git#browse-a-folder)). Files you open show there too, each in a tab: the first tab goes back to the folder.
@@ -464,7 +460,9 @@ Ctrl+S (⌘S on a Mac) saves. As with other files, if the notebook changes on di
 
 ## See your repositories on the Git page
 
-Click **System**, then **Git**, or go to [Git](/git). On the left it lists your git repositories, the most recently used first: those your sessions worked in (a session's folder, or a file a session edited; throwaway places such as `/tmp` are left out) and those you added yourself. Once there are more than six, a field at the top finds one by name.
+Click **Git** on the rail, or go to [Git](/git). On the left it lists your git repositories, the most recently used first: those your sessions worked in (a session's folder, or a file a session edited; throwaway places such as `/tmp` are left out) and those you added yourself. Once there are more than six, a field at the top finds one by name.
+
+The first time you open the Git page, a short tour written for people new to Git shows you around. It comes while tips are on, after the welcome tour. A card in plain words says what Git is (save points for a folder: commits, in a repository), then each part of the page lights up in turn with a card of its own: your repositories, **Changes**, **Commit**, keeping a copy online (**Push** and **Pull**), **History**, **Branches**, and that you can just ask an agent. Move with **Next** and **Back**; **Done** ends it, and **Skip** or Esc closes it sooner. **Show me around** (the compass button at the top right of the page) starts it again any time.
 
 Each repository shows its name and branch, and small marks when there is something to do:
 

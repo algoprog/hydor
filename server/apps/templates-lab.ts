@@ -1159,7 +1159,7 @@ return {
   hypotheses,
   runs,
   results: String(table.markdown || ''),
-  results_page: String(table.page || (table.id ? '/system/experiments?table=' + encodeURIComponent(table.id) : '')),
+  results_page: String(table.page || (table.id ? '/experiments?table=' + encodeURIComponent(table.id) : '')),
   report: String(input.report || ''),
   notebook: String(input.notebook || ''),
   next: list(input.next).map(String),
@@ -1502,7 +1502,7 @@ return { params, mode, runs, command, gpus: Math.max(1, Number(input.gpus) || 1)
 const d = Object.keys(obj(input.early)).length ? obj(input.early) : obj(input.all);
 const ids = list(d.runs).map((r) => String(r && typeof r === 'object' ? r.id : r)).filter(Boolean);
 if (!ids.length) throw new Error('The sweep started no runs' + (d.why ? ': ' + d.why : ''));
-return { ids, sweep: String(d.sweep || ''), page: String(d.page || (d.sweep ? '/system/experiments?sweep=' + encodeURIComponent(d.sweep) : '')), count: ids.length };`,
+return { ids, sweep: String(d.sweep || ''), page: String(d.page || (d.sweep ? '/experiments?sweep=' + encodeURIComponent(d.sweep) : '')), count: ids.length };`,
         outputs: [
           { id: 'ids', label: 'Runs', type: 'list' },
           { id: 'sweep', label: 'The sweep', type: 'text' },

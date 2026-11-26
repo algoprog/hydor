@@ -362,7 +362,7 @@ const NEW_MODEL_WATCH_UI: AppUi = {
   events: {
     show: [{ do: 'set', name: 'show', value: '{{event.name}}' }],
     copy_name: [{ do: 'copy', text: '{{event.name}}' }],
-    experiments: [{ do: 'open', url: '/system/experiments' }],
+    experiments: [{ do: 'open', url: '/experiments' }],
   },
 };
 

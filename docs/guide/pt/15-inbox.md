@@ -6,7 +6,7 @@ Os agentes trabalham por conta própria, mas de vez em quando precisam de você:
 
 ## Abrir a Caixa de entrada
 
-A Caixa de entrada é o bloco **Caixa de entrada** na barra de ícones, com o ícone de bandeja, logo abaixo de **Apps**, com **Pesquisa** abaixo dela (eles ficam ali mesmo quando você arrasta os outros blocos). Um número no canto dela indica quantas coisas esperam por você. No celular, abra primeiro a barra lateral com **Menu** (≡): o botão fica no alto da gaveta. Você também pode digitar "caixa de entrada" na caixa de pesquisa (Ctrl+K, ⌘K no Mac). [Abrir a Caixa de entrada](/inbox).
+A Caixa de entrada é o bloco **Caixa de entrada** na barra de ícones, com o ícone de bandeja, logo abaixo de **Experimentos**, com **Pesquisa** abaixo dela (eles ficam ali mesmo quando você arrasta os outros blocos). Um número no canto dela indica quantas coisas esperam por você. No celular, abra primeiro a barra lateral com **Menu** (≡): o botão fica no alto da gaveta. Você também pode digitar "caixa de entrada" na caixa de pesquisa (Ctrl+K, ⌘K no Mac). [Abrir a Caixa de entrada](/inbox).
 
 O cabeçalho diz quantas coisas esperam por você ("3 esperando por você"). As mais novas ficam no topo. A lista é atualizada sozinha conforme as sessões começam e deixam de esperar, e verifica de novo a cada poucos segundos enquanto você a observa.
 

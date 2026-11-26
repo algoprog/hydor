@@ -237,7 +237,7 @@ Vous pouvez ouvrir le navigateur d’une session avant l’agent, par exemple po
 
 Les fichiers téléchargés par une page sont enregistrés dans le dossier de la session, dans un dossier nommé downloads, et l’agent est prévenu de leur emplacement. Le menu du navigateur liste les plus récents sous **Enregistré dans le dossier de la session**.
 
-Un agent ne peut joindre des fichiers au champ d’envoi d’une page que depuis le dossier de la session. Pour qu’il envoie un autre fichier, copiez-le d’abord dans ce dossier (voir [Système : fichiers, Git, Terminal et Aperçu](/guide/files-git)).
+Un agent ne peut joindre des fichiers au champ d’envoi d’une page que depuis le dossier de la session. Pour qu’il envoie un autre fichier, copiez-le d’abord dans ce dossier (voir [Fichiers, Git, Terminal et Aperçu](/guide/files-git)).
 
 ## Quand le navigateur se ferme
 

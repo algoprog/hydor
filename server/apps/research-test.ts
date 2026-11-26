@@ -470,7 +470,7 @@ test('New-model watch: each model worth trying goes to Experiments with your eva
     // As workstream A's tools answer (server/experiments/tools.ts): JSON text, its data read from it.
     experiment_run: (a: Record<string, unknown>) => {
       runs.push(a);
-      const out = { id: `run${runs.length}`, status: 'queued', name: a.name, page: `/system/experiments/run${runs.length}` };
+      const out = { id: `run${runs.length}`, status: 'queued', name: a.name, page: `/experiments/run${runs.length}` };
       return { text: JSON.stringify(out, null, 1), data: out };
     },
     experiment_list: () => {

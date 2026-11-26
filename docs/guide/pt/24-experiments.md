@@ -2,11 +2,13 @@
 
 O Experimentos executa para você seus trabalhos de treinamento e avaliação. Um trabalho espera por uma GPU com memória livre suficiente em uma das suas máquinas (ou aguarda sua vez na fila de um cluster), é executado por conta própria e fica guardado como um registro: seu código, hiperparâmetros, ambiente, log e métricas, e o que o agente de plantão fez quando algo deu errado. Cada experimento (as execuções que você compara juntas) tem um título, uma descrição e uma categoria, e sua página mostra as execuções em uma tabela, suas métricas em gráficos e quais hiperparâmetros importam. Compare execuções ou crie uma tabela de resultados com testes de significância para o seu artigo. Os agentes também usam esse recurso: peça a qualquer agente para treinar algo em uma GPU livre, e ele inicia uma execução aqui.
 
-![Sistema → Experimentos: experimentos por categoria à esquerda e a aba Gráficos de um sweep: as curvas de suas seis execuções em gráficos compartilhados, cada execução com sua própria cor](images/experiments.webp)
+![A página Experimentos: experimentos por categoria à esquerda e a aba Gráficos de um sweep: as curvas de suas seis execuções em gráficos compartilhados, cada execução com sua própria cor](images/experiments.webp)
 
 ## Abrir o Experimentos
 
-Clique em **Sistema** na barra de ícones e depois na aba **Experimentos**, ou acesse [Experimentos](/system/experiments). O cartão **Experimentos** na [visão geral do Sistema](/system) lista as execuções em andamento; clique em uma para abri-la.
+Clique em **Experimentos** na barra de ícones, ou acesse [Experimentos](/experiments).
+
+Na primeira vez que você abre a página, um tour curto, escrito para quem está começando com experimentos, mostra como ela funciona. Ele aparece enquanto as dicas estão ativadas, depois do tour de boas-vindas. Um cartão explica em palavras simples o que são um experimento e uma execução, e depois cada parte da página se ilumina, uma de cada vez, com um cartão próprio: **Nova execução**, a fila e as GPUs, seus experimentos por categoria, acompanhar uma execução ao vivo, comparar execuções e tabelas de resultados, e deixar um agente fazer o trabalho. Avance e volte com **Próxima** e **Voltar**; **Concluído** encerra o tour, e **Pular** ou Esc o fecha antes. **Me mostre como funciona** (o botão de bússola no canto superior direito da página) o inicia de novo a qualquer momento.
 
 No computador, uma coluna à esquerda permanece ao lado de tudo o que você abre aqui:
 
@@ -72,7 +74,7 @@ No final, **Criar uma tabela** e **Comparar as 6 melhores**.
 
 ## Iniciar uma execução
 
-1. Clique em [**Nova execução**](/system/experiments?new=1) no canto superior direito.
+1. Clique em [**Nova execução**](/experiments?new=1) no canto superior direito.
 2. Digite o **Command**, como você faria na pasta dele: `python train.py --lr 3e-4`.
 3. Escolha a **Pasta** em que ele é executado e **Onde executa**: **Este computador**, uma das suas outras máquinas ou um cluster (veja [Para onde vão as execuções](#where-runs-go)).
 4. Defina as **GPUs** de que ele precisa (0 o executa sem uma) e **Memória livre de cada uma (GB)**. Se ficar vazio, ele espera por uma GPU que ninguém esteja usando.
@@ -194,7 +196,7 @@ Para testes pareados sobre exemplos (consultas em recuperação de informação,
 
 ## Sweeps
 
-Um sweep é um comando com um marcador para cada hiperparâmetro, executado uma vez para cada combinação dos valores deles. Clique em **Mais** (⋯) no alto e depois em [**Novo sweep**](/system/experiments?new=sweep) (ou **Novo sweep neste experimento** no menu de um experimento, ou **Um sweep** em Nova execução):
+Um sweep é um comando com um marcador para cada hiperparâmetro, executado uma vez para cada combinação dos valores deles. Clique em **Mais** (⋯) no alto e depois em [**Novo sweep**](/experiments?new=sweep) (ou **Novo sweep neste experimento** no menu de um experimento, ou **Um sweep** em Nova execução):
 
 1. Digite o comando com `{name}` onde vai o valor de cada hiperparâmetro: `python train.py --lr {lr} --batch {batch}`.
 2. Em **Hiperparâmetros e seus valores**, dê a cada hiperparâmetro os seus valores: `lr` e `0.001, 0.0003, 0.0001`. **Adicionar um hiperparâmetro** para outro.
@@ -206,7 +208,7 @@ As execuções do sweep são um experimento como qualquer outro: a tabela de exe
 
 ## Para onde vão as execuções
 
-**Mais** (⋯) no topo → [**Para onde vão as execuções**](/system/experiments?places=1):
+**Mais** (⋯) no topo → [**Para onde vão as execuções**](/experiments?places=1):
 
 - **Este computador**: suas GPUs e **Jobs sem GPU: no máximo N ao mesmo tempo**.
 - **Outras máquinas**: as que estão conectadas em [Configurações → Máquinas](/settings?s=machines). Uma execução enviada a uma delas fica guardada e é monitorada lá: o agente de plantão e os avisos dela são dessa máquina (os avisos chegam até você aqui, como todos os dessa máquina), e esta página a acompanha. A lista aqui também mostra as execuções de todas as máquinas conectadas, marcadas com o lugar onde rodam; abrir uma delas a lê lá, e **Parar** a interrompe lá.
@@ -214,7 +216,7 @@ As execuções do sweep são um experimento como qualquer outro: a tabela de exe
 
 ### Adicionar um cluster
 
-Clique em [**Adicionar um cluster**](/system/experiments?cluster=new) e informe:
+Clique em [**Adicionar um cluster**](/experiments?cluster=new) e informe:
 
 - **Nome** e **Host SSH**: como você digitaria depois de `ssh`, uma entrada do seu `~/.ssh/config` ou `me@login.cluster.edu`. O servidor do app se conecta com as próprias chaves SSH e nunca pede senha, então ele precisa de uma chave lá que funcione sem senha (`ssh-copy-id`) e da chave de host do cluster já conhecida (conecte uma vez com `ssh` em um terminal).
 - **SLURM** ou **SSH simples**.

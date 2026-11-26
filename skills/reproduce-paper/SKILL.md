@@ -71,7 +71,7 @@ match is a finding too, when you can say why. The report's outline is in `refere
 - A run that needs a GPU or takes more than a few minutes goes through Experiments when you have
   it: `experiment_run` with the `command`, its folder as `cwd`, a `name`, `gpus` and `hours` within
   your limits, and the paper's id in `tags`. It waits for free GPUs, runs on its own, keeps the
-  run's record, its log and its metrics, and the user sees it under System → Experiments. It
+  run's record, its log and its metrics, and the user sees it in Experiments (its icon in the sidebar). It
   answers at once with the run's id: read how it goes with `experiment_get` (its status, metrics and
   the end of its log). In the Reproduce a paper app, hand in the ids instead of waiting: the app
   waits for the runs to end, then an agent finishes from your notes. Without Experiments, run it in

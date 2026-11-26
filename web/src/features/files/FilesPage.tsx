@@ -15,7 +15,8 @@ import { filePath, go, showInFiles } from '../../lib/nav';
 import { useApp, useUI } from '../../lib/store';
 import { FolderFinder } from '../../components/FolderPicker';
 import { cx, Throbber, IconButton, MenuBack, Popover, SheetsOnPhone, useIsMobile, useMediaQuery } from '../../components/ui';
-import { rememberFilesPlace, SystemHeader } from '../system/SystemHeader';
+import { PageHeader } from '../layout/PageHeader';
+import { rememberFilesPlace } from './place';
 import { goFolder } from './actions';
 import { SlideColumn } from '../../components/SlideColumn';
 import { FileAskButton, FileAskPanel, FileAskPill, useFileAsk } from './FileAsk';
@@ -335,7 +336,7 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
       <SheetsOnPhone.Provider value>
         <UnsavedDialog />
         <div className="flex h-full min-h-0 flex-col">
-          <SystemHeader tab="files" actions={title} />
+          <PageHeader title="Files" tip="files" actions={title} />
           <div className="min-h-0 flex-1">{main}</div>
           {placesMenu}
         </div>
@@ -345,7 +346,7 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
 
   return (
     <div ref={pageRef} className="flex h-full min-h-0 flex-col">
-      <SystemHeader tab="files" actions={fold ? title : undefined} />
+      <PageHeader title="Files" tip="files" actions={fold ? title : undefined} />
       <UnsavedDialog />
       <div className="flex min-h-0 flex-1">
         {!fold && (

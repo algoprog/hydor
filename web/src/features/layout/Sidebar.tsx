@@ -40,7 +40,7 @@ interface DragBits {
 /** A drop ends with a click on the tool under the pointer; that click is ignored. */
 let lastDragEnd = 0;
 
-/** A tool: icon over label, four to a row (five with nine tools: two rows), so the sessions keep the room (on phones and computers alike). */
+/** A tool: icon over label, four to a row (five with nine or ten tools: two rows), so the sessions keep the room (on phones and computers alike). */
 function NavItem({ t, drag, floating, onMenu, tight }: { t: Tool; drag?: DragBits; floating?: boolean; onMenu?: (e: ReactMouseEvent<HTMLElement>) => void; tight?: boolean }) {
   return (
     <button
@@ -92,8 +92,10 @@ function ToolGrid({ nav, close }: { nav: (path: string) => void; close: () => vo
     openPalette();
   });
   tools.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-  // Nine tools or more: five to a row, so they make two rows (not two and a lone one).
-  const wide = tools.length >= 9;
+  // Nine or ten tools: five to a row, so they make two rows (not two and a lone one). Eleven or more (Files, Git and
+  // Experiments are tools of their own): four again, in three rows, as six to a row cut the longer names short
+  // ("Experim…") and five would leave a lone one.
+  const wide = tools.length >= 9 && tools.length <= 10;
   const dragging = dragId ? tools.find((t) => t.id === dragId) : undefined;
 
   const onToolDrop = ({ active, over }: DragEndEvent) => {

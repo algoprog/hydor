@@ -635,7 +635,7 @@ tbody tr:last-child td { border-bottom: 0; }
   events: {
     copy_report: [{ do: 'copy', text: '{{result.report}}' }],
     open_folder: [{ do: 'open', url: '/files?dir={{result.folder|url}}' }],
-    open_run: [{ do: 'open', url: '/system/experiments/{{event.run|url}}' }],
+    open_run: [{ do: 'open', url: '/experiments/{{event.run|url}}' }],
     again: [{ do: 'again', confirm: 'Try it again with the same answers? It is a new run, which starts from the work folder as it is.' }],
   },
 };

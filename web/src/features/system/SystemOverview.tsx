@@ -1,23 +1,19 @@
 // System → Overview: this computer at a glance. How it is doing (processor, memory, disk, graphics), and a card
-// for each of its tools with what is useful now: files you opened lately and a search, repositories with
-// changes, the terminals running, the web apps you can preview, the experiments' runs going. Each card opens its tab.
+// for each of its tools with what is useful now: the terminals running and the web apps you can preview. Each card
+// opens its tab. Files, Git and Experiments, cards here before, are sections of their own on the rail.
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ChevronRight, Clock, Cpu, File, FlaskConical, FolderTree, GitBranch, HardDrive, House, MemoryStick, Microchip, MonitorSmartphone, Plus, Search, SquareTerminal, Trash2 } from 'lucide-react';
-import type { GitRepo, SystemInfo, SystemSample } from '@shared/types';
-import type { RunRecord } from '@shared/experiments';
+import { ArrowDown, ArrowUp, ChevronRight, Cpu, HardDrive, MemoryStick, Microchip, MonitorSmartphone, Plus, SquareTerminal } from 'lucide-react';
+import type { SystemInfo, SystemSample } from '@shared/types';
 import { api } from '../../lib/api';
-import { ago, basename, dirname, pct, tildify } from '../../lib/format';
+import { ago, basename, pct, tildify } from '../../lib/format';
 import { machineId } from '../../lib/machine';
-import { filePath, go } from '../../lib/nav';
+import { go } from '../../lib/nav';
 import { toastError, useApp, useSystemLive } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { Meter, severityColor, useInterval } from '../../components/charts';
-import { Button, cx, inputCls, Throbber } from '../../components/ui';
-import { useFilesPrefs } from '../files/prefs';
-import { searchUrl } from '../files/SearchView';
+import { Button, cx, Throbber } from '../../components/ui';
 import { loadTerms, newTerminal, useTerms } from '../terminal/TerminalPanel';
 import { SystemHeader } from './SystemHeader';
-import { metricsLine, runPath, statusTone, statusWords } from '../experiments/api';
 
 function uptime(s: number): string {
   const d = Math.floor(s / 86400);
@@ -126,94 +122,6 @@ function Health() {
   );
 }
 
-function FilesCard() {
-  const home = useApp((s) => s.boot?.home) ?? '/';
-  const recent = useFilesPrefs((s) => s.recent);
-  const [q, setQ] = useState('');
-  return (
-    <Card icon={<FolderTree size={16} />} title="Files" to="/files">
-      <form
-        className="relative px-2 pb-1.5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (q.trim()) go(searchUrl({ q: q.trim(), in: home }));
-        }}
-      >
-        <Search size={14} className="pointer-events-none absolute top-1/2 left-4.5 -translate-y-1/2 text-fg-3" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find files and words in them" className={cx(inputCls, 'h-9 pl-8 text-[13.5px]')} />
-      </form>
-      {recent.length ? (
-        recent.slice(0, 5).map((p) => (
-          <Item key={p} icon={<File size={14} />} title={<span translate="no">{basename(p)}</span>} sub={<span translate="no">{tildify(dirname(p), home)}</span>} onClick={() => go(filePath(p))} />
-        ))
-      ) : (
-        <Quiet>Files you open show here, to get back to them.</Quiet>
-      )}
-      <div className="flex flex-wrap gap-1.5 px-2 pt-1.5">
-        {[
-          { icon: <House size={13} />, label: 'Home folder', to: `/files?dir=${encodeURIComponent(home)}` },
-          { icon: <Clock size={13} />, label: 'Recent files', to: '/files?place=recent' },
-          { icon: <Trash2 size={13} />, label: 'Trash', to: '/files?place=trash' },
-        ].map((x) => (
-          <button key={x.label} type="button" onClick={() => go(x.to)} className="inline-flex h-8 items-center gap-1.5 rounded-full bg-bg-2 px-3 text-[12.5px] text-fg-2 hover:bg-bg-3 hover:text-fg">
-            {x.icon}
-            {x.label}
-          </button>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function GitCard() {
-  const home = useApp((s) => s.boot?.home) ?? '/';
-  const [repos, setRepos] = useState<GitRepo[] | null>(null);
-  useEffect(() => {
-    api<{ repos: GitRepo[] }>('/api/git/repos').then(
-      (r) => setRepos(r.repos),
-      () => setRepos([]),
-    );
-  }, []);
-  // Those with changes or commits to send first, then the ones used last.
-  const list = [...(repos ?? [])].sort((a, b) => Number(b.changed > 0 || b.ahead > 0) - Number(a.changed > 0 || a.ahead > 0) || (b.lastUsed ?? 0) - (a.lastUsed ?? 0)).slice(0, 5);
-  return (
-    <Card icon={<GitBranch size={16} />} title="Git" count={repos?.length || undefined} to="/git">
-      {!repos ? (
-        <div className="flex justify-center py-6">
-          <Throbber />
-        </div>
-      ) : list.length ? (
-        list.map((r) => (
-          <Item
-            key={r.path}
-            icon={<GitBranch size={14} />}
-            title={<span translate="no">{r.name}</span>}
-            sub={
-              <span translate="no">
-                {r.branch ?? 'detached'} · {tildify(r.path, home)}
-              </span>
-            }
-            right={
-              r.changed > 0 || r.ahead > 0 || r.behind > 0 ? (
-                <span className="flex items-center gap-1.5">
-                  {r.changed > 0 && <span className="text-warn">{r.changed} changed</span>}
-                  {r.ahead > 0 && <span>↑{r.ahead}</span>}
-                  {r.behind > 0 && <span>↓{r.behind}</span>}
-                </span>
-              ) : (
-                'up to date'
-              )
-            }
-            onClick={() => go(`/git?path=${encodeURIComponent(r.path)}`)}
-          />
-        ))
-      ) : (
-        <Quiet>Repositories show up here once a session works in one, or when you add one on the Git tab.</Quiet>
-      )}
-    </Card>
-  );
-}
-
 function TerminalCard() {
   const home = useApp((s) => s.boot?.home) ?? '/';
   const terms = useTerms((s) => s.list);
@@ -309,46 +217,6 @@ function PreviewCard() {
   );
 }
 
-/** The experiments' runs going now (running, then waiting), each opening its page. */
-function ExperimentsCard() {
-  const [runs, setRuns] = useState<RunRecord[] | null>(null);
-  const load = () =>
-    api<{ runs: RunRecord[] }>('/api/experiments/runs?status=active&limit=50')
-      .then((r) => setRuns(r.runs))
-      .catch(() => setRuns([]));
-  useEffect(() => {
-    load();
-  }, []);
-  useInterval(load, 10_000);
-  const sorted = [...(runs ?? [])].sort((a, b) => Number(b.status === 'running') - Number(a.status === 'running'));
-  return (
-    <Card icon={<FlaskConical size={16} />} title="Experiments" count={runs?.length || undefined} to="/system/experiments">
-      {!runs ? (
-        <div className="flex justify-center py-6">
-          <Throbber />
-        </div>
-      ) : sorted.length ? (
-        sorted.slice(0, 5).map((r) => (
-          <Item
-            key={r.id}
-            icon={<span className={cx('h-1.5 w-1.5 rounded-full', statusTone(r.status))} />}
-            title={<span translate="no">{r.name ?? r.id}</span>}
-            sub={
-              <>
-                {statusWords(r)}
-                {metricsLine(r, 2) ? <span translate="no"> · {metricsLine(r, 2)}</span> : null}
-              </>
-            }
-            onClick={() => go(runPath(r))}
-          />
-        ))
-      ) : (
-        <Quiet>No runs going. Start a job that waits for a free GPU and is kept as a record, or ask an agent to train or evaluate something on one.</Quiet>
-      )}
-    </Card>
-  );
-}
-
 export function SystemOverview() {
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -357,11 +225,8 @@ export function SystemOverview() {
         <div className="mx-auto max-w-[1100px] space-y-4 px-4 py-5 sm:px-6">
           <Health />
           <div className="grid gap-4 md:grid-cols-2">
-            <FilesCard />
-            <GitCard />
             <TerminalCard />
             {!machineId && <PreviewCard />}
-            <ExperimentsCard />
           </div>
         </div>
       </div>

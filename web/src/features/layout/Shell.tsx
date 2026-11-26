@@ -79,7 +79,7 @@ function useDrag(onMove: (dy: number) => void) {
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
   // A run of Experiments opens beside its list: the same page.
-  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : loc.startsWith('/system/experiments') ? '/system/experiments' : loc;
+  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : loc === '/experiments' || loc.startsWith('/experiments/') ? '/experiments' : loc;
   return (
     <div key={section} className="h-full">
       <Page />
@@ -140,11 +140,15 @@ function Redirect({ to }: { to: string }) {
   return null;
 }
 
-/** Where an older address goes now (until 5 November 2026 a project's page was /spaces/…, the Library's filter ?space=), or null. */
+/**
+ * Where an older address goes now (until 5 November 2026 a project's page was /spaces/…, the Library's filter
+ * ?space=; until late November 2026 Experiments was a tab of System, /system/experiments…), or null.
+ */
 function movedAddress(loc: string): string | null {
   // As the address has them: wouter's own search comes unescaped.
   const { search, hash } = window.location;
   if (loc === '/spaces' || loc.startsWith('/spaces/')) return `/projects${loc.slice('/spaces'.length)}${search}${hash}`;
+  if (loc === '/system/experiments' || loc.startsWith('/system/experiments/')) return `${loc.slice('/system'.length)}${search}${hash}`;
   const q = new URLSearchParams(search);
   if (loc !== '/library' || !q.has('space')) return null;
   q.set('project', q.get('space')!);

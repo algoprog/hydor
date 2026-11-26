@@ -2,11 +2,13 @@
 
 Experimentos ejecuta por ti tus trabajos de entrenamiento y evaluación. Un trabajo espera una GPU con suficiente memoria libre en una de tus máquinas (o espera su turno en la cola de un clúster), se ejecuta por su cuenta y se conserva como registro: su código, hiperparámetros, entorno, log y métricas, y lo que hizo el agente de guardia cuando algo salió mal. Cada experimento (las ejecuciones que comparas juntas) tiene un título, una descripción y una categoría, y su página muestra las ejecuciones como una tabla, sus métricas como gráficos y qué hiperparámetros importan. Compara ejecuciones o crea una tabla de resultados con pruebas de significancia para tu artículo. Los agentes también lo usan: pide a cualquier agente que entrene algo en una GPU libre y empezará una ejecución aquí.
 
-![Sistema → Experimentos: experimentos por categoría a la izquierda, y la pestaña Gráficos de un barrido: las curvas de sus seis ejecuciones en gráficos compartidos, cada ejecución con su propio color](images/experiments.webp)
+![La página de Experimentos: experimentos por categoría a la izquierda, y la pestaña Gráficos de un barrido: las curvas de sus seis ejecuciones en gráficos compartidos, cada ejecución con su propio color](images/experiments.webp)
 
 ## Abrir Experimentos
 
-Haz clic en **Sistema** en la barra de iconos y luego en la pestaña **Experimentos**, o ve a [Experimentos](/system/experiments). La tarjeta **Experimentos** del [resumen de Sistema](/system) muestra las ejecuciones en curso; haz clic en una para abrirla.
+Haz clic en **Experimentos** en la barra de iconos, o ve a [Experimentos](/experiments).
+
+La primera vez que abres la página, un recorrido corto pensado para quien empieza con los experimentos te la enseña. Aparece mientras los consejos están activados, después del recorrido de bienvenida. Una tarjeta explica en palabras sencillas qué son un experimento y una ejecución, y luego cada parte de la página se ilumina por turno con su propia tarjeta: **Nueva ejecución**, la cola y las GPU, tus experimentos por categoría, seguir una ejecución en vivo, comparar ejecuciones y tablas de resultados, y dejar que un agente haga el trabajo. Avanza y retrocede con **Siguiente** y **Atrás**; **Hecho** lo termina, y **Omitir** o Esc lo cierra antes. **Muéstrame cómo funciona** (el botón de la brújula arriba a la derecha de la página) lo vuelve a empezar cuando quieras.
 
 En una computadora, una columna a la izquierda permanece junto a todo lo que abras aquí:
 
@@ -72,7 +74,7 @@ Al final, **Crear una tabla** y **Comparar las 6 mejores**.
 
 ## Empezar una ejecución
 
-1. Haz clic en [**Nueva ejecución**](/system/experiments?new=1) arriba a la derecha.
+1. Haz clic en [**Nueva ejecución**](/experiments?new=1) arriba a la derecha.
 2. Escribe el **Comando**, como lo harías en su carpeta: `python train.py --lr 3e-4`.
 3. Elige la **Carpeta** en la que se ejecuta y **Dónde se ejecuta**: **Esta computadora**, una de tus otras máquinas o un clúster (consulta [Adónde van las ejecuciones](#where-runs-go)).
 4. Indica las **GPU** que necesita (0 la ejecuta sin una) y la **Memoria libre de cada una (GB)**. Si lo dejas vacío, espera una GPU que nadie use.
@@ -194,7 +196,7 @@ Para las pruebas pareadas sobre ejemplos (consultas en recuperación, frases en 
 
 ## Barridos
 
-Un barrido es un comando con un marcador para cada hiperparámetro, ejecutado una vez por cada combinación de sus valores. Haz clic en **Más** (⋯) arriba y luego en [**Nuevo barrido**](/system/experiments?new=sweep) (o **Nuevo barrido en este experimento** en el menú de un experimento, o **Un barrido** en Nueva ejecución):
+Un barrido es un comando con un marcador para cada hiperparámetro, ejecutado una vez por cada combinación de sus valores. Haz clic en **Más** (⋯) arriba y luego en [**Nuevo barrido**](/experiments?new=sweep) (o **Nuevo barrido en este experimento** en el menú de un experimento, o **Un barrido** en Nueva ejecución):
 
 1. Escribe el comando con `{name}` donde va el valor de cada hiperparámetro: `python train.py --lr {lr} --batch {batch}`.
 2. En **Hiperparámetros y sus valores**, da a cada hiperparámetro sus valores: `lr` y `0.001, 0.0003, 0.0001`. **Añadir un hiperparámetro** para otro más.
@@ -206,7 +208,7 @@ Las ejecuciones del barrido son un experimento como cualquier otro: su tabla de 
 
 ## Dónde van las ejecuciones
 
-**Más** (⋯) en la parte superior → [**Dónde van las ejecuciones**](/system/experiments?places=1):
+**Más** (⋯) en la parte superior → [**Dónde van las ejecuciones**](/experiments?places=1):
 
 - **Esta computadora**: sus GPU y **Trabajos sin GPU: como máximo N a la vez**.
 - **Otras máquinas**: las de [Configuración → Máquinas](/settings?s=machines) que están conectadas. Una ejecución enviada a una de ellas se conserva y se vigila allí: su agente de guardia y sus avisos son los de esa máquina (sus avisos te llegan aquí, como todos los de esa máquina), y esta página la sigue. La lista de aquí muestra también las ejecuciones de todas las máquinas conectadas, marcadas con el lugar donde se ejecutan; al abrir una se lee allí, y **Detener** la detiene allí.
@@ -214,7 +216,7 @@ Las ejecuciones del barrido son un experimento como cualquier otro: su tabla de 
 
 ### Añadir un clúster
 
-Haz clic en [**Añadir un clúster**](/system/experiments?cluster=new) e indica:
+Haz clic en [**Añadir un clúster**](/experiments?cluster=new) e indica:
 
 - **Nombre** y **Host SSH**: tal como lo escribirías después de `ssh`, una entrada de tu `~/.ssh/config` o `me@login.cluster.edu`. El servidor de la app se conecta con sus propias claves SSH y nunca pide una contraseña, así que necesita una clave allí que funcione sin ella (`ssh-copy-id`), y que la clave de host del clúster sea conocida (conéctate una vez con `ssh` desde una terminal).
 - **SLURM** o **SSH simple**.

@@ -147,7 +147,7 @@ Les noms de fichiers et les chemins dans une réponse sont des liens. Un nom ou 
 
 ## Afficher un aperçu d’un document dans la visionneuse de fichiers
 
-La visionneuse de fichiers affiche les documents depuis une carte, depuis la page Fichiers ou depuis un lien dans une réponse (voir [Système : fichiers, Git, Terminal et Aperçu](/guide/files-git)).
+La visionneuse de fichiers affiche les documents depuis une carte, depuis la page Fichiers ou depuis un lien dans une réponse (voir [Fichiers, Git, Terminal et Aperçu](/guide/files-git)).
 
 - Les **PDF** s’affichent tels quels, dans la visionneuse PDF du navigateur, avec **Remplir et signer** pour les remplir et les signer ([Remplir et signer un PDF](/guide/files-git#fill-in-and-sign-a-pdf)).
 - Les fichiers **PowerPoint** (.pptx, ainsi que ses variantes avec macros, diaporama et modèle) s’ouvrent sur **Diapositives** : « Ses diapositives, telles que l’app les dessine ». Chaque diapositive s’affiche telle qu’elle est, comme une présentation conservée (images, formes, tableaux, graphiques, arrière-plan et pied de page en place), les unes sous les autres avec leur numéro et leurs notes de l’orateur, y compris sur un téléphone. Une police utilisée par la présentation mais absente de cet ordinateur est remplacée par une autre ; quand celle-ci demande plus de place, le texte d’une zone est un peu réduit pour tenir, de sorte que rien ne soit coupé. **Texte** (« Ses mots et les notes de l’orateur ») affiche le texte des diapositives, et **Pages** les affiche mises en page par LibreOffice s’il est installé. Si les diapositives ne peuvent pas être dessinées, la visionneuse s’ouvre sur **Texte** et en donne la raison.

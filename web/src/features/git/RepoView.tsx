@@ -154,16 +154,17 @@ export function RepoView({ path, onChanged, onBack, onRemoved }: { path: string;
     );
   if (!repo)
     return frame(
-      <div className="flex flex-1 items-center justify-center text-fg-3">
+      <div data-intro-loading className="flex flex-1 items-center justify-center text-fg-3">
         <Throbber size={34} />
       </div>,
     );
 
   const ctx: RepoCtx = { repo, apply, reload: load, wide, phone, sel, open, confirm };
+  // The marked words let the page's tour light their tabs.
   const tabs = [
-    { value: 'changes' as const, label: 'Changes', count: repo.changed > 0 ? repo.changed.toLocaleString() : undefined },
-    { value: 'history' as const, label: 'History' },
-    { value: 'branches' as const, label: 'Branches' },
+    { value: 'changes' as const, label: <span data-intro="git-changes">Changes</span>, count: repo.changed > 0 ? repo.changed.toLocaleString() : undefined },
+    { value: 'history' as const, label: <span data-intro="git-history">History</span> },
+    { value: 'branches' as const, label: <span data-intro="git-branches">Branches</span> },
     { value: 'stashes' as const, label: 'Stashes', count: repo.stashes.length || undefined },
   ];
   return frame(
@@ -184,8 +185,10 @@ export function RepoView({ path, onChanged, onBack, onRemoved }: { path: string;
               {tildify(repo.path, home)}
             </div>
           </div>
-          <SyncButton repo={repo} sync={sync} />
-          <RepoMenu repo={repo} apply={apply} sync={sync} confirm={confirm} onRemotes={() => setRemotes(true)} onRemoved={onRemoved} />
+          <div data-intro="git-sync" className="flex shrink-0 items-start gap-2">
+            <SyncButton repo={repo} sync={sync} />
+            <RepoMenu repo={repo} apply={apply} sync={sync} confirm={confirm} onRemotes={() => setRemotes(true)} onRemoved={onRemoved} />
+          </div>
         </div>
         <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
           <BranchSwitcher repo={repo} apply={apply} confirm={confirm} />

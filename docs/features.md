@@ -601,7 +601,7 @@ agents that speak ACP and take MCP servers.
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
-  guidelines and its own skills and start as its assistant. The Projects page (Projects on the rail, right before Agents, and in the phone's drawer; `/projects`) lists every project as a card, on the page's whole width: a band in its colour with its mark and, for projects Hydor found, a Group, From Claude Code or From Codex chip; its name, what it is about (a group: Brings together …) and its folder; what it holds (sessions, documents, skills, kept files, Shared with N people); N working while its sessions work, and a dot when one finished since you last looked; when it was last at work; and small bars for its last four weeks of messages. New project (a split button: its ▾ has New project and New group of projects…, which needs two projects) makes one; Find a project filters by name, description and folder; a sort button (Recent activity, the usual, Name or Most sessions) is kept on each device. Pointing at a card (always on a touch screen) shows New session and ⋯ (Open its folder in Files, Show in Finder or its like, Only its sessions in the sidebar, Share with people, Delete the project); a click opens the details window; files dropped on a card go into the project's folder. Under the cards, Folders you work in lists the folders your sessions worked in lately that no project has, each with Make a project and ✕ (Not a project: stop suggesting it). With no projects it explains what a project is. The sidebar groups each
+  guidelines and its own skills and start as its assistant. The Projects page (Projects on the rail, right before Files, and in the phone's drawer; `/projects`) lists every project as a card, on the page's whole width: a band in its colour with its mark and, for projects Hydor found, a Group, From Claude Code or From Codex chip; its name, what it is about (a group: Brings together …) and its folder; what it holds (sessions, documents, skills, kept files, Shared with N people); N working while its sessions work, and a dot when one finished since you last looked; when it was last at work; and small bars for its last four weeks of messages. New project (a split button: its ▾ has New project and New group of projects…, which needs two projects) makes one; Find a project filters by name, description and folder; a sort button (Recent activity, the usual, Name or Most sessions) is kept on each device. Pointing at a card (always on a touch screen) shows New session and ⋯ (Open its folder in Files, Show in Finder or its like, Only its sessions in the sidebar, Share with people, Delete the project); a click opens the details window; files dropped on a card go into the project's folder. Under the cards, Folders you work in lists the folders your sessions worked in lately that no project has, each with Make a project and ✕ (Not a project: stop suggesting it). With no projects it explains what a project is. The sidebar groups each
   project's sessions under its name, and a project's details open in a window over the page you are on, from a click on
   a card on the Projects page, its name in the sidebar (a tap on a phone; the arrow before it folds its sessions), its ⋯ menu (which also has New folder, a folder of its own for sorting its sessions), the search box (Ctrl+K), or any
   link to it (`/projects/<id>`, with the tab after it). The window has a band in the project's colour (its mark, its name, what
@@ -1592,7 +1592,7 @@ agents that speak ACP and take MCP servers.
   colour-blind-safe colours, embedded fonts, one style file). The LaTeX editor opens them with your paper filled in. A paper
   that cannot be read stops the run at once, saying how to give it another way; the venue, the limit and tone, and the
   figures' template start from your last answers.
-- **Experiments** (System → Experiments): jobs wait for a GPU with enough free memory on any of your machines (or a
+- **Experiments** (**Experiments** on the rail, `/experiments`): jobs wait for a GPU with enough free memory on any of your machines (or a
   SLURM cluster's queue over SSH), run in tmux and are kept as records: the commit and its changes, hyperparameters,
   seed, environment, log and metrics (what it prints again and again drawn as curves, the most telling first; what it
   prints once kept as values), and how far a run has got with about how long is left. The page has a column at the left
@@ -1613,7 +1613,10 @@ agents that speak ACP and take MCP servers.
   random sample, losing runs stopped early; a sweep is one experiment, and its notice opens its Hyperparameters tab),
   and make **results tables** (mean ± std over seeds, the best in bold, paired or Welch tests with Holm's correction as
   daggers) as LaTeX, Markdown or CSV, or straight into a LaTeX document you kept. Agents use it with experiment_run,
-  experiment_sweep, experiment_list, experiment_get, experiment_stop, experiment_table and experiment_describe.
+  experiment_sweep, experiment_list, experiment_get, experiment_stop, experiment_table and experiment_describe. The
+  first time you open the page, a short tour for people new to it explains what an experiment and a run are and lights
+  each part in turn (New run, the queue and GPUs, experiments by category, following a run live, comparing runs and
+  results tables, letting an agent do the work); **Show me around** starts it again.
 - **The lab's work** (Apps → Lab and Work): an **Annotation workbench** (you and a model label the same sample, the
   model's label hidden until you give yours; disagreements, Cohen's κ and a confusion matrix; publish on Hugging Face
   with a dataset card), a **Research sprint** (hypotheses, code on its own branch, runs in Experiments, an analysis
@@ -1946,6 +1949,9 @@ programs shows each program's version and what is out, with Check now, Update no
   an agent to resolve them. The history as a graph with branch and tag labels and a search; a commit can be
   explained by an agent, reverted, tagged, branched from or undone. Branches to switch, merge, compare,
   rename, publish and delete (saying which commits would be lost), and stashes to look inside, apply and drop.
+  The first time you open the page, a short tour for people new to Git explains what Git is and lights each part
+  in turn (your repositories, Changes, Commit, Push and Pull, History, Branches, asking an agent); **Show me
+  around** starts it again.
 - Preview: the web apps running on this computer (dev servers, told apart from APIs and databases, with their
   project, page title and framework), shown inside the app at a computer's, tablet's or phone's width with an
   address bar, back and forward. Where the browser can't reach the preview port (behind a tunnel), the page
@@ -2005,10 +2011,10 @@ programs shows each program's version and what is out, with Check now, Update no
   and the app keeps its own link to every conversation file (no extra disk), so one that gets deleted comes back.
   Sessions nobody used for a year are deleted (Settings → General → Delete inactive sessions: on or off, and how
   long); pinned and busy ones stay, and their numbers stay in Activity.
-- System: this computer under one tool on the rail, a tab each for Files, Git, Terminal, Preview,
-  Monitor (CPU, memory, GPUs, disks, network, each live session's programs and the busiest processes, live) and
-  Experiments, and an overview with how it is doing and what each tool holds now (recent files and a search,
-  repositories with changes, the shells running, the web apps to preview).
+- System: this computer under one tool on the rail, a tab each for Terminal, Preview and
+  Monitor (CPU, memory, GPUs, disks, network, each live session's programs and the busiest processes, live), and an
+  overview with how it is doing and what its tools hold now (the shells running, the web apps to preview). Files, Git
+  and Experiments each have an icon of their own on the rail.
 - Each session's share of the computer: its programs (the agent's, the commands it runs, the servers it starts) with
   their CPU and memory, in its Info and in Monitor; and, on Linux, Settings → General → Limit each session puts each
   session in a systemd scope of its own with at most that much memory and so many processors, so a program that
@@ -2150,7 +2156,7 @@ programs shows each program's version and what is out, with Check now, Update no
   sidebar slides as you hide or show it, the Browser's right column and the Files page's Ask panel slide in and out, pages cross-fade (not to or from the Browser),
   the theme blends when you switch between light and dark, and windows come in over a page that dims behind them (a dialog or window rises a little as it grows to its size, and on a phone rises from the bottom edge like a sheet; a side panel slides in from the right; the search box and the picture and video viewer fade in quickly; all close at once). On a phone, the slides of the sidebar and columns and the page cross-fades don't play, but windows still rise from the bottom. Calm keeps all but those five; Off keeps only work in
   progress moving (the throbber's water, the dots of sessions at work). Nothing delays content, and nothing repeats but work in progress.
-- The rail's icons (a tooltip names each, with its shortcut): Sessions (shows or hides the sidebar, or goes back to the session you had open), then the sections (Browser, which is in the desktop app only, Projects, Agents, Apps), right under them Inbox (with a count of what waits on you) and Search, and below, after some space, Usage, System, Settings and Help. The current page's icon is lit, with a bar of the accent colour beside it. Each group stays in the order you drag it into, as sessions do, the same on every device (Inbox and Search stay right under the sections; a tool a newer version brings, such as Projects, takes its usual place in an order you set, right before the next tool that follows it in the usual order, not the end); a phone has no rail, and its drawer holds them in one grid (hold one a moment to pick it up; the drawer's header has the Inbox). On a computer, right-click an icon for Back to the usual order. The sessions' sidebar shows on the start page and in a session only; Apps, Agents, Help and Settings have a column of the same kind (logo, their list, Hide), and the Browser draws one of its own. The rail shows the offline mark when no column does. Sessions are found with the search box, not a field in the sidebar.
+- The rail's icons (a tooltip names each, with its shortcut): Sessions (shows or hides the sidebar, or goes back to the session you had open), then the sections (Browser, which is in the desktop app only, Projects, Files, Agents, Apps, Git, Experiments), right under them Inbox (with a count of what waits on you) and Search, and below, after some space, Usage, System, Settings and Help. The current page's icon is lit, with a bar of the accent colour beside it. Each group stays in the order you drag it into, as sessions do, the same on every device (Inbox and Search stay right under the sections; a tool a newer version brings, such as Files, takes its usual place among its own group in an order you set, right before the next tool of its group that follows it in the usual order (else right after the one before it, as Git after Apps), not the end); a phone has no rail, and its drawer holds them in one grid (hold one a moment to pick it up; the drawer's header has the Inbox). On a computer, right-click an icon for Back to the usual order. The sessions' sidebar shows on the start page and in a session only; Apps, Agents, Help and Settings have a column of the same kind (logo, their list, Hide), and the Browser draws one of its own. The rail shows the offline mark when no column does. Sessions are found with the search box, not a field in the sidebar.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search on the rail finds pages,
   every setting, sessions (by title, folder, first message and the agent they started as, archived ones too, marked Archived) and what was said in them, memory notes, projects, apps, scheduled tasks, assistants,
   skills, plugins, kept pages, pictures and videos, connections, themes and files, as you type. Pictures,
@@ -2173,7 +2179,7 @@ programs shows each program's version and what is out, with Check now, Update no
   streams flow from what you picked into a pool around the Ω; small dots show the steps, over a sea whose waves
   drift gently. Then it shows you around as the app builds itself up, a ring of water lighting each part as it is
   explained, with first tasks to put in the message box; the message box's step mentions the grey word
-  suggestions, the tools' step Experiments, and a step of its own lights Apps (what an app is, with requests to try).
+  suggestions, the tools' step Files, Git and Experiments, and a step of its own lights Apps (what an app is, with requests to try).
   Everyone gets one page about what other assistants know about you: "Coming from ChatGPT or Claude?" says how to ask
   for the export they email you and opens Bring in over the tour; when the folder of Claude Code, Codex or another
   agent is on this computer, it is "Coming from another agent?" and names what it found too. The last page's
@@ -2182,11 +2188,14 @@ programs shows each program's version and what is out, with Check now, Update no
   what is switched on (Bookmarks, History), or **Open System Settings** on a Mac while macOS keeps Hydor from reading
   Safari (the tour comes back to this page if Hydor has to reopen); Next goes on without. Help shows it again.
 - After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
-  inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Experiments
-  and Apps pages, Make an app, an answer card, an app's card in a conversation, the panel beside the conversation,
+  inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Apps
+  page, Make an app, an answer card, an app's card in a conversation, the panel beside the conversation,
   the grey word suggestions, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
   guide. One at a time and a while apart, never while you type or a menu is open; each shows once, on every
-  device. Skip tips, or skipping the tour, stops them; Settings → General → Tips turns them on again.
+  device. Skip tips, or skipping the tour, stops them; Settings → General → Tips turns them on again. The Git and
+  Experiments pages have a short tour of their own instead, which comes the first time you open each (while tips are on,
+  after the welcome tour): it lights each part of the page with a card in plain words (Skip, Back, Next, Done; Esc
+  closes it); **Show me around** (a compass at the top right) starts it again.
 - Help (on the rail): a guide to every part of the app, its topics grouped on one page as cards (in a wide window, in a
   column of the same kind as the sessions' instead, with Hide sidebar beside the logo, the first page keeping its box, a few questions and "What Hydor can do": a card each for bringing in from ChatGPT or Claude, apps, making your own, answer cards, word suggestions, documents, deep research, work that runs by itself, goals, experiments, the phone and, in the desktop apps, the browser, each with a request to try or a place to open and a link to the guide), each with a picture of
   that part of the app and its sections to open one at a time. One box finds sections as you type, or asks an

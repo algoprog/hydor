@@ -159,7 +159,7 @@ export const suggestShot = (id) => ({
   },
 });
 
-/** System → Experiments: the learning rate sweep's charts, its six runs (the guide's picture, as a whole window). */
+/** Experiments: the learning rate sweep's charts, its six runs (the guide's picture, as a whole window). */
 export const experimentsShot = (id) => ({
   id,
   async take(p, ctx) {
@@ -168,7 +168,7 @@ export const experimentsShot = (id) => ({
       if (r && !r.runs?.length) break;
       await sleep(1000);
     }
-    await ctx.go('/system/experiments?e=dense-retriever-lr-sweep&tab=charts', { settle: 2500 });
+    await ctx.go('/experiments?e=dense-retriever-lr-sweep&tab=charts', { settle: 2500 });
     await p.waitFor(`document.querySelectorAll('main svg path.viz-line').length >= 12`, { timeout: 20000 }).catch(() => {});
     await sleep(1500);
     await p.park();
@@ -286,7 +286,7 @@ export const SHOTS = [
   appsMakeShot('readme-apps-make'),
   // Word suggestions: the grey rest of the word and the next one, in a session's message box.
   suggestShot('readme-suggest'),
-  // System → Experiments: a sweep's six runs on their charts.
+  // Experiments: a sweep's six runs on their charts.
   experimentsShot('readme-experiments'),
   // A board with cards pinned from replies (numbers, a chart, the forecast, a checklist, a split).
   boardShot('readme-boards'),

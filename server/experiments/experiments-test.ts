@@ -363,7 +363,7 @@ test('a job runs in tmux and is recorded: commit, branch, patch, settings, seed,
   );
   assert.equal(notices.length, 1);
   assert.match(notices[0].body, /^Done in under a minute: loss 0\.4, acc 0\.8$/);
-  assert.equal(notices[0].url, `/system/experiments/${r.id}`);
+  assert.equal(notices[0].url, `/experiments/${r.id}`);
   // Its environment comes a moment later.
   await until(() => !!getRun(db, r.id)!.environment?.host, 10_000, 'the environment');
   const view = (await http.inject({ method: 'GET', url: `/api/experiments/runs/${r.id}` })).json();
@@ -761,10 +761,10 @@ test('a sweep through the route: runs of one group, each with its settings; mist
   forgetNotices();
   await until(() => res.runs.every((r: RunRecord) => ended(r.id)()), 20_000, 'the sweep');
   // Earlier tests may finish runs asynchronously: count only this sweep and its runs.
-  const sweepUrls = new Set([`/system/experiments?sweep=${res.sweep.id}`, ...res.runs.map((r: RunRecord) => `/system/experiments/${r.id}`)]);
+  const sweepUrls = new Set([`/experiments?sweep=${res.sweep.id}`, ...res.runs.map((r: RunRecord) => `/experiments/${r.id}`)]);
   const sweepNotices = notices.filter((n) => sweepUrls.has(n.url ?? ''));
   assert.equal(sweepNotices.length, 1, 'one notice for the whole sweep, none for individual runs');
-  assert.equal(sweepNotices[0].url, `/system/experiments?sweep=${res.sweep.id}`);
+  assert.equal(sweepNotices[0].url, `/experiments?sweep=${res.sweep.id}`);
   assert.match(sweepNotices[0].body, /^2 done\. Best loss 0\.25: lr=0\.25\.$/);
   assert.equal(sweepNotices[0].title, 'Sweep sw');
   const got = (await http.inject({ method: 'GET', url: `/api/experiments/sweeps/${res.sweep.id}` })).json();

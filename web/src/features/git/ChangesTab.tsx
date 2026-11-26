@@ -421,7 +421,7 @@ function CommitBox({ ctx, picked }: { ctx: RepoCtx; picked: GitFileStatus[] }) {
   };
   const ready = !busy && !!summary.trim() && (picked.length > 0 || amending);
   return (
-    <div className="shrink-0 space-y-2 border-t border-line bg-bg-1 p-2.5 pb-[max(10px,var(--safe-bottom))]">
+    <div data-intro="git-commit" className="shrink-0 space-y-2 border-t border-line bg-bg-1 p-2.5 pb-[max(10px,var(--safe-bottom))]">
       <input
         value={summary}
         onChange={(e) => setSummary(e.target.value)}

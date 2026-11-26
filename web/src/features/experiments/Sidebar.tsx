@@ -234,13 +234,13 @@ export function Sidebar({ runs, entries, queue, q, onQ, current, onOverview, onO
   return (
     <aside className="hidden min-h-0 w-[232px] shrink-0 flex-col border-r border-line lg:flex xl:w-[256px]">
       <div className="shrink-0 space-y-3 px-3 pt-3.5 pb-2">
-        <div className="px-1 space-y-2.5">
+        <div data-intro="exp-queue" className="px-1 space-y-2.5">
           <QueueLine runs={runs ?? []} />
           {queue && <GpuMeters gpus={queue.gpus} runs={runs ?? []} onOpen={onOpenRun} />}
         </div>
         <FindBox value={q} onChange={onQ} />
       </div>
-      <nav aria-label="Experiments" className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
+      <nav aria-label="Experiments" data-intro={found.length ? 'exp-list' : undefined} className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
         <button type="button" onClick={onOverview} aria-current={current === null ? 'page' : undefined} className={cx('mb-2 flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-medium transition-colors', current === null ? 'bg-bg-2 text-fg' : 'text-fg-2 hover:bg-bg-1')}>
           <HomeIcon size={14} className="shrink-0 text-fg-3" />
           Overview

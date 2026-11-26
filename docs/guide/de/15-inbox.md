@@ -6,7 +6,7 @@ Agenten arbeiten selbstständig, aber hin und wieder brauchen sie dich: eine Gen
 
 ## Den Posteingang öffnen
 
-Der Posteingang ist die Kachel **Posteingang** in der Leiste, mit dem Ablagefach-Symbol, direkt unter **Apps** und mit **Suchen** darunter (sie bleiben dort, wenn du die anderen Kacheln verschiebst). Eine Zahl an der Ecke zeigt, wie viele Dinge auf dich warten. Auf einem Handy öffnest du zuerst die Seitenleiste mit **Menü** (≡): Die Schaltfläche befindet sich oben im Drawer. Du kannst auch „Posteingang“ in das Suchfeld eingeben (Ctrl+K, ⌘K auf dem Mac). [Posteingang öffnen](/inbox).
+Der Posteingang ist die Kachel **Posteingang** in der Leiste, mit dem Ablagefach-Symbol, direkt unter **Experimente** und mit **Suchen** darunter (sie bleiben dort, wenn du die anderen Kacheln verschiebst). Eine Zahl an der Ecke zeigt, wie viele Dinge auf dich warten. Auf einem Handy öffnest du zuerst die Seitenleiste mit **Menü** (≡): Die Schaltfläche befindet sich oben im Drawer. Du kannst auch „Posteingang“ in das Suchfeld eingeben (Ctrl+K, ⌘K auf dem Mac). [Posteingang öffnen](/inbox).
 
 Die Kopfzeile sagt, wie viele Dinge auf dich warten („3 warten auf dich“). Die neuesten stehen oben. Die Liste aktualisiert sich von selbst, wenn Sitzungen anfangen oder aufhören zu warten, und prüft alle paar Sekunden erneut, solange du sie ansiehst.
 

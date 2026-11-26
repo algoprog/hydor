@@ -27,36 +27,43 @@ const tests: [string, () => void | Promise<void>][] = [];
 const test = (name: string, fn: () => void | Promise<void>) => tests.push([name, fn]);
 const usual = [...SIDEBAR_TOOLS];
 
-test('the usual order: the sections (Browser, Projects, Agents, Apps), then Search, Usage, System, Settings, Help', () => {
-  assert.deepEqual(usual, ['browser', 'spaces', 'agents', 'apps', 'search', 'usage', 'system', 'settings', 'help']);
-  assert.deepEqual(SECTION_TOOLS, usual.slice(0, 4), 'the rail\'s upper group comes first in the usual order');
-  assert.ok(SIDEBAR_TOOLS.indexOf('spaces') === SIDEBAR_TOOLS.indexOf('agents') - 1, 'Projects is right before Agents');
+test('the usual order: the sections (Browser, Projects, Files, Agents, Apps, Git, Experiments), then Search, Usage, System, Settings, Help', () => {
+  assert.deepEqual(usual, ['browser', 'spaces', 'files', 'agents', 'apps', 'git', 'experiments', 'search', 'usage', 'system', 'settings', 'help']);
+  assert.deepEqual(SECTION_TOOLS, usual.slice(0, 7), 'the rail\'s upper group comes first in the usual order');
+  assert.ok(SIDEBAR_TOOLS.indexOf('spaces') === SIDEBAR_TOOLS.indexOf('files') - 1, 'Projects is right before Files');
+  assert.ok(SIDEBAR_TOOLS.indexOf('files') === SIDEBAR_TOOLS.indexOf('agents') - 1, 'Files is right before Agents');
 });
 
 test('an order: the tools named in their order, any left out in their usual place', () => {
   assert.deepEqual(toolOrder([]), usual);
   assert.deepEqual(toolOrder(undefined), usual);
   assert.deepEqual(toolOrder('settings'), usual, 'not a list: the usual order');
-  assert.deepEqual(toolOrder(['help', 'gone', 'help', 3, 'system']), ['settings', 'help', 'browser', 'spaces', 'agents', 'apps', 'search', 'usage', 'system'], 'unknown names and repeats skipped; each tool left out right before the next that follows it');
-  assert.deepEqual(toolOrder(['files', 'git', 'help']), usual, 'tools that moved into System are passed over');
+  assert.deepEqual(toolOrder(['help', 'gone', 'help', 3, 'system']), ['settings', 'help', 'browser', 'spaces', 'files', 'agents', 'apps', 'git', 'experiments', 'search', 'usage', 'system'], 'unknown names and repeats skipped; each tool left out right before the next that follows it');
+  assert.deepEqual(toolOrder(['terminal', 'preview', 'help']), usual, 'tools that moved into System are passed over');
   assert.deepEqual(toolOrder(['pages', 'help']), usual, 'the Library is gone: passed over');
-  // Someone who dragged their tools into their own order before Projects came back: it joins right before Agents.
-  assert.deepEqual(toolOrder(['help', 'apps', 'agents', 'browser', 'settings']), ['help', 'apps', 'spaces', 'agents', 'browser', 'search', 'usage', 'system', 'settings']);
+  // Someone who dragged their tools into their own order before Projects came back: it joins right before Files, and
+  // Files right before Agents; Git and Experiments, out of System, have no section after them, so they come right after
+  // Apps, among the sections, even where a tool below the gap was dragged first (a phone's drawer is one grid).
+  assert.deepEqual(toolOrder(['help', 'apps', 'agents', 'browser', 'settings']), ['help', 'apps', 'git', 'experiments', 'spaces', 'files', 'agents', 'browser', 'search', 'usage', 'system', 'settings']);
   const without = ['settings', 'system', 'usage', 'search', 'apps', 'agents', 'browser', 'help'];
   const got = toolOrder(without);
-  assert.equal(got.indexOf('spaces'), got.indexOf('agents') - 1, 'a kept order without Projects gets it before Agents');
-  assert.deepEqual(got.filter((t) => t !== 'spaces'), without, 'and nothing else moves');
-  const named = ['settings', 'agents', 'spaces', 'system', 'usage', 'search', 'apps', 'browser', 'help'];
-  assert.deepEqual(toolOrder(named), named, 'a kept order that names Projects keeps it where it is');
-  const last = ['browser', 'agents', 'apps', 'search', 'usage', 'system', 'settings', 'help', 'spaces'];
+  assert.equal(got.indexOf('spaces'), got.indexOf('agents') - 2, 'a kept order without Projects and Files gets them before Agents');
+  assert.equal(got.indexOf('files'), got.indexOf('agents') - 1);
+  assert.deepEqual(got.filter((t) => !['spaces', 'files', 'git', 'experiments'].includes(t)), without, 'and nothing else moves');
+  const named = ['settings', 'agents', 'spaces', 'experiments', 'system', 'usage', 'search', 'git', 'apps', 'files', 'browser', 'help'];
+  assert.deepEqual(toolOrder(named), named, 'a kept order that names Projects, Files, Git and Experiments keeps them where they are');
+  const last = ['browser', 'agents', 'apps', 'search', 'usage', 'system', 'settings', 'help', 'spaces', 'files', 'git', 'experiments'];
   assert.deepEqual(toolOrder(last), last, '…even last');
   const reversed = [...usual].reverse();
   assert.deepEqual(toolOrder(reversed), reversed);
   assert.ok(usualOrder(toolOrder([])));
   assert.ok(!usualOrder(reversed));
-  // The rail's two groups: the sections above the gap (Projects among them), the rest below; Search under the Inbox.
+  // The rail's two groups: the sections above the gap (Projects, Files, Git and Experiments among them), the rest below; Search under the Inbox.
   const split = toolOrder(['help', 'apps', 'agents', 'browser']);
-  assert.deepEqual(split.filter((t) => SECTION_TOOLS.includes(t)), ['apps', 'spaces', 'agents', 'browser']);
+  assert.deepEqual(split.filter((t) => SECTION_TOOLS.includes(t)), ['apps', 'git', 'experiments', 'spaces', 'files', 'agents', 'browser']);
+  // A kept order of every tool from before Files, Git and Experiments came out of System (the rail's own, sections first).
+  const before = ['apps', 'browser', 'spaces', 'agents', 'search', 'usage', 'system', 'settings', 'help'];
+  assert.deepEqual(toolOrder(before), ['apps', 'git', 'experiments', 'browser', 'spaces', 'files', 'agents', 'search', 'usage', 'system', 'settings', 'help']);
   assert.deepEqual(split.filter((t) => !SECTION_TOOLS.includes(t) && t !== 'search'), ['usage', 'system', 'settings', 'help'], 'the tools below keep the order they come in');
 });
 
@@ -66,7 +73,7 @@ test('kept: every device reads the same; the usual order is kept as none', () =>
   assert.deepEqual(setSidebarTools(db, mine), mine);
   assert.deepEqual(sidebarTools(db), mine);
   assert.deepEqual(setSidebarTools(db, ['help']), usual, 'an order naming one tool only: the rest take their usual places (here Help is last already)');
-  assert.deepEqual(setSidebarTools(db, ['agents', 'apps', 'help']).slice(0, 4), ['browser', 'spaces', 'agents', 'apps'], 'Projects, left out, goes before Agents');
+  assert.deepEqual(setSidebarTools(db, ['agents', 'apps', 'help']).slice(0, 5), ['browser', 'spaces', 'files', 'agents', 'apps'], 'Projects and Files, left out, go before Agents');
   assert.deepEqual(setSidebarTools(db, []), usual);
   assert.equal(kvGet(db, 'sidebar.tools'), '[]');
   setSidebarTools(db, mine);
@@ -80,8 +87,8 @@ test('a name it does not know is refused, and changes nothing', () => {
   assert.throws(() => setSidebarTools(db, 'system'), /first to last/);
   assert.throws(() => setSidebarTools(db, undefined), /first to last/);
   assert.equal(sidebarTools(db)[0], 'usage');
-  // An older page still sending Files or Git: those are passed over, not refused.
-  assert.equal(setSidebarTools(db, ['files', 'apps', 'git']).indexOf('apps'), setSidebarTools(db, ['apps']).indexOf('apps'));
+  // An older page still sending Terminal or Preview: those are passed over, not refused.
+  assert.equal(setSidebarTools(db, ['terminal', 'apps', 'preview']).indexOf('apps'), setSidebarTools(db, ['apps']).indexOf('apps'));
   assert.deepEqual(setSidebarTools(db, ['help', 'pages', 'spaces']), setSidebarTools(db, ['help', 'spaces']), 'the Library is passed over');
   // Kept by an older or a hand-edited copy: what it no longer knows is left out.
   db.prepare("insert or replace into kv (k, v) values ('sidebar.tools', ?)").run(JSON.stringify(['notebook', 'help']));

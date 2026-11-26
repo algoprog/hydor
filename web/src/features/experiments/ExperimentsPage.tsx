@@ -1,7 +1,7 @@
-// System → Experiments: jobs that wait for a free GPU on any of your machines (or a cluster's queue), run on their
-// own, and are kept so you can compare them. The address says what shows: /system/experiments is the Overview (what
-// runs now, the experiments as cards, the latest runs), ?e=<experiment> one experiment (its runs, charts and
-// hyperparameters; ?e= alone is the runs without one), /system/experiments/<id> one run. A wide screen has a
+// Experiments, a section of its own on the rail: jobs that wait for a free GPU on any of your machines (or a cluster's
+// queue), run on their own, and are kept so you can compare them. The address says what shows: /experiments is the
+// Overview (what runs now, the experiments as cards, the latest runs), ?e=<experiment> one experiment (its runs,
+// charts and hyperparameters; ?e= alone is the runs without one), /experiments/<id> one run. A wide screen has a
 // sidebar with the queue, the GPUs and the experiments by category; a narrow one stacks the views. Ticked runs
 // (by their key) stay ticked from view to view, in a bar at the bottom to compare them or make a table.
 // Addresses open things too, once: ?new=1 (or sweep), ?sweep=<id> (its experiment's Hyperparameters), ?table=<id>
@@ -14,7 +14,8 @@ import { api, enc } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toast } from '../../lib/store';
 import { Button, Empty, IconButton, MenuItem, Popover, useMediaQuery } from '../../components/ui';
-import { SystemHeader } from '../system/SystemHeader';
+import { PageHeader } from '../layout/PageHeader';
+import { PageTour, TourButton } from '../tips/PageTour';
 import { differingParams, runKey } from './analysis';
 import { experimentPath, type ExperimentTab, type RunTab, runPath, useGroups, useQueue, useRuns } from './api';
 import { Compare } from './Compare';
@@ -25,6 +26,7 @@ import { Places } from './Places';
 import { RunView } from './RunView';
 import { entriesOf, Sidebar } from './Sidebar';
 import { TableDialog, TablesList, type TableStart } from './TableDialog';
+import { EXPERIMENTS_TOUR } from './tour';
 
 const TAB_KEY = 'hydor.experiments.tab';
 const EXPERIMENT_TABS: ExperimentTab[] = ['runs', 'charts', 'params'];
@@ -64,7 +66,7 @@ export function ExperimentsPage() {
   const menuRef = useRef<HTMLButtonElement>(null);
 
   // What the address shows.
-  const openId = /^\/system\/experiments\/([a-z0-9]{4,32})$/.exec(loc)?.[1] ?? null;
+  const openId = /^\/experiments\/([a-z0-9]{4,32})$/.exec(loc)?.[1] ?? null;
   const openMachine = q.get('m');
   const experiment = !openId && q.has('e') ? (q.get('e') ?? '') : null;
   const view: 'overview' | 'experiment' | 'run' = openId ? 'run' : experiment !== null ? 'experiment' : 'overview';
@@ -161,7 +163,7 @@ export function ExperimentsPage() {
     });
   const remotePicked = pickedRuns.some((r) => r.machine);
 
-  const overview = () => go('/system/experiments');
+  const overview = () => go('/experiments');
   const openRun = (r: Pick<RunRecord, 'id' | 'machine'>) => go(runPath(r));
   const openExperiment = (g: string) => go(experimentPath(g));
 
@@ -211,7 +213,8 @@ export function ExperimentsPage() {
 
   const actions = (
     <div className="flex items-center gap-1">
-      <Button size="sm" variant="primary" icon={<Plus size={15} />} onClick={() => setNewRun({ group: view === 'experiment' && experiment ? experiment : undefined })}>
+      <TourButton id="experiments" />
+      <Button data-intro="exp-new" size="sm" variant="primary" icon={<Plus size={15} />} onClick={() => setNewRun({ group: view === 'experiment' && experiment ? experiment : undefined })}>
         New run
       </Button>
       <IconButton ref={menuRef} label="More" onClick={() => setMenu((m) => !m)}>
@@ -323,7 +326,7 @@ export function ExperimentsPage() {
   return (
     // data-i18n: the page's own words where they mean something else elsewhere ("Run" is a run here, not "to run").
     <div data-i18n="experiments" className="flex h-full min-h-0 flex-col">
-      {!detailOnPhone && <SystemHeader tab="experiments" actions={actions} />}
+      {!detailOnPhone && <PageHeader title="Experiments" actions={actions} />}
       <div className="flex min-h-0 flex-1">
         {wide && <Sidebar runs={runs} entries={entries} queue={queue} q={find} onQ={setFind} current={current} onOverview={overview} onOpen={openExperiment} onOpenRun={(id) => openRun({ id })} />}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -373,6 +376,7 @@ export function ExperimentsPage() {
         }}
       />
       <Places open={!!places} adding={places?.adding} onClose={() => setPlaces(null)} />
+      <PageTour id="experiments" steps={EXPERIMENTS_TOUR} ready={runs !== null} />
     </div>
   );
 }

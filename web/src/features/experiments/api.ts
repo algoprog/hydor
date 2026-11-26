@@ -13,17 +13,17 @@ export type { RunRecord };
 export type RunTab = 'overview' | 'charts' | 'log';
 export type ExperimentTab = 'runs' | 'charts' | 'params';
 
-/** A run's page: /system/experiments/<id>, with ?m=<machine> for a run kept on another machine, and &tab= for a tab other than Overview. */
+/** A run's page: /experiments/<id>, with ?m=<machine> for a run kept on another machine, and &tab= for a tab other than Overview. */
 export const runPath = (r: Pick<RunRecord, 'id' | 'machine'>, tab?: RunTab) => {
   const q = new URLSearchParams();
   if (r.machine) q.set('m', r.machine.id);
   if (tab && tab !== 'overview') q.set('tab', tab);
   const s = q.toString();
-  return `/system/experiments/${enc(r.id)}${s ? `?${s}` : ''}`;
+  return `/experiments/${enc(r.id)}${s ? `?${s}` : ''}`;
 };
 
-/** An experiment's page: /system/experiments?e=<group> ('' for the runs without one), with &tab= for a tab other than Runs. */
-export const experimentPath = (group: string, tab?: ExperimentTab) => `/system/experiments?e=${enc(group)}${tab && tab !== 'runs' ? `&tab=${tab}` : ''}`;
+/** An experiment's page: /experiments?e=<group> ('' for the runs without one), with &tab= for a tab other than Runs. */
+export const experimentPath = (group: string, tab?: ExperimentTab) => `/experiments?e=${enc(group)}${tab && tab !== 'runs' ? `&tab=${tab}` : ''}`;
 
 /** Where a run's own calls go: this machine, or the machine it is kept on. */
 export const baseOf = (machine?: string | null) => (machine ? `/m/${machine}` : undefined);

@@ -237,7 +237,7 @@ Puedes abrir el navegador de una sesión antes que el agente, por ejemplo para i
 
 Los archivos que descarga una página se guardan en la carpeta de la sesión, dentro de una carpeta llamada downloads, y se le avisa al agente dónde quedaron. El menú del navegador muestra las últimas en **Guardado en la carpeta de la sesión**.
 
-Un agente solo puede adjuntar archivos al campo de subida de una página desde la carpeta de la sesión. Para que suba otro archivo, copia primero el archivo en esa carpeta (consulta [Sistema: archivos, Git, Terminal y vista previa](/guide/files-git)).
+Un agente solo puede adjuntar archivos al campo de subida de una página desde la carpeta de la sesión. Para que suba otro archivo, copia primero el archivo en esa carpeta (consulta [Archivos, Git, Terminal y Vista previa](/guide/files-git)).
 
 ## Cuándo se cierra el navegador
 

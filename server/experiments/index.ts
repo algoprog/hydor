@@ -1,4 +1,4 @@
-// Experiments (System → Experiments): a queue of jobs that wait for free GPUs on any of your machines (or a
+// Experiments (its own section on the rail, /experiments): a queue of jobs that wait for free GPUs on any of your machines (or a
 // cluster's queue over SSH), run on their own and are kept as records (commit and patch, settings, seed,
 // environment, metrics, log), an agent on call that wakes when a run goes wrong, sweeps, and results tables with
 // significance for the paper. The queue is queue.ts; records.ts keeps the records (and is what the rest of the app

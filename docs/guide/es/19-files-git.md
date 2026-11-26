@@ -1,22 +1,21 @@
-# Sistema: archivos, Git, Terminal y Vista previa
+# Archivos, Git, Terminal y Vista previa
 
-**Sistema** en la barra de iconos es esta computadora: explora, busca, abre y edita sus archivos, añádelos a proyectos y a nuevas sesiones, busca dentro de ellos, ejecuta cuadernos de Jupyter, haz commit y push con Git, abre pull requests y revisa lo que cambia una rama. Aquí también están las terminales, las vistas previas de las apps web que se ejecutan en ella, las capturas de pantalla de antes y después de los cambios de un agente y una vista en vivo de cómo va la computadora (**Monitor**), para que puedas comprobar y terminar el trabajo de un agente sin salir de la app.
+**Archivos**, **Git** y **Sistema** en la barra de iconos son tu puerta de entrada a esta computadora: explora, busca, abre y edita sus archivos, añádelos a proyectos y a nuevas sesiones, busca dentro de ellos, ejecuta cuadernos de Jupyter, haz commit y push con Git, abre pull requests y revisa lo que cambia una rama. Aquí también están las terminales, las vistas previas de las apps web que se ejecutan en ella, las capturas de pantalla de antes y después de los cambios de un agente y una vista en vivo de cómo va la computadora (**Monitor**), para que puedas comprobar y terminar el trabajo de un agente sin salir de la app.
 
-![Sistema → Git: los cambios de un repositorio junto al diff de un archivo, el cuadro del commit y Sincronizar](images/files-git.webp)
+![La página de Git: los cambios de un repositorio junto al diff de un archivo, el cuadro del commit y Sincronizar](images/files-git.webp)
 
 ## Abrir Sistema
 
 Haz clic en **Sistema** en la barra de iconos, o ve a [Sistema](/system). Una fila de pestañas bajo el título te lleva a cada parte, y cada una tiene su propia dirección:
 
-- **Resumen** ([abrir](/system)): la computadora de un vistazo y lo que contiene ahora cada herramienta (consulta [El resumen](#the-overview)).
-- **Archivos** ([abrir](/files)): los archivos de esta computadora (consulta [Abrir la página de Archivos](#open-the-files-page)).
-- **Git** ([abrir](/git)): tus repositorios (consulta [Ver tus repositorios en la página de Git](#see-your-repositories-on-the-git-page)).
+- **Resumen** ([abrir](/system)): la computadora de un vistazo y lo que contienen ahora sus herramientas (consulta [El resumen](#the-overview)).
 - **Terminal** ([abrir](/terminal)): shells de esta computadora (consulta [Usar la terminal](#use-the-terminal)).
 - **Vista previa** ([abrir](/preview)): las apps web que se ejecutan aquí (consulta [Ver un servidor de desarrollo con Vista previa](#look-at-a-dev-server-with-preview)). Solo aparece en las páginas de esta misma máquina, no mientras miras otra máquina.
 - **Monitor** ([abrir](/system/monitor)): lo ocupada que está la computadora (consulta [Vigilar esta computadora en Monitor](#watch-this-computer-in-monitor)).
-- **Experimentos** ([abrir](/system/experiments)): trabajos que esperan una GPU libre, se ejecutan solos y se guardan como registros (consulta [Experimentos](/guide/experiments)).
 
-En un teléfono el título indica la parte en la que estás (**Sistema / Monitor**): tócalo para ver todas las partes de Sistema, cuatro por fila, y toca una para ir a ella. Los botones propios de una pestaña (**Añadir** en Git, el de actualizar en Vista previa) están a la derecha del título.
+En un teléfono el título indica la parte en la que estás (**Sistema / Monitor**): tócalo para ver todas las partes de Sistema, cuatro por fila, y toca una para ir a ella. Los botones propios de una pestaña (como el de actualizar en Vista previa) están a la derecha del título.
+
+**Archivos** y **Git** no están dentro de Sistema: cada uno tiene su propio icono en la barra de iconos (en un teléfono, entre las herramientas del panel de la barra lateral). Haz clic en él, o ve a [Archivos](/files) (consulta [Abrir la página de Archivos](#open-the-files-page)) o a [Git](/git) (consulta [Ver tus repositorios en la página de Git](#see-your-repositories-on-the-git-page)). Experimentos también tiene su propio icono (consulta [Experimentos](/guide/experiments)).
 
 ## El resumen
 
@@ -24,15 +23,12 @@ En un teléfono el título indica la parte en la que estás (**Sistema / Monitor
 
 Debajo hay una tarjeta por cada herramienta; su título, o **Abrir**, abre su pestaña:
 
-- **Archivos**: un cuadro que busca nombres de archivos y las palabras que hay dentro de ellos (desde tu carpeta personal), los archivos que abriste hace poco, y **Carpeta personal**, **Archivos recientes** y **Papelera**.
-- **Git**: tus repositorios, primero los que tienen cambios o commits por enviar, cada uno con su rama y cuántos archivos cambiaron. Haz clic en uno para abrirlo en la pestaña Git.
 - **Terminal**: las shells en ejecución, y **Nueva** para abrir otra.
 - **Vista previa**: las apps web que se ejecutan aquí, cada una con su puerto. Haz clic en una para verla.
-- **Experimentos**: las ejecuciones en curso, cada una con su estado y sus métricas. Haz clic en una para abrirla.
 
 ## Abrir la página de Archivos
 
-Haz clic en **Sistema** y luego en **Archivos**, o ve a [Archivos](/files). En una computadora la página tiene dos partes:
+Haz clic en **Archivos** en la barra de iconos, o ve a [Archivos](/files). En una computadora la página tiene dos partes:
 
 - A la izquierda, los **lugares**: los archivos que abriste hace poco, tu carpeta personal, las carpetas que fijaste, las carpetas de tus proyectos, las carpetas en las que han trabajado las sesiones y la papelera (consulta [Lugares](/guide/files-git#places)).
 - A la derecha, la carpeta en la que estás, con lo que contiene (consulta [Explorar una carpeta](/guide/files-git#browse-a-folder)). Los archivos que abres también se muestran ahí, cada uno en una pestaña: la primera pestaña vuelve a la carpeta.
@@ -464,7 +460,9 @@ Ctrl+S (⌘S en un Mac) guarda. Como con otros archivos, si el cuaderno cambia e
 
 ## Ver tus repositorios en la página de Git
 
-Haz clic en **Sistema** y luego en **Git**, o ve a [Git](/git). A la izquierda se enumeran tus repositorios de git, empezando por los usados más recientemente: aquellos en los que trabajaron tus sesiones (la carpeta de una sesión, o un archivo que una sesión editó; los lugares desechables como `/tmp` se omiten) y los que agregaste tú. Cuando hay más de seis, un campo en la parte superior encuentra uno por su nombre.
+Haz clic en **Git** en la barra de iconos, o ve a [Git](/git). A la izquierda se enumeran tus repositorios de git, empezando por los usados más recientemente: aquellos en los que trabajaron tus sesiones (la carpeta de una sesión, o un archivo que una sesión editó; los lugares desechables como `/tmp` se omiten) y los que agregaste tú. Cuando hay más de seis, un campo en la parte superior encuentra uno por su nombre.
+
+La primera vez que abres la página de Git, un recorrido corto pensado para quien empieza con Git te la enseña. Aparece mientras los consejos están activados, después del recorrido de bienvenida. Una tarjeta explica en palabras sencillas qué es Git (puntos de guardado de una carpeta: commits, en un repositorio) y luego cada parte de la página se ilumina por turno con su propia tarjeta: tus repositorios, **Cambios**, **Commit**, guardar una copia en línea (**Push** y **Pull**), **Historial**, **Ramas** y que puedes simplemente pedírselo a un agente. Avanza y retrocede con **Siguiente** y **Atrás**; **Hecho** lo termina, y **Omitir** o Esc lo cierra antes. **Muéstrame cómo funciona** (el botón de la brújula arriba a la derecha de la página) lo vuelve a empezar cuando quieras.
 
 Cada repositorio muestra su nombre y su rama, y pequeñas marcas cuando hay algo que hacer:
 

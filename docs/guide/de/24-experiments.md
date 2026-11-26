@@ -2,11 +2,13 @@
 
 Experimente führt Trainings- und Evaluationsjobs für dich aus. Ein Job wartet auf eine GPU mit genügend freiem Speicher auf einem deiner Computer (oder bis er in der Warteschlange eines Clusters an der Reihe ist), läuft dann selbstständig und wird als Aufzeichnung aufbewahrt: Code, Hyperparameter, Umgebung, Protokoll und Metriken sowie das, was der zuständige Agent unternommen hat, wenn etwas schiefging. Jedes Experiment (die Läufe, die du gemeinsam vergleichst) hat einen Titel, eine Beschreibung und eine Kategorie. Seine Seite zeigt die Läufe als Tabelle, ihre Metriken als Diagramme und welche Hyperparameter wichtig sind. Du kannst Läufe vergleichen oder eine Ergebnistabelle mit Signifikanztests für dein Paper erstellen. Auch Agenten nutzen diese Funktion: Bitte einen beliebigen Agenten, etwas auf einer freien GPU zu trainieren, und er startet hier einen Lauf.
 
-![System → Experimente: links die Experimente nach Kategorie, daneben der Tab Diagramme eines Sweeps: die Kurven seiner sechs Läufe in gemeinsamen Diagrammen, jeder Lauf in seiner eigenen Farbe](images/experiments.webp)
+![Die Experimente-Seite: links die Experimente nach Kategorie, daneben der Tab Diagramme eines Sweeps: die Kurven seiner sechs Läufe in gemeinsamen Diagrammen, jeder Lauf in seiner eigenen Farbe](images/experiments.webp)
 
 ## Experimente öffnen
 
-Klicke in der Werkzeugleiste auf **System** und dann auf den Tab **Experimente** oder öffne [Experimente](/system/experiments). Die Karte **Experimente** in der [Systemübersicht](/system) listet die aktiven Läufe auf. Ein Klick öffnet den jeweiligen Lauf.
+Klicke in der Werkzeugleiste auf **Experimente** oder öffne [Experimente](/experiments).
+
+Wenn du die Seite zum ersten Mal öffnest, führt dich ein kurzer Rundgang herum, der für Neulinge bei Experimenten geschrieben ist. Er kommt, solange Tipps eingeschaltet sind, nach der Willkommenstour. Eine Karte erklärt in einfachen Worten, was ein Experiment und ein Lauf sind, dann leuchtet jeder Teil der Seite der Reihe nach mit einer eigenen Karte auf: **Neuer Lauf**, die Warteschlange und die GPUs, deine Experimente nach Kategorie, einen Lauf live verfolgen, Läufe vergleichen und Ergebnistabellen sowie einen Agenten die Arbeit machen lassen. Mit **Weiter** und **Zurück** bewegst du dich durch den Rundgang; **Fertig** beendet ihn, und **Überspringen** oder Esc schließt ihn früher. **Rundgang zeigen** (die Kompass-Schaltfläche oben rechts auf der Seite) startet ihn jederzeit erneut.
 
 Auf einem Computer bleibt links eine Spalte neben allem stehen, was du hier öffnest:
 
@@ -72,7 +74,7 @@ Am Ende stehen **Tabelle erstellen** und **Die besten 6 vergleichen**.
 
 ## Einen Lauf starten
 
-1. Klicke oben rechts auf [**Neuer Lauf**](/system/experiments?new=1).
+1. Klicke oben rechts auf [**Neuer Lauf**](/experiments?new=1).
 2. Trage den **Befehl** so ein, wie du ihn in seinem Ordner ausführen würdest: `python train.py --lr 3e-4`.
 3. Wähle den **Ordner**, in dem er läuft, und den **Ausführungsort**: **Dieser Computer**, einen deiner anderen Computer oder einen Cluster (siehe [Ausführungsorte](#where-runs-go)).
 4. Lege fest, wie viele **GPUs** er braucht (0 führt ihn ohne GPU aus) und wie viel **Freier Speicher je GPU (GB)**. Ohne Angabe wartet er auf eine GPU, die niemand nutzt.
@@ -194,7 +196,7 @@ Für gepaarte Tests über Beispiele (Suchanfragen beim Retrieval, Sätze bei der
 
 ## Sweeps
 
-Ein Sweep ist ein Befehl mit einem Platzhalter für jeden Hyperparameter, der einmal für jede Kombination ihrer Werte ausgeführt wird. Klicke oben auf **Mehr** (⋯), dann auf [**Neuer Sweep**](/system/experiments?new=sweep) (oder auf **Neuer Sweep in diesem Experiment** im Menü eines Experiments oder auf **Ein Sweep** bei Neuer Lauf):
+Ein Sweep ist ein Befehl mit einem Platzhalter für jeden Hyperparameter, der einmal für jede Kombination ihrer Werte ausgeführt wird. Klicke oben auf **Mehr** (⋯), dann auf [**Neuer Sweep**](/experiments?new=sweep) (oder auf **Neuer Sweep in diesem Experiment** im Menü eines Experiments oder auf **Ein Sweep** bei Neuer Lauf):
 
 1. Gib den Befehl mit `{name}` an der Stelle ein, an die der Wert jedes Hyperparameters gehört: `python train.py --lr {lr} --batch {batch}`.
 2. Gib unter **Hyperparameter und ihre Werte** jedem Hyperparameter seine Werte: `lr` und `0.001, 0.0003, 0.0001`. **Hyperparameter hinzufügen** ergänzt einen weiteren.
@@ -206,7 +208,7 @@ Die Läufe des Sweeps sind ein Experiment wie jedes andere: Seine Tabelle der L�
 
 ## Ausführungsorte
 
-**Mehr** (⋯) oben → [**Ausführungsorte**](/system/experiments?places=1):
+**Mehr** (⋯) oben → [**Ausführungsorte**](/experiments?places=1):
 
 - **Dieser Computer**: seine GPUs und die Einstellung **Jobs ohne GPU: höchstens N gleichzeitig**.
 - **Andere Computer**: verbundene Computer aus [Einstellungen → Computer](/settings?s=machines). Ein dort gestarteter Lauf wird dort gespeichert und überwacht: Sein zuständiger Agent und seine Meldungen gehören diesem Computer (seine Meldungen kommen zu dir hierher, wie alle von diesem Computer), und diese Seite verfolgt ihn. Die Liste hier zeigt auch die Läufe jedes verbundenen Computers, markiert mit ihrem Ausführungsort; Öffnen liest sie dort, und Stoppen stoppt sie dort.
@@ -214,7 +216,7 @@ Die Läufe des Sweeps sind ein Experiment wie jedes andere: Seine Tabelle der L�
 
 ### Einen Cluster hinzufügen
 
-Klicke auf [**Cluster hinzufügen**](/system/experiments?cluster=new) und gib an:
+Klicke auf [**Cluster hinzufügen**](/experiments?cluster=new) und gib an:
 
 - **Name** und **SSH-Host**: so, wie du ihn hinter `ssh` eintippen würdest, ein Eintrag aus deiner `~/.ssh/config` oder `me@login.cluster.edu`. Der Server der App verbindet sich mit seinen eigenen SSH-Keys und fragt nie nach einem Passwort; dafür braucht er dort einen Key, der ohne Passwort funktioniert (`ssh-copy-id`), und der Host-Key des Clusters muss bekannt sein (verbinde dich einmal im Terminal mit `ssh`).
 - **SLURM** oder **Einfaches SSH**.

@@ -221,7 +221,8 @@ export function Home({
         </section>
       )}
 
-      <section>
+      {/* With a sidebar, the page's tour lights its list instead. */}
+      <section data-intro={narrow && cards.length ? 'exp-list' : undefined}>
         <h2 className="mb-2 text-[13px] font-semibold text-fg">Experiments</h2>
         {runs === null ? (
           <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]" aria-hidden>
@@ -241,7 +242,7 @@ export function Home({
       </section>
 
       {(runs === null || all.length > 0) && (
-        <section>
+        <section data-intro="exp-runs">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <h2 className="mr-auto text-[13px] font-semibold text-fg">Latest runs</h2>
             {allLatest && <input value={findRun} onChange={(e) => setFindRun(e.target.value)} placeholder="Find a run" aria-label="Find a run" spellCheck={false} className={cx(inputCls, 'h-8 w-52 text-[13px]')} />}
@@ -300,8 +301,10 @@ function metricPoints(r: RunRecord, s: Record<string, [number, number][]> | unde
 function Top({ runs, queue, q, onQ, onOpenRun }: { runs: RunRecord[]; queue: QueueNow | null; q: string; onQ: (q: string) => void; onOpenRun: (r: Pick<RunRecord, 'id' | 'machine'>) => void }) {
   return (
     <div className="mb-5 space-y-3">
-      <QueueLine runs={runs} />
-      {queue && queue.gpus.length > 0 && <GpuMeters gpus={queue.gpus} runs={runs} onOpen={(id) => onOpenRun({ id })} className="sm:grid-cols-4" />}
+      <div data-intro="exp-queue" className="space-y-3">
+        <QueueLine runs={runs} />
+        {queue && queue.gpus.length > 0 && <GpuMeters gpus={queue.gpus} runs={runs} onOpen={(id) => onOpenRun({ id })} className="sm:grid-cols-4" />}
+      </div>
       <FindBox value={q} onChange={onQ} />
     </div>
   );

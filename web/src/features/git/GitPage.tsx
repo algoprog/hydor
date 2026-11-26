@@ -12,10 +12,12 @@ import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { RefreshIcon } from '../../components/RefreshIcon';
 import { cx, Empty, IconButton, Popover, SheetsOnPhone, Throbber, useIsMobile } from '../../components/ui';
-import { SystemHeader } from '../system/SystemHeader';
+import { PageHeader } from '../layout/PageHeader';
+import { PageTour, TourButton } from '../tips/PageTour';
 import { AddRepo } from './AddRepo';
 import { repoUrl, useWidth } from './parts';
 import { RepoView } from './RepoView';
+import { GIT_TOUR } from './tour';
 
 /** What the list keeps of a repository (a detail has much more). */
 const summary = (r: GitRepo): GitRepo => ({
@@ -98,7 +100,7 @@ function RepoList({ repos, selected, onPick, limit, find }: { repos: GitRepo[]; 
   const found = text ? repos.filter((r) => r.name.toLowerCase().includes(text) || tildify(r.path, home).toLowerCase().includes(text)) : repos;
   const shown = limit && !text ? found.slice(0, limit) : found;
   return (
-    <div className="p-2">
+    <div data-intro="git-repos" className="p-2">
       {(find || repos.length > 6) && (
         <div className="relative mb-1.5">
           <Search size={14} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-3" />
@@ -183,15 +185,19 @@ export function GitPage({ selected }: { selected: string | null }) {
   };
   const actions = (
     <>
-      <AddRepo onAdded={onAdded} compact={mobile} />
+      <span data-intro="git-add" className="flex">
+        <AddRepo onAdded={onAdded} compact={mobile} />
+      </span>
       <IconButton label="Fetch every repository’s remote" onClick={fetchAll} disabled={!!busy}>
         {busy === 'fetch' ? <Throbber /> : <CloudDownload size={16} />}
       </IconButton>
       <IconButton label="Refresh" onClick={() => load(true)} disabled={!!busy}>
         <RefreshIcon size={15} busy={busy === 'refresh'} />
       </IconButton>
+      <TourButton id="git" />
     </>
   );
+  const tour = <PageTour id="git" steps={GIT_TOUR} ready={!!repos} />;
   const empty = (
     <Empty icon={<GitBranch size={20} />} title="No repositories yet">
       Repositories show up here once a session works in one. Or add one yourself:
@@ -201,7 +207,7 @@ export function GitPage({ selected }: { selected: string | null }) {
     </Empty>
   );
   const list = !repos ? (
-    <div className="flex justify-center py-16 text-fg-3">
+    <div data-intro-loading className="flex justify-center py-16 text-fg-3">
       <Throbber size={28} />
     </div>
   ) : !repos.length ? (
@@ -219,16 +225,17 @@ export function GitPage({ selected }: { selected: string | null }) {
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col">
-            <SystemHeader tab="git" actions={actions} />
+            <PageHeader title="Git" actions={actions} />
             <div className="min-h-0 flex-1 overflow-y-auto">{list}</div>
           </div>
         )}
+        {tour}
       </SheetsOnPhone.Provider>
     );
 
   const current = repos?.find((r) => r.path === selected);
   const title = fold ? (
-    <button ref={titleRef} type="button" onClick={() => setPicker((o) => !o)} className="-ml-1 flex max-w-full min-w-0 items-center gap-1 rounded-lg px-1 text-left hover:bg-bg-2" aria-label="Repositories">
+    <button ref={titleRef} data-intro="git-repos" type="button" onClick={() => setPicker((o) => !o)} className="-ml-1 flex max-w-full min-w-0 items-center gap-1 rounded-lg px-1 text-left hover:bg-bg-2" aria-label="Repositories">
       <span translate="no" className="truncate">
         {current?.name ?? 'Git'}
       </span>
@@ -239,8 +246,8 @@ export function GitPage({ selected }: { selected: string | null }) {
   );
   return (
     <div ref={page} className="flex h-full min-h-0 flex-col">
-      <SystemHeader
-        tab="git"
+      <PageHeader
+        title="Git"
         actions={
           fold ? (
             <>
@@ -275,6 +282,7 @@ export function GitPage({ selected }: { selected: string | null }) {
           <RepoList repos={repos} selected={selected} onPick={pick} limit={8} find />
         </Popover>
       )}
+      {tour}
     </div>
   );
 }

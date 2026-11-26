@@ -20,12 +20,15 @@ A barra de ícones é uma coluna de ícones; aponte para um deles, ou vá até e
 
 - **Sessões**: mostra suas sessões na barra lateral. Enquanto você está na página inicial ou em uma sessão, ela oculta ou mostra a barra lateral (o mesmo que Ctrl+B). Em qualquer outra página, ela mostra a barra lateral e leva você de volta à sessão que você abriu por último nesta janela, ou à página inicial quando não havia nenhuma. Enquanto a barra lateral está oculta, um pontinho nesse bloco indica que algo aconteceu em outra máquina (veja [Alternar entre máquinas](/guide/devices#switch-between-machines)).
 
-Depois, as seções do app (o app para computador tem quatro; o app web e o celular têm três, sem o **Navegador**):
+Depois, as seções do app (o app para computador tem sete; o app web e o celular têm seis, sem o **Navegador**):
 
 - **Navegador**: um navegador só seu, apenas no app para computador, com abas, abas privadas, uma barra de endereço inteligente, tradução de páginas, modo leitura, favoritos, histórico, um bloqueador de anúncios e extensões do Chrome, a partir do qual você pode passar uma página para um agente. Veja [Seu próprio navegador](/guide/web#your-own-browser).
-- **Apps**: tarefas que você executa várias vezes: preencha um formulário e um agente faz o trabalho. Veja [Apps](/guide/apps).
 - **Projetos**: cada projeto como um cartão, com o que ele guarda e quando trabalhou pela última vez; um clique em um cartão abre os detalhes do projeto. Veja [Encontre todos os seus projetos](/guide/projects#find-all-your-projects).
+- **Arquivos**: os arquivos deste computador, para navegar, abrir e editar. Veja [Abrir a página Arquivos](/guide/files-git#open-the-files-page).
 - **Agentes**: seus agentes, cada um com o que faz, onde e quando trabalha, com o que pensa e a quem pergunta, além dos que já vêm com o app. Veja [Agentes](/guide/agents).
+- **Apps**: tarefas que você executa várias vezes: preencha um formulário e um agente faz o trabalho. Veja [Apps](/guide/apps).
+- **Git**: seus repositórios, suas alterações, branches e histórico, com um tour curto na primeira vez que você abre a página. Veja [Ver seus repositórios na página Git](/guide/files-git#see-your-repositories-on-the-git-page).
+- **Experimentos**: tarefas de treinamento e avaliação que esperam uma GPU livre, executam sozinhas e ficam guardadas como registros, com um tour curto na primeira vez que você abre a página. Veja [Experimentos](/guide/experiments).
 
 Logo abaixo, sempre no mesmo lugar:
 
@@ -35,11 +38,11 @@ Logo abaixo, sempre no mesmo lugar:
 Depois, após um espaço, as ferramentas:
 
 - **Uso**: quanto dos limites de cada plano você usou e quando eles são renovados, com as abas **Atividade** e **Arena**; uma barra fina sob o ícone mostra quanto resta nas suas assinaturas pagas, ou nas gratuitas quando você não tem nenhuma paga, e fica vermelha quando não resta nada. Veja [Uso, limites e custos](/guide/usage).
-- **Sistema**: este computador, com uma aba para cada uma de suas ferramentas: **Visão geral** (como ele está e o que cada ferramenta guarda agora), **Arquivos** (navegar, abrir e editar arquivos), **Git** (seus repositórios, suas alterações, branches e histórico), **Terminal** (shells que continuam em execução quando você sai da página), **Prévia** (o servidor de desenvolvimento de um app web em execução aqui; apenas nas páginas desta própria máquina) e **Monitor** (processadores, placas de vídeo, memória, discos e os programas mais ativos, ao vivo). Veja [Sistema: arquivos, Git, Terminal e Prévia](/guide/files-git).
+- **Sistema**: este computador, com uma aba para cada uma de suas ferramentas: **Visão geral** (como ele está e o que as ferramentas dele guardam agora), **Terminal** (shells que continuam em execução quando você sai da página), **Prévia** (o servidor de desenvolvimento de um app web em execução aqui; apenas nas páginas desta própria máquina) e **Monitor** (processadores, placas de vídeo, memória, discos e os programas mais ativos, ao vivo). Veja [Arquivos, Git, Terminal e Prévia](/guide/files-git).
 - **Configurações**: tudo o que o app pode configurar. Um ponto nele indica que há uma versão mais nova. Veja [Todas as configurações](/guide/settings).
 - **Ajuda**: abre este guia, onde você também pode perguntar a um agente sobre o app. O tour de boas-vindas também começa por lá.
 
-As seções vêm na ordem Navegador, Projetos, Agentes, Apps, depois Caixa de entrada e Pesquisa, e as ferramentas abaixo delas na ordem Uso, Sistema, Configurações, Ajuda: essa é a ordem padrão. Para mudá-la, arraste um bloco para outro lugar dentro do seu próprio grupo (as seções, ou as ferramentas na parte de baixo); a Caixa de entrada e a Pesquisa ficam logo abaixo das seções. Um bloco que uma versão mais nova traz ocupa o lugar padrão dele na ordem que você definiu (Projetos logo antes de Agentes, por exemplo), e não o fim da lista. Os blocos mantêm a ordem que você definiu em todos os dispositivos, em qualquer máquina que você olhar. Depois de movê-los, clique com o botão direito em um bloco e escolha **Voltar à ordem padrão** para colocar todos de volta. Em uma janela baixa demais para todos os blocos, a barra de ícones rola.
+As seções vêm na ordem Navegador, Projetos, Arquivos, Agentes, Apps, Git, Experimentos, depois Caixa de entrada e Pesquisa, e as ferramentas abaixo delas na ordem Uso, Sistema, Configurações, Ajuda: essa é a ordem padrão. Para mudá-la, arraste um bloco para outro lugar dentro do seu próprio grupo (as seções, ou as ferramentas na parte de baixo); a Caixa de entrada e a Pesquisa ficam logo abaixo das seções. Um bloco que uma versão mais nova traz ocupa o lugar padrão dele na ordem que você definiu (Arquivos logo antes de Agentes, por exemplo), e não o fim da lista. Os blocos mantêm a ordem que você definiu em todos os dispositivos, em qualquer máquina que você olhar. Depois de movê-los, clique com o botão direito em um bloco e escolha **Voltar à ordem padrão** para colocar todos de volta. Em uma janela baixa demais para todos os blocos, a barra de ícones rola.
 
 A barra lateral com suas sessões aparece apenas na página inicial, em uma sessão e na revisão dela. **Apps**, **Agentes**, **Ajuda** e **Configurações** têm uma coluna do mesmo tipo, com o logotipo, a lista própria (os lugares da página Apps e da página Agentes, os tópicos do guia, as seções das Configurações) e **Ocultar barra lateral**; a página **Navegador** mostra suas abas em uma coluna própria, e as outras páginas (Projetos, Caixa de entrada, Uso, Sistema…) usam toda a largura. **Ctrl+B** oculta ou mostra a coluna da página em que você está, e todas as colunas têm a mesma largura. Uma coluna que guarda mais do que cabe mostra sua barra de rolagem, e o rodapé dela esmaece enquanto há mais conteúdo abaixo. Enquanto a página se reconecta ao app, um ícone de Wi-Fi riscado aparece ao lado do logotipo no alto da coluna, ou no alto da barra de ícones quando nenhuma coluna está visível (ela está oculta, ou a página não tem uma).
 
@@ -194,7 +197,7 @@ A caixa de pesquisa encontra qualquer coisa no app enquanto você digita, como o
 
 ### O que ela encontra
 
-- **Ir para**: as páginas do Hydor, como Nova sessão, Caixa de entrada, Arquivos, Buscar em arquivos, Git, Terminal, Apps, Novo app, Projetos, Conhecimento compartilhado, Publicados, Prévia, Uso e limites, Arena de modelos, Atividade, Sistema e Configurações.
+- **Ir para**: as páginas do Hydor, como Nova sessão, Caixa de entrada, Arquivos, Buscar em arquivos, Git, Experimentos, Terminal, Apps, Novo app, Projetos, Conhecimento compartilhado, Publicados, Prévia, Uso e limites, Arena de modelos, Atividade, Sistema e Configurações.
 - **Ações**: Fazer o tour, O que o Hydor pode fazer, Conversar com mãos livres, Notas de versão, Alternar entre claro e escuro, Mostrar ou ocultar a barra lateral, Agrupar sessões por pasta ou projeto, Mostrar ou ocultar o painel do terminal.
 - **Configurações**: todas as seções das Configurações e as opções nelas. Abrir uma abre a seção e aponta para a opção.
 - **Temas**: os temas internos e os seus. Abrir um muda para ele.

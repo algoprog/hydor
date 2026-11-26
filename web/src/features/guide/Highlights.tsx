@@ -110,7 +110,7 @@ const HIGHLIGHTS: Highlight[] = [
     name: 'Experiments',
     line: 'Training and evaluation runs that wait for a free GPU, with live charts, sweeps and results tables for your paper. Agents start and watch them for you.',
     topic: 'experiments',
-    open: { label: 'Open Experiments', path: '/system/experiments' },
+    open: { label: 'Open Experiments', path: '/experiments' },
     guide: '/guide/experiments#open-experiments',
   },
   {

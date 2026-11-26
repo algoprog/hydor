@@ -456,7 +456,7 @@ Um worktree é uma cópia separada dos arquivos de um repositório em um novo br
 
 A partir do branch de uma sessão, o menu da sessão (⋯) → **Pasta e código** → **Abrir um pull request** abre um pull request no GitHub ou no Gitea. **Escrever para mim** redige o título e a descrição a partir dos commits e do diff; uma caixa pode fazer o commit das alterações pendentes antes; **Rascunho** o marca como rascunho; o push do branch é feito quando você pressiona **Abrir pull request**. Você precisa de uma conta em [Configurações → Controle de versão](/settings?s=scm). **Vincular um pull request que já existe…** vincula um aberto em outro lugar.
 
-Depois de vinculado, o estado e as verificações dele aparecem como um selo na barra lateral e no cabeçalho, e são atualizados a cada poucos minutos, com um aviso quando ele é mesclado ou suas verificações terminam. O mesmo item de menu, agora **Pull request #12**, tem **Abrir no GitHub** (ou Gitea), **Revisar as alterações**, **Verificar agora** e **Desvincular**. **Revisar as alterações** no submenu percorre o que o branch altera, arquivo por arquivo. Veja [Sistema: arquivos, Git, Terminal e Preview](/guide/files-git).
+Depois de vinculado, o estado e as verificações dele aparecem como um selo na barra lateral e no cabeçalho, e são atualizados a cada poucos minutos, com um aviso quando ele é mesclado ou suas verificações terminam. O mesmo item de menu, agora **Pull request #12**, tem **Abrir no GitHub** (ou Gitea), **Revisar as alterações**, **Verificar agora** e **Desvincular**. **Revisar as alterações** no submenu percorre o que o branch altera, arquivo por arquivo. Veja [Arquivos, Git, Terminal e Prévia](/guide/files-git).
 
 ## Quando um limite de uso interrompe uma sessão
 

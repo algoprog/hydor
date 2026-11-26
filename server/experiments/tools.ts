@@ -129,7 +129,7 @@ function runTool(ctx: RunCtx): RunTool {
           const no = await mayRun(ctx, `Run “${prev.name ?? prev.id}” again`, [changes.command ?? prev.command, `# in ${changes.cwd ?? prev.cwd} · ${whereWords(db, prev)}`].join('\n'));
           if (no) return failed(no);
           const r = await runAgain(ctx.deps, prev.id, { ...changes, ...(onCall ? { onCall } : {}) }, startedBy(ctx));
-          return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), name: r.name, page: `/system/experiments/${r.id}` });
+          return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), name: r.name, page: `/experiments/${r.id}` });
         }
         const spec = await cleanJob(db, { ...a, ...(onCall ? { onCall } : {}) }, { cwd: ctx.cwd });
         const no = await mayRun(
@@ -139,7 +139,7 @@ function runTool(ctx: RunCtx): RunTool {
         );
         if (no) return failed(no);
         const r = await submit(ctx.deps, spec, { startedBy: startedBy(ctx) });
-        return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), name: r.name, page: `/system/experiments/${r.id}` });
+        return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), name: r.name, page: `/experiments/${r.id}` });
       } catch (e) {
         return failed(e);
       }
@@ -186,7 +186,7 @@ function sweepTool(ctx: RunCtx): RunTool {
         if (no) return failed(no);
         const onCall = a.onCall && typeof a.onCall === 'object' && !a.onCall.agent && !ctx.step ? { ...a.onCall, agent: agentOf(ctx) } : a.onCall;
         const s = await startSweep(ctx.deps, { ...a, ...(onCall ? { onCall } : {}) }, { cwd: ctx.cwd, startedBy: startedBy(ctx) });
-        return json({ sweep: s.sweep.id, group: s.sweep.group, runs: s.runs.map((r) => r.id), page: `/system/experiments?sweep=${s.sweep.id}` });
+        return json({ sweep: s.sweep.id, group: s.sweep.group, runs: s.runs.map((r) => r.id), page: `/experiments?sweep=${s.sweep.id}` });
       } catch (e) {
         return failed(e);
       }
@@ -312,7 +312,7 @@ const TABLE: RunTool = {
   async run(a, ctx) {
     try {
       const t = makeTable(ctx.deps, a);
-      return json({ ...t, page: `/system/experiments?table=${t.id}` });
+      return json({ ...t, page: `/experiments?table=${t.id}` });
     } catch (e) {
       return failed(e);
     }
@@ -352,4 +352,4 @@ export function experimentTools(ctx: RunCtx): RunTool[] {
 }
 
 export const SPAWN_NOTE =
-  'Experiments (System → Experiments in the app): long training or evaluation goes to experiment_run (many settings: experiment_sweep) instead of running in the foreground: it waits for free GPUs, runs on its own and is recorded. Read runs with experiment_list and experiment_get; make results tables (mean ± std over seeds, significance, LaTeX) with experiment_table. When you start the first runs of an experiment (its group), or what it tests changes, give it a title, a short description and a category with experiment_describe, so people see what it is and find it by searching. Never start runs on the user’s GPUs unless they asked you to.';
+  'Experiments (Experiments in the app’s sidebar): long training or evaluation goes to experiment_run (many settings: experiment_sweep) instead of running in the foreground: it waits for free GPUs, runs on its own and is recorded. Read runs with experiment_list and experiment_get; make results tables (mean ± std over seeds, significance, LaTeX) with experiment_table. When you start the first runs of an experiment (its group), or what it tests changes, give it a title, a short description and a category with experiment_describe, so people see what it is and find it by searching. Never start runs on the user’s GPUs unless they asked you to.';

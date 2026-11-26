@@ -147,7 +147,7 @@ Nomes de arquivos e caminhos em uma resposta são links. Um nome ou caminho em c
 
 ## Visualizar um documento no visualizador de arquivos
 
-O visualizador de arquivos mostra documentos a partir de um cartão, da página Arquivos ou de um link em uma resposta (veja [Sistema: arquivos, Git, Terminal e Visualização](/guide/files-git)).
+O visualizador de arquivos mostra documentos a partir de um cartão, da página Arquivos ou de um link em uma resposta (veja [Arquivos, Git, Terminal e Prévia](/guide/files-git)).
 
 - **PDFs** aparecem como são, na visualização de PDF do próprio navegador, com **Preencher e assinar** para preenchê-los e assiná-los ([Preencher e assinar um PDF](/guide/files-git#fill-in-and-sign-a-pdf)).
 - Arquivos do **PowerPoint** (.pptx, e suas variantes com macro, de apresentação e de modelo) abrem em **Slides**: “Os slides, como o app os desenha”. Cada slide aparece como ele é, como aparece uma apresentação mantida (com imagens, formas, tabelas, gráficos, plano de fundo e rodapé no lugar), um abaixo do outro, com o número e as notas do apresentador, também no celular. Uma fonte que a apresentação usa e que este computador não tem é substituída por outra; quando a substituta precisa de mais espaço, o texto de uma caixa é reduzido um pouco para caber, de modo que nada fique cortado. **Texto** (“As palavras e as notas do apresentador”) mostra o texto dos slides, e **Páginas** os mostra diagramados pelo LibreOffice, quando ele está instalado. Se não for possível desenhar os slides, o visualizador abre em **Texto** e diz o motivo.

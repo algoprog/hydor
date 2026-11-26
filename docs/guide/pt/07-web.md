@@ -237,7 +237,7 @@ Você pode abrir o navegador de uma sessão antes do agente, por exemplo, para e
 
 Os arquivos que uma página baixa são salvos na pasta da sessão, em uma pasta chamada downloads, e o agente é informado de onde eles foram parar. O menu do navegador lista os mais recentes em **Salvo na pasta da sessão**.
 
-Um agente só pode anexar arquivos ao campo de upload de uma página a partir da pasta da sessão. Para que ele envie outro arquivo, copie esse arquivo para essa pasta primeiro (veja [Sistema: arquivos, Git, Terminal e Preview](/guide/files-git)).
+Um agente só pode anexar arquivos ao campo de upload de uma página a partir da pasta da sessão. Para que ele envie outro arquivo, copie esse arquivo para essa pasta primeiro (veja [Arquivos, Git, Terminal e Prévia](/guide/files-git)).
 
 ## Quando o navegador fecha
 

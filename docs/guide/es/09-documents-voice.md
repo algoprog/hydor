@@ -147,7 +147,7 @@ Los nombres y rutas de archivo en una respuesta son enlaces. Un nombre o ruta en
 
 ## Ver una vista previa de un documento en el visor de archivos
 
-El visor de archivos muestra documentos desde una tarjeta, desde la página Archivos o desde un enlace en una respuesta (consulta [Sistema: archivos, Git, Terminal y vista previa](/guide/files-git)).
+El visor de archivos muestra documentos desde una tarjeta, desde la página Archivos o desde un enlace en una respuesta (consulta [Archivos, Git, Terminal y Vista previa](/guide/files-git)).
 
 - Los **PDF** se muestran tal cual, en el visor de PDF del propio navegador, con **Rellenar y firmar** para rellenarlos y firmarlos ([Rellenar y firmar un PDF](/guide/files-git#fill-in-and-sign-a-pdf)).
 - Los archivos de **PowerPoint** (.pptx, y sus variantes con macros, de presentación y de plantilla) se abren en **Diapositivas**: “Sus diapositivas, tal como las dibuja la app”. Cada diapositiva se muestra tal como se ve, igual que una presentación conservada (con sus imágenes, formas, tablas, gráficos, fondo y pie de página en su sitio), una debajo de otra con su número y sus notas del orador, también en un teléfono. Si la presentación usa una fuente que esta computadora no tiene, se sustituye por otra; cuando esa necesita más espacio, el texto de un cuadro se reduce un poco para que quepa y no se corte nada. **Texto** (“Sus palabras y notas del orador”) muestra las palabras de las diapositivas, y **Páginas** las muestra maquetadas por LibreOffice cuando está instalado. Si no se pueden dibujar las diapositivas, el visor se abre en **Texto** y explica el motivo.

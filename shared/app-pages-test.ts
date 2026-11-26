@@ -42,6 +42,8 @@ const pages = [
   '/browser',
   '/system',
   '/system/monitor',
+  '/experiments',
+  '/experiments/abcd12',
   '/system/experiments/abcd12',
   '/files',
   '/file?path=%2Fhome%2Fyou%2Fa.md',

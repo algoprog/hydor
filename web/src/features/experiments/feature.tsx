@@ -1,4 +1,5 @@
-// Experiments in the app: its page under System (/system/experiments, a run at /system/experiments/<id>), and its
+// Experiments in the app: its page, a section of its own on the rail (/experiments, a run at /experiments/<id>; under
+// System, /system/experiments, until November 2026, whose addresses still land there), and its
 // tools in a conversation: a run or a sweep an agent started shows as a card that follows how it goes, a results
 // table as the table itself with Copy LaTeX; reading runs shows as steps of the agent's work.
 import { useEffect, useState } from 'react';
@@ -94,7 +95,7 @@ function SweepCard({ item, sessionKey }: { item: ToolItem; sessionKey: string })
             {out.group}
           </span>
         </span>
-        <Button size="sm" variant="ghost" className="-my-1 -mr-1.5" onClick={() => go(`/system/experiments?sweep=${out.sweep}`)}>
+        <Button size="sm" variant="ghost" className="-my-1 -mr-1.5" onClick={() => go(`/experiments?sweep=${out.sweep}`)}>
           Open
         </Button>
       </div>
@@ -115,7 +116,7 @@ function TableCard({ item, sessionKey }: { item: ToolItem; sessionKey: string })
         <Button size="sm" variant="ghost" className="-my-1" onClick={async () => toast((await copy(t.latex)) ? 'Copied the LaTeX' : 'Could not copy')}>
           Copy LaTeX
         </Button>
-        <Button size="sm" variant="ghost" className="-my-1 -mr-1.5" onClick={() => go(`/system/experiments?table=${t.id}`)}>
+        <Button size="sm" variant="ghost" className="-my-1 -mr-1.5" onClick={() => go(`/experiments?table=${t.id}`)}>
           Open
         </Button>
       </div>
@@ -128,7 +129,8 @@ function TableCard({ item, sessionKey }: { item: ToolItem; sessionKey: string })
 
 export const experimentsFeature: WebFeature = {
   id: 'experiments',
-  routes: [{ match: (p) => p === '/system/experiments' || p.startsWith('/system/experiments/'), Page: ExperimentsPage }],
+  nav: [{ id: 'experiments', path: '/experiments', label: 'Experiments', icon: <FlaskConical size={17} />, match: (p) => p === '/experiments' || p.startsWith('/experiments/') }],
+  routes: [{ match: (p) => p === '/experiments' || p.startsWith('/experiments/'), Page: ExperimentsPage }],
   toolViews: {
     experiment_run: { place: 'answer', Row: RunCard, step: (t) => ({ verb: going(t) ? 'Starting' : 'Started', title: arg(t, 'name') ?? arg(t, 'command') ?? 'a run' }) },
     experiment_sweep: { place: 'answer', Row: SweepCard, step: (t) => ({ verb: going(t) ? 'Starting' : 'Started', title: `a sweep${arg(t, 'group') ? `: ${arg(t, 'group')}` : ''}` }) },

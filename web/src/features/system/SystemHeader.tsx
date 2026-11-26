@@ -1,39 +1,29 @@
-// The System section: this computer's files, its Git repositories, terminals, the web apps running on it
-// (Preview), how it is doing (Monitor) and the jobs it runs for you (Experiments), under one tool in the sidebar. Each
-// page keeps its own address (/files, /git, /terminal, /preview, /system/monitor, /system/experiments); this is the
-// header they share, with a tab each. What the agents' plans have left (Usage) has a tool of its own since 0.82.0.
+// The System section: this computer's terminals, the web apps running on it (Preview) and how it is doing (Monitor),
+// under one tool in the sidebar. Each page keeps its own address (/terminal, /preview, /system/monitor); this is the
+// header they share, with a tab each. What the agents' plans have left (Usage) has a tool of its own since 0.82.0;
+// Files, Git and Experiments, tabs of System before, are sections of their own on the rail (shared/sidebar.ts).
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, ChevronDown, FlaskConical, FolderTree, GitBranch, LayoutDashboard, MonitorSmartphone, SquareTerminal } from 'lucide-react';
+import { Activity, ChevronDown, LayoutDashboard, MonitorSmartphone, SquareTerminal } from 'lucide-react';
 import type { TipId } from '@shared/tips';
 import { machineId } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { cx, Popover, SheetsOnPhone, useIsMobile } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 
-export type SystemTab = 'overview' | 'files' | 'git' | 'terminal' | 'preview' | 'monitor' | 'experiments';
+export type SystemTab = 'overview' | 'terminal' | 'preview' | 'monitor';
 
-/** The page each tab opens; Files opens where you left it. */
-let filesAt = '/files';
-export const rememberFilesPlace = (p: string) => {
-  filesAt = p;
-};
-const PATHS: Record<SystemTab, () => string> = {
-  overview: () => '/system',
-  files: () => filesAt,
-  git: () => '/git',
-  terminal: () => '/terminal',
-  preview: () => '/preview',
-  monitor: () => '/system/monitor',
-  experiments: () => '/system/experiments',
+/** The page each tab opens. */
+const PATHS: Record<SystemTab, string> = {
+  overview: '/system',
+  terminal: '/terminal',
+  preview: '/preview',
+  monitor: '/system/monitor',
 };
 
 /** Which tab an address belongs to, or null when it is not one of System's. */
 export function systemTabOf(loc: string): SystemTab | null {
   if (loc === '/system') return 'overview';
   if (loc === '/system/monitor') return 'monitor';
-  if (loc === '/system/experiments' || loc.startsWith('/system/experiments/')) return 'experiments';
-  if (loc === '/files' || loc === '/file' || loc === '/search') return 'files';
-  if (loc === '/git') return 'git';
   if (loc === '/terminal') return 'terminal';
   if (loc === '/preview') return 'preview';
   return null;
@@ -41,18 +31,15 @@ export function systemTabOf(loc: string): SystemTab | null {
 
 const TABS: { id: SystemTab; label: string; icon: ReactNode; tip?: TipId }[] = [
   { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={14} /> },
-  { id: 'files', label: 'Files', icon: <FolderTree size={14} />, tip: 'files' },
-  { id: 'git', label: 'Git', icon: <GitBranch size={14} />, tip: 'git' },
   { id: 'terminal', label: 'Terminal', icon: <SquareTerminal size={14} />, tip: 'terminal' },
   // Dev-server previews open on this server's own preview port: its own machine only.
   ...(machineId ? [] : [{ id: 'preview' as const, label: 'Preview', icon: <MonitorSmartphone size={14} />, tip: 'preview' as const }]),
   { id: 'monitor', label: 'Monitor', icon: <Activity size={14} /> },
-  { id: 'experiments', label: 'Experiments', icon: <FlaskConical size={14} />, tip: 'experiments' },
 ];
 
 /**
  * On a phone, the title names the tab you are on and opens all of System's tools in a sheet, a grid of four
- * across (as the drawer's tools): seven tabs never fit across a phone, and those scrolled off its edge were lost.
+ * across (as the drawer's tools): the tabs do not fit across a phone beside the page's own buttons.
  */
 function PhoneSwitcher({ tab }: { tab: SystemTab }) {
   const [open, setOpen] = useState(false);
@@ -78,7 +65,7 @@ function PhoneSwitcher({ tab }: { tab: SystemTab }) {
                   aria-current={on ? 'page' : undefined}
                   onClick={() => {
                     setOpen(false);
-                    if (!on) go(PATHS[t.id]());
+                    if (!on) go(PATHS[t.id]);
                   }}
                   className={cx('flex min-h-[68px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl px-1 text-[12px] transition-colors', on ? 'bg-bg-2 font-semibold text-fg' : 'text-fg-2 active:bg-bg-2')}
                 >
@@ -115,7 +102,7 @@ export function SystemHeader({ tab, actions, sub }: { tab: SystemTab; actions?: 
               role="tab"
               aria-selected={on}
               data-tip={t.tip}
-              onClick={() => !on && go(PATHS[t.id]())}
+              onClick={() => !on && go(PATHS[t.id])}
               className={cx('relative flex h-9 shrink-0 items-center gap-1.5 px-2.5 text-[13.5px] font-medium transition-colors', on ? 'text-fg' : 'text-fg-3 hover:text-fg-2')}
             >
               <span className={on ? 'text-fg' : 'text-fg-3'}>{t.icon}</span>

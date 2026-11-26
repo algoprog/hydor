@@ -37,7 +37,7 @@ Fermez-la avec ✕, avec Échap, ou en cliquant sur la page assombrie à l’ext
 
 ## Retrouver tous vos projets
 
-**Projets** dans la barre d’icônes (juste avant **Agents** ; sur un téléphone, dans la grille d’outils du tiroir de la barre latérale) ouvre la page Projets, ou rendez-vous sur [/projects](/projects). Elle liste chaque projet sous forme de carte, sur toute la largeur de la page, sans colonne à côté de la barre d’icônes. Le titre indique combien il y en a.
+**Projets** dans la barre d’icônes (juste avant **Fichiers** ; sur un téléphone, dans la grille d’outils du tiroir de la barre latérale) ouvre la page Projets, ou rendez-vous sur [/projects](/projects). Elle liste chaque projet sous forme de carte, sur toute la largeur de la page, sans colonne à côté de la barre d’icônes. Le titre indique combien il y en a.
 
 - **Nouveau projet** en crée un (voir [Créer un projet](#make-a-project)). Son ▾ propose **Nouveau projet** et **Nouveau groupe de projets…**, qui demande deux projets à réunir (voir [Créer un groupe](#make-a-group)).
 - **Rechercher un projet** filtre les cartes au fil de la saisie, par nom, description et dossier.

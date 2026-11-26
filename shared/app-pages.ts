@@ -10,7 +10,7 @@
  */
 const PAGES: RegExp[] = [
   /^\/$/,
-  /^\/(?:file|files|search|git|terminal|preview|system|system\/monitor|system\/experiments|inbox|usage|stats|arena|settings|customize|projects|spaces|apps|agents|knowledge|library|pages|published|guide|answers|browser)$/,
+  /^\/(?:file|files|search|git|terminal|preview|system|system\/monitor|system\/experiments|experiments|inbox|usage|stats|arena|settings|customize|projects|spaces|apps|agents|knowledge|library|pages|published|guide|answers|browser)$/,
   /^\/(?:s|review)\/[^/]+$/,
   /^\/guide\/[a-z0-9-]+$/,
   /^\/(?:projects|spaces)\/[a-z0-9]+(?:\/(?:library|files|memory|knowledge|wiki|skills|agents|settings))?$/,
@@ -21,7 +21,7 @@ const PAGES: RegExp[] = [
   /^\/media\/[a-f0-9]{10}$/,
   /^\/remote\/[\w-]{8,40}\/?$/,
   /^\/arena\/[a-z0-9]+$/,
-  /^\/system\/experiments\/[a-z0-9]{4,32}$/,
+  /^\/(?:system\/)?experiments\/[a-z0-9]{4,32}$/,
 ];
 
 /** Whether a path (`/settings`, `/guide/projects`: no query or #) is one of the app's pages. */

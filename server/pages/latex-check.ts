@@ -1257,7 +1257,7 @@ async function checkNumbers(c: Ctx, input: CheckInput) {
       group: 'numbers',
       level: 'info',
       title: `Experiments has no finished runs for ${where === 'all of Experiments' ? 'you yet' : where}`,
-      detail: 'So the tables’ numbers were not traced to runs. Runs started with Experiments (System → Experiments, or experiment_run) are traced from then on.',
+      detail: 'So the tables’ numbers were not traced to runs. Runs started with Experiments (its page in the sidebar, or experiment_run) are traced from then on.',
       ...place(c.doc, withNums[0].s.name, withNums[0].t.from, withNums[0].t.from + 20),
     });
     return;

@@ -147,7 +147,7 @@ File names and paths in a reply are links. A name or path in code (`report.tex`,
 
 ## Preview a document in the file viewer
 
-The file viewer shows documents from a card, from the Files page, or from a link in a reply (see [System: files, Git, Terminal and Preview](/guide/files-git)).
+The file viewer shows documents from a card, from the Files page, or from a link in a reply (see [Files, Git, Terminal and Preview](/guide/files-git)).
 
 - **PDFs** show as they are, in the browser's own PDF view, with **Fill & sign** to fill them in and sign them ([Fill in and sign a PDF](/guide/files-git#fill-in-and-sign-a-pdf)).
 - **PowerPoint** files (.pptx, and its macro, slide-show and template kinds) open on **Slides**: "Its slides, as the app draws them". Each slide shows as it looks, as a kept deck shows (its pictures, shapes, tables, charts, background and footer in place), one under the other with its number and its speaker notes, on a phone too. A font the deck uses that this computer lacks is stood in for by another; where that one needs more room, a box's words are made a little smaller to fit, so none are cut off. **Text** ("Its words and speaker notes") shows the slides' words, and **Pages** shows them laid out by LibreOffice when it is installed. If the slides can't be drawn, the viewer opens on **Text** and says why.

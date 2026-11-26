@@ -37,7 +37,7 @@ Feche-a com ✕, com Esc ou com um clique na página escurecida fora dela. Ir pa
 
 ## Encontre todos os seus projetos
 
-**Projetos** na barra de ícones (logo antes de **Agentes**; no celular, na grade de ferramentas da gaveta da barra lateral) abre a página Projetos, ou vá a [/projects](/projects). Ela lista cada projeto como um cartão, na largura toda da página, sem coluna ao lado da barra de ícones. O título mostra quantos há.
+**Projetos** na barra de ícones (logo antes de **Arquivos**; no celular, na grade de ferramentas da gaveta da barra lateral) abre a página Projetos, ou vá a [/projects](/projects). Ela lista cada projeto como um cartão, na largura toda da página, sem coluna ao lado da barra de ícones. O título mostra quantos há.
 
 - **Novo projeto** cria um (veja [Crie um projeto](#make-a-project)). O ▾ dele tem **Novo projeto** e **Novo grupo de projetos…**, que precisa de dois projetos para reunir (veja [Crie um grupo](#make-a-group)).
 - **Encontrar um projeto** filtra os cartões enquanto você digita, por nome, descrição e pasta.

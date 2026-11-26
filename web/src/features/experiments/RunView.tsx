@@ -1,4 +1,4 @@
-// A run's page (/system/experiments/<id>): a way back to its experiment, its name, Stop, Run again and a menu; its status
+// A run's page (/experiments/<id>): a way back to its experiment, its name, Stop, Run again and a menu; its status
 // and why, and how far it is while it runs; then three tabs. Overview: how a failed run ended, its key metrics as tiles
 // (a tap opens that curve on the Charts tab), its hyperparameters, the numbers it printed once, and what it ran from
 // (details, code, command, environment) and what happened. Charts: every metric that is a curve over steps. Log: the
@@ -568,7 +568,7 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                 )}
                 {r.from && (
                   <Row label="Again of">
-                    <button type="button" onClick={() => go(`/system/experiments/${r.from}`)} className={cx(linkCls, 'font-mono text-[12px]')}>
+                    <button type="button" onClick={() => go(`/experiments/${r.from}`)} className={cx(linkCls, 'font-mono text-[12px]')}>
                       <span translate="no">{r.from}</span>
                     </button>
                   </Row>

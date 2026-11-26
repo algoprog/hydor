@@ -6,7 +6,7 @@ Los agentes trabajan por su cuenta, pero de vez en cuando te necesitan: una apro
 
 ## Abrir la bandeja de entrada
 
-La bandeja de entrada es el icono **Bandeja de entrada** de la barra de iconos, con el icono de bandeja, justo debajo de **Apps** y con **Búsqueda** debajo de ella (se quedan ahí cuando arrastras los demás iconos). Un número en su esquina indica cuántas cosas esperan tu respuesta. En un teléfono, abre primero la barra lateral con **Menú** (≡): el botón está en la parte superior del panel. También puedes escribir "bandeja de entrada" en el cuadro de búsqueda (Ctrl+K, ⌘K en una Mac). [Abrir la bandeja de entrada](/inbox).
+La bandeja de entrada es el icono **Bandeja de entrada** de la barra de iconos, con el icono de bandeja, justo debajo de **Experimentos** y con **Búsqueda** debajo de ella (se quedan ahí cuando arrastras los demás iconos). Un número en su esquina indica cuántas cosas esperan tu respuesta. En un teléfono, abre primero la barra lateral con **Menú** (≡): el botón está en la parte superior del panel. También puedes escribir "bandeja de entrada" en el cuadro de búsqueda (Ctrl+K, ⌘K en una Mac). [Abrir la bandeja de entrada](/inbox).
 
 Su encabezado indica cuántas cosas esperan tu respuesta ("3 esperan tu respuesta"). Las más recientes están arriba. La lista se actualiza sola cuando las sesiones empiezan o dejan de esperar, y se vuelve a comprobar cada pocos segundos mientras la miras.
 

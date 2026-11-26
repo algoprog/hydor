@@ -37,7 +37,7 @@ Close it with ✕, with Esc, or with a click on the dimmed page outside it. Goin
 
 ## Find all your projects
 
-**Projects** on the rail (right before **Agents**; on a phone, in the grid of tools in the sidebar drawer) opens the Projects page, or go to [/projects](/projects). It lists every project as a card, on the whole width of the page, with no column beside the rail. The title shows how many there are.
+**Projects** on the rail (right before **Files**; on a phone, in the grid of tools in the sidebar drawer) opens the Projects page, or go to [/projects](/projects). It lists every project as a card, on the whole width of the page, with no column beside the rail. The title shows how many there are.
 
 - **New project** makes one (see [Make a project](#make-a-project)). Its ▾ has **New project** and **New group of projects…**, which needs two projects to bring together (see [Make a group](#make-a-group)).
 - **Find a project** filters the cards as you type, by name, description and folder.

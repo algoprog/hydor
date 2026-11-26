@@ -6,7 +6,7 @@ Les agents travaillent seuls, mais ils ont parfois besoin de vous : une approbat
 
 ## Ouvrir la Boîte de réception
 
-La Boîte de réception est la tuile **Boîte de réception** de la barre d’icônes, avec l’icône de bac, juste sous **Apps** et au-dessus de **Recherche** (ces tuiles restent à leur place quand vous déplacez les autres). Un nombre sur son coin indique combien d’éléments attendent votre réponse. Sur un téléphone, ouvrez d’abord la barre latérale avec **Menu** (≡) : le bouton se trouve en haut du panneau. Vous pouvez aussi saisir « boîte de réception » dans le champ de recherche (Ctrl+K, ⌘K sur un Mac). [Ouvrir la Boîte de réception](/inbox).
+La Boîte de réception est la tuile **Boîte de réception** de la barre d’icônes, avec l’icône de bac, juste sous **Expériences** et au-dessus de **Recherche** (ces tuiles restent à leur place quand vous déplacez les autres). Un nombre sur son coin indique combien d’éléments attendent votre réponse. Sur un téléphone, ouvrez d’abord la barre latérale avec **Menu** (≡) : le bouton se trouve en haut du panneau. Vous pouvez aussi saisir « boîte de réception » dans le champ de recherche (Ctrl+K, ⌘K sur un Mac). [Ouvrir la Boîte de réception](/inbox).
 
 Son en-tête indique combien d’éléments attendent votre réponse (« 3 en attente de votre réponse »). Les plus récents sont en haut. La liste se met à jour toute seule quand des sessions commencent ou cessent d’attendre, et elle se rafraîchit toutes les quelques secondes pendant que vous la regardez.
 

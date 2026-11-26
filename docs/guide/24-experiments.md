@@ -2,11 +2,13 @@
 
 Experiments runs your training and evaluation jobs for you. A job waits for a GPU with enough free memory on one of your machines (or takes its turn in a cluster's queue), runs on its own, and is kept as a record: its code, hyperparameters, environment, log and metrics, and what the agent on call did when something went wrong. Each experiment (the runs you compare together) has a title, a description and a category, and its page shows the runs as a table, their metrics as charts and which hyperparameters matter. Compare runs, or make a results table with significance tests for your paper. Agents use it too: ask any agent to train something on a free GPU, and it starts a run here.
 
-![System → Experiments: experiments by category at the left, and a sweep's Charts tab: its six runs' curves on shared charts, each run in its own colour](images/experiments.webp)
+![The Experiments page: experiments by category at the left, and a sweep's Charts tab: its six runs' curves on shared charts, each run in its own colour](images/experiments.webp)
 
 ## Open Experiments
 
-Click **System** on the rail, then the **Experiments** tab, or go to [Experiments](/system/experiments). The **Experiments** card on [System's overview](/system) lists the runs going now; click one to open it.
+Click **Experiments** on the rail, or go to [Experiments](/experiments).
+
+The first time you open the page, a short tour written for people new to experiments shows you around. It comes while tips are on, after the welcome tour. A card in plain words says what an experiment and a run are, then each part of the page lights up in turn with a card of its own: **New run**, the queue and GPUs, your experiments by category, following a run live, comparing runs and results tables, and letting an agent do the work. Move with **Next** and **Back**; **Done** ends it, and **Skip** or Esc closes it sooner. **Show me around** (the compass button at the top right of the page) starts it again any time.
 
 On a computer, a column at the left stays beside everything you open here:
 
@@ -72,7 +74,7 @@ At the end, **Make a table** and **Compare the best 6**.
 
 ## Start a run
 
-1. Click [**New run**](/system/experiments?new=1) at the top right.
+1. Click [**New run**](/experiments?new=1) at the top right.
 2. Type the **Command**, as you would in its folder: `python train.py --lr 3e-4`.
 3. Pick the **Folder** it runs in, and **Where it runs**: **This computer**, one of your other machines, or a cluster (see [Where runs go](#where-runs-go)).
 4. Set the **GPUs** it needs (0 runs it without one) and **Free memory each (GB)**. Left empty, it waits for a GPU nobody uses.
@@ -194,7 +196,7 @@ For paired tests over examples (queries in retrieval, sentences in translation),
 
 ## Sweeps
 
-A sweep is one command with a placeholder for each hyperparameter, run once for each combination of their values. Click **More** (⋯) at the top, then [**New sweep**](/system/experiments?new=sweep) (or **New sweep in this experiment** in an experiment's menu, or **A sweep** in New run):
+A sweep is one command with a placeholder for each hyperparameter, run once for each combination of their values. Click **More** (⋯) at the top, then [**New sweep**](/experiments?new=sweep) (or **New sweep in this experiment** in an experiment's menu, or **A sweep** in New run):
 
 1. Type the command with `{name}` where each hyperparameter's value goes: `python train.py --lr {lr} --batch {batch}`.
 2. Under **Hyperparameters and their values**, give each hyperparameter its values: `lr` and `0.001, 0.0003, 0.0001`. **Add a hyperparameter** for another.
@@ -206,7 +208,7 @@ The sweep's runs are one experiment like any other: its runs table has a column 
 
 ## Where runs go
 
-**More** (⋯) at the top → [**Where runs go**](/system/experiments?places=1):
+**More** (⋯) at the top → [**Where runs go**](/experiments?places=1):
 
 - **This computer**: its GPUs, and **Jobs without a GPU: at most N at once**.
 - **Other machines**: those in [Settings → Machines](/settings?s=machines) that are connected. A run sent to one is kept and watched there: its agent on call and its notices are that machine's (its notices come to you here, as all of that machine's do), and this page follows it. The list here shows every connected machine's runs too, marked with where they run; opening one reads it there, and Stop stops it there.
@@ -214,7 +216,7 @@ The sweep's runs are one experiment like any other: its runs table has a column 
 
 ### Add a cluster
 
-Click [**Add a cluster**](/system/experiments?cluster=new) and give:
+Click [**Add a cluster**](/experiments?cluster=new) and give:
 
 - **Name**, and **SSH host**: as you would type it after `ssh`, an entry of your `~/.ssh/config` or `me@login.cluster.edu`. The app's server connects with its own SSH keys and never asks for a password, so it needs a key there that works without one (`ssh-copy-id`), and the cluster's host key known (connect once with `ssh` from a terminal).
 - **SLURM** or **Plain SSH**.

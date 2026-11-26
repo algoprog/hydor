@@ -147,7 +147,7 @@ Dateinamen und Pfade in einer Antwort sind Links. Ein Name oder Pfad in Code (`r
 
 ## Ein Dokument im Dateibetrachter ansehen
 
-Der Dateibetrachter zeigt Dokumente von einer Karte, von der Seite „Dateien“ oder von einem Link in einer Antwort (siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git)).
+Der Dateibetrachter zeigt Dokumente von einer Karte, von der Seite „Dateien“ oder von einem Link in einer Antwort (siehe [Dateien, Git, Terminal und Vorschau](/guide/files-git)).
 
 - **PDFs** werden unverändert angezeigt, in der PDF-Ansicht des Browsers, mit **Ausfüllen und unterschreiben**, um sie auszufüllen und zu unterschreiben ([Ein PDF ausfüllen und unterschreiben](/guide/files-git#fill-in-and-sign-a-pdf)).
 - **PowerPoint**-Dateien (.pptx sowie die Varianten mit Makros, als Bildschirmpräsentation und als Vorlage) öffnen sich auf **Folien**: „Die Folien, wie die App sie zeichnet“. Jede Folie wird so angezeigt, wie sie aussieht, wie bei einer behaltenen Präsentation (mit Bildern, Formen, Tabellen, Diagrammen, Hintergrund und Fußzeile an ihrem Platz), untereinander, mit Nummer und Sprechernotizen, auch auf dem Smartphone. Eine Schriftart, die die Präsentation verwendet und die diesem Computer fehlt, wird durch eine andere ersetzt; braucht diese mehr Platz, wird der Text in einem Feld etwas kleiner gemacht, damit nichts abgeschnitten wird. **Text** („Die Wörter und Sprechernotizen“) zeigt den Text der Folien, und **Seiten** zeigt sie so, wie LibreOffice sie setzt, wenn es installiert ist. Können die Folien nicht gezeichnet werden, öffnet der Betrachter **Text** und nennt den Grund.

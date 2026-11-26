@@ -2,11 +2,13 @@
 
 Expériences exécute pour vous vos tâches d’entraînement et d’évaluation. Une tâche attend un GPU avec assez de mémoire libre sur l’une de vos machines (ou attend son tour dans la file d’un cluster), s’exécute toute seule et est conservée comme un enregistrement : son code, ses hyperparamètres, son environnement, son journal et ses métriques, ainsi que ce que l’agent d’astreinte a fait quand quelque chose s’est mal passé. Chaque expérience (les exécutions que vous comparez ensemble) a un titre, une description et une catégorie, et sa page présente les exécutions sous forme de tableau, leurs métriques sous forme de graphiques et les hyperparamètres qui comptent. Comparez des exécutions, ou créez un tableau de résultats avec des tests de significativité pour votre article. Les agents l’utilisent aussi : demandez à n’importe quel agent d’entraîner quelque chose sur un GPU libre, et il démarre une exécution ici.
 
-![Système → Expériences : les expériences par catégorie à gauche, et l’onglet Graphiques d’un balayage : les courbes de ses six exécutions sur des graphiques partagés, chaque exécution dans sa propre couleur](images/experiments.webp)
+![La page Expériences : les expériences par catégorie à gauche, et l’onglet Graphiques d’un balayage : les courbes de ses six exécutions sur des graphiques partagés, chaque exécution dans sa propre couleur](images/experiments.webp)
 
 ## Ouvrir Expériences
 
-Cliquez sur **Système** dans la barre d’icônes, puis sur l’onglet **Expériences**, ou allez à [Expériences](/system/experiments). La carte **Expériences** de la [vue d’ensemble de Système](/system) liste les exécutions en cours ; cliquez sur l’une d’elles pour l’ouvrir.
+Cliquez sur **Expériences** dans la barre d’icônes, ou allez à [Expériences](/experiments).
+
+La première fois que vous ouvrez la page, une courte visite conçue pour les personnes qui découvrent les expériences vous la fait découvrir. Elle apparaît tant que les astuces sont activées, après la visite de bienvenue. Une carte explique en mots simples ce que sont une expérience et une exécution, puis chaque partie de la page s’éclaire à son tour avec sa propre carte : **Nouvelle exécution**, la file d’attente et les GPU, vos expériences par catégorie, le suivi d’une exécution en direct, la comparaison d’exécutions et les tableaux de résultats, et le fait de laisser un agent faire le travail. Avancez et revenez avec **Suivant** et **Retour** ; **Terminé** y met fin, et **Passer** ou Esc la ferme plus tôt. **Faire la visite** (le bouton boussole en haut à droite de la page) la relance à tout moment.
 
 Sur un ordinateur, une colonne à gauche reste à côté de tout ce que vous ouvrez ici :
 
@@ -72,7 +74,7 @@ L’onglet **Hyperparamètres** montre comment les hyperparamètres des exécuti
 
 ## Démarrer une exécution
 
-1. Cliquez sur [**Nouvelle exécution**](/system/experiments?new=1) en haut à droite.
+1. Cliquez sur [**Nouvelle exécution**](/experiments?new=1) en haut à droite.
 2. Saisissez la **Commande**, comme vous le feriez dans son dossier : `python train.py --lr 3e-4`.
 3. Choisissez le **Dossier** dans lequel elle s’exécute, et **Où elle s’exécute** : **Cet ordinateur**, l’une de vos autres machines, ou un cluster (voir [Où vont les exécutions](#where-runs-go)).
 4. Réglez les **GPUs** dont elle a besoin (0 l’exécute sans GPU) et **Mémoire libre chacun (Go)**. Si ce champ reste vide, elle attend un GPU que personne n’utilise.
@@ -194,7 +196,7 @@ Pour les tests appariés sur les exemples (requêtes en recherche d’informatio
 
 ## Balayages
 
-Un balayage est une commande avec un paramètre pour chaque hyperparamètre, exécutée une fois pour chaque combinaison de leurs valeurs. Cliquez sur **Plus** (⋯) en haut, puis sur [**Nouveau balayage**](/system/experiments?new=sweep) (ou **Nouveau balayage dans cette expérience** dans le menu d’une expérience, ou **Un balayage** dans « Nouvelle exécution ») :
+Un balayage est une commande avec un paramètre pour chaque hyperparamètre, exécutée une fois pour chaque combinaison de leurs valeurs. Cliquez sur **Plus** (⋯) en haut, puis sur [**Nouveau balayage**](/experiments?new=sweep) (ou **Nouveau balayage dans cette expérience** dans le menu d’une expérience, ou **Un balayage** dans « Nouvelle exécution ») :
 
 1. Saisissez la commande avec `{name}` à l’endroit où va la valeur de chaque hyperparamètre : `python train.py --lr {lr} --batch {batch}`.
 2. Sous **Hyperparamètres et leurs valeurs**, donnez ses valeurs à chaque hyperparamètre : `lr` et `0.001, 0.0003, 0.0001`. **Ajouter un hyperparamètre** pour en ajouter un autre.
@@ -206,7 +208,7 @@ Les exécutions du balayage forment une expérience comme les autres : son table
 
 ## Où vont les exécutions
 
-**Plus** (⋯) en haut → [**Où vont les exécutions**](/system/experiments?places=1) :
+**Plus** (⋯) en haut → [**Où vont les exécutions**](/experiments?places=1) :
 
 - **Cet ordinateur** : ses GPU, et **Jobs without a GPU: at most N at once**.
 - **Autres machines** : celles de [Paramètres → Machines](/settings?s=machines) qui sont connectées. Une exécution envoyée vers l’une d’elles y est conservée et surveillée : son agent d’astreinte et ses notifications sont ceux de cette machine (ses notifications vous parviennent ici, comme toutes celles de cette machine), et cette page la suit. La liste affichée ici montre aussi les exécutions de chaque machine connectée, avec l’endroit où elles tournent ; en ouvrir une la lit sur place, et **Arrêter** l’arrête sur place.
@@ -214,7 +216,7 @@ Les exécutions du balayage forment une expérience comme les autres : son table
 
 ### Ajouter un cluster
 
-Cliquez sur [**Ajouter un cluster**](/system/experiments?cluster=new) et renseignez :
+Cliquez sur [**Ajouter un cluster**](/experiments?cluster=new) et renseignez :
 
 - **Nom**, et **Hôte SSH** : tel que vous le saisiriez après `ssh`, une entrée de votre `~/.ssh/config` ou `me@login.cluster.edu`. Le serveur de l’app se connecte avec ses propres clés SSH et ne demande jamais de mot de passe : il lui faut donc une clé qui fonctionne sans mot de passe sur place (`ssh-copy-id`), et la clé d’hôte du cluster doit être connue (connectez-vous une fois avec `ssh` depuis un terminal).
 - **SLURM** ou **SSH simple**.

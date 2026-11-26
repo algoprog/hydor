@@ -37,7 +37,7 @@ Ciérrala con ✕, con Esc o haciendo clic en la página atenuada fuera de ella.
 
 ## Encontrar todos tus proyectos
 
-**Proyectos** en la barra de iconos (justo antes de **Agentes**; en un teléfono, en la cuadrícula de herramientas del panel de la barra lateral) abre la página Proyectos, o ve a [/projects](/projects). Muestra cada proyecto como una tarjeta, en todo el ancho de la página, sin columna junto a la barra de iconos. El título indica cuántos hay.
+**Proyectos** en la barra de iconos (justo antes de **Archivos**; en un teléfono, en la cuadrícula de herramientas del panel de la barra lateral) abre la página Proyectos, o ve a [/projects](/projects). Muestra cada proyecto como una tarjeta, en todo el ancho de la página, sin columna junto a la barra de iconos. El título indica cuántos hay.
 
 - **Nuevo proyecto** crea uno (consulta [Crear un proyecto](#make-a-project)). Su ▾ tiene **Nuevo proyecto** y **Nuevo grupo de proyectos…**, que necesita dos proyectos que reunir (consulta [Crear un grupo](#make-a-group)).
 - **Buscar un proyecto** filtra las tarjetas mientras escribes, por nombre, descripción y carpeta.

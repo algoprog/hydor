@@ -237,7 +237,7 @@ Du kannst den Browser einer Sitzung öffnen, bevor der Agent es tut, etwa um dic
 
 Heruntergeladene Dateien liegen im Unterordner downloads des Sitzungsordners. Der Agent erfährt den Pfad. Das Browsermenü zeigt die neuesten Dateien unter **Wird im Sitzungsordner gespeichert**.
 
-Ein Agent kann Dateien nur aus dem Ordner der Sitzung an das Upload-Feld einer Seite anhängen. Soll er eine andere Datei hochladen, kopiere sie zuerst in diesen Ordner (siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git)).
+Ein Agent kann Dateien nur aus dem Ordner der Sitzung an das Upload-Feld einer Seite anhängen. Soll er eine andere Datei hochladen, kopiere sie zuerst in diesen Ordner (siehe [Dateien, Git, Terminal und Vorschau](/guide/files-git)).
 
 ## Wann der Browser schließt
 

@@ -37,7 +37,7 @@ Schließe es mit ✕, mit Esc oder mit einem Klick auf die abgedunkelte Seite au
 
 ## Alle Projekte finden
 
-**Projekte** in der Werkzeugleiste (direkt vor **Agenten**; auf dem Smartphone im Raster der Werkzeuge im Menü der Seitenleiste) öffnet die Projekte-Seite, oder gehe zu [/projects](/projects). Sie listet jedes Projekt als Karte auf, über die ganze Breite der Seite, ohne Spalte neben der Werkzeugleiste. Der Titel zeigt, wie viele es sind.
+**Projekte** in der Werkzeugleiste (direkt vor **Dateien**; auf dem Smartphone im Raster der Werkzeuge im Menü der Seitenleiste) öffnet die Projekte-Seite, oder gehe zu [/projects](/projects). Sie listet jedes Projekt als Karte auf, über die ganze Breite der Seite, ohne Spalte neben der Werkzeugleiste. Der Titel zeigt, wie viele es sind.
 
 - **Neues Projekt** erstellt eines (siehe [Ein Projekt erstellen](#make-a-project)). Sein ▾ bietet **Neues Projekt** und **Neue Gruppe von Projekten …**, wofür zwei Projekte zum Verbinden nötig sind (siehe [Eine Gruppe erstellen](#make-a-group)).
 - **Projekt suchen** filtert die Karten beim Tippen, nach Name, Beschreibung und Ordner.
