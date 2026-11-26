@@ -5,6 +5,7 @@
 // its scores), ?evolution=<id> one evolution (&try=<id> one of its tries), /experiments/<id> one run. A wide screen has
 // a sidebar with the queue, the GPUs, the evaluations and the experiments by category; a narrow one stacks the views.
 // Ticked runs (by their key) stay ticked from view to view, in a bar at the bottom to compare them or make a table.
+// ?night=<date> is the Overview with that night's runs first (the morning's notice opens it).
 // Addresses open things too, once: ?new=1 (or sweep, or evaluation), ?sweep=<id> (its experiment's Hyperparameters),
 // ?table=<id> (or new), ?places=1, ?cluster=new.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -30,6 +31,7 @@ import { evolvingBy } from './evolveWords';
 import { ExperimentView } from './Experiment';
 import { Home } from './Home';
 import { NewRun } from './NewRun';
+import { nightDay } from './nightWords';
 import { Places } from './Places';
 import { RunView } from './RunView';
 import { entriesOf, Sidebar } from './Sidebar';
@@ -130,7 +132,7 @@ export function ExperimentsPage() {
     }
     if (done) {
       const keep = new URLSearchParams();
-      for (const k of ['e', 'tab', 'm', 'evaluation', 'score', 'evolution', 'try']) if (p.has(k) && !sweep) keep.set(k, p.get(k)!);
+      for (const k of ['e', 'tab', 'm', 'evaluation', 'score', 'evolution', 'try', 'night']) if (p.has(k) && !sweep) keep.set(k, p.get(k)!);
       const rest = keep.toString();
       go(`${loc}${rest ? `?${rest}` : ''}`, true);
     }
@@ -153,12 +155,27 @@ export function ExperimentsPage() {
   const entries = useMemo(() => entriesOf(all, groups), [runs, groups]); // eslint-disable-line react-hooks/exhaustive-deps
   const categories = useMemo(() => [...new Set([...groups.values()].map((g) => g.category?.trim() ?? '').filter(Boolean))].sort((a, b) => a.localeCompare(b)), [groups]);
 
-  // The loaded runs, and the older ones of the experiments opened (those not loaded already).
+  // The night the address names, and its runs (this computer's; they may be older than the ones loaded).
+  const night = view === 'overview' && nightDay(q.get('night')) ? q.get('night')! : null;
+  const [nightRead, setNightRead] = useState<{ date: string; runs: RunRecord[] } | null>(null);
+  useEffect(() => {
+    if (!night) return;
+    let live = true;
+    api<{ runs: RunRecord[] }>(`/api/experiments/runs?night=${enc(night)}&limit=1000`)
+      .then((r) => live && setNightRead({ date: night, runs: r.runs }))
+      .catch(() => live && setNightRead({ date: night, runs: [] }));
+    return () => {
+      live = false;
+    };
+  }, [night]);
+
+  // The loaded runs, and the older ones of the experiments and the night opened (those not loaded already).
   const pool = useMemo(() => {
     const have = new Set(all.map(runKey));
-    const more = Object.values(older).flat().filter((r) => !have.has(runKey(r)));
+    const more = [...Object.values(older).flat(), ...(nightRead?.runs ?? [])].filter((r) => !have.has(runKey(r)) && !!have.add(runKey(r)));
     return more.length ? [...all, ...more] : all;
-  }, [runs, older]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [runs, older, nightRead]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nightRuns = night ? { date: night, runs: runs && nightRead?.date === night ? pool.filter((r) => !r.machine && r.nights?.includes(night)) : null } : null;
 
   // Picked runs, by key, across views; one that no longer exists is let go.
   useEffect(() => {
@@ -374,6 +391,8 @@ export function ExperimentsPage() {
             onOpenExperiment={openExperiment}
             onNewRun={() => setNewRun({})}
             placeOf={placeOf}
+            night={nightRuns}
+            onLeaveNight={overview}
             evaluations={evals}
             scoring={scoring}
             evolving={evolving}

@@ -1,16 +1,20 @@
 // New run: the command, its folder, the GPUs it needs and the free memory each, where it runs, a name and an
 // experiment; More options folds the rest (hyperparameters, seed, priority, a metrics file, what to tell you, the agent on
 // call and its rules, a cluster's needs). As a sweep: the command with {name} placeholders and values for each
-// hyperparameter, every combination or a random sample, and an early stop. Run again opens it filled in.
+// hyperparameter, every combination or a random sample, and an early stop. Run again opens it filled in. Start says
+// whether it goes when a GPU is free or waits for tonight (always the former when the dialog opens).
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Plus, X } from 'lucide-react';
-import type { ClusterSpec, RunRecord, WatchKind } from '@shared/experiments';
+import type { ClusterSpec, ExperimentsSettings, RunRecord, WatchKind } from '@shared/experiments';
 import type { MachineView } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { machineId } from '../../lib/machine';
 import { useApp } from '../../lib/store';
+import { trIn } from '../../i18n/runtime';
 import { FolderPicker } from '../../components/FolderPicker';
 import { Button, cx, Dialog, IconButton, inputCls, Segmented } from '../../components/ui';
+import { loadSettings } from './api';
+import { hoursWords, stopNote } from './nightWords';
 
 const DEFAULT_RULES =
   'Read the log and the code. If a fix is clear and safe, run it again with experiment_run (from the last checkpoint if there is one), changing as little as possible. Never delete files or checkpoints. Then tell the user in a few lines what happened and what you did.';
@@ -83,6 +87,8 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
   const [mem, setMem] = useState('');
   const [name, setName] = useState('');
   const [group, setGroup] = useState('');
+  const [startAt, setStartAt] = useState<'free' | 'night'>('free');
+  const [night, setNight] = useState<ExperimentsSettings | null>(null);
   const [more, setMore] = useState(false);
   const [settings, setSettings] = useState('');
   const [seed, setSeed] = useState('');
@@ -116,6 +122,10 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setStartAt('free');
+    loadSettings()
+      .then(setNight)
+      .catch(() => setNight(null));
     setMode(asSweep ? 'sweep' : 'one');
     // The machines of Settings → Machines are this computer's: on another machine's pages, its runs go there or to its clusters.
     if (machineId) setMachines([]);
@@ -178,7 +188,8 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
   }, [params, sampling, maxRuns]);
 
   const body = (): Record<string, unknown> => {
-    const b: Record<string, unknown> = { command: command.trim(), cwd: cwd.trim(), where, gpus: nGpus };
+    // Always said, so a night run run again starts now unless Tonight is picked. A cluster has its own queue.
+    const b: Record<string, unknown> = { command: command.trim(), cwd: cwd.trim(), where, gpus: nGpus, when: startAt === 'night' && !where.startsWith('c:') ? 'night' : 'now' };
     if (nGpus && mem) b.gpuMemGb = Number(mem);
     if (name.trim() && mode === 'one') b.name = name.trim();
     if (group.trim()) b.group = group.trim();
@@ -313,6 +324,27 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
             <div />
           )}
         </div>
+        {where.startsWith('c:') ? (
+          startAt === 'night' && <p className="leading-relaxed text-fg-3">A cluster has its own queue: its runs cannot wait for tonight.</p>
+        ) : (
+          <div>
+            {/* When it starts: not the button's "Start". */}
+            <span className="mb-1 block text-fg-2">{trIn('night', 'Start')}</span>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <Segmented
+                size="sm"
+                value={startAt}
+                onChange={setStartAt}
+                options={[
+                  { value: 'free', label: 'When a GPU is free' },
+                  { value: 'night', label: trIn('night', 'Tonight') },
+                ]}
+              />
+              <span className="text-[12px] text-fg-3">{hoursWords(night, where)}</span>
+            </div>
+            {startAt === 'night' && stopNote(night, where) && <p className="mt-1 leading-relaxed text-fg-3">{stopNote(night, where)}</p>}
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           {mode === 'one' && (
             <Field label="Name">

@@ -21,6 +21,8 @@ export interface RunQuery {
   limit?: number;
   /** The runs of a sweep. */
   sweep?: string;
+  /** The night runs of one night (the date it began on). */
+  night?: string;
   /** Words in the name, group, command or id. */
   q?: string;
   /** Oldest first (the queue's order), instead of newest first. */
@@ -157,10 +159,11 @@ export function listRuns(db: DB, q: RunQuery = {}): RunRecord[] {
   if (q.plain) where.push(`not (instr(spec, '"HYDOR_EVALUATION":') > 0 and instr(spec, '"evaluation"') > 0)`);
   const limit = Math.min(Math.max(Math.round(q.limit ?? 200), 1), 5000);
   // Tags and words are looked for in the job itself; more rows are read so the limit still fills.
-  const loose = !!q.tag || !!q.q?.trim();
+  const loose = !!q.tag || !!q.night || !!q.q?.trim();
   const sql = `select * from exp_runs ${where.length ? `where ${where.join(' and ')}` : ''} order by created_at ${q.oldest ? 'asc' : 'desc'}, id ${q.oldest ? 'asc' : 'desc'} limit ?`;
   let runs = (db.prepare(sql).all(...args, loose ? limit * 20 : limit) as Row[]).map(toRecord);
   if (q.tag) runs = runs.filter((r) => r.tags?.includes(q.tag!));
+  if (q.night) runs = runs.filter((r) => r.nights?.includes(q.night!));
   const words = q.q?.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (words?.length) runs = runs.filter((r) => words.every((w) => [r.id, r.name, r.group, r.command, ...(r.tags ?? [])].some((x) => x?.toLowerCase().includes(w))));
   return runs.slice(0, limit);
@@ -202,6 +205,7 @@ const SPEC_KEYS: (keyof JobSpec)[] = [
   'seed',
   'tags',
   'priority',
+  'when',
   'metricsFile',
   'onCall',
   'notify',
@@ -271,6 +275,18 @@ export function updateRun(
   }
   if (!sets.length) return;
   db.prepare(`update exp_runs set ${sets.join(', ')} where id = ?`).run(...args, id);
+}
+
+/** Puts a run back to wait, to start again from the beginning: what its last start recorded goes (its events stay). */
+export function resetRun(db: DB, id: string, why: string) {
+  tables(db);
+  const row = db.prepare('select info from exp_runs where id = ?').get(id) as { info: string | null } | undefined;
+  if (!row) return;
+  const { gpuIds: _g, outputAt: _o, stopping: _s, nightStop: _n, exitCode: _e, patchPath: _p, kept: _k, notKept: _nk, environment: _v, sealed: _se, scores: _sc, ...info } = parse<RunInfo>(row.info, {});
+  db.transaction(() => {
+    db.prepare("update exp_runs set status = 'waiting', why = ?, started_at = null, ended_at = null, metrics = null, log_offset = 0, file_offset = 0, info = ? where id = ?").run(why, JSON.stringify(info), id);
+    db.prepare('delete from exp_series where run = ?').run(id);
+  })();
 }
 
 /** Deletes a run's record, its events and series, and its own folder (never the job's files). */

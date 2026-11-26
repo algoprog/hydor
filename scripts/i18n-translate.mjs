@@ -376,6 +376,7 @@ const PARTS = {
   browser: 'the web browser',
   agents: 'the Agents page',
   jobs: 'the Jobs page: long computing work running in the background, such as builds and training runs, never employment',
+  night: 'Experiments, runs that wait for the night: "Start" is a field label for when a run starts (a noun, not a button), "to" joins two times of day ("Night from 23:00 to 07:00"), "Tonight" is in the night to come',
 };
 const PART_RE = /^([a-z]+)::/;
 

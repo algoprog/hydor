@@ -12,6 +12,7 @@
 // While a session works, what newly bears on a message comes with it, and what is about the files its agent touches
 // comes as it touches them (Claude Code's hook, Custom's tools) or with the next message (deliver.ts); nothing twice
 // (given.ts). When a turn ends, what the agent used of what it was given counts as used.
+import { isAppNotice } from '../../shared/app-notice.ts';
 import type { Agent, TimelineItem } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import type { Deps, Feature, SpawnAdditions } from '../features/types.ts';
@@ -87,7 +88,8 @@ async function lastAsk(d: Deps, key?: string): Promise<string | undefined> {
     const items = (await d.sessions.timeline(key)).parser.items;
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
-      if (it.kind === 'user' && !it.meta && it.text.trim()) return it.text.slice(0, 2000);
+      // A notice from the app asks nothing: what the session is about is in what was asked before it.
+      if (it.kind === 'user' && !it.meta && it.text.trim() && !isAppNotice(it.text)) return it.text.slice(0, 2000);
     }
   } catch {}
   return undefined;
@@ -189,7 +191,7 @@ export const memory: Feature = {
     // The same block until the conversation is condensed (`epoch`), so the instructions stay as the provider cached them.
     // Made for the message that starts the turn (Custom sends it), else the latest one the user wrote.
     const block = await blockFor(d, s.key, flavor, epoch, async () =>
-      (await memoryBlock(d.db, { cwd: s.cwd, key: s.key, session: true, query: s.query?.trim() || (await lastAsk(d, s.key)), readOnly: reads, cls, window: s.window })).text,
+      (await memoryBlock(d.db, { cwd: s.cwd, key: s.key, session: true, query: (s.query && !isAppNotice(s.query) && s.query.trim()) || (await lastAsk(d, s.key)), readOnly: reads, cls, window: s.window })).text,
     );
     return block.text;
   },

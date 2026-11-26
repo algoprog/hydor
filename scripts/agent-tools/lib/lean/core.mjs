@@ -978,8 +978,10 @@ export async function verifyFile(lean, file, opts = {}) {
       theorems.push({ name: x.full, axioms, ok: !why && !other, statement, pin, ...(definitions.length ? { definitions } : {}) });
       if (other) {
         changed.push(x.full);
-        const rests = definitions.length ? ` (the pin covers the definitions of its own that it rests on too: ${definitions.join(', ')})` : '';
-        changes.push(`${x.full} no longer says what was agreed: its statement changed (it was pinned as ${other.pin}, it is now ${pin})${rests}. It now says: ${statement}`);
+        // With definitions of its own under it, a statement can read exactly as it did and say something else: that is said first.
+        const what = definitions.length ? `its statement, or one of its own definitions that it rests on (${definitions.join(', ')}), changed` : 'its statement changed';
+        const same = definitions.length ? ' A statement can read the same and say something else once a definition under it has changed.' : '';
+        changes.push(`${x.full} no longer says what was agreed: ${what} (it was pinned as ${other.pin}, it is now ${pin}).${same} It now says: ${statement}`);
       }
       if (why && !(sorries.length && !o.allowSorry && axioms.includes('sorryAx'))) reasons.push(why);
     }

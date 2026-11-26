@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { isAppNotice } from '../shared/app-notice.ts';
 import type { AccountAgent, Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
 import { ClaudeLive, CLAUDE_MODES, claudeSpec, mcpRunFiles, precompactCopy, removeMcpRunFiles } from './agents/claude.ts';
 import { acpControl } from './agents/acp-accounts.ts';
@@ -312,9 +313,9 @@ const familyName = (family: string) => family.charAt(0).toUpperCase() + family.s
  */
 export type LimitAfter = { goes: 'account'; to: string; signedOut?: boolean } | { goes: 'credit' } | { goes: 'resume'; at: number } | { goes: 'on' };
 
-/** The notes a started agent has for its first message, given once: a command leaves them for the next. */
+/** The notes a started agent has for its first message, given once: a command, or a notice the app sends, leaves them for the next. */
 function takeFirst(l: Live, text: string): string {
-  if (!l.firstNotes || text.trimStart().startsWith('/')) return '';
+  if (!l.firstNotes || text.trimStart().startsWith('/') || isAppNotice(text)) return '';
   const f = l.firstNotes;
   l.firstNotes = undefined;
   return f;

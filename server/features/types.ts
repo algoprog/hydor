@@ -213,7 +213,8 @@ export interface Feature {
   beforeMessage?(key: string, d: Deps): string | null | undefined;
   /**
    * What the agent should hear about the user's message itself (one of their apps does what it asks), ahead of it
-   * with beforeMessage's notes. Asked once per message, the first one of a session too.
+   * with beforeMessage's notes. Asked once per message, the first one of a session too; not for a notice the app
+   * sends (runs ended, the goal loop), and nor is turnNotes.
    */
   aboutMessage?(text: string, key: string, d: Deps): string | null | undefined | Promise<string | null | undefined>;
   /** Once, when the server is up. */

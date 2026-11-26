@@ -527,7 +527,7 @@ test('lean_verify: what each theorem states and its pin, even while it is sorry;
   assert.deepEqual([weaker.changed, weaker.theorems[0].ok], [['bound'], false]);
   const now = weaker.theorems[0].pin;
   assert.notEqual(now, pin);
-  assert.equal(weaker.why, `bound no longer says what was agreed: its statement changed (it was pinned as ${pin}, it is now ${now}) (the pin covers the definitions of its own that it rests on too: twice). It now says: ∀ (n : Nat), (0 : Nat) < n → n < (5 : Nat) → twice n < n * (3 : Nat)`);
+  assert.equal(weaker.why, `bound no longer says what was agreed: its statement, or one of its own definitions that it rests on (twice), changed (it was pinned as ${pin}, it is now ${now}). A statement can read the same and say something else once a definition under it has changed. It now says: ∀ (n : Nat), (0 : Nat) < n → n < (5 : Nat) → twice n < n * (3 : Nat)`);
   // A malformed pin is the question's fault; a pin for a theorem that is not there is no such theorem.
   const bad = await verify(`${def}theorem bound : True := trivial\n`, ['bound@abc']);
   assert.equal(bad.error, true);

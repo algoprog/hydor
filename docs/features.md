@@ -1800,7 +1800,10 @@ agents that speak ACP and take MCP servers.
   random sample, losing runs stopped early; a sweep is one experiment, and its notice opens its Hyperparameters tab),
   and make **results tables** (mean ± std over seeds, the best in bold, paired or Welch tests with Holm's correction as
   daggers, a double dagger where worse, and a note instead where the seeds barely change a number) as LaTeX, Markdown
-  or CSV, or straight into a LaTeX document you kept. Agents use it with experiment_run,
+  or CSV, or straight into a LaTeX document you kept. A run or a sweep can wait for the night (**Start: Tonight**, or
+  an agent's `when: "night"`): it starts only in this computer's night hours and after every other waiting run, and is
+  let finish, or stopped to start again, when the night ends. In the morning one notice says what was done, what failed
+  and what still waits, and opens that night's runs. Agents use it with experiment_run,
   experiment_sweep, experiment_list, experiment_get, experiment_stop, experiment_table and experiment_describe. The
   first time you open the page, a short tour for people new to it explains what an experiment and a run are and lights
   each part in turn (New run, the queue and GPUs, experiments by category, following a run live, comparing runs and
@@ -1873,7 +1876,7 @@ agents that speak ACP and take MCP servers.
   table.
 - **Try a paper's idea on your own code**: a paper in Paper radar or Living related work has **Try it on my code**,
   which opens the start page with a request for an agent to read it, check what your project already tried, plan the
-  smallest faithful version and ask which way to go before any run, measure it against your code unchanged, try to
+  smallest faithful version and ask which way to go before any run, measure it against your code as it is, try to
   explain a gain away, and record what came of it, also when it did not help.
 - New skills for every agent: papers' peer review, reproducing a paper, figures for papers, trying to break a result,
   proofs in Lean, and checking a proof written in words.

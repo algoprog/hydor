@@ -17,12 +17,13 @@ import { makeTable, runView, startSweep } from './api.ts';
 import { allowedFolder, ChangedError, check, cleanSpec, createEvaluation, evaluationsFor, getEvaluation, getScore, listed, listScores, measure, mustEvaluation, rootFor, startScore, testReadable, waitScore } from './evaluations.ts';
 import type { Candidate, Evolution } from '../../shared/evolve.ts';
 import { candidateDetail, candidatesOf, checkEvolveSpec, EVOLVE, listEvolutions, mustEvolution, startEvolution } from './evolve.ts';
-import { cleanJob, onCallSession, placesLine, runAgain, stopRun, submit, waitRuns, whereWords } from './queue.ts';
+import { cleanJob, onCallSession, placeOf, placesLine, runAgain, settingsOf, stopRun, submit, waitRuns, whereWords } from './queue.ts';
+import { NIGHT_CLUSTER, tonightWords } from './night.ts';
 import { keepUntracked, keptWords, localShell } from './capture.ts';
 import { agentBaseEnv } from '../env.ts';
 import { sawEnded } from './notices.ts';
 import { getRun, getRunWithEvents, isFinalRun, isScoringRun, listInfo, listRuns, saveInfo } from './records.ts';
-import { connectedMachines } from './remote.ts';
+import { connectedMachines, remoteMachine } from './remote.ts';
 
 const json = (v: unknown): string => JSON.stringify(v, null, 1);
 
@@ -33,10 +34,17 @@ async function notInGit(r: RunRecord): Promise<string> {
   return keptWords(await keepUntracked(localShell(r.cwd, { ...agentBaseEnv(), ...r.env }), r.command, r.cwd, null).catch(() => ({ kept: [], notKept: [] })));
 }
 
+/** When a night run to `where` will start, in a sentence ("It will start tonight, between 23:00 and 07:00"). */
+function tonight(ctx: RunCtx, where: string | undefined): string {
+  const p = placeOf(where);
+  return tonightWords(settingsOf(ctx.deps.db), p.kind === 'machine' ? (remoteMachine(p.id)?.name ?? p.id) : undefined);
+}
+
 /** What experiment_run answers with. */
-async function started(r: RunRecord): Promise<string> {
+async function started(r: RunRecord, ctx: RunCtx): Promise<string> {
   const note = await notInGit(r);
-  return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), name: r.name, page: `/experiments/${r.id}`, ...(note ? { note } : {}) });
+  const where = r.remote ? `m:${r.remote.machine}` : r.where;
+  return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), ...(r.when ? { when: r.when, starts: tonight(ctx, where) } : {}), name: r.name, page: `/experiments/${r.id}`, ...(note ? { note } : {}) });
 }
 
 const failed = (e: unknown): ToolOutput => ({ text: (e as Error)?.message ?? String(e), isError: true });
@@ -90,6 +98,7 @@ const brief = (db: RunCtx['deps']['db'], r: RunRecord, titles?: Map<string, stri
   ...(r.params && Object.keys(r.params).length ? { params: r.params } : {}),
   ...(r.seed !== undefined ? { seed: r.seed } : {}),
   metrics: r.metrics ?? { last: {} },
+  ...(r.when ? { when: r.when } : {}),
   ...(r.startedAt ? { startedAt: r.startedAt } : {}),
   ...(r.endedAt ? { endedAt: r.endedAt } : {}),
   ...sealChanged(r),
@@ -120,6 +129,12 @@ const JOB_PROPS = (ctx: RunCtx) => {
     scoresFile: { type: 'string', description: 'A file of per-example scores it writes (JSON lines with "id" and a number per metric, or trec_eval -q lines): kept with the run for paired significance tests over examples. {run} and {param} placeholders are filled, and it may start with $HYDOR_RUN_DIR/. Not needed for scores written to $HYDOR_RUN_DIR/scores.jsonl.' },
     hours: { type: 'number', description: 'A time limit: it is stopped after this many hours (on SLURM, its --time).' },
     priority: { type: 'number', description: 'Higher goes first in the queue (default 0).' },
+    when: {
+      type: 'string',
+      enum: ['night', 'now'],
+      description:
+        '"night": it waits for the night hours of the computer it runs on (Experiments → Where runs go) and starts then, after every other waiting run; for exploratory work that can wait. Not on a cluster. Leave it out to start as soon as a GPU is free ("now" does the same: for running a night run again at once).',
+    },
     env: { type: 'object', description: 'Environment variables for it.' },
     better: { type: 'object', description: 'Which way is better for metrics whose name does not say: { "bleu": "max" } (losses, errors, perplexity… are lower-is-better by name).' },
     onCall: {
@@ -128,7 +143,10 @@ const JOB_PROPS = (ctx: RunCtx) => {
         'The agent on call: { on: true, act: "tell" (a notification) or "agent" (an agent session looks into it, acts within the rules, then tells the user), watch?: ["nan","oom","stall","crash","diverge"] (default all), stallMinutes?: 30, rules?: what the agent may do }.',
     },
     notify: { type: 'object', description: 'What to tell the user: { done?: true, failed?: true, when?: { metric, op: ">"|"<"|">="|"<=", value } } (done and failed are on unless set false).' },
-    report: { type: 'boolean', description: 'When it ends, this session gets a message saying how it went, so you can go on from there.' },
+    report: {
+      type: 'boolean',
+      description: `When it ends, this session gets a message saying how it went, so you can go on from there. The message comes after your turn ends when you are at work (while you work, ${ctx.step ? 'experiment_wait or experiment_get' : 'experiment_get'} tells you), and runs you have read since they ended are left out of it.`,
+    },
     cpus: { type: 'number', description: 'SLURM: processors (--cpus-per-task).' },
     memGb: { type: 'number', description: 'SLURM: memory in GB (--mem).' },
     partition: { type: 'string', description: 'SLURM: the partition (default: the cluster’s).' },
@@ -157,20 +175,23 @@ function runTool(ctx: RunCtx): RunTool {
           if (!prev) throw new HttpError(404, `There is no run ${a.again}`);
           if (isScoringRun(prev)) throw new HttpError(400, 'That run scored an evaluation: score it again with evaluation_score.');
           const { again: _a, ...changes } = a;
-          const no = await mayRun(ctx, `Run “${prev.name ?? prev.id}” again`, [changes.command ?? prev.command, `# in ${changes.cwd ?? prev.cwd} · ${whereWords(db, prev)}`].join('\n'));
+          const night = (changes.when ?? prev.when) === 'night';
+          const where = String(changes.where ?? (prev.remote ? `m:${prev.remote.machine}` : (prev.where ?? 'local')));
+          if (night && placeOf(where).kind === 'cluster') return failed(NIGHT_CLUSTER);
+          const no = await mayRun(ctx, `Run “${prev.name ?? prev.id}” again`, [changes.command ?? prev.command, `# in ${changes.cwd ?? prev.cwd} · ${whereWords(db, prev)}`, ...(night ? [`# ${tonight(ctx, where)}`] : [])].join('\n'));
           if (no) return failed(no);
           const r = await runAgain(ctx.deps, prev.id, { ...changes, ...(onCall ? { onCall } : {}) }, startedBy(ctx));
-          return started(r);
+          return started(r, ctx);
         }
         const spec = await cleanJob(db, { ...a, ...(onCall ? { onCall } : {}) }, { cwd: ctx.cwd });
         const no = await mayRun(
           ctx,
           `Run a job${spec.gpus ? ` on ${spec.gpus} GPU${spec.gpus === 1 ? '' : 's'}` : ''}`,
-          [spec.command, `# in ${spec.cwd}${spec.where && spec.where !== 'local' ? ` · ${spec.where}` : ''}${spec.group ? ` · experiment ${spec.group}` : ''}`].join('\n'),
+          [spec.command, `# in ${spec.cwd}${spec.where && spec.where !== 'local' ? ` · ${spec.where}` : ''}${spec.group ? ` · experiment ${spec.group}` : ''}`, ...(spec.when ? [`# ${tonight(ctx, spec.where)}`] : [])].join('\n'),
         );
         if (no) return failed(no);
         const r = await submit(ctx.deps, spec, { startedBy: startedBy(ctx) });
-        return started(r);
+        return started(r, ctx);
       } catch (e) {
         return failed(e);
       }
@@ -183,7 +204,7 @@ function sweepTool(ctx: RunCtx): RunTool {
   return {
     name: 'experiment_sweep',
     description:
-      'Start a sweep: one command with a {name} placeholder for each setting, and values for each, expanded into runs of one experiment (every combination, or a random sample with mode "random"), queued like experiment_run’s. Each run can write its own per-example scores to $HYDOR_RUN_DIR/scores.jsonl, its own folder; tags, name, scoresFile and metricsFile apply to every run. With earlyStop, a run whose metric at a step is worse than the median of the other runs at that step is stopped. The user hears once, when the whole sweep has ended. Never start runs on the user’s GPUs unless they asked for it.',
+      'Start a sweep: one command with a {name} placeholder for each setting, and values for each, expanded into runs of one experiment (every combination, or a random sample with mode "random"), queued like experiment_run’s. Each run can write its own per-example scores to $HYDOR_RUN_DIR/scores.jsonl, its own folder; tags, name, scoresFile, metricsFile and when apply to every run. With earlyStop, a run whose metric at a step is worse than the median of the other runs at that step is stopped. The user hears once, when the whole sweep has ended (with when: "night", in the morning). Never start runs on the user’s GPUs unless they asked for it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -204,21 +225,32 @@ function sweepTool(ctx: RunCtx): RunTool {
         scoresFile: props.scoresFile,
         hours: props.hours,
         priority: props.priority,
+        when: props.when,
         env: props.env,
         onCall: props.onCall,
         notify: props.notify,
-        report: { type: 'boolean', description: 'When the whole sweep has ended, this session gets a message saying how it went.' },
+        report: {
+          type: 'boolean',
+          description: `When the whole sweep has ended, this session gets a message saying how it went. The message comes after your turn ends when you are at work (while you work, ${ctx.step ? 'experiment_wait or experiment_get' : 'experiment_get'} tells you); it is left out when you have read all its runs since they ended.`,
+        },
       },
       required: ['command', 'params', 'group'],
     },
     async run(a, ctx) {
       try {
         const n = Object.values((a.params ?? {}) as Record<string, unknown[]>).reduce<number>((x, v) => x * (Array.isArray(v) ? v.length : 1), 1);
-        const no = await mayRun(ctx, `Start a sweep of ${a.mode === 'random' && a.maxRuns ? Math.min(n, Number(a.maxRuns)) : n} runs`, [String(a.command ?? ''), `# ${JSON.stringify(a.params ?? {})} · experiment ${a.group ?? ''}`].join('\n'));
+        const night = a.when === 'night';
+        const where = typeof a.where === 'string' ? a.where : undefined;
+        if (night && placeOf(where).kind === 'cluster') return failed(NIGHT_CLUSTER);
+        const no = await mayRun(
+          ctx,
+          `Start a sweep of ${a.mode === 'random' && a.maxRuns ? Math.min(n, Number(a.maxRuns)) : n} runs`,
+          [String(a.command ?? ''), `# ${JSON.stringify(a.params ?? {})} · experiment ${a.group ?? ''}`, ...(night ? [`# ${tonight(ctx, where)}`] : [])].join('\n'),
+        );
         if (no) return failed(no);
         const onCall = a.onCall && typeof a.onCall === 'object' && !a.onCall.agent && !ctx.step ? { ...a.onCall, agent: agentOf(ctx) } : a.onCall;
         const s = await startSweep(ctx.deps, { ...a, ...(onCall ? { onCall } : {}) }, { cwd: ctx.cwd, startedBy: startedBy(ctx) });
-        return json({ sweep: s.sweep.id, group: s.sweep.group, runs: s.runs.map((r) => r.id), page: `/experiments?sweep=${s.sweep.id}` });
+        return json({ sweep: s.sweep.id, group: s.sweep.group, runs: s.runs.map((r) => r.id), ...(night ? { when: 'night', starts: tonight(ctx, where) } : {}), page: `/experiments?sweep=${s.sweep.id}` });
       } catch (e) {
         return failed(e);
       }
@@ -331,7 +363,7 @@ const STOP: RunTool = {
 const TABLE: RunTool = {
   name: 'experiment_table',
   description:
-    'Make a results table from runs of Experiments: a row per experiment (group) or per value of a setting ("param:lr"), the runs of a row averaged over seeds (mean ± std), the best of each column in bold, each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired over seeds when they share seeds, else Welch’s t-test; Holm-corrected), † on cells significantly better than the baseline and ‡ on those significantly worse (each tested cell has verdict: "better", "worse" or "same"). When the seeds barely change a number and there are no per-example scores, it is not tested and the table’s notes say so. Runs have per-example scores when they wrote $HYDOR_RUN_DIR/scores.jsonl (each run’s own folder) or named a scoresFile. Returns it as LaTeX (booktabs, with a “% hydor:table <id>” line that lets the numbers be checked again later: keep it), Markdown and CSV.',
+    'Make a results table from runs of Experiments: a row per experiment (group) or per value of a setting ("param:lr"), the runs of a row averaged over seeds (mean ± std), the best of each column in bold, each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired over seeds when they share seeds, else Welch’s t-test; Holm-corrected), † on cells significantly better than the baseline and ‡ on those significantly worse. Each tested cell has verdict, to be read with its p (pAdj: after the correction): "better" or "worse" says the test found that difference, in the direction the metric is better in; "same" says it found none (not that the two are equal). A row whose per-example scores are the baseline’s on every example is "same", with no p, and a note says so. When the seeds barely change a number and there are no per-example scores, it is not tested and the table’s notes say so. Runs have per-example scores when they wrote $HYDOR_RUN_DIR/scores.jsonl (each run’s own folder) or named a scoresFile. Returns it as LaTeX (booktabs, with a “% hydor:table <id>” line that lets the numbers be checked again later: keep it), Markdown and CSV.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -352,7 +384,9 @@ const TABLE: RunTool = {
     try {
       if (Array.isArray(a.runs) && a.runs.some((id) => typeof id === 'string' && isFinalRun(getRun(ctx.deps.db, id) ?? {}))) return failed('One of those runs is a final test: only the person reads it.');
       const t = makeTable(ctx.deps, a);
-      return json({ ...t, page: `/experiments?table=${t.id}` });
+      // The verdict says how a cell stands. `significant` (kept for the marks) means only "significantly better": left out here.
+      const rows = t.rows.map((r) => ({ ...r, cells: r.cells.map(({ significant: _, ...c }) => c) }));
+      return json({ ...t, rows, page: `/experiments?table=${t.id}` });
     } catch (e) {
       return failed(e);
     }
@@ -408,6 +442,16 @@ const scoreBrief = (s: EvalScore) => ({
   ...(s.dirty ? { dirty: true } : {}),
   when: new Date(s.endedAt ?? s.createdAt).toISOString(),
 });
+
+/** The latest finished score of the same seal from each other folder or branch, five at most: what a score with no baseline can be compared with. */
+function otherScores(db: RunCtx['deps']['db'], s: EvalScore) {
+  const seen = new Set<string>();
+  return listScores(db, s.evaluation, ['score'])
+    .filter((x) => x.status === 'done' && x.seal === s.seal && (x.folder !== s.folder || x.branch !== s.branch))
+    .filter((x) => !seen.has(`${x.folder}\n${x.branch}`) && !!seen.add(`${x.folder}\n${x.branch}`))
+    .slice(0, 5)
+    .map((x) => ({ ...(x.branch ? { branch: x.branch } : { folder: x.folder }), mean: x.mean, std: x.std, seeds: x.seeds }));
+}
 
 const folderArg = (a: Record<string, any>, ctx: RunCtx) => (typeof a.cwd === 'string' && a.cwd.trim() ? path.resolve(ctx.cwd, a.cwd.trim().replace(/^~(?=$|\/)/, config.home)) : undefined);
 
@@ -513,6 +557,8 @@ const EVAL_SCORE: RunTool = {
       const ms = Math.min(minutes * 60_000, Math.max(0, began + CALL_MS - Date.now()));
       const s = (await waitScore(ctx.deps, started.id, ms, ctx.signal)) ?? started;
       const over = s.status === 'done' || s.status === 'failed' || s.status === 'stopped';
+      const based = !!listed(db, mustEvaluation(db, ev.id)).baselineScore;
+      const others = based ? [] : otherScores(db, s);
       return json({
         evaluation: { id: ev.id, name: ev.name, metric: ev.metric, better: ev.better },
         ...scoreBrief(s),
@@ -520,7 +566,8 @@ const EVAL_SCORE: RunTool = {
         runs: s.runs,
         ...(s.lent ? { lent: s.lent } : {}),
         page: evalPage(ev.id, s.id),
-        ...(listed(db, mustEvaluation(db, ev.id)).baselineScore ? {} : { noBaseline: `There is no baseline yet, so the score is not compared with one: only the person measures it, on the evaluation’s page (${evalPage(ev.id)}).` }),
+        ...(based ? {} : { noBaseline: `There is no baseline yet, so the score is not compared with one: only the person measures it, on the evaluation’s page (${evalPage(ev.id)}).${others.length ? ' The latest scores of the same seal from other folders or branches are under others: compare with those yourself, without running them again.' : ''}` }),
+        ...(others.length ? { others } : {}),
         ...(over ? {} : { note: `Still ${s.status}: read it later with evaluation_get, score "${s.id}".` }),
       });
     } catch (e) {
@@ -753,4 +800,4 @@ export function experimentTools(ctx: RunCtx): RunTool[] {
 }
 
 export const SPAWN_NOTE =
-  'Experiments (Experiments in the app’s sidebar): long training or evaluation goes to experiment_run (many settings: experiment_sweep) instead of running in the foreground: it waits for free GPUs, runs on its own and is recorded. Read runs with experiment_list and experiment_get; make results tables (mean ± std over seeds, significance, LaTeX) with experiment_table. When you start the first runs of an experiment (its group), or what it tests changes, give it a title, a short description and a category with experiment_describe, so people see what it is and find it by searching. Never start runs on the user’s GPUs unless they asked you to. A project may keep an evaluation (Experiments → Evaluations): one scoring command and one number, sealed so every run is scored the same way. When the folder you work in has one (evaluation_get), judge your work by evaluation_score and report its numbers, not your own; never change the files it protects (a score is refused while they differ) and never run or read its final test: that is the person’s. When someone wants results they can trust and has none, offer to set one up with evaluation_propose. When a folder has an evaluation and the person wants a file made better against it by search (a heuristic, a scoring function, a prompt, a slow routine), offer evolve_start rather than trying changes one by one by hand: it tries many small changes, scores each with the evaluation and keeps the best (evolve_get says how it goes); never point it at files the evaluation protects. Before you report that one thing beats another, try to break the result first (the break-the-result skill).';
+  'Experiments (Experiments in the app’s sidebar): long training or evaluation goes to experiment_run (many settings: experiment_sweep) instead of running in the foreground: it waits for free GPUs, runs on its own and is recorded. Read runs with experiment_list and experiment_get; make results tables (mean ± std over seeds, significance, LaTeX) with experiment_table. When you start the first runs of an experiment (its group), or what it tests changes, give it a title, a short description and a category with experiment_describe, so people see what it is and find it by searching. Never start runs on the user’s GPUs unless they asked you to. Runs that are exploratory and can wait (controls, wider sweeps, “also try” ideas) go to the night with when: "night" (and report: true), so the person’s GPUs are theirs by day. When such runs have ended, tell the person what ran, what it showed and what you need them to decide, as choices. A project may keep an evaluation (Experiments → Evaluations): one scoring command and one number, sealed so every run is scored the same way. When the folder you work in has one (evaluation_get), judge your work by evaluation_score and report its numbers, not your own; never change the files it protects (a score is refused while they differ) and never run or read its final test: that is the person’s. When someone wants results they can trust and has none, offer to set one up with evaluation_propose. When a folder has an evaluation and the person wants a file made better against it by search (a heuristic, a scoring function, a prompt, a slow routine), offer evolve_start rather than trying changes one by one by hand: it tries many small changes, scores each with the evaluation and keeps the best (evolve_get says how it goes); never point it at files the evaluation protects. Before you report that one thing beats another, try to break the result first (the break-the-result skill).';

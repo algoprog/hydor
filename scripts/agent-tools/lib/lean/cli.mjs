@@ -50,7 +50,9 @@ export function report(name, v, allowSorry = false) {
   for (const t of v.theorems) {
     // A gap that --allow-sorry lets through is not "ok": the theorem is not proved.
     const mark = !t.ok ? 'FAIL' : t.axioms.includes('sorryAx') ? 'gap ' : 'ok  ';
-    const stated = t.pin ? `@${t.pin} : ${t.statement}` : '';
+    // A statement that changed from its pin is not given with its new pin: that would read as the pin to use.
+    const changed = Array.isArray(v.changed) && v.changed.includes(t.name);
+    const stated = t.pin ? `${changed ? ' (not the statement that was pinned)' : `@${t.pin}`} : ${t.statement}` : '';
     lines.push(`  ${mark} ${t.name}${stated}${t.axioms.length ? `  (axioms: ${t.axioms.join(', ')})` : t.ok ? '  (no axioms)' : ''}`);
     if (t.definitions) lines.push(`       rests on its own definitions: ${t.definitions.join(', ')}`);
   }

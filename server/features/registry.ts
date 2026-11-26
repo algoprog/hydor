@@ -1,5 +1,6 @@
 // Calls into the app's capabilities. Kept apart from the list of them (index.ts) so sessions.ts and
 // mcp.ts can call in without importing every capability's code.
+import { isAppNotice } from '../../shared/app-notice.ts';
 import type { SessionExtra } from '../../shared/features.ts';
 import type { InboxItem } from '../../shared/inbox.ts';
 import type { ServerEvent } from '../../shared/types.ts';
@@ -187,7 +188,8 @@ export async function featureContext(s: { key: string; cwd: string; extra: Sessi
     }
   }
   // After every instruction is made: what goes with the message leaves out what they give (memory's block).
-  if (s.query?.trim())
+  // Nothing goes with a notice the app sends (runs ended, the goal loop).
+  if (s.query?.trim() && !isAppNotice(s.query))
     for (const f of list) {
       if (!f.turnNotes) continue;
       try {
@@ -237,7 +239,10 @@ export async function beforeSend(key: string) {
   for (const f of list) await f.beforeSend?.(key, deps);
 }
 
-/** What the capabilities have for the agent with this message, as one block ('' for nothing). */
+/**
+ * What the capabilities have for the agent with this message, as one block ('' for nothing). With a notice the app
+ * sends (runs ended, the goal loop), only what the person did meanwhile (beforeMessage): nothing about its words.
+ */
 export async function messageNotes(key: string, text = ''): Promise<string> {
   if (!deps) return '';
   const parts: string[] = [];
@@ -248,7 +253,7 @@ export async function messageNotes(key: string, text = ''): Promise<string> {
     } catch (e) {
       warn(f, 'beforeMessage', e);
     }
-    if (!f.aboutMessage || !text.trim()) continue;
+    if (!f.aboutMessage || !text.trim() || isAppNotice(text)) continue;
     try {
       const t = await f.aboutMessage(text, key, deps);
       if (t?.trim()) parts.push(t.trim());

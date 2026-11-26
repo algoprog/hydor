@@ -3,11 +3,12 @@
 // each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired
 // over seeds when the rows share seeds, else Welch's t-test), Holm-corrected across the rows, a dagger on the
 // cells that are significantly better and a double dagger on those significantly worse. Seeds that barely change a
-// number (one side's standard deviation next to nothing) give no test over seeds, and a note says so. Written as LaTeX (booktabs, with the marker line the pre-submission check
+// number (one side's standard deviation next to nothing) give no test over seeds, and a note says so; per-example
+// scores the same as the baseline's on every example read as the same, and a note says that too. Written as LaTeX (booktabs, with the marker line the pre-submission check
 // finds), Markdown and CSV. Also: placing a table in a LaTeX file, replacing the one it made before.
 import fs from 'node:fs';
 import path from 'node:path';
-import { seedsFlatNote, TABLE_MARK, type ResultsCell, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord } from '../../shared/experiments.ts';
+import { identicalNote, seedsFlatNote, TABLE_MARK, type ResultsCell, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord } from '../../shared/experiments.ts';
 import { looseObject } from './metrics.ts';
 import { holm, mean, pairedBootstrap, pairedT, std, welch } from './stats.ts';
 
@@ -63,7 +64,7 @@ export function readScores(run: RunRecord): ScoreMap | null {
 
 // ---- working it out ------------------------------------------------------------------------------------------
 
-const seedOf = (r: RunRecord): string | undefined => {
+export const seedOf = (r: Pick<RunRecord, 'seed' | 'params'>): string | undefined => {
   const s = r.seed ?? r.params?.seed ?? r.params?.random_seed;
   return s === undefined || s === null ? undefined : String(s);
 };
@@ -87,7 +88,7 @@ function rowsOf(spec: ResultsTableSpec, runs: RunRecord[]): Row[] {
   for (const r of runs) {
     const k = keyOf(r);
     let row = rows.get(k);
-    if (!row) rows.set(k, (row = { key: k, label: spec.labels?.[k] ?? (by ? `${by} = ${k}` : k), runs: [] }));
+    if (!row) rows.set(k, (row = { key: k, label: spec.labels?.[k] ?? (!by ? k : r.params?.[by] === undefined ? `${by} not set` : `${by} = ${k}`), runs: [] }));
     row.runs.push(r);
   }
   const list = [...rows.values()];
@@ -113,6 +114,8 @@ function examplesOf(row: Row, metric: string, scores: (r: RunRecord) => ScoreMap
 interface Tested {
   p: number | null;
   how: string;
+  /** Every example scored the same as the baseline: no test to make. */
+  identical?: boolean;
 }
 
 /** A row against the baseline for one column, by the test asked for (or the fitting one). */
@@ -130,6 +133,8 @@ function test(spec: ResultsTableSpec, c: ResultsColumn, row: Row, base: Row, sco
     const ea = examplesOf(row, c.metric, scores, c.scale ?? 1);
     const eb = examplesOf(base, c.metric, scores, c.scale ?? 1);
     if (ea && eb) {
+      const same = ea.size === eb.size && [...ea].every(([id, v]) => eb.has(id) && Math.abs(v - eb.get(id)!) <= 1e-12 * Math.max(1, Math.abs(v)));
+      if (same) return { p: null, how: '', identical: true };
       const ids = [...ea.keys()].filter((id) => eb.has(id));
       if (ids.length >= 2) {
         const a = ids.map((id) => ea.get(id)!);
@@ -184,6 +189,8 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
   const tests: string[] = [];
   /** The comparisons left untested because the seeds barely change the number. */
   const flat: string[] = [];
+  /** The notes for rows whose examples all scored as the baseline's. */
+  const identical: string[] = [];
   // Cells, column by column (the best, the tests and Holm's correction are within a column).
   const grid: ResultsCell[][] = rows.map(() => []);
   cols.forEach((c, ci) => {
@@ -201,6 +208,11 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
       const ps = rows.map((row, ri) => {
         if (row === base || cells[ri].mean === null || cells[rows.indexOf(base)].mean === null) return null;
         const t = test(spec, c, row, base, o.scores);
+        if (t.identical) {
+          identical.push(identicalNote(row.label, colLabel(c), base.label));
+          Object.assign(cells[ri], { p: null, pAdj: null, significant: false, verdict: 'same' });
+          return null;
+        }
         if (/ seeds$/.test(t.how) && (barelyVaries(row, c) || barelyVaries(base, c))) {
           flat.push(`${row.label}, ${colLabel(c)}`);
           return null;
@@ -226,6 +238,7 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
   });
   const seedsNote = flat.length ? seedsFlatNote(flat.join('; ')) : '';
   if (seedsNote) notes.push(seedsNote);
+  notes.push(...identical);
   const madeAt = o.at ?? Date.now();
   const table: ResultsTable = {
     id: o.id,
@@ -241,7 +254,7 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
   const words = describe(table, base?.label, alpha);
   if (words.dagger) table.footnote = words.dagger;
   // In what is copied out too, as a comment that does not show: one line, so the marker stays near its tabular.
-  const comment = seedsNote.replace(/\s+/g, ' ');
+  const comment = [seedsNote, ...identical].filter(Boolean).join('. ').replace(/\s+/g, ' ');
   table.latex = latexOf(table, words, comment);
   table.markdown = markdownOf(table, words, comment);
   table.csv = csvOf(table);
@@ -358,8 +371,9 @@ function csvOf(t: ResultsTable): string {
     const s = v === null || v === undefined ? '' : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const head = ['row', 'label', ...cols.flatMap((c) => ['mean', 'std', 'n', 'p', 'p_holm', 'significant', 'verdict'].map((x) => `${c.metric}_${x}`))];
-  const rows = t.rows.map((r) => [r.key, r.label, ...r.cells.flatMap((x) => [x.mean, x.std, x.n, x.p, x.pAdj, x.significant === undefined ? '' : x.significant ? 'yes' : 'no', x.verdict])]);
+  // The verdict and p say how a cell stands: `significant` (only "better") beside "worse" misled readers.
+  const head = ['row', 'label', ...cols.flatMap((c) => ['mean', 'std', 'n', 'p', 'p_holm', 'verdict'].map((x) => `${c.metric}_${x}`))];
+  const rows = t.rows.map((r) => [r.key, r.label, ...r.cells.flatMap((x) => [x.mean, x.std, x.n, x.p, x.pAdj, x.verdict])]);
   return [head, ...rows].map((r) => r.map(q).join(',')).join('\n') + '\n';
 }
 

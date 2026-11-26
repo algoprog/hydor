@@ -528,6 +528,17 @@ test('the baseline is the person’s; scores are compared with it', async () => 
   await assert.rejects(startScore(deps, main.id, { kind: 'baseline', by: { who: 'agent' } }), /Only the person sets the baseline/);
   assert.equal((await call('POST', `/api/experiments/evaluations/${main.id}/baseline`, {}, true)).status, 403);
   assert.equal((await call('POST', `/api/experiments/evaluations/${main.id}/baseline`, { score: homeScore.id }, true)).status, 403);
+  // With no baseline, an agent’s score comes with the latest of the same seal from other folders and branches.
+  sessions.answer = 'accept';
+  const alone = (await tool('evaluation_score', { id: main.id, cwd: repo, wait: 1 })).json;
+  assert.equal(alone.status, 'done', alone.why);
+  assert.match(alone.noBaseline, /There is no baseline yet.*under others: compare with those yourself, without running them again\.$/);
+  const better0 = alone.others.find((x: { branch?: string }) => x.branch === 'better');
+  assert.deepEqual(Object.keys(better0), ['branch', 'mean', 'std', 'seeds']);
+  near(better0.mean, 0.92);
+  assert.deepEqual(better0.seeds, [1, 2, 3]);
+  assert.equal(alone.others.filter((x: { branch?: string }) => x.branch === 'better').length, 1, 'the latest of each');
+  assert.ok(!alone.others.some((x: { branch?: string }) => x.branch === 'main'), 'not its own folder’s');
   const measured = await call('POST', `/api/experiments/evaluations/${main.id}/baseline`, {});
   assert.equal(measured.status, 200, JSON.stringify(measured.body));
   const base = await over(measured.body.score.id);

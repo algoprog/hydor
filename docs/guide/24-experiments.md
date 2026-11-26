@@ -80,7 +80,7 @@ At the end, **Make a table** and **Compare the best 6**.
 3. Pick the **Folder** it runs in, and **Where it runs**: **This computer**, one of your other machines, or a cluster (see [Where runs go](#where-runs-go)).
 4. Set the **GPUs** it needs (0 runs it without one) and **Free memory each (GB)**. Left empty, it waits for a GPU nobody uses.
 5. Give it a **Name** if you like (the name of its script otherwise) and an **Experiment**: the runs of one experiment are listed, charted and compared together (the box suggests the ones you have).
-6. Click **Start**.
+6. **Start** says when it goes: **When a GPU is free**, or **Tonight** (see [Runs that wait for the night](#runs-that-wait-for-the-night)). Then click **Start**.
 
 **More options** holds the rest:
 
@@ -101,9 +101,19 @@ The new run opens, so you can watch it start. To add a run to an experiment you 
 - A run sees only its own GPUs (CUDA_VISIBLE_DEVICES); one without a GPU sees none. It also gets HYDOR_RUN (its id), HYDOR_RUN_DIR (its folder) and HYDOR_SEED, and Python prints at once (PYTHONUNBUFFERED), so its log follows as it goes.
 - Runs go on in tmux (or in the background, where there is no tmux) when the app restarts or updates. When the app is back, it finds them again, reads what they printed meanwhile and sees which ended; one whose process went missing is marked **Went missing**.
 
+## Runs that wait for the night
+
+When your GPUs are also for your own work by day, or for services that must stay fast, send what can wait (controls, wider sweeps, ideas worth a try) to the night. A night run starts only in the night hours of the computer it runs on, and only when none of your other runs waits there for the same thing (a GPU, or a place among the runs without one): those always go first, whatever the priorities. Until then it says **Waits for the night (from 23:00)**, and the queue line counts these runs apart.
+
+- **The hours**: in [Where runs go](#where-runs-go), **Night from** one time **to** another, 23:00 to 07:00 unless you change them (a night may cross midnight). They are this computer's own clock; a run sent to another of your machines waits for that machine's night. With the same time in both there is no night, and night runs wait until you set one. A cluster has its own queue, so a night run cannot be sent to one.
+- **When the night ends**: **Let running ones finish** (what it is to start with), or **Stop them and start them again the next night**. A stopped run starts again from the beginning (the log it had is kept in its folder), and says "The night ended: it starts again tonight" until then. Changing the hours so that it is no longer night ends the night too.
+- **Starting one**: in New run, for a run or a sweep, set **Start** to **Tonight**; the night's hours are written beside it. The dialog opens on **When a GPU is free** every time, **Run again** too.
+- **In the morning**: one notice, such as "Last night: 5 runs done, 1 failed, 2 still wait for tonight", opens Experiments with that night's runs first. A night run that ends in the night sends no "done" notice of its own (a failure is told as ever, and a session that asked still hears how it went); one that ends after the morning notice is told on its own. There is no notice when no night run ended or waits.
+- **Agents** send exploratory runs there too; their approval card says when a run will start.
+
 ## What a run records
 
-- **Its code**: when it starts, the commit and branch of its folder's Git repository and whether there were changes not committed; if there were, a patch of them (binary files left out, at most 2 MB), and how many files Git does not track. On this computer, the files its command names that Git does not track or ignores (a script you have not committed, a small settings file) are copied into its folder, under `untracked/`, so you can run it again later: at most 1 MB a file and 5 MB in all, never one that looks like it holds a key or a password. Its record says "Not in git, kept with the run", and which were too large to keep.
+- **Its code**: when it starts, the commit and branch of its folder's Git repository and whether there were changes not committed; if there were, a patch of them (binary files left out, at most 2 MB), and how many files Git does not track. On this computer, the files its command names that Git does not track or ignores (a script you have not committed, a small settings file) are copied into its folder, under `untracked/`, so you can run it again later. Files of your own outside the run's folder that the command names (by a whole path, a path with `..` or `~`) are copied too, under `untracked/outside/` by their names, and listed as the command wrote them: a script in your main checkout run from a Git worktree, say. Not those another checkout or worktree of the same repository has committed unchanged at the run's commit, nor system or package files (under `/usr`, `/opt`, `node_modules`, `site-packages`, a virtual environment's programs…), nor the app's own data. In all, at most 1 MB a file and 5 MB a run, never one that looks like it holds a key or a password. Its record says "Not in git, kept with the run", and which were too large to keep.
 - **Its environment**: the computer; the Python the command runs with and the versions of PyTorch, Transformers, JAX, TensorFlow and NumPy in it (read from the packages, nothing is imported); with GPUs, the CUDA and driver versions and the GPUs' names.
 - **Its hyperparameters and seed**, its **log**, its **exit code**, and its own folder in the app's data (its log, patch, exit code and metrics).
 - **Its metrics**, read from its output as it grows: `key=value` pairs (`loss=0.42`, as Lightning's progress bars print them), a JSON object on a line (`{"step": 100, "loss": 0.42}`), Python's printed dicts (as Hugging Face's Trainer prints them), Keras' "loss: 0.41 - accuracy: 0.87", and the metrics file. The step comes from `step`, `global_step`, `iter` or `epoch`. For each metric it keeps the last value, the best (lower is better for losses, errors, perplexity and the like by their names, higher for the others) and a series for the charts. A metric it prints again and again is a curve; a number it prints once is a value (its hyperparameters at the start, its results at the end). It keeps up to 100 metrics: when a run prints more, its curves are kept before numbers it printed once.
@@ -146,9 +156,9 @@ Left empty, the rules are: "Read the log and the code. If a fix is clear and saf
 
 ## Notifications
 
-You hear when a run is done or fails (unless you untick them), when a metric crosses the value you set, and from the agent on call. A notification opens the run's page. A sweep tells you once, when all its runs have ended, with its best run; its notice opens the sweep's experiment on its **Hyperparameters** tab. At most eight notices about runs come in ten minutes; past that, one tells you how many more there were.
+You hear when a run is done or fails (unless you untick them), when a metric crosses the value you set, and from the agent on call. A notification opens the run's page. A sweep tells you once, when all its runs have ended, with its best setting (its seeds averaged), or the number all its runs gave when they gave the same one; its notice opens the sweep's experiment on its **Hyperparameters** tab. At most eight notices about runs come in ten minutes; past that, one tells you how many more there were.
 
-A run an agent started with "tell me when it ends" (report) also sends that session a message when it ends, so its agent can go on from there. Runs of one session that end close together, or while its agent is at work, are told in one message, a line each with the numbers that matter most, and a run the agent has read since it ended is left out; in the conversation it shows as one row, **Experiments · Runs ended**, which opens on a click.
+A run an agent started with "tell me when it ends" (report) also sends that session a message when it ends, so its agent can go on from there. Runs of one session that end close together, or while its agent is at work, are told in one message, under their experiments' names, with the numbers that matter most. Runs that differ only in their seed are one line, with each number's mean and spread over them, and a failed or stopped seed said in it. How long a run took is said when it was a minute or more, or it failed; past 20 lines, the message counts what is left in each experiment. The message comes after the agent's turn when it is at work, and a run the agent has read since it ended is left out; in the conversation it shows as one row, **Experiments · Runs ended**, which opens on a click. It is the app's own notice, not a message of yours, so nothing from memory or the wiki is added to it (nor to a goal's messages).
 
 ## Titles, descriptions and categories
 
@@ -218,7 +228,7 @@ If a sealed file differs, an amber notice says which, and scores wait until they
 
 ### What agents can do
 
-Agents can read the evaluations, ask for a score of their folder (the app runs the sealed command itself; they report that number, not their own), propose a new evaluation (you see every part of it on a card and it is made only if you say yes) and put sealed files back. They cannot create or seal one themselves, set the baseline, or run or read the final test.
+Agents can read the evaluations, ask for a score of their folder (the app runs the sealed command itself; they report that number, not their own; with no baseline yet, the answer also gives the latest scores of other folders and branches, so they can compare without running them again), propose a new evaluation (you see every part of it on a card and it is made only if you say yes) and put sealed files back. They cannot create or seal one themselves, set the baseline, or run or read the final test.
 
 Runs started in an evaluation's folder say on their page whether its files were as sealed when they started, and a runs table marks the ones where they were not with an amber sign. A run that scored an evaluation leads back to it.
 
@@ -273,12 +283,12 @@ Agents can start one with your yes on a card, and read how it goes. They cannot 
 - **Test against the baseline**: **Pick for me** (paired over examples when the runs kept per-example scores, else paired over seeds when the rows' runs share their seeds, else Welch's t-test over seeds), **Welch’s t-test over seeds**, **Paired t-test (by seed or by example)**, **Paired bootstrap over examples** or **No test**.
 - **Caption**.
 
-Each cell is the mean ± the standard deviation over the row's runs (its seeds); the best of each column is in bold; a dagger (†) marks a cell that is better than the baseline at p < 0.05, after Holm's correction for testing several rows, and a double dagger (‡) one that is worse. When the seeds barely change a number (it comes out the same, or almost, for every seed) and the runs kept no per-example scores, that comparison gets no mark: a note under the table says a test over seeds says little, and to compare per example. Hover over a cell for its p-values. A line under the table says which test was made, and what was left out (runs that have not ended, or without these metrics).
+Each cell is the mean ± the standard deviation over the row's runs (its seeds); the best of each column is in bold; a dagger (†) marks a cell that is better than the baseline at p < 0.05, after Holm's correction for testing several rows, and a double dagger (‡) one that is worse. When the seeds barely change a number (it comes out the same, or almost, for every seed) and the runs kept no per-example scores, that comparison gets no mark: a note under the table says a test over seeds says little, and to compare per example. A row whose per-example scores are the baseline's on every example counts as the same, and a note under the table says so. With a row per value of a hyperparameter, the runs that do not have it are one row, named so (**ranker not set**). Hover over a cell for its p-values. A line under the table says which test was made, and what was left out (runs that have not ended, or without these metrics).
 
 Then:
 
 - **Copy LaTeX**: a `table` with booktabs' rules (add `\usepackage{booktabs}` to your preamble), the best in `\textbf`, `$\pm$`, daggers and double daggers, and a caption that says how the cells read.
-- **Copy Markdown** and **Download CSV** (each metric's mean, standard deviation, number of runs and p-values).
+- **Copy Markdown** and **Download CSV** (each metric's mean, standard deviation, number of runs, p-values and verdict: better than the baseline, worse, or the same, which means the test found no difference).
 - **Put it in a LaTeX document**: pick one of your LaTeX documents (kept in a project's files, or with its conversation), then one of its files. The table goes before `\end{document}` (or at the end of a file without it), or in place of the table it made there before, keeping your own caption and label. It is saved as a new version of the document, as your own edits are.
 
 A table is kept when you copy it or put it in a document. Its LaTeX carries a line `% hydor:table <id>` just above its tabular: keep it there, so the check before you submit can work the numbers out again from the runs and say which changed. **Results tables**, in the menu (⋯) at the top of the page, lists the tables kept: open one to copy or place it again, or **Work it out again** from its runs as they are now.
@@ -301,7 +311,7 @@ The sweep's runs are one experiment like any other: its runs table has a column 
 
 **More** (⋯) at the top → [**Where runs go**](/experiments?places=1):
 
-- **This computer**: its GPUs, and **Jobs without a GPU: at most N at once**.
+- **This computer**: its GPUs, **Jobs without a GPU: at most N at once**, and its night: **Night from** and **to**, and **When the night ends** (see [Runs that wait for the night](#runs-that-wait-for-the-night)).
 - **Other machines**: those in [Settings → Machines](/settings?s=machines) that are connected. A run sent to one is kept and watched there: its agent on call and its notices are that machine's (its notices come to you here, as all of that machine's do), and this page follows it. The list here shows every connected machine's runs too, marked with where they run; opening one reads it there, and Stop stops it there.
 - **Clusters**: computers you reach over SSH, where nothing needs installing.
 
@@ -325,6 +335,7 @@ There is no column: the Overview starts with the queue, the GPUs and **Find an e
 ## Ask an agent
 
 - "Train this on a free GPU and tell me when it's done."
+- "Run these three controls tonight and tell me in the morning what they showed."
 - "Run eval.py on the Unity cluster with 2 GPUs for 4 hours."
 - "Sweep the learning rate over 1e-4, 3e-4 and 1e-3 with seeds 1, 2 and 3, and stop the bad runs early."
 - "Why did my last run fail? If the fix is clear, run it again."

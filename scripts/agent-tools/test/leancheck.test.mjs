@@ -129,7 +129,7 @@ test('name@pin: verified while the statement is the pinned one; 3 and its own se
   assert.equal(run([weaker]).code, 0, 'it is proved; only the pin tells it is not what was agreed');
   const r = run([weaker, '--theorem', `bound@${pin}`]);
   assert.equal(r.code, 3, r.out + r.err);
-  assert.match(r.out, /\n {2}FAIL bound@[0-9a-f]{12} : /);
+  assert.match(r.out, /\n {2}FAIL bound \(not the statement that was pinned\) : /);
   const last = r.out.trim().split('\n').pop();
   const now = said('Now.lean', 'theorem bound (n : Nat) (h : 0 < n) : n ≤ n + 1 := by\n  omega\n').pin;
   assert.ok(last.startsWith(`NOT VERIFIED: bound no longer says what was agreed: its statement changed (it was pinned as ${pin}, it is now ${now}). It now says: ∀ (n : Nat), (0 : Nat) < n → n ≤ n + (1 : Nat) (`), last);
@@ -153,7 +153,7 @@ test('a definition the statement rests on is part of the pin', { skip: WIN }, ()
   const { pin } = said('Def.lean', text(2));
   const r = run([lean('Def.lean', text(3)), '--theorem', `t@${pin}`]);
   assert.equal(r.code, 3, r.out);
-  assert.match(r.out, new RegExp(`t no longer says what was agreed: its statement changed \\(it was pinned as ${pin}, it is now [0-9a-f]{12}\\) \\(the pin covers the definitions of its own that it rests on too: twice\\)\\. It now says: twice \\(0 : Nat\\) = \\(0 : Nat\\)`));
+  assert.match(r.out, new RegExp(`t no longer says what was agreed: its statement, or one of its own definitions that it rests on \\(twice\\), changed \\(it was pinned as ${pin}, it is now [0-9a-f]{12}\\)\\. A statement can read the same and say something else once a definition under it has changed\\. It now says: twice \\(0 : Nat\\) = \\(0 : Nat\\)`));
 });
 
 test('exit 2: the question is wrong (no such file, no such theorem, a malformed pin)', { skip: WIN }, () => {

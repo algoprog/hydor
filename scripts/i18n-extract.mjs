@@ -496,6 +496,28 @@ for (const s of [
   "Welch's t-test over {0} seeds",
 ])
   add(s, 'server/experiments/tables.ts');
+// Runs that wait for the night: why one waits, and why a cluster takes none, which the pages show as the run's reason or in a
+// toast (the constants of server/experiments/night.ts), and the box a refused time names (queue.ts).
+for (const m of fs.readFileSync(path.join(ROOT, 'server/experiments/night.ts'), 'utf8').matchAll(/^(?:export )?const NIGHT_\w+ = ('(?:[^'\\]|\\.)*');$/gm)) for (const s of literals(m[1])) add(s, 'server/experiments/night.ts');
+add('Night to', 'server/experiments/queue.ts');
+// The morning's notice (morningWords in night.ts): its counts joined by commas, the first saying "run" or "runs". The pages'
+// translator takes it whole or not at all, so every reading is written out here.
+{
+  const parts = ['done', 'failed', 'stopped', 'still running', 'waits'];
+  for (let set = 1; set < 1 << parts.length; set++) {
+    const used = parts.filter((_, i) => set & (1 << i));
+    for (const one of [true, false]) {
+      let readings = [''];
+      let k = one ? 0 : 1;
+      used.forEach((p, i) => {
+        const count = i ? `{${k++}}` : one ? '1 run' : '{0} runs';
+        const said = p !== 'waits' ? [p] : (i ? [true, false] : [one]).map((single) => `still ${single ? 'waits' : 'wait'} for tonight`);
+        readings = readings.flatMap((r) => said.map((w) => `${r}${i ? ', ' : ''}${count} ${w}`));
+      });
+      for (const r of readings) add(`Last night: ${r}`, 'server/experiments/night.ts');
+    }
+  }
+}
 // The names and lines of what ships, and of the choices the server offers (permission modes, the buttons of an approval).
 const NAMED = ['assistants/builtins', 'apps/templates', 'apps/templates-more', 'apps/templates-research', 'apps/templates-papers', 'apps/templates-lab', 'apps/explore', 'apps/draft', 'apps/screens', 'pages/latex-check', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api', 'automations/account-watch'];
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {

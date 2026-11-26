@@ -1,12 +1,14 @@
 // Where runs go: this computer (its GPUs, and how many jobs without a GPU run at once), the other machines of
 // Settings → Machines, and clusters reached over SSH (SLURM, or plain SSH with tmux there): Add a cluster, Check
-// (ssh host true, then sinfo or nvidia-smi), Remove.
-import { useEffect, useState } from 'react';
+// (ssh host true, then sinfo or nvidia-smi), Remove. This computer's night is set here too: its hours, and what
+// happens to night runs still going when it ends.
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Plus, Server, XCircle } from 'lucide-react';
-import type { ClusterSpec, QueueNow } from '@shared/experiments';
+import type { ClusterSpec, ExperimentsSettings, QueueNow } from '@shared/experiments';
 import type { MachineView } from '@shared/types';
 import { api, post, put } from '../../lib/api';
 import { machineId } from '../../lib/machine';
+import { trIn } from '../../i18n/runtime';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { Button, cx, Dialog, inputCls, Segmented, Throbber } from '../../components/ui';
@@ -123,6 +125,9 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
   const [machines, setMachines] = useState<MachineView[]>([]);
   const [queue, setQueue] = useState<QueueNow | null>(null);
   const [slots, setSlots] = useState('');
+  const [night, setNight] = useState<Pick<ExperimentsSettings, 'nightFrom' | 'nightTo' | 'nightEnds'> | null>(null);
+  // A time typed is saved a moment after the last key, or on leaving the box: half a time is not a night.
+  const hours = useRef<{ patch: Partial<ExperimentsSettings>; timer?: number }>({ patch: {} });
   const [form, setForm] = useState(false);
   const [checking, setChecking] = useState<string | null>(null);
   const load = () => {
@@ -140,10 +145,31 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
     api<QueueNow>('/api/experiments/queue')
       .then(setQueue)
       .catch(() => {});
+    setNight(null);
     loadSettings()
-      .then((s) => setSlots(String(s.cpuSlots)))
+      .then((s) => {
+        setSlots(String(s.cpuSlots));
+        setNight({ nightFrom: s.nightFrom, nightTo: s.nightTo, nightEnds: s.nightEnds });
+      })
       .catch(() => {});
   }, [open, adding]);
+  const saveHours = () => {
+    window.clearTimeout(hours.current.timer);
+    const patch = hours.current.patch;
+    hours.current = { patch: {} };
+    if (Object.keys(patch).length) put('/api/experiments/settings', patch).catch(toastError);
+  };
+  const setHour = (k: 'nightFrom' | 'nightTo', v: string) => {
+    setNight((n) => n && { ...n, [k]: v });
+    window.clearTimeout(hours.current.timer);
+    if (v) hours.current.patch[k] = v;
+    else delete hours.current.patch[k];
+    hours.current.timer = window.setTimeout(saveHours, 1200);
+  };
+  const setNightEnds = (v: ExperimentsSettings['nightEnds']) => {
+    setNight((n) => n && { ...n, nightEnds: v });
+    put('/api/experiments/settings', { nightEnds: v }).catch(toastError);
+  };
   const saveSlots = async (v: string) => {
     setSlots(v);
     const n = Number(v);
@@ -181,6 +207,38 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
             <input value={slots} onChange={(e) => saveSlots(e.target.value.replace(/\D/g, '').slice(0, 2))} inputMode="numeric" className={cx(inputCls.replace('w-full', ''), 'tnum h-8 w-14 text-[13px]')} />
             at once
           </label>
+          {night && (
+            <>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-fg-2">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="whitespace-nowrap">Night from</span>
+                  <input type="time" aria-label="The night starts at" value={night.nightFrom} onChange={(e) => setHour('nightFrom', e.target.value)} onBlur={saveHours} className={cx(inputCls.replace('w-full', ''), 'tnum h-8 w-[9rem] text-[13px]')} />
+                  {/* Kept with its box, so a narrow screen takes both to the next line. */}
+                  <span className="flex items-center gap-2">
+                    {trIn('night', 'to')}
+                    <input type="time" aria-label="The night ends at" value={night.nightTo} onChange={(e) => setHour('nightTo', e.target.value)} onBlur={saveHours} className={cx(inputCls.replace('w-full', ''), 'tnum h-8 w-[9rem] text-[13px]')} />
+                  </span>
+                </span>
+                <span className="flex max-w-full flex-wrap items-center gap-2">
+                  When the night ends
+                  <Segmented
+                    size="sm"
+                    value={night.nightEnds}
+                    onChange={setNightEnds}
+                    options={[
+                      { value: 'finish', label: 'Let running ones finish' },
+                      { value: 'stop', label: 'Stop them and start them again the next night' },
+                    ]}
+                  />
+                </span>
+              </div>
+              <p className="leading-relaxed text-fg-3">
+                {night.nightFrom === night.nightTo
+                  ? 'From and to are the same: there is no night, and night runs wait until you set one.'
+                  : 'A night run starts only in these hours, after your other waiting runs. One stopped at the end starts again from the beginning.'}
+              </p>
+            </>
+          )}
         </section>
         {!machineId && (
           <section className="space-y-2">

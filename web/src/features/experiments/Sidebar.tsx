@@ -10,6 +10,7 @@ import type { EvaluationListed } from '@shared/evaluations';
 import type { Evolution } from '@shared/evolve';
 import { entryLine, toneClass } from './evalWords';
 import { columnWords } from './evolveWords';
+import { countWaitingForNight, nightCountWords } from './nightWords';
 import { LOCALE } from '../../i18n/locale';
 import { timeAgo } from '../../lib/format';
 import { Meter } from '../../components/charts';
@@ -120,18 +121,23 @@ export function byCategory<T extends Entry>(entries: T[]): { blocks: { label: st
   return { blocks, none };
 }
 
-/** What runs now and what waits, as a line: "1 running · 2 waiting". */
+/** What runs now and what waits, as a line: "1 running · 2 waiting · 2 wait for the night". */
 export function QueueLine({ runs }: { runs: RunRecord[] }) {
   const going = runs.filter((r) => r.status === 'running' || r.status === 'starting').length;
-  const waiting = runs.filter((r) => r.status === 'queued' || r.status === 'waiting').length;
+  // Those that wait for the night are counted apart: nothing is in their way but the hour.
+  const night = countWaitingForNight(runs);
+  const waiting = runs.filter((r) => r.status === 'queued' || r.status === 'waiting').length - night;
   return (
     <div className="flex min-w-0 items-center gap-2 text-[12.5px] text-fg-2">
-      <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', going ? 'bg-accent' : waiting ? 'bg-warn' : 'bg-fg-3')} />
-      {going || waiting ? (
-        <span className="min-w-0 truncate">
+      <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', going ? 'bg-accent' : waiting || night ? 'bg-warn' : 'bg-fg-3')} />
+      {going || waiting || night ? (
+        // With three parts the line may take a second one rather than cut the last off.
+        <span className={cx('min-w-0', !night && 'truncate')}>
           {going > 0 && <span>{`${going} running`}</span>}
           {going > 0 && waiting > 0 && <span> · </span>}
           {waiting > 0 && <span>{`${waiting} waiting`}</span>}
+          {night > 0 && going + waiting > 0 && <span> · </span>}
+          {night > 0 && <span>{nightCountWords(night)}</span>}
         </span>
       ) : (
         <span>Nothing running now</span>

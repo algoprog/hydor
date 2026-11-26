@@ -39,7 +39,8 @@ function NoticeCard({ t, n }: { t: Toast; n: ToastNotice }) {
           <span className={cx('mt-0.5 block text-[12.5px] text-fg-3', n.kind === 'failed' ? 'line-clamp-2' : 'truncate')}>
             <span className={cx('font-medium', tone.text)}>{status}</span>
             {n.machine && <> · on {n.machine}</>}
-            {detail && <> · {detail}</>}
+            {/* In an element of its own, so it is translated whole: not as one line with the dot before it. */}
+            {detail && <> · <span>{detail}</span></>}
           </span>
         </span>
       </button>

@@ -9,7 +9,9 @@
 // (expansion, placeholders, the early stop); SLURM (the batch script, sbatch, squeue and sacct with canned output,
 // a whole run through a stand-in ssh); another machine's runs; the tools (in a step, in Plan mode, asking the user)
 // and experiment_wait; the routes; the batch series route; experiments' titles, descriptions and categories (the
-// routes, the helper's writing with a stand-in model, when it happens by itself) and experiment_describe.
+// routes, the helper's writing with a stand-in model, when it happens by itself) and experiment_describe; runs that
+// wait for the night, with the clock set by the test (the hours, ordinary runs first, the night's end both ways, the
+// morning's notice, clusters and other machines, the tools).
 // Build and run with a scratch data folder (no GPU is used):
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/experiments/experiments-test.ts
 //   DATA_DIR=/tmp/hydor-test-experiments CUDA_VISIBLE_DEVICES= node dist/dev/experiments-test.js
@@ -36,14 +38,16 @@ import { describeGroup, enableExperimentDescriptions, firstObject, redactCommand
 import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
 import { MAX_METRICS, nanText, oomText, parseLine, Tracker } from './metrics.ts';
-import { cleanJob, endLine, forgetLive, forgetNotices, onCallBrief, repairEnded, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
-import { addEvent, getInfo, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveSeries, saveTable, seriesOf, updateRun, waitStarted, workOut } from './records.ts';
+import { cleanJob, endLine, forgetLive, forgetNotices, onCallBrief, repairEnded, setSettings, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
+import { clock, morningWords, NIGHT_AGAIN, NIGHT_BEHIND, nightAt } from './night.ts';
+import { addEvent, getInfo, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveInfo, saveSeries, saveTable, seriesOf, updateRun, waitStarted, workOut } from './records.ts';
 import { useMachines } from './remote.ts';
 import { holm, lgamma, pairedBootstrap, pairedT, tTwoSided, welch } from './stats.ts';
 import { earlyStop, expandSweep, fillCommand, paramsOf, placeholders, runFile, shellWords } from './sweeps.ts';
 import { insertTable, makeTable, parseScores } from './tables.ts';
+import { startSweep } from './api.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
-import { experimentTools } from './tools.ts';
+import { experimentTools, SPAWN_NOTE } from './tools.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -556,7 +560,7 @@ test('a results table: mean ± std, the best in bold, Welch with Holm against sc
   assert.ok(t.markdown.includes('| ours | **83.37** ± 0.25 † | **0.453** ± 0.015 † |'), t.markdown);
   assert.ok(t.markdown.endsWith("† Better than base at p < 0.05 (Welch's t-test over 3 seeds, Holm-corrected)."));
   const csv = t.csv.split('\n');
-  assert.equal(csv[0], 'row,label,acc_mean,acc_std,acc_n,acc_p,acc_p_holm,acc_significant,acc_verdict,loss_mean,loss_std,loss_n,loss_p,loss_p_holm,loss_significant,loss_verdict');
+  assert.equal(csv[0], 'row,label,acc_mean,acc_std,acc_n,acc_p,acc_p_holm,acc_verdict,loss_mean,loss_std,loss_n,loss_p,loss_p_holm,loss_verdict');
   assert.deepEqual([ours.cells[0].verdict, other.cells[0].verdict, base.cells[0].verdict], ['better', 'same', undefined]);
   assert.ok(csv[2].startsWith('ours,ours,83.3666666666666'), csv[2]);
   assert.deepEqual(tableMarks(`a\n% hydor:table tabc1234\nb\n  % hydor:table tx9\n`), ['tabc1234']);
@@ -572,9 +576,10 @@ test('worse than the baseline is marked apart from no difference, and the captio
   assert.match(wide.latex, /\$\^\\ddagger\$ Worse than base, by the same test\./);
   assert.match(wide.markdown, /\| down \|[^\n]* ‡ \|/);
   assert.ok(wide.footnote!.endsWith('‡ Worse than base, by the same test.'));
-  assert.match(wide.csv, /\ndown,down,[^\n]*,no,worse\n/);
-  assert.match(wide.csv, /\nup,up,[^\n]*,yes,better\n/);
-  assert.match(wide.csv, /\neven,even,[^\n]*,no,same\n/);
+  assert.match(wide.csv, /\ndown,down,[^\n]*,worse\n/);
+  assert.match(wide.csv, /\nup,up,[^\n]*,better\n/);
+  assert.match(wide.csv, /\neven,even,[^\n]*,same\n/);
+  assert.ok(!/significant|,yes,|,no,/.test(wide.csv), wide.csv);
   // Where lower is better, lower is the better verdict.
   assert.equal(t.rows.find((r) => r.key === 'down')!.cells[1].verdict, 'worse');
   assert.equal(t.rows.find((r) => r.key === 'up')!.cells[1].verdict, 'better');
@@ -614,6 +619,40 @@ test('seeds that barely change a number are not tested over seeds, and the table
   assert.deepEqual(e.tests, ['paired t-test over 6 examples']);
   assert.equal(e.rows.find((r) => r.key === 'BM25')!.cells[0].verdict, 'better');
   assert.equal(e.notes, undefined);
+});
+
+test('per-example scores the same on every example read as the same, and say so; a row of runs without the setting is named so', async () => {
+  const mk = (id: string, seed: number, ndcg: number, params?: Record<string, string>) => ({ id, status: 'done', createdAt: seed, command: 'x', cwd: tmp, group: 'toy-ranker', seed, params, metrics: { last: { ndcg } }, scores: true, folder: `/${id}` }) as RunRecord;
+  // As the trial had it: the unchanged ranker (no setting), one variant that scores each query the same, one that differs.
+  const runs = [0, 1, 2].flatMap((i) => [mk(`none${i}`, i, 0.7), mk(`bm25l${i}`, i, 0.7, { ranker: 'bm25l' }), mk(`cos${i}`, i, 0.8, { ranker: 'cosine' })]);
+  const per = (r: RunRecord) => new Map([['ndcg', new Map([0, 1, 2, 3, 4].map((k) => [`q${k}`, (r.params?.ranker === 'cosine' ? 0.8 : 0.7) + (k - 2) / 10 + (r.params?.ranker === 'cosine' ? k / 100 - 0.02 : 0)]))]]);
+  const note = 'ranker = bm25l, ndcg: identical to ranker not set on every example';
+  for (const test of [undefined, 'paired', 'bootstrap'] as const) {
+    const t = makeTable({ rows: 'param:ranker', columns: [{ metric: 'ndcg', better: 'max' }], baseline: '—', test }, runs, { id: 'tident01', scores: per });
+    assert.deepEqual(t.rows.map((r) => r.label).sort(), ['ranker = bm25l', 'ranker = cosine', 'ranker not set']);
+    const cell = t.rows.find((r) => r.key === 'bm25l')!.cells[0];
+    assert.deepEqual([cell.p, cell.pAdj, cell.significant, cell.verdict], [null, null, false, 'same'], String(test));
+    assert.deepEqual(t.notes, [note]);
+    assert.ok(t.latex.includes(`% hydor:table tident01\n% ${note}\n\\begin{tabular}`), t.latex);
+    assert.ok(t.markdown.endsWith(`<!-- ${note} -->`), t.markdown);
+    assert.match(t.csv, /\nbm25l,ranker = bm25l,[^\n]*,,,same\n/);
+  }
+  // The tool's answer gives each cell's verdict and p, never `significant`; the table kept still has it, for its marks.
+  for (const r of runs) {
+    insertRun(db, { id: r.id, status: 'done', spec: { command: 'x', cwd: tmp, group: 'identical', params: r.params, seed: r.seed } });
+    updateRun(db, r.id, { metrics: { last: { ndcg: r.metrics!.last.ndcg + r.seed! / 50 } } });
+  }
+  const step = ctxOf({ step: true, runId: 'flow-tab', key: 'acp:flow-tab', agent: 'acp' });
+  const answer = JSON.parse((await call('experiment_table', { group: 'identical', rows: 'param:ranker', columns: [{ metric: 'ndcg', better: 'max' }] }, step)).text);
+  const cells = answer.rows.flatMap((r: { cells: Record<string, unknown>[] }) => r.cells);
+  assert.ok(cells.every((c: Record<string, unknown>) => !('significant' in c)) && cells.some((c: Record<string, unknown>) => c.verdict && 'p' in c), JSON.stringify(cells));
+  assert.ok(!answer.csv.includes('significant'));
+  assert.ok(getTable(db, answer.id)!.rows.some((r) => r.cells[0].significant !== undefined));
+  const tools = experimentTools(step);
+  assert.match(tools.find((t) => t.name === 'experiment_table')!.description, /verdict, to be read with its p/);
+  // A sweep's tool takes what its description names.
+  const props = (tools.find((t) => t.name === 'experiment_sweep')!.inputSchema as { properties: Record<string, unknown> }).properties;
+  for (const k of ['tags', 'name', 'scoresFile', 'metricsFile']) assert.ok(props[k], k);
 });
 
 test('tests pick themselves: paired over seeds when the rows share seeds, over examples when runs kept scores', () => {
@@ -1021,7 +1060,7 @@ test('the tools: JSON answers; a step runs without asking, Plan mode refuses, a 
   assert.equal(getRun(db, again.id)!.seed, 3);
   sessions.answer = 'accept';
   await until(() => ended(ok.id)() && ended(again.id)(), 20_000, 'the session’s runs');
-  const heard = () => sessions.delivered.some((x) => x.key === 'claude:s1' && x.text.includes(`(${ok.id}) ended. Done in`));
+  const heard = () => sessions.delivered.some((x) => x.key === 'claude:s1' && x.text.includes(`(${ok.id}) ended. Done: acc 1`));
   await until(heard, 5000, 'report: the session to hear how it went');
   const said = sessions.delivered.find((x) => x.key === 'claude:s1')!.text;
   assert.ok(experimentNoticeOf(said), said);
@@ -1099,7 +1138,7 @@ test('runs that end close together are told in one message; one waiting is added
   assert.ok(!sessions.queued.get(key)![0].text.includes('(rf)'));
   const many = noticeText(Array.from({ length: 23 }, (_, i) => e(`r${i}`, i)));
   assert.equal(many.split('\n').filter((l) => l.startsWith('- ')).length, 20);
-  assert.match(many, /\nand 3 more \(experiment_list lists them\)\n/);
+  assert.match(many, /\nand 3 more in no experiment \(experiment_list lists them\)\n/);
   sessions.live.delete(key);
   sessions.queued.delete(key);
 });
@@ -1117,7 +1156,80 @@ test('a run read with experiment_get before the message goes is not told; the ot
   await until(() => sessions.delivered.some((x) => x.key === key), 5000, 'the message');
   gather.ms = was;
   const text = sessions.delivered.filter((x) => x.key === key).map((x) => x.text).join('\n');
-  assert.ok(text.includes(`(${b}) ended. Done in under a minute: ndcg@10 0.5\n`) && !text.includes(`(${a})`), text);
+  assert.ok(text.includes(`(${b}) ended. Done: ndcg@10 0.5\n`) && !text.includes(`(${a})`), text);
+});
+
+test('thirty runs of ten settings over three seeds: a line a setting with the mean and spread, under their experiments, nothing hidden', async () => {
+  const key = 'claude:thirty';
+  sessions.delivered.length = 0;
+  sessions.live.set(key, 'working');
+  const dir = path.join(tmp, 'toy-ranker');
+  fs.mkdirSync(dir, { recursive: true });
+  const names = ['bm25', 'bm25l', 'bm25plus', 'cosine', 'jaccard', 'dirichlet', 'jm', 'pl2'];
+  const settings = [...names.map((n) => ['toy-ranker', n] as const), ['toy-ranker-controls', 'shuffled'] as const, ['toy-ranker-controls', 'idf-only'] as const];
+  const ids = new Map<string, string[]>();
+  saveInfo(db, 'toy-ranker', { title: 'Ranking variants on the toy set' }, 'agent');
+  for (const [group, ranker] of settings)
+    for (const seed of [0, 1, 2]) {
+      // A seed of one setting fails; the scores go to a file named for each seed.
+      const command = `echo "queries=60"; echo "ndcg@10=0.955$HYDOR_SEED"; echo --ranker {ranker} --seed {seed} --out out_{seed}.json > said-{seed}.txt; test {ranker} != jm || test "$HYDOR_SEED" != 1`;
+      const r = await submit(deps, await cleanJob(db, { command, params: { ranker }, seed, cwd: dir, gpus: 0, group, name: `${ranker} seed ${seed}`, report: true }), { startedBy: { session: key } });
+      ids.set(ranker, [...(ids.get(ranker) ?? []), r.id]);
+    }
+  await until(() => [...ids.values()].flat().every((id) => ended(id)()), 90_000, 'thirty runs');
+  await until(() => [...ids.values()].flat().every((id) => sessions.queued.get(key)?.[0]?.text.includes(id)), 10_000, 'the message').catch((e) => assert.fail(`${e.message}: ${JSON.stringify(sessions.queued.get(key))}`));
+  assert.equal(sessions.queued.get(key)!.length, 1, 'one message');
+  const text = sessions.queued.get(key)![0].text;
+  const lines = text.split('\n');
+  const rows = lines.filter((l) => l.startsWith('- '));
+  assert.equal(rows.length, 10, text);
+  assert.ok(lines.includes('Ranking variants on the toy set:') && lines.includes('toy-ranker-controls:'), text);
+  assert.ok(lines.indexOf('Ranking variants on the toy set:') < lines.indexOf('toy-ranker-controls:'), 'the experiment whose first run ended first, first');
+  assert.ok(rows.includes(`- bm25l (3 seeds): ndcg@10 0.9551 ± ${'1.00e-4'} (${ids.get('bm25l')!.join(', ')})`), text);
+  assert.ok(rows.includes(`- jm (3 seeds, 1 failed): ndcg@10 0.9551 ± ${'1.41e-4'}. Seed 1 failed after under a minute: Its command ended with exit code 1 (${ids.get('jm')!.join(', ')})`), text);
+  assert.ok(!/Done in|more/.test(rows.join('\n')), 'under a minute is not said');
+  sessions.live.delete(key);
+  sessions.queued.delete(key);
+});
+
+test('what is one line over seeds, what is not; the rest past twenty lines counted by experiment', () => {
+  const run = (id: string, command: string, params: Record<string, string | number>, seed: number, more: Partial<RunRecord> = {}) => ({ id, command, params, seed, status: 'done', createdAt: 0, cwd: tmp, group: 'g', name: `v seed ${seed}`, startedAt: 0, endedAt: 1000, metrics: { last: { acc: 0.5 } }, ...more }) as RunRecord;
+  const e = (r: RunRecord, at: number) => ({ runs: [r.id], line: `“${r.name}” (${r.id}) ended. Done`, at, group: r.group, run: { record: r, names: ['acc'], took: (r.endedAt! - r.startedAt!) >= 60_000 ? `${Math.round((r.endedAt! - r.startedAt!) / 60_000)} min` : '' } });
+  const rows = (...runs: RunRecord[]) => noticeText(runs.map((r, i) => e(r, i))).split('\n').filter((l) => l.startsWith('- '));
+  // The seed however the command takes it.
+  assert.deepEqual(rows(run('a', 'py x.py --seed 1', { seed: 1 }, 1), run('b', 'py x.py --seed 2', { seed: 2 }, 2)), ['- v (2 seeds): acc 0.5 ± 0 (a, b)']);
+  assert.equal(rows(run('a', 'py x.py 1', {}, 1), run('b', 'py x.py 2', {}, 2)).length, 1, 'a bare {seed}');
+  assert.equal(rows(run('a', 'SEED=1 py x.py --out out/1.json', { out: 'out/1.json' }, 1), run('b', 'SEED=2 py x.py --out out/2.json', { out: 'out/2.json' }, 2)).length, 1);
+  // A setting that happens to equal the seed is still a setting.
+  assert.equal(rows(run('a', 'py x.py --k 1 --seed 1', { k: 1, seed: 1 }, 1), run('b', 'py x.py --k 2 --seed 2', { k: 2, seed: 2 }, 2)).length, 2);
+  assert.equal(rows(run('a', 'py x.py --dropout 1', { dropout: 1 }, 1), run('b', 'py x.py --dropout 2', { dropout: 2 }, 2)).length, 2);
+  // Another folder (the unchanged code beside a worktree's) is not another seed, nor is the same seed run again.
+  assert.equal(rows(run('a', 'py x.py', {}, 1), run('b', 'py x.py', {}, 2, { cwd: '/elsewhere' })).length, 2);
+  assert.equal(rows(run('a', 'py x.py', {}, 1), run('b', 'py x.py', {}, 1)).length, 2);
+  // A minute or more is said.
+  assert.match(rows(run('a', 'py x.py', {}, 1, { endedAt: 5 * 60_000 }), run('b', 'py x.py', {}, 2))[0], /\. Done in up to 5 min \(a, b\)$/);
+  const many = noticeText([...Array.from({ length: 22 }, (_, i) => e(run(`a${i}`, `py x.py --k ${i}`, { k: i }, 0), i)), ...[1, 2, 3, 4].map((i) => e(run(`c${i}`, `py c.py --k ${i}`, { k: i }, 0, { group: 'toy-ranker-controls' }), 30 + i))]);
+  assert.equal(many.split('\n').filter((l) => l.startsWith('- ')).length, 20);
+  assert.match(many, /\nand 2 more in g, 4 more in toy-ranker-controls \(experiment_list lists them\)\n/);
+});
+
+test('a sweep’s end says its best setting without the seed, or what all its runs gave', async () => {
+  const key = 'claude:sweeps';
+  sessions.delivered.length = 0;
+  sessions.live.set(key, 'working');
+  const go = async (group: string, command: string, params: Record<string, unknown[]>) => {
+    const s = await startSweep(deps, { command, params, group, cwd: tmp, gpus: 0, report: true }, { startedBy: { session: key } });
+    await until(() => s.runs.every((r) => ended(r.id)()), 30_000, group);
+    await until(() => !!sessions.queued.get(key)?.[0]?.text.includes(`(${s.sweep.id}) ended`), 10_000, 'the message');
+    return sessions.queued.get(key)![0].text.split('\n').find((l) => l.includes(`(${s.sweep.id}) ended`))!;
+  };
+  assert.match(await go('flat', 'echo "acc=0.9696" --seed {seed}', { seed: [0, 1, 2] }), /ended: 3 done\. All 3 gave acc 0\.9696\. experiment_list/);
+  assert.match(await go('seeds', 'echo "acc=0.{seed}"', { seed: [4, 5, 6] }), /ended: 3 done\. acc 0\.5 ± 0\.1 over 3 seeds\. /);
+  assert.match(await go('both', 'echo "acc=0.{k}{seed}"', { k: [1, 2], seed: [0, 2] }), /ended: 4 done\. Best acc 0\.21 \(mean of 2 seeds\): k=2\. /);
+  assert.match(await go('same', 'echo "acc=0.5" --k {k}', { k: [1, 2] }), /ended: 2 done\. All 2 gave acc 0\.5\. /);
+  assert.match(await go('one', 'echo "acc=0.7" --seed {seed}', { seed: [3] }), /ended: 1 done\. acc 0\.7\. /);
+  sessions.live.delete(key);
+  sessions.queued.delete(key);
 });
 
 // ---- files git does not track, and files of a run's own ----------------------------------------------------------------
@@ -1143,7 +1255,8 @@ test('the files a command names that git does not track are kept with the run, w
   const command = 'sh controls/control.sh --config=ignored.cfg; true tracked.sh big.bin .env keys.py link.txt settings.txt ../outside.txt missing.py > out.txt # notes.txt';
   assert.deepEqual(commandWords('a "b c" d>e 2>&1 | f <g # h'), ['a', 'b c', 'd', '2', 'f', 'g']);
   const listed = await keepUntracked(localShell(dir, process.env as Record<string, string>), command, dir, null);
-  assert.deepEqual(listed, { kept: ['controls/control.sh', 'ignored.cfg'], notKept: ['big.bin'] });
+  // outside.txt is named by a path with .. too: kept as the command gave it (the link to it is left alone).
+  assert.deepEqual(listed, { kept: ['controls/control.sh', 'ignored.cfg', '../outside.txt'], notKept: ['big.bin'] });
   // Five megabytes in all.
   const many = Array.from({ length: 7 }, (_, i) => `part${i}.dat`);
   for (const f of many) fs.writeFileSync(path.join(dir, f), Buffer.alloc(KEEP_FILE));
@@ -1152,16 +1265,83 @@ test('the files a command names that git does not track are kept with the run, w
   assert.deepEqual(await keepUntracked(localShell(tmp, process.env as Record<string, string>), 'sh outside.txt', tmp, null), { kept: [], notKept: [] }, 'outside a repository: nothing');
   const step = ctxOf({ step: true, runId: 'flow-keep', key: 'acp:flow-keep', agent: 'acp' });
   const run = JSON.parse((await call('experiment_run', { command, cwd: dir, gpus: 0 }, step)).text);
-  const words = 'Not in git, kept with the run: controls/control.sh, ignored.cfg. Not in git and too large to keep: big.bin';
+  const words = 'Not in git, kept with the run: controls/control.sh, ignored.cfg, ../outside.txt. Not in git and too large to keep: big.bin';
   assert.equal(run.note, words);
   await until(ended(run.id), 20_000, 'the run');
   const r = getRun(db, run.id)!;
-  assert.deepEqual([r.kept, r.notKept], [['controls/control.sh', 'ignored.cfg'], ['big.bin']]);
+  assert.deepEqual([r.kept, r.notKept], [['controls/control.sh', 'ignored.cfg', '../outside.txt'], ['big.bin']]);
   assert.equal(fs.readFileSync(path.join(runFolder(r.id), 'untracked/controls/control.sh'), 'utf8'), fs.readFileSync(path.join(dir, 'controls/control.sh'), 'utf8'));
-  assert.deepEqual(fs.readdirSync(path.join(runFolder(r.id), 'untracked')).sort(), ['controls', 'ignored.cfg']);
+  assert.deepEqual(fs.readdirSync(path.join(runFolder(r.id), 'untracked')).sort(), ['controls', 'ignored.cfg', 'outside']);
   const got = JSON.parse((await call('experiment_get', { id: run.id }, step)).text);
   assert.equal(got.note, words);
   assert.equal(got.run.where, `local (this computer: ${os.hostname()})`, 'the tools call this computer "local"');
+});
+
+test('files outside the run’s folder are kept too: from a worktree by an absolute path, a path with .. or ~; not what git has, a system’s, a package’s or a secret', async () => {
+  const base = path.join(tmp, 'away');
+  const main = path.join(base, 'main');
+  const wt = path.join(base, 'wt');
+  const other = path.join(base, 'other');
+  const home = path.join(base, 'home');
+  const put = (file: string, text: string | Buffer = `echo ${path.basename(file)}\n`) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, text);
+    return file;
+  };
+  const g = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=T', ...a], { cwd, stdio: 'pipe' });
+  fs.mkdirSync(main, { recursive: true });
+  g(main, 'init', '-q', '-b', 'main');
+  const same = put(path.join(main, 'scripts/same.sh'), 'true\n');
+  const changed = put(path.join(main, 'scripts/changed.sh'), 'true\n');
+  g(main, 'add', '.');
+  g(main, 'commit', '-q', '-m', 'first');
+  g(main, 'worktree', 'add', '-q', '-b', 'try', wt);
+  // The main checkout moves on: one file committed after the run's commit, one changed, one never in git.
+  const later = put(path.join(main, 'scripts/later.sh'));
+  g(main, 'add', 'scripts/later.sh');
+  g(main, 'commit', '-q', '-m', 'later');
+  fs.writeFileSync(changed, 'echo changed\n');
+  const script = put(path.join(main, 'scripts/run.sh'), 'echo "acc=1"\n');
+  put(path.join(home, 'helper.sh'));
+  put(path.join(other, 'x.sh'));
+  const twin = put(path.join(other, 'run.sh'), 'echo twin\n');
+  const big = put(path.join(other, 'big.bin'), Buffer.alloc(KEEP_FILE + 1));
+  put(path.join(other, 'venv/pyvenv.cfg'), 'home = /usr/bin\n');
+  const left = [
+    put(path.join(other, 'venv/bin/tool')),
+    put(path.join(other, 'node_modules/pkg/cli.js')),
+    put(path.join(other, 'lib/python3/site-packages/mod.py')),
+    put(path.join(other, '.env'), 'A=1\n'),
+    put(path.join(other, 'keys.py'), `KEY = "hf_${'a'.repeat(34)}"\n`),
+    put(path.join(process.env.DATA_DIR!, 'private-notes.txt')),
+    '/bin/sh',
+    '/dev/null',
+    '/etc/hostname',
+  ];
+  const command = `sh ${script} ${same} ${changed} ${later} ~/helper.sh ../other/x.sh --also=${twin} ${big} ${left.join(' ')} > ${path.join(other, 'x.sh')}.out`;
+  const wanted = [script, changed, later, '~/helper.sh', '../other/x.sh', twin];
+  const was = process.env.HOME;
+  process.env.HOME = home;
+  try {
+    const sh = localShell(wt, process.env as Record<string, string>);
+    assert.deepEqual(await keepUntracked(sh, command, wt, null), { kept: wanted, notKept: [big] });
+    // From the main checkout itself: what it tracks is not copied (the patch has the changes), the untracked is.
+    assert.deepEqual(await keepUntracked(localShell(path.join(main, 'scripts'), process.env as Record<string, string>), `sh ${same} ${changed} run.sh`, path.join(main, 'scripts'), null), { kept: ['run.sh'], notKept: [] });
+    const step = ctxOf({ step: true, runId: 'flow-away', key: 'acp:flow-away', agent: 'acp' });
+    const run = JSON.parse((await call('experiment_run', { command: `sh ${script} ${same} ../other/x.sh --also=${twin}`, cwd: wt, gpus: 0 }, step)).text);
+    const words = `Not in git, kept with the run: ${script}, ../other/x.sh, ${twin}`;
+    assert.equal(run.note, words);
+    await until(ended(run.id), 20_000, 'the run');
+    const r = getRun(db, run.id)!;
+    assert.deepEqual([r.status, r.kept, r.notKept, r.untracked], ['done', [script, '../other/x.sh', twin], undefined, 0], r.why);
+    const under = path.join(runFolder(r.id), 'untracked/outside');
+    assert.deepEqual(fs.readdirSync(under).sort(), ['run-2.sh', 'run.sh', 'x.sh']);
+    assert.equal(fs.readFileSync(path.join(under, 'run.sh'), 'utf8'), 'echo "acc=1"\n');
+    assert.equal(fs.readFileSync(path.join(under, 'run-2.sh'), 'utf8'), 'echo twin\n');
+    assert.equal(JSON.parse((await call('experiment_get', { id: r.id }, step)).text).note, words);
+  } finally {
+    process.env.HOME = was;
+  }
 });
 
 test('scores of a run’s own: scores.jsonl in $HYDOR_RUN_DIR, {run} and $HYDOR_RUN_DIR in the files, and a sweep’s names and tags', async () => {
@@ -1526,6 +1706,372 @@ test('records made under the old rule are fixed once: from the series, or the lo
   const before = JSON.stringify(getRun(db, id)!.metrics);
   await repairEnded(deps);
   assert.equal(JSON.stringify(getRun(db, id)!.metrics), before);
+});
+
+// ---- runs that wait for the night ------------------------------------------------------------------------------------
+
+/** A time on the computer's own clock, in January 2026: each test takes days of its own. */
+const at = (day: number, h: number, m = 0) => new Date(2026, 0, day, h, m).getTime();
+let now = at(1, 12);
+const setNight = (o: Record<string, unknown> = {}) => setSettings(db, { cpuSlots: 4, nightFrom: '23:00', nightTo: '07:00', nightEnds: 'finish', ...o });
+/** The clock set by the test, the night's settings as given, and the notices forgotten. */
+function nightTest(o: Record<string, unknown> = {}) {
+  clock.now = () => now;
+  setNight(o);
+  forgetNotices();
+  notices.length = 0;
+}
+const job = async (command: string, o: Record<string, unknown> = {}) => submit(deps, await cleanJob(db, { command, cwd: tmp, gpus: 0, ...o }));
+const nightJob = (command: string, o: Record<string, unknown> = {}) => job(command, { when: 'night', ...o });
+let gates = 0;
+/** A command that goes on until the test opens its gate. */
+function gate(before = '', after = 'echo acc=1') {
+  const f = path.join(tmp, `gate-${++gates}`);
+  return { command: `${before}while [ ! -f ${f} ]; do sleep 0.1; done; ${after}`, open: () => fs.writeFileSync(f, '') };
+}
+const status = (r: RunRecord) => getRun(db, r.id)!.status;
+const why = (r: RunRecord) => getRun(db, r.id)!.why;
+const mornings = () => notices.filter((n) => n.key === 'experiments:night');
+const noticesOf = (r: RunRecord) => notices.filter((n) => n.key === `experiment:${r.id}`);
+const stop = (r: RunRecord) => http.inject({ method: 'POST', url: `/api/experiments/runs/${r.id}/stop`, payload: {} });
+async function steps(n = 3) {
+  for (let i = 0; i < n; i++) {
+    await tick();
+    await sleep(60);
+  }
+}
+
+test('night hours: the night an hour is in, across midnight; the settings and what is wrong with them in words', async () => {
+  const h = { nightFrom: '23:00', nightTo: '07:00' };
+  assert.equal(nightAt(at(5, 22, 59), h), null);
+  assert.equal(nightAt(at(5, 23), h), '2026-01-05');
+  assert.equal(nightAt(at(6, 3), h), '2026-01-05', 'the early hours belong to the evening before');
+  assert.equal(nightAt(at(6, 6, 59), h), '2026-01-05');
+  assert.equal(nightAt(at(6, 7), h), null);
+  assert.equal(nightAt(new Date(2026, 1, 1, 2).getTime(), h), '2026-01-31', 'across a month');
+  assert.equal(nightAt(at(5, 0, 59), { nightFrom: '01:00', nightTo: '05:00' }), null);
+  assert.equal(nightAt(at(5, 1), { nightFrom: '01:00', nightTo: '05:00' }), '2026-01-05', 'a night after midnight');
+  assert.equal(nightAt(at(5, 3), { nightFrom: '03:00', nightTo: '03:00' }), null, 'no night');
+
+  assert.equal(morningWords({ done: 5, failed: 1, stopped: 0, running: 0, waiting: 2 }), 'Last night: 5 runs done, 1 failed, 2 still wait for tonight');
+  assert.equal(morningWords({ done: 1, failed: 0, stopped: 0, running: 1, waiting: 1 }), 'Last night: 1 run done, 1 still running, 1 still waits for tonight');
+  assert.equal(morningWords({ done: 0, failed: 2, stopped: 1, running: 0, waiting: 0 }), 'Last night: 2 runs failed, 1 stopped');
+
+  const get = async () => (await http.inject({ method: 'GET', url: '/api/experiments/settings' })).json();
+  const put = async (payload: Record<string, unknown>) => http.inject({ method: 'PUT', url: '/api/experiments/settings', payload });
+  const first = await get();
+  assert.deepEqual([first.nightFrom, first.nightTo, first.nightEnds], ['23:00', '07:00', 'finish']);
+  for (const [payload, words] of [
+    [{ nightFrom: '25:00' }, /^Night from: a time on the 24-hour clock/],
+    [{ nightTo: 'soon' }, /^Night to: a time/],
+    [{ nightEnds: 'kill' }, /^When the night ends: "finish".*or "stop"/],
+    [{}, /^Say what to change/],
+    [{ nightFrom: '22:00', cpuSlots: 0 }, /number from 1 to 64/],
+  ] as const) {
+    const r = await put(payload);
+    assert.equal(r.statusCode, 400, JSON.stringify(payload));
+    assert.match(r.json().error, words);
+  }
+  assert.equal((await get()).nightFrom, '23:00', 'a mistake changes nothing');
+  const set = (await put({ nightFrom: '7:30', nightEnds: 'stop' })).json();
+  assert.deepEqual([set.nightFrom, set.nightTo, set.nightEnds, set.cpuSlots], ['07:30', '07:00', 'stop', first.cpuSlots]);
+  setNight();
+});
+
+test('a night run waits by day with when it starts, and starts at night; every ordinary run goes first, whatever the priorities', async () => {
+  assert.ok(!listRuns(db, { status: ['queued', 'waiting'], limit: 100 }).some((r) => (r.where ?? 'local') === 'local' && !r.remote), 'nothing waits from before');
+  now = at(2, 14);
+  nightTest({ cpuSlots: 1 });
+  const gn = gate();
+  const n = await nightJob(gn.command, { priority: 50 });
+  await steps();
+  assert.equal(status(n), 'waiting');
+  assert.equal(why(n), 'Waits for the night (from 23:00)');
+  assert.equal(getRun(db, n.id)!.when, 'night');
+  // By day an ordinary run takes the one slot, and at night the next ordinary one still comes before the night run.
+  const ga = gate();
+  const gb = gate();
+  const a = await job(ga.command);
+  await until(() => status(a) === 'running', 20_000, 'the ordinary run by day');
+  now = at(2, 23, 30);
+  const b = await job(gb.command);
+  await steps();
+  assert.equal(status(b), 'waiting');
+  assert.equal(why(n), NIGHT_BEHIND);
+  ga.open();
+  await until(() => status(b) === 'running', 20_000, 'the ordinary run to take the slot');
+  await steps();
+  assert.equal(status(n), 'waiting');
+  assert.match(why(n)!, /^Waiting for one of your runs without a GPU to end/, 'no ordinary run waits now: it waits as any run does');
+  gb.open();
+  await until(() => status(n) === 'running', 20_000, 'the night run');
+  gn.open();
+  await until(ended(n.id), 20_000, 'it to end');
+  // An ordinary run that waits for a GPU holds back the night runs that want a GPU too, and not one that needs none:
+  // a run stuck waiting for a card that never frees does not keep the night's processor-only runs from starting.
+  setNight();
+  const big = await job('echo big', { gpus: 1, gpuMemGb: 1000 });
+  const held = await nightJob('echo held', { gpus: 1, gpuMemGb: 1 });
+  const free = await nightJob('echo free');
+  await steps();
+  assert.equal(status(big), 'waiting');
+  assert.equal(why(held), NIGHT_BEHIND);
+  await until(ended(free.id), 20_000, 'the night run that needs no GPU');
+  await stop(big);
+  await until(() => why(held) !== NIGHT_BEHIND, 20_000, 'the night run with a GPU, the other gone');
+  await stop(held);
+  now = at(3, 7);
+  await steps();
+});
+
+test('from equal to to is no night: night runs wait and say so; a night that crosses midnight is still on at 03:00', async () => {
+  now = at(4, 3);
+  nightTest({ nightFrom: '23:00', nightTo: '23:00' });
+  const r = await nightJob('echo late');
+  await steps();
+  assert.equal(status(r), 'waiting');
+  assert.equal(why(r), 'Waits for the night: none is set. Give Night two different times in Where runs go');
+  setNight();
+  await until(ended(r.id), 20_000, 'it to run once there is a night');
+  assert.equal(status(r), 'done');
+  assert.deepEqual(getRun(db, r.id)!.nights, ['2026-01-03'], 'the night that began the evening before');
+  now = at(4, 7);
+  await steps();
+});
+
+test('the night ends with "let running ones finish": it runs on; no "done" notice for what the morning tells; one morning notice, once', async () => {
+  now = at(10, 23, 30);
+  nightTest();
+  const ok = await nightJob('echo acc=0.9');
+  const bad = await nightJob('exit 3');
+  const g = gate();
+  const long = await nightJob(g.command);
+  const plain = await job('echo ordinary');
+  await until(() => [ok, bad, plain].every((r) => ended(r.id)()) && status(long) === 'running', 20_000, 'the night’s runs');
+  assert.equal(noticesOf(ok).length, 0, 'told in the morning, not on its own');
+  assert.equal(noticesOf(plain)[0]?.kind, 'done', 'an ordinary run is told as ever');
+  assert.equal(noticesOf(bad)[0]?.kind, 'failed', 'a failure is told as ever');
+  assert.equal(mornings().length, 0, 'not before the night ends');
+  now = at(11, 7);
+  await steps();
+  assert.equal(status(long), 'running');
+  assert.equal(getRun(db, long.id)!.stopping, undefined);
+  assert.equal(mornings().length, 1);
+  assert.equal(mornings()[0].body, 'Last night: 1 run done, 1 failed, 1 still running');
+  assert.equal(mornings()[0].title, 'Experiments');
+  assert.equal(mornings()[0].url, '/experiments?night=2026-01-10');
+  const of = (await http.inject({ method: 'GET', url: '/api/experiments/runs?night=2026-01-10&everywhere=1' })).json().runs as RunRecord[];
+  assert.deepEqual(of.map((r) => r.id).sort(), [ok.id, bad.id, long.id].sort(), 'the night’s runs, which the notice opens');
+  now = at(11, 15);
+  await steps();
+  assert.equal(mornings().length, 1, 'once');
+  g.open();
+  await until(ended(long.id), 20_000, 'it to finish by day');
+  assert.equal(noticesOf(long)[0]?.kind, 'done', 'what ends after the morning is told on its own');
+});
+
+test('the night ends with "stop": stopped, waiting again, and started from the beginning the next night', async () => {
+  now = at(12, 23, 30);
+  nightTest({ nightEnds: 'stop' });
+  const g = gate('echo start; echo loss=2; ', 'echo acc=1');
+  const r = await nightJob(g.command, { report: true });
+  const log = () => fs.readFileSync(path.join(runFolder(r.id), 'log.txt'), 'utf8');
+  await until(() => status(r) === 'running' && getRun(db, r.id)!.metrics?.last.loss === 2, 30_000, 'it to run and print');
+  // The app restarts in the night, and is back when it has ended: the night is still closed properly.
+  forgetLive();
+  now = at(13, 7, 30);
+  await until(() => status(r) === 'waiting', 40_000, 'it to be stopped and wait again');
+  const x = getRunWithEvents(db, r.id)!;
+  assert.equal(x.why, NIGHT_AGAIN);
+  assert.equal(x.why, 'The night ended: it starts again tonight');
+  assert.deepEqual([x.startedAt, x.endedAt, x.metrics, x.gpuIds, x.stopping, x.exitCode, x.nightStop], [undefined, undefined, undefined, undefined, undefined, undefined, undefined]);
+  assert.deepEqual(seriesOf(db, r.id), {});
+  assert.ok(x.events!.some((e) => e.kind === 'waiting' && e.text === NIGHT_AGAIN));
+  assert.ok(!x.events!.some((e) => e.kind === 'crash' || e.kind === 'failed' || e.kind === 'stopped'), 'not a failure, nor an end');
+  assert.equal(noticesOf(r).length, 0);
+  assert.equal(mornings().length, 1);
+  assert.equal(mornings()[0].body, 'Last night: 1 run still waits for tonight');
+  now = at(13, 14);
+  await steps();
+  assert.equal(status(r), 'waiting', 'not by day');
+  assert.equal(why(r), NIGHT_AGAIN, 'it keeps saying why');
+  now = at(13, 23);
+  await until(() => status(r) === 'running' && getRun(db, r.id)!.metrics?.last.loss === 2, 40_000, 'it to start again');
+  assert.equal(log().match(/^start$/gm)?.length, 1, 'from the beginning, with a log of its own');
+  assert.ok(fs.readdirSync(runFolder(r.id)).some((f) => /^log-before-\d+\.txt$/.test(f)), 'the first night’s log is kept');
+  g.open();
+  await until(ended(r.id), 20_000, 'it to end');
+  assert.equal(status(r), 'done');
+  assert.equal(getRun(db, r.id)!.metrics!.last.acc, 1);
+  assert.deepEqual(getRun(db, r.id)!.nights, ['2026-01-12', '2026-01-13']);
+  assert.equal(noticesOf(r).length, 0);
+  now = at(14, 7);
+  await steps();
+  assert.equal(mornings().length, 2);
+  assert.equal(mornings()[1].body, 'Last night: 1 run done');
+});
+
+test('a sweep of night runs waits whole, and is told by the morning rather than by itself', async () => {
+  now = at(15, 12);
+  nightTest();
+  const s = (await http.inject({ method: 'POST', url: '/api/experiments/sweeps', payload: { command: 'echo acc={a}', params: { a: [1, 2] }, group: 'night sweep', cwd: tmp, gpus: 0, when: 'night' } })).json();
+  const runs = s.runs as RunRecord[];
+  assert.ok(runs.length === 2 && runs.every((r) => r.when === 'night'));
+  await steps();
+  assert.ok(runs.every((r) => status(r) === 'waiting' && why(r) === 'Waits for the night (from 23:00)'));
+  now = at(15, 23);
+  await until(() => runs.every((r) => ended(r.id)()), 20_000, 'the sweep');
+  await steps();
+  assert.equal(notices.length, 0, 'no notice of the sweep’s own');
+  now = at(16, 7);
+  await steps();
+  assert.deepEqual(
+    notices.map((n) => n.body),
+    ['Last night: 2 runs done'],
+  );
+});
+
+test('no morning notice when nothing ran and nothing waits: no night runs, or only one you stopped', async () => {
+  now = at(20, 23, 30);
+  nightTest();
+  const plain = await job('echo ordinary');
+  await until(ended(plain.id), 20_000, 'the ordinary one');
+  now = at(21, 7);
+  await steps();
+  assert.equal(mornings().length, 0);
+  now = at(21, 23, 30);
+  const g = gate();
+  const r = await nightJob(g.command);
+  await until(() => status(r) === 'running', 20_000, 'it to run');
+  await stop(r);
+  await until(ended(r.id), 40_000, 'it to stop');
+  now = at(22, 7);
+  await steps();
+  assert.equal(mornings().length, 0);
+});
+
+test('hours changed so another night begins on the same date: it has its own morning, of what ended in it', async () => {
+  // A night after midnight is over by 06:00; the hours then change so that tonight begins on the same date.
+  now = at(26, 1);
+  nightTest({ nightFrom: '00:00', nightTo: '06:00' });
+  const a = await nightJob('echo a');
+  await until(ended(a.id), 20_000, 'the first night’s run');
+  now = at(26, 6);
+  await steps();
+  assert.deepEqual(
+    mornings().map((n) => n.body),
+    ['Last night: 1 run done'],
+  );
+  await sleep(20);
+  setNight({ nightFrom: '22:00', nightTo: '06:00' });
+  now = at(26, 22);
+  const b = await nightJob('echo b');
+  const c = await nightJob('echo c');
+  await until(() => [b, c].every((r) => ended(r.id)()), 20_000, 'the second night’s runs');
+  assert.equal(noticesOf(b).length, 0);
+  now = at(27, 6);
+  await steps();
+  assert.deepEqual(
+    mornings().map((n) => n.body),
+    ['Last night: 1 run done', 'Last night: 2 runs done'],
+  );
+});
+
+test('a cluster refuses a night run in words; run again keeps when; the tools’ card says when it starts', async () => {
+  now = at(23, 14);
+  nightTest();
+  const c = saveCluster(db, { name: 'Night cluster', host: 'nightly', kind: 'ssh' });
+  await assert.rejects(cleanJob(db, { command: 'x', cwd: '/data', where: `c:${c.id}`, when: 'night' }), /A run on a cluster cannot wait for the night: the cluster has its own queue/);
+  const refused = await http.inject({ method: 'POST', url: '/api/experiments/jobs', payload: { command: 'x', where: `c:${c.id}`, when: 'night' } });
+  assert.equal(refused.statusCode, 400);
+  assert.match(refused.json().error, /cannot wait for the night/);
+  await assert.rejects(cleanJob(db, { command: 'x', cwd: tmp, when: 'later' }), /when: "night"/);
+  assert.equal((await cleanJob(db, { command: 'x', cwd: tmp, when: 'now' })).when, undefined);
+
+  const first = await nightJob('echo hi');
+  const again = (await http.inject({ method: 'POST', url: `/api/experiments/runs/${first.id}/again`, payload: {} })).json().run as RunRecord;
+  assert.equal(again.when, 'night', 'run again keeps it');
+  const atOnce = (await http.inject({ method: 'POST', url: `/api/experiments/runs/${first.id}/again`, payload: { when: 'now' } })).json().run as RunRecord;
+  assert.equal(atOnce.when, undefined);
+  await until(ended(atOnce.id), 20_000, 'the one run at once');
+  assert.equal(status(again), 'waiting');
+
+  sessions.mode = 'default';
+  sessions.answer = 'accept';
+  const ctx = ctxOf({ key: 'claude:night' });
+  const sentence = 'It will start tonight, between 23:00 and 07:00';
+  const props = toolOf('experiment_run', ctx).inputSchema as any;
+  assert.deepEqual(props.properties.when.enum, ['night', 'now']);
+  assert.ok((toolOf('experiment_sweep', ctx).inputSchema as any).properties.when);
+  const out = JSON.parse((await call('experiment_run', { command: 'echo tool', gpus: 0, when: 'night' }, ctx)).text);
+  assert.ok(sessions.cards.at(-1)!.detail!.includes(sentence), sessions.cards.at(-1)!.detail);
+  assert.deepEqual([out.when, out.starts], ['night', sentence]);
+  const rerun = JSON.parse((await call('experiment_run', { again: out.id }, ctx)).text);
+  assert.ok(sessions.cards.at(-1)!.detail!.includes(sentence));
+  assert.equal(getRun(db, rerun.id)!.when, 'night');
+  await call('experiment_run', { again: out.id, when: 'now' }, ctx);
+  assert.ok(!sessions.cards.at(-1)!.detail!.includes('tonight'));
+  const sweep = JSON.parse((await call('experiment_sweep', { command: 'echo {a}', params: { a: [1] }, group: 'tool night', gpus: 0, when: 'night' }, ctx)).text);
+  assert.ok(sessions.cards.at(-1)!.detail!.includes(sentence));
+  assert.equal(sweep.starts, sentence);
+  const cards = sessions.cards.length;
+  for (const [name, a] of [
+    ['experiment_run', { command: 'x', where: `c:${c.id}`, when: 'night' }],
+    ['experiment_sweep', { command: 'echo {a}', params: { a: [1] }, group: 'g', where: `c:${c.id}`, when: 'night' }],
+    ['experiment_run', { again: out.id, where: `c:${c.id}` }],
+  ] as const) {
+    const no = await call(name, a, ctx);
+    assert.ok(no.isError && /cannot wait for the night/.test(no.text), no.text);
+  }
+  assert.equal(sessions.cards.length, cards, 'refused before anyone is asked');
+  const listed = JSON.parse((await call('experiment_list', { group: 'tool night' }, ctx)).text);
+  assert.equal(listed.runs[0].when, 'night');
+  assert.match(SPAWN_NOTE, /go to the night with when: "night"/);
+  assert.match(SPAWN_NOTE, /what you need them to decide, as choices/);
+  for (const r of listRuns(db, { status: ['queued', 'waiting'], limit: 100 }).filter((r) => r.when === 'night')) await stop(r);
+  await http.inject({ method: 'DELETE', url: `/api/experiments/clusters/${c.id}` });
+});
+
+test('another machine keeps when, for its own night; one from before night runs is not left to run by day', async () => {
+  nightTest();
+  const calls: { method: string; p: string; body?: any }[] = [];
+  let knows = true;
+  let kept: RunRecord | null = null;
+  const lab = {
+    def: { name: 'Lab box' },
+    async call<T>(method: string, p: string, _t?: number, body?: any): Promise<T> {
+      calls.push({ method, p, body });
+      if (method === 'POST' && p === '/api/experiments/jobs') {
+        const { when, ...rest } = body;
+        kept = { ...rest, ...(knows ? { when } : {}), id: `rlabn00${calls.length}`, status: 'waiting', why: 'Waits for the night (from 22:00)', createdAt: Date.now(), name: 'train.py' };
+        return { run: kept } as T;
+      }
+      return { run: kept } as T;
+    },
+  };
+  useMachines({ list: () => [{ id: 'lab', name: 'Lab box', via: 'url', status: { state: 'online', waiting: 0, working: 0 } }], get: () => lab } as any);
+  const r = await submit(deps, await cleanJob(db, { command: 'python train.py', cwd: '/data/code', where: 'm:lab', gpus: 1, when: 'night' }));
+  assert.equal(calls[0].body.when, 'night');
+  assert.equal(r.when, 'night');
+  assert.equal(r.why, 'Waits for the night (from 22:00)', 'that machine’s night');
+  const sessionCtx = ctxOf({ key: 'claude:nightlab' });
+  await call('experiment_run', { command: 'python train.py', where: 'm:lab', cwd: '/data/code', gpus: 1, when: 'night' }, sessionCtx);
+  assert.ok(sessions.cards.at(-1)!.detail!.includes('It will start tonight, in the night hours set on Lab box'));
+  const before = listRuns(db, { limit: 5000 }).length;
+  knows = false;
+  await assert.rejects(submit(deps, await cleanJob(db, { command: 'python train.py', cwd: '/data/code', where: 'm:lab', gpus: 1, when: 'night' })), /Lab box runs an older Hydor that does not know night runs/);
+  assert.ok(calls.at(-1)!.p.endsWith('/stop'), 'stopped there');
+  assert.equal(listRuns(db, { limit: 5000 }).length, before, 'nothing kept here');
+  for (const x of listRuns(db, { status: ['queued', 'waiting'], limit: 100 }).filter((x) => x.remote)) updateRun(db, x.id, { status: 'stopped' });
+  useMachines({
+    list: () => [],
+    get: () => {
+      throw new HttpError(404, 'no');
+    },
+  } as any);
+  now = Date.now();
+  clock.now = () => Date.now();
+  setNight();
 });
 
 // ---- run ------------------------------------------------------------------------------------------------------------------

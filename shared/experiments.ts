@@ -51,6 +51,11 @@ export interface JobSpec {
   tags?: string[];
   /** Higher goes first. */
   priority?: number;
+  /**
+   * night: it starts only in the night hours of the computer it runs on, and only when no ordinary run waits there
+   * (Where runs go sets the hours and what happens to it when the night ends). Not for a cluster.
+   */
+  when?: 'night';
   /** Metrics: read from its log (key=value and JSON lines) and from a file it writes (metrics.jsonl, relative to cwd; {name}, {run} and $HYDOR_RUN_DIR as for scoresFile). */
   metricsFile?: string;
   onCall?: OnCallSpec;
@@ -114,7 +119,10 @@ export interface RunRecord extends JobSpec {
   folder?: string;
   /** Files in its folder that git does not track, when it started. */
   untracked?: number;
-  /** The files its command names that git does not track (or ignores), copied into the run's folder under untracked/. */
+  /**
+   * The files its command names that git does not track (or ignores), copied into the run's folder under untracked/:
+   * those in its folder by their paths there, those outside it (listed as the command gave them) under untracked/outside/.
+   */
   kept?: string[];
   /** Those that were too large to keep. */
   notKept?: string[];
@@ -122,6 +130,10 @@ export interface RunRecord extends JobSpec {
   startedBy?: { session?: string; app?: string; page?: boolean };
   /** The run this one is a new run of (Run again). */
   from?: string;
+  /** A night run: the nights it was part of (ran in, or waited through), each by the date it began on ("2026-01-05"). */
+  nights?: string[];
+  /** A night run whose night ended while it ran, with "stop them" chosen: it is being put back to wait. */
+  nightStop?: boolean;
   /** Kept on another machine (where "m:<id>"): this is its copy as last read from there. */
   remote?: { machine: string; id: string };
   /** Listed from another machine (Settings → Machines): reading and stopping go through it. */
@@ -309,6 +321,11 @@ export interface ExperimentGroup extends ExperimentInfo {
 export interface ExperimentsSettings {
   /** Jobs without a GPU running at once on this computer. */
   cpuSlots: number;
+  /** The night, "HH:MM" on this computer's own clock; it may cross midnight. From equal to to: there is no night. */
+  nightFrom: string;
+  nightTo: string;
+  /** When the night ends, night runs still going: let finish, or stopped to start again from the beginning the next night. */
+  nightEnds: 'finish' | 'stop';
 }
 
 /** The words for a status, as the page and the tools say them. */
@@ -336,6 +353,9 @@ export function betterOf(metric: string, told?: Record<string, 'max' | 'min'>): 
 
 /** The note for comparisons not tested over seeds, since the seeds barely change the number; `where`: which ones. */
 export const seedsFlatNote = (where: string) => `${where}: The seeds barely change this number, so a test over seeds says little: compare per example (give the runs a scores file)`;
+
+/** The note for a row whose per-example scores are the baseline's, example for example. */
+export const identicalNote = (row: string, metric: string, base: string) => `${row}, ${metric}: identical to ${base} on every example`;
 
 /** The marker line above a results table's tabular in a LaTeX document, so its numbers can be checked again. */
 export const TABLE_MARK = (id: string) => `% hydor:table ${id}`;

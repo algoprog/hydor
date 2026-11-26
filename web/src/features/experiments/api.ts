@@ -7,6 +7,7 @@ import type { ExperimentGroup, ExperimentsSettings, MetricSeries, QueueNow, RunR
 import { metricScore, rankMetrics } from '@shared/metric-rank';
 import { api, enc } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
+import { nightStatus, waitsForNight } from './nightWords';
 
 export type { RunRecord };
 export { metricScore, rankMetrics };
@@ -43,12 +44,13 @@ export function took(ms: number): string {
   return `${Math.floor(h / 24)} days ${h % 24} h`;
 }
 
-/** What a waiting run waits for: a GPU, a slot (a run without a GPU ends first), the cluster's queue, or something else. */
-export type WaitKind = 'gpu' | 'slot' | 'cluster' | 'other';
+/** What a waiting run waits for: a GPU, a slot (a run without a GPU ends first), the cluster's queue, the night, or something else. */
+export type WaitKind = 'gpu' | 'slot' | 'cluster' | 'night' | 'other';
 export function waitKind(r: Pick<RunRecord, 'why' | 'clusterJob'>): WaitKind {
   const why = r.why ?? '';
   // The server's words for each (queue.ts, gpus.ts), as patterns so they are not taken for the page's own words.
   if (r.clusterJob || /^In the cluster/.test(why)) return 'cluster';
+  if (waitsForNight(why)) return 'night';
   if (/^Waiting for one of your runs without a GPU/.test(why)) return 'slot';
   if (/^Waiting for (1 GPU|\d+ GPUs)/.test(why) || /nvidia-smi/.test(why)) return 'gpu';
   return 'other';
@@ -61,6 +63,7 @@ export function statusWords(r: RunRecord, now = Date.now()): string {
       return 'In line';
     case 'waiting': {
       const k = waitKind(r);
+      if (k === 'night') return nightStatus(r.why);
       return k === 'gpu' ? 'Waiting for a GPU' : k === 'slot' ? 'Waiting for a run to end' : k === 'cluster' ? 'In the cluster’s queue' : 'Waiting';
     }
     case 'starting':

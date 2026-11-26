@@ -65,7 +65,7 @@ function routes(d: Deps) {
     // The runs that score evaluations are not experiments: they come when their group or tag is asked for, with
     // evaluation=1, and in a list of what is running now.
     const plain = !(q.group || q.tag === 'evaluation' || q.evaluation === '1' || (status?.length && status.every((s) => ACTIVE.includes(s))));
-    const runs = await runsList(d, { group: q.group, tag: q.tag, status, cwd: q.cwd, project: q.project, sweep: q.sweep, q: q.q, limit: Math.min(Number(q.limit) || 200, 1000), plain }, q.everywhere === '1');
+    const runs = await runsList(d, { group: q.group, tag: q.tag, status, cwd: q.cwd, project: q.project, sweep: q.sweep, night: q.night, q: q.q, limit: Math.min(Number(q.limit) || 200, 1000), plain }, q.everywhere === '1');
     return { runs: isInternal(req) ? runs.filter((r) => !isFinalRun(r)) : runs };
   });
   app.get('/api/experiments/runs/:id', async (req) => runView(d, open(req), Q(req).log === '0' ? 0 : Math.min(Number(Q(req).lines ?? 300) || 0, 5000)));

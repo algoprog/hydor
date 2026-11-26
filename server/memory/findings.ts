@@ -179,6 +179,7 @@ const recordTool = (step: boolean): RunTool => ({
   name: 'finding_record',
   description: [
     'Record a finding for this project: one thing it tried and what came of it, kept with its evidence for later sessions, dead ends included.',
+    `Keep it short: the statement up to ${MAX_STATEMENT} characters, what was learned a sentence or two up to ${MAX_LEARNED}.`,
     'Record one after each result, also when it did not work or was unclear. verdict "open" is for something stated and not tested yet.',
     'A measured number in "learned" needs the run, score or table it comes from in "evidence", or, when it is what a paper reports, that paper: never give a number you did not read from its record. Names (BM25, nDCG@10), years and counts (3 seeds) are not measured numbers.',
     'To replace a finding with a later result on the same statement, give its number as "replaces" (the old one stays in the history); two findings that disagree are otherwise both kept. Never put secrets in one.',
@@ -186,9 +187,9 @@ const recordTool = (step: boolean): RunTool => ({
   inputSchema: {
     type: 'object',
     properties: {
-      statement: { type: 'string', description: 'The hypothesis or claim, one sentence that stands on its own.' },
+      statement: { type: 'string', description: `The hypothesis or claim, one sentence that stands on its own, up to ${MAX_STATEMENT} characters.` },
       verdict: { type: 'string', enum: FINDING_VERDICTS, description: 'supported, refuted, unclear, or open (not tested yet).' },
-      learned: { type: 'string', description: 'What came of it, one or two sentences: the numbers, where it holds, why it failed.' },
+      learned: { type: 'string', description: `What came of it, a sentence or two up to ${MAX_LEARNED} characters: the numbers, where it holds, why it failed.` },
       evidence: EVIDENCE_SCHEMA,
       replaces: { type: 'number', description: 'The number of a finding this later result takes the place of.' },
       ...(step ? FOLDER : {}),
@@ -203,7 +204,8 @@ const recordTool = (step: boolean): RunTool => ({
     const run = ctx.step ? { id: ctx.runId.replace(/^flow-/, ''), ...(ctx.notice?.title ? { app: ctx.notice.title } : {}) } : undefined;
     const r = await recordFinding(ctx.deps.db, root, { statement: a.statement, verdict: a.verdict, learned: a.learned, evidence: a.evidence, replaces: a.replaces, run }, { source: 'agent', ...(ctx.step ? {} : { session: ctx.key }) });
     if (!r.already) tellPages(ctx);
-    const said = r.already ? `Already recorded as finding #${r.entry.id}.` : `Recorded as finding #${r.entry.id}${r.replaced ? `, replacing #${r.replaced}` : ''}.`;
+    // It names the project's folder: a session may sit in a folder the person does not think of as the project.
+    const said = r.already ? `Already recorded as finding #${r.entry.id}.` : `Recorded as finding #${r.entry.id}${r.replaced ? `, replacing #${r.replaced}` : ''}, for the project in ${root}.`;
     return JSON.stringify({ recorded: said, ...findingView(r.entry) });
   },
 });

@@ -17,6 +17,7 @@ import { Button, cx } from '../../components/ui';
 import { StepRow } from '../automations/StepRow';
 import type { WebFeature } from '../registry';
 import { copy, metricsLine, runPath, statusTone, statusWords } from './api';
+import { saidByStatus } from './nightWords';
 import { evaluationPath, scoreUrl } from './evalApi';
 import { betterWords, isOpen, meanStd, standing, toneClass } from './evalWords';
 import { evolutionPath } from './evolveApi';
@@ -77,7 +78,7 @@ function RunCard({ item, sessionKey }: { item: ToolItem; sessionKey: string }) {
         {run && <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', statusTone(run.status))} />}
         <span className="truncate" title={run?.why}>
           {run ? statusWords(run) : 'In line'}
-          {run?.why && (run.status === 'waiting' || run.status === 'failed') ? `: ${run.why}` : ''}
+          {run?.why && !saidByStatus(run.why) && (run.status === 'waiting' || run.status === 'failed') ? `: ${run.why}` : ''}
         </span>
       </div>
       {m && (

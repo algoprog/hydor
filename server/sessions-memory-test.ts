@@ -5,7 +5,8 @@
 // essentials are read, when the job ends, on Start now, Start without memory and Don't ask; a failed build asks again;
 // what is sent meanwhile goes after the first message; a message on its way to the agent counts as delivering until
 // the agent has it (the goal loop's idle); "Start without memory" keeps the question away for a week; and
-// the cards and the waiting come back after a restart, a build that ended meanwhile starting the agent.
+// the cards and the waiting come back after a restart, a build that ended meanwhile starting the agent. And a notice
+// the app sends (runs ended, the goal loop) carries no memory or wiki additions, which wait for your message.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/sessions-memory-test.ts
 //   DATA_DIR=/tmp/hydor-test-mem CLAUDE_CONFIG_DIR=/tmp/hydor-test-mem/claude CODEX_HOME=/tmp/hydor-test-mem/codex node dist/dev/sessions-memory-test.js
@@ -23,7 +24,7 @@ import type { BuildOffer } from './wiki/areas/build.ts';
 import { saveJob, wikiJobEvents, type JobState } from './wiki/areas/jobs.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import { dropGoal, loadGoal, saveGoal } from './goals/store.ts';
-import { registerFeatures } from './features/registry.ts';
+import { featureContext, registerFeatures } from './features/registry.ts';
 import { STOPPED_SWARM } from './goals/driver.ts';
 import { checkpoint } from './worktrees.ts';
 import { execFileSync } from 'node:child_process';
@@ -669,6 +670,43 @@ async function withDeps<T>(h: { m: any }, fn: () => Promise<T>): Promise<T> {
     registerFeatures([], null as any);
   }
 }
+
+test('a notice the app sends (runs ended, the goal loop) carries nothing about its words: memory and the wiki wait for your message', async () => {
+  const h = manager();
+  const key = `claude:${crypto.randomUUID()}`;
+  saveGates(db, new Map());
+  db.prepare('insert into app_sessions (key, agent, cwd, created_at, updated_at) values (?, ?, ?, ?, ?)').run(key, 'claude', folder, Date.now(), Date.now());
+  h.sessions(key);
+  Object.assign(h.m, { limitHits: new Map(), signedOutHits: new Map(), switchBeforeSend: async () => {}, takeMoveNote: () => '', isCustom: () => false, touchApp: () => {}, saveFiles: () => [], saveImages: () => [] });
+  // As after the agent started again: what memory had for the first message waits.
+  h.m.lives.get(key).firstNotes = 'From memory: the notes on this request';
+  const asked: string[] = [];
+  const fake = {
+    id: 'fake',
+    aboutMessage: (text: string) => (asked.push(text), 'From memory, newly relevant to this message: the wiki’s article'),
+    beforeMessage: () => 'You changed a page.',
+    turnNotes: () => 'From memory, newly relevant to this message: a note',
+  };
+  registerFeatures([fake], { db, sessions: h.m, broadcast: () => {}, publicBase: () => 'https://naget.test' } as any);
+  const notices = ['[Experiments · runs ended]\n- “bm25” (r1) ended. Done\n(This notice is from Experiments.)', '[Goal · round 2 of 5]\n\nGo on towards the goal.'];
+  try {
+    for (const text of notices) {
+      h.adapter.state = { ...h.adapter.state, status: 'idle' };
+      await h.m.send(key, text);
+      // What you did meanwhile still goes with it; nothing about what it says.
+      assert.equal(h.sent.at(-1)!.text, `<system-reminder>\nYou changed a page.\n</system-reminder>\n\n${text}`);
+      const turn = (await featureContext({ key, cwd: folder, extra: {}, runId: 'r', query: text })).turn;
+      assert.deepEqual(turn, [], 'Custom’s turn too');
+    }
+    assert.deepEqual(asked, []);
+    h.adapter.state = { ...h.adapter.state, status: 'idle' };
+    await h.m.send(key, 'how do refunds work');
+    assert.match(h.sent.at(-1)!.text, /From memory: the notes on this request[^]*newly relevant to this message: the wiki[^]*how do refunds work$/);
+    assert.equal((await featureContext({ key, cwd: folder, extra: {}, runId: 'r', query: 'how do refunds work' })).turn.length, 1);
+  } finally {
+    registerFeatures([], null as any);
+  }
+});
 
 test('S1: create() with a goal and a swarm sets the goal (its first message carries the draft); with a campaign, a deep research or an arena match the person hears why it was not set', async () => {
   const h0 = manager();

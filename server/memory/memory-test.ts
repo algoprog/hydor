@@ -1646,6 +1646,11 @@ test('Custom: a block that fits its model, what newly bears on its turn besides 
   assert.ok(!(await memoryFeature.turnNotes!({ ...s, query: 'and how do refunds work with stripe webhooks' }, d)), 'nor twice');
   asked = 'the refunds';
   assert.equal(await memoryFeature.context!(s, d), block, 'the same block while not condensed');
+  // A notice the app sent last asks nothing: the block is made for what was asked before it.
+  (d.sessions as unknown as { timeline: unknown }).timeline = async () => ({ parser: { items: [user('how do the stripe webhooks retry'), user('[Experiments · runs ended]\n- the catalogue photos on Fridays')] }, readMore: async () => {} });
+  const noticed = (await memoryFeature.context!({ ...s, key: 'acp:noticed', query: '[Goal · round 2 of 5]\nthe catalogue photos' }, d))!;
+  assert.ok(noticed.includes(stripe.text), noticed);
+  (d.sessions as unknown as { timeline: unknown }).timeline = async () => ({ parser: { items: [user(asked)] }, readMore: async () => {} });
   // A smaller model: a block of its own.
   const lean = (await memoryFeature.context!({ ...s, window: 32_768, lean: true }, d))!;
   assert.ok(lean !== block && lean.length < block.length && store.keptBlock(db, key, 'full:lean', 0) === lean);

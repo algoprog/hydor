@@ -120,7 +120,7 @@ test('record and read back: the note’s text is written from the data, and find
   const events: unknown[] = [];
   const c = toolCtx('claude:record', repo, {}, events);
   const got = await json('finding_record', gain, c);
-  assert.match(got.recorded, /^Recorded as finding #\d+\.$/);
+  assert.match(got.recorded, /^Recorded as finding #\d+, for the project in .+\.$/);
   assert.equal(got.number, store.entries(db)[0].id);
   const e = store.getEntry(db, got.number)!;
   assert.equal(e.kind, 'finding');
@@ -145,6 +145,12 @@ test('record and read back: the note’s text is written from the data, and find
   // The very same finding twice is one.
   assert.match((await json('finding_record', gain, c)).recorded, new RegExp(`Already recorded as finding #${e.id}`));
   assert.equal(store.entries(db).length, 1);
+  // The tool says the limits, so an agent writes to them the first time.
+  const recorder = tool('finding_record', c);
+  const props = (recorder.inputSchema as { properties: Record<string, { description: string }> }).properties;
+  assert.match(props.statement.description, /up to 300 characters/);
+  assert.match(props.learned.description, /a sentence or two up to 450 characters/);
+  assert.match(recorder.description, /statement up to 300 characters, what was learned a sentence or two up to 450/);
   // A topic's room, not a note's.
   const long = await json('finding_record', { statement: `S ${'long words '.repeat(26)}`.slice(0, 290), verdict: 'unclear', learned: 'why '.repeat(110) }, c);
   assert.ok(store.getEntry(db, long.number)!.text.length > store.MAX_TEXT && store.getEntry(db, long.number)!.text.length <= store.MAX_SUMMARY);

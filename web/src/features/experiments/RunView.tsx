@@ -13,6 +13,8 @@ import { evalUrl, scoredBy } from './evalApi';
 import { pathWords } from './evalWords';
 import { api, ApiError } from '../../lib/api';
 import { LOCALE } from '../../i18n/locale';
+import { trIn } from '../../i18n/runtime';
+import { saidByStatus } from './nightWords';
 import { machinePath } from '../../lib/machine';
 import { go, goFull, sessionPath, showInFiles } from '../../lib/nav';
 import { canReveal, reveal, revealLabel } from '../../lib/reveal';
@@ -514,7 +516,7 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
               </span>
             </button>
           )}
-          {r.why && (r.status === 'queued' || r.status === 'waiting' || r.status === 'failed' || r.status === 'lost' || r.status === 'stopped') && (
+          {r.why && !saidByStatus(r.why) && (r.status === 'queued' || r.status === 'waiting' || r.status === 'failed' || r.status === 'lost' || r.status === 'stopped') && (
             <p className={cx('rounded-lg border px-3 py-2 text-[13px] leading-relaxed text-fg-2', r.status === 'failed' || r.status === 'lost' ? 'border-err/40 bg-err/5' : 'border-line bg-bg-1')}>{r.why}</p>
           )}
         </div>
@@ -626,6 +628,7 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                   </Row>
                 )}
                 <Row label="Status">{statusWords(r)}</Row>
+                {r.when === 'night' && <Row label={trIn('night', 'Start')}>At night</Row>}
                 <Row label={r.startedAt ? 'Started' : 'Added'}>
                   <span className="tnum">{when(r.startedAt ?? r.createdAt)}</span>
                 </Row>

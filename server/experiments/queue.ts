@@ -25,10 +25,11 @@ import { stampRun } from './evaluations.ts';
 import { chooseGpus, gpuList, gpusVia, readGpus, type GpuReading } from './gpus.ts';
 import { aliveLocal, exitOf, files, startLocal, stopLocal, wrapperScript } from './local.ts';
 import { nanText, oomText, parseLine, readFrom, tailLines, Tracker } from './metrics.ts';
-import { addEvent, eventsOf, eventsSince, getRun, getSweep, insertRun, isScoringRun, listRuns, listSweeps, listTables, newId, offsetsOf, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
+import { clock, clockTime, endedAtNight, morningDue, NIGHT_AGAIN, NIGHT_BEHIND, NIGHT_CLUSTER, nightAt, nightWhy, watchNight } from './night.ts';
+import { addEvent, eventsOf, eventsSince, getInfo, getRun, getSweep, insertRun, isScoringRun, listRuns, listSweeps, listTables, newId, offsetsOf, resetRun, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
 import { repairRecord, repairRecordSoon } from './repair.ts';
 import { remoteMachine, type RemoteRun } from './remote.ts';
-import { tellEnded } from './notices.ts';
+import { fmt, spread, tellEnded } from './notices.ts';
 import { earlyStop, fillCommand, paramsOf, runFile, settingsLine, type Value } from './sweeps.ts';
 import { keyNumbers } from '../../shared/metric-rank.ts';
 
@@ -55,19 +56,48 @@ ended.setMaxListeners(200);
 
 const defaultSlots = () => Math.max(1, Math.min(4, Math.floor(os.cpus().length / 4)));
 
-export function settingsOf(db: DB): ExperimentsSettings {
-  let s: Partial<ExperimentsSettings> = {};
+/** The settings as saved: only those that were set, so a default that depends on the computer stays one. */
+function savedSettings(db: DB): Partial<ExperimentsSettings> {
   try {
-    s = JSON.parse(kvGet(db, 'experiments_settings') ?? '{}');
-  } catch {}
+    return JSON.parse(kvGet(db, 'experiments_settings') ?? '{}') ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export function settingsOf(db: DB): ExperimentsSettings {
+  const s = savedSettings(db);
   const n = Number(s.cpuSlots);
-  return { cpuSlots: Number.isInteger(n) && n >= 1 && n <= 64 ? n : defaultSlots() };
+  return {
+    cpuSlots: Number.isInteger(n) && n >= 1 && n <= 64 ? n : defaultSlots(),
+    nightFrom: clockTime(s.nightFrom) ?? '23:00',
+    nightTo: clockTime(s.nightTo) ?? '07:00',
+    nightEnds: s.nightEnds === 'stop' ? 'stop' : 'finish',
+  };
 }
 
 export function setSettings(db: DB, b: Partial<ExperimentsSettings>): ExperimentsSettings {
-  const n = Math.round(Number(b.cpuSlots));
-  if (!Number.isInteger(n) || n < 1 || n > 64) throw new HttpError(400, 'Jobs without a GPU at once: a number from 1 to 64');
-  kvSet(db, 'experiments_settings', JSON.stringify({ ...settingsOf(db), cpuSlots: n }));
+  const given: Partial<ExperimentsSettings> = {};
+  if (b.cpuSlots !== undefined) {
+    const n = Math.round(Number(b.cpuSlots));
+    if (!Number.isInteger(n) || n < 1 || n > 64) throw new HttpError(400, 'Jobs without a GPU at once: a number from 1 to 64');
+    given.cpuSlots = n;
+  }
+  for (const [k, what, like] of [
+    ['nightFrom', 'Night from', '23:00'],
+    ['nightTo', 'Night to', '07:00'],
+  ] as const) {
+    if (b[k] === undefined) continue;
+    const t = clockTime(b[k]);
+    if (!t) throw new HttpError(400, `${what}: a time on the 24-hour clock, like ${like}`);
+    given[k] = t;
+  }
+  if (b.nightEnds !== undefined) {
+    if (b.nightEnds !== 'finish' && b.nightEnds !== 'stop') throw new HttpError(400, 'When the night ends: "finish" (let running ones finish) or "stop" (stop them and start them again the next night)');
+    given.nightEnds = b.nightEnds;
+  }
+  if (!Object.keys(given).length) throw new HttpError(400, 'Say what to change: cpuSlots, nightFrom, nightTo or nightEnds');
+  kvSet(db, 'experiments_settings', JSON.stringify({ ...savedSettings(db), ...given }));
   wake();
   return settingsOf(db);
 }
@@ -123,6 +153,13 @@ export async function cleanJob(db: DB, b: Record<string, any>, o: { cwd?: string
     if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) throw new HttpError(400, `The folder ${cwd} is not there`);
   }
   const spec: JobSpec = { command, cwd, where };
+  // night: it waits for the night of the computer it runs on. "now" is the ordinary way (to run a night run again by day).
+  const when = str(b.when, 20);
+  if (when && when !== 'night' && when !== 'now') throw new HttpError(400, 'when: "night" for a run that waits for the night, or leave it out');
+  if (when === 'night') {
+    if (place.kind === 'cluster') throw new HttpError(400, NIGHT_CLUSTER);
+    spec.when = 'night';
+  }
   const name = str(b.name, 120);
   if (name) spec.name = name;
   const group = str(b.group, 120);
@@ -235,6 +272,11 @@ export async function submit(d: Deps, spec: JobSpec, o: { startedBy?: RunInfo['s
     const there = await m.call<{ run: RunRecord }>('POST', '/api/experiments/jobs', 30_000, { ...spec, where: 'local', report: false }).catch((e) => {
       throw new HttpError(502, `${m.name} did not take it: ${(e as Error).message}`);
     });
+    // A Hydor from before night runs would start it by day: it is stopped there, and said.
+    if (spec.when === 'night' && there.run.when !== 'night') {
+      await m.call('POST', `/api/experiments/runs/${there.run.id}/stop`, 20_000, { why: 'Stopped: this Hydor cannot keep it for the night' }).catch(() => {});
+      throw new HttpError(502, `${m.name} runs an older Hydor that does not know night runs, so it was stopped there: update it, or send the run without “Tonight”`);
+    }
     insertRun(d.db, {
       id,
       spec: { ...spec, name: spec.name ?? there.run.name },
@@ -333,7 +375,10 @@ async function pass() {
   const d = deps;
   if (!d) return;
   const active = listRuns(d.db, { status: ACTIVE, limit: 5000, oldest: true });
-  if (!active.length && !busy.size) return sleepLoop();
+  const settings = settingsOf(d.db);
+  const night = nightAt(clock.now(), settings);
+  watchNight(d, night, active, settings);
+  if (!active.length && !busy.size && !morningDue(d.db)) return sleepLoop();
   for (const r of active) {
     if (busy.has(r.id)) continue;
     try {
@@ -344,7 +389,7 @@ async function pass() {
       console.error(`[experiments] ${r.id}:`, (e as Error)?.message ?? e);
     }
   }
-  await startWaiting(d);
+  await startWaiting(d, night, settings);
 }
 
 function liveOf(d: Deps, r: RunRecord): Live {
@@ -365,14 +410,14 @@ function liveOf(d: Deps, r: RunRecord): Live {
       carry: '',
       fileCarry: '',
       outputAt: r.outputAt ?? r.startedAt ?? Date.now(),
-      fired: new Set(eventsOf(d.db, r.id).flatMap((e) => (WATCH_ALL.includes(e.kind as WatchKind) && e.kind !== 'stall' ? [e.kind as WatchKind] : []))),
+      fired: new Set(eventsOfThisStart(d.db, r.id).flatMap((e) => (WATCH_ALL.includes(e.kind as WatchKind) && e.kind !== 'stall' ? [e.kind as WatchKind] : []))),
       stalls: 0,
       stalled: false,
       dirty: false,
       fresh: false,
       savedAt: Date.now(),
       toldAt: 0,
-      when: eventsOf(d.db, r.id).some((e) => e.kind === 'note' && e.text.startsWith('Crossed')),
+      when: eventsOfThisStart(d.db, r.id).some((e) => e.kind === 'note' && e.text.startsWith('Crossed')),
       goneAt: 0,
       polledAt: 0,
       judgedAt: 0,
@@ -380,6 +425,13 @@ function liveOf(d: Deps, r: RunRecord): Live {
     live.set(r.id, L);
   }
   return L;
+}
+
+/** A run's events since it last went back to wait at a night's end (all of them for any other run). */
+function eventsOfThisStart(db: DB, id: string): RunEvent[] {
+  const all = eventsOf(db, id);
+  const back = all.map((e) => e.kind === 'waiting' && e.text === NIGHT_AGAIN).lastIndexOf(true);
+  return back < 0 ? all : all.slice(back + 1);
 }
 
 /** Output as it comes: lines into metrics, and the words the agent on call watches for. */
@@ -464,6 +516,8 @@ async function followLocal(d: Deps, r: RunRecord) {
   const L = liveOf(d, r);
   readLocal(r, L);
   await watch(d, r, L);
+  // Its night ended and night runs are to be stopped then: unless it has just ended, or is stopping for something else.
+  if (r.nightStop && exitOf(folder) === null && !getRun(d.db, r.id)?.stopping) await stopRun(d, r.id, NIGHT_AGAIN);
   const code = exitOf(folder);
   if (code !== null) return finish(d, r, L, code);
   if (!aliveLocal(r.id, folder)) {
@@ -524,8 +578,6 @@ async function watch(d: Deps, r: RunRecord, L: Live) {
     }
   }
 }
-
-const fmt = (v: number | undefined) => (v === undefined ? '?' : Number.isNaN(v) ? 'NaN' : Math.abs(v) >= 1000 || (Math.abs(v) < 0.001 && v !== 0) ? v.toExponential(2) : String(Math.round(v * 10_000) / 10_000));
 
 /**
  * Something the agent on call watches for happened: an event always; then, when the job has the agent on call for
@@ -730,16 +782,59 @@ export function endLine(db: DB, r: RunRecord): string {
   return `${r.why ?? 'Failed'}${took(r) ? ` (after ${took(r)})` : ''}`;
 }
 
+/** How long a run took, when that is worth saying: a minute or more. */
+const tookLong = (r: RunRecord) => (r.startedAt && (r.endedAt ?? Date.now()) - r.startedAt >= 60_000 ? took(r) : '');
+
+/** The experiment a message about a run lists it under. */
+const experimentOf = (db: DB, group?: string) => (group ? { group, title: getInfo(db, group)?.title } : {});
+
+/** What the session that started a run is told of its end. */
+function reportOf(db: DB, r: RunRecord) {
+  const long = tookLong(r);
+  const m = metricsLine(db, r);
+  const how = r.status === 'done' ? `Done${long ? ` in ${long}` : ''}${m ? `: ${m}` : ''}` : endLine(db, r);
+  const run = { record: r, names: numbersOf(db, r, 6), took: r.status === 'failed' || r.status === 'lost' ? took(r) : long };
+  return { runs: [r.id], line: `“${r.name ?? r.id}” (${r.id}) ended. ${how}`, at: r.endedAt ?? Date.now(), ...experimentOf(db, r.group), run };
+}
+
 /** A run ended: tell you (as it asked; a sweep's runs once, when the sweep ends) and the session that asked to hear. */
 async function ending(d: Deps, r: RunRecord, toldAlready: boolean) {
-  if (r.sweep) return sweepEnding(d, r.sweep);
-  const want = r.status === 'done' ? r.notify?.done !== false : r.status === 'failed' || r.status === 'lost' ? r.notify?.failed !== false : false;
+  // A night run that ends in its night is told of in the morning: no "done" notice of its own.
+  const morning = endedAtNight(d.db, r);
+  if (r.sweep) return sweepEnding(d, r.sweep, morning);
+  const want = r.status === 'done' ? r.notify?.done !== false && !morning : r.status === 'failed' || r.status === 'lost' ? r.notify?.failed !== false : false;
   if (want && !toldAlready && !r.remote) notice(d, r, r.status === 'done' ? 'done' : 'failed', endLine(d.db, r));
-  if (r.report && r.startedBy?.session) tellEnded(d, r.startedBy.session, { runs: [r.id], line: `“${r.name ?? r.id}” (${r.id}) ended. ${endLine(d.db, r)}`, at: r.endedAt ?? Date.now() });
+  if (r.report && r.startedBy?.session) tellEnded(d, r.startedBy.session, reportOf(d.db, r));
+}
+
+/**
+ * What a sweep found, in a sentence: its best setting by `metric`, its seeds averaged (a seed is no setting to pick);
+ * when the runs differ only in their seeds, or all gave the same number, that instead.
+ */
+function bestOf(sw: ReturnType<typeof getSweep>, runs: RunRecord[], metric: string): string {
+  const scored = runs.filter((x) => typeof x.metrics?.best?.[metric] === 'number');
+  if (!scored.length) return '';
+  const values = scored.map((x) => x.metrics!.best![metric]);
+  if (values.length > 1 && values.every((v) => fmt(v) === fmt(values[0]))) return ` All ${values.length}${values.length < runs.length ? ' with a number' : ''} gave ${metric} ${fmt(values[0])}.`;
+  const names = Object.keys(sw?.params ?? {});
+  const own = names.filter((k) => k !== 'seed' && k !== 'random_seed');
+  if (names.length && !own.length) return ` ${metric} ${spread(values)}${values.length > 1 ? ` over ${values.length} seeds` : ''}.`;
+  const settings = new Map<string, RunRecord[]>();
+  for (const x of scored) {
+    // Runs with seeds among the sweep's values are one setting; any other run is a setting of its own.
+    const key = own.length < names.length && x.params ? JSON.stringify(own.map((k) => x.params![k])) : x.id;
+    settings.set(key, [...(settings.get(key) ?? []), x]);
+  }
+  const way = sw?.earlyStop?.better ?? betterOf(metric, runs[0].better);
+  const ranked = [...settings.values()].map((xs) => ({ xs, value: xs.reduce((a, x) => a + x.metrics!.best![metric], 0) / xs.length }));
+  ranked.sort((a, b) => (way === 'min' ? a.value - b.value : b.value - a.value));
+  const { xs, value } = ranked[0];
+  const said = xs[0].params ? settingsLine(Object.fromEntries(Object.entries(xs[0].params).filter(([k]) => own.includes(k)))) : xs[0].name;
+  return ` Best ${metric} ${fmt(value)}${xs.length > 1 ? ` (mean of ${xs.length} seeds)` : ''}: ${said}.`;
 }
 
 /** A sweep's run ended: when it was the last, one notice for the sweep, with its best run. */
-async function sweepEnding(d: Deps, sweep: string) {
+async function sweepEnding(d: Deps, sweep: string, morning = false) {
   const runs = listRuns(d.db, { sweep, limit: 1000 });
   if (!runs.length || runs.some((x) => ACTIVE.includes(x.status))) return;
   const sw = getSweep(d.db, sweep);
@@ -750,22 +845,19 @@ async function sweepEnding(d: Deps, sweep: string) {
   );
   const done = runs.find((x) => x.status === 'done');
   const metric = sw?.earlyStop?.metric ?? (done ? numbersOf(d.db, done, 1)[0] : undefined);
-  let best = '';
-  if (metric) {
-    const way = sw?.earlyStop?.better ?? betterOf(metric, runs[0].better);
-    const scored = runs.filter((x) => typeof x.metrics?.best?.[metric] === 'number');
-    scored.sort((a, b) => (way === 'min' ? a.metrics!.best![metric] - b.metrics!.best![metric] : b.metrics!.best![metric] - a.metrics!.best![metric]));
-    if (scored[0]) best = ` Best ${metric} ${fmt(scored[0].metrics!.best![metric])}: ${scored[0].params ? settingsLine(Object.fromEntries(Object.entries(scored[0].params).filter(([k]) => k in (sw?.params ?? {})))) : scored[0].name}.`;
-  }
+  const best = metric ? bestOf(sw, runs, metric) : '';
   const first = runs[runs.length - 1];
   const line = `${parts.join(', ')}.${best}`;
-  if (first.notify?.done !== false || (count('failed') && first.notify?.failed !== false))
+  // A night sweep that ends in its night (or on another machine, whose morning tells it) is only told here when some failed.
+  const quiet = first.when === 'night' && (morning || !!first.remote);
+  if ((first.notify?.done !== false && !quiet) || (count('failed') && first.notify?.failed !== false))
     notice(d, first, count('done') ? 'done' : 'failed', line, { title: `Sweep ${sw?.group ?? first.group ?? ''}`.trim(), url: `/experiments?sweep=${sweep}` });
   if (first.report && first.startedBy?.session)
     tellEnded(d, first.startedBy.session, {
       runs: runs.map((x) => x.id),
       line: `The sweep ${sw?.group ?? sweep} (${sweep}) ended: ${line} experiment_list with group "${sw?.group ?? first.group}" lists its runs; experiment_table compares them.`,
       at: Date.now(),
+      ...experimentOf(d.db, sw?.group ?? first.group),
     });
 }
 
@@ -778,6 +870,7 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
   // What its last output said (NaN, divergence) is noticed before its end is.
   await watchOutput(d, { ...r, status: 'done' }, L);
   const cur = getRun(d.db, r.id) ?? r;
+  if (cur.stopping === NIGHT_AGAIN) return backToWaiting(d, cur);
   const now = Date.now();
   let status: RunRecord['status'];
   let why: string | null = null;
@@ -821,7 +914,7 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
     metrics: L.tracker.snapshot(),
     logOffset: L.log,
     fileOffset: L.file,
-    info: { exitCode: code, outputAt: L.outputAt, stopping: undefined, ...(scores ? { scores: true } : {}) },
+    info: { exitCode: code, outputAt: L.outputAt, stopping: undefined, nightStop: undefined, ...(scores ? { scores: true } : {}) },
   });
   saveSeries(d.db, r.id, L.tracker.series);
   try {
@@ -838,6 +931,23 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
   await ending(d, rec, told);
   tellRuns(d, [r.id]);
   ended.emit('ended', r.id);
+}
+
+/** A night run stopped because its night ended waits for the next one, to start from the beginning; its log so far is set aside. */
+function backToWaiting(d: Deps, r: RunRecord) {
+  const folder = r.folder ?? runFolder(r.id);
+  const f = files(folder);
+  try {
+    fs.renameSync(f.log, path.join(folder, `log-before-${Date.now()}.txt`));
+  } catch {}
+  // Its last exit code must not be taken for the next start's.
+  fs.rmSync(f.exit, { force: true });
+  fs.rmSync(f.pid, { force: true });
+  resetRun(d.db, r.id, NIGHT_AGAIN);
+  addEvent(d.db, r.id, { kind: 'waiting', text: NIGHT_AGAIN });
+  live.delete(r.id);
+  tellRuns(d, [r.id]);
+  wake();
 }
 
 // ---- starting runs ------------------------------------------------------------------------------------------------
@@ -858,24 +968,44 @@ function fail(d: Deps, r: RunRecord, why: string) {
   ended.emit('ended', r.id);
 }
 
-/** The runs here that wait: each takes what it needs while it is free, by priority then age. */
-async function startWaiting(d: Deps) {
+/**
+ * The runs here that wait: each takes what it needs while it is free, by priority then age. Night runs come after all
+ * the others, whatever their priorities: they start only in the night (`night`) and while no other run waits.
+ */
+async function startWaiting(d: Deps, night: string | null, settings: ExperimentsSettings) {
   const all = listRuns(d.db, { status: ['queued', 'waiting', 'starting', 'running'], limit: 5000, oldest: true }).filter((r) => !r.remote && placeOf(r.where).kind === 'local');
   const waiting = all.filter((r) => (r.status === 'queued' || r.status === 'waiting') && !busy.has(r.id));
   if (!waiting.length) return;
-  waiting.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || a.createdAt - b.createdAt);
+  const last = (r: RunRecord) => (r.when === 'night' ? 1 : 0);
+  waiting.sort((a, b) => last(a) - last(b) || (b.priority ?? 0) - (a.priority ?? 0) || a.createdAt - b.createdAt);
   const going = all.filter((r) => r.status === 'starting' || r.status === 'running' || busy.has(r.id));
   const held = new Set(going.flatMap((r) => r.gpuIds ?? []));
-  const slots = settingsOf(d.db).cpuSlots;
+  const slots = settings.cpuSlots;
   let free = slots - going.filter((r) => !r.gpus).length;
   let reading: GpuReading | null = null;
+  // An ordinary run that waits holds back the night runs that want what it wants: a GPU, or a processor slot. (One
+  // stuck waiting for a GPU that never frees does not keep a night run that needs none from starting.)
+  const othersWait = { gpu: false, cpu: false };
+  const wait = (r: RunRecord, why: string) => {
+    setWaiting(d, r, why);
+    if (r.when !== 'night') othersWait[r.gpus ? 'gpu' : 'cpu'] = true;
+  };
+  const seen = new Set(waiting.map((r) => r.id));
+  // One that came in while this pass was at its GPUs or starting others goes first too (looked for again after each).
+  let came: boolean | null = null;
+  const cameIn = () => (came ??= listRuns(d.db, { status: ['queued'], limit: 5000 }).some((r) => !seen.has(r.id) && r.when !== 'night' && !r.remote && placeOf(r.where).kind === 'local'));
   for (const r of waiting) {
+    if (r.when === 'night' && (!night || othersWait[r.gpus ? 'gpu' : 'cpu'] || cameIn())) {
+      wait(r, night ? NIGHT_BEHIND : nightWhy(r, settings));
+      continue;
+    }
     const need = r.gpus ?? 0;
     if (!need) {
       if (free > 0) {
         free--;
         await begin(d, r, []);
-      } else setWaiting(d, r, `Waiting for one of your runs without a GPU to end (${slots} at most at once)`);
+        came = null;
+      } else wait(r, `Waiting for one of your runs without a GPU to end (${slots} at most at once)`);
       continue;
     }
     reading ??= await readGpus().catch((): GpuReading => ({ gpus: [], error: 'failed' }));
@@ -884,7 +1014,7 @@ async function startWaiting(d: Deps) {
       continue;
     }
     if (!reading.gpus.length) {
-      setWaiting(d, r, 'Waiting: the GPUs could not be read just now (nvidia-smi failed); trying again');
+      wait(r, 'Waiting: the GPUs could not be read just now (nvidia-smi failed); trying again');
       continue;
     }
     if (need > reading.gpus.length) {
@@ -893,11 +1023,12 @@ async function startWaiting(d: Deps) {
     }
     const pick = chooseGpus(reading.gpus, need, r.gpuMemGb, held);
     if ('why' in pick) {
-      setWaiting(d, r, pick.why);
+      wait(r, pick.why);
       continue;
     }
     for (const i of pick.ids) held.add(i);
     await begin(d, r, pick.ids, reading);
+    came = null;
   }
 }
 
@@ -1170,6 +1301,8 @@ function setWhy(d: Deps, r: RunRecord, why: string) {
 
 /** Copies what another machine says of a run it keeps into the copy here; tells you of its end the way the job asked. */
 function copyRemote(d: Deps, r: RunRecord, there: RemoteRun) {
+  // Put back to wait at the end of that machine's night: the copy drops what its last start recorded, too.
+  if (there.why === NIGHT_AGAIN && r.why !== NIGHT_AGAIN) resetRun(d.db, r.id, NIGHT_AGAIN);
   const info: Partial<RunInfo> = {};
   for (const k of ['host', 'gpuIds', 'exitCode', 'commit', 'branch', 'dirty', 'untracked', 'kept', 'notKept', 'environment', 'outputAt', 'scores', 'stopping'] as const) (info as Record<string, unknown>)[k] = there[k];
   updateRun(d.db, r.id, { status: there.status, why: there.why ?? null, ...(there.startedAt ? { startedAt: there.startedAt } : {}), ...(there.endedAt ? { endedAt: there.endedAt } : {}), info, ...(there.metrics ? { metrics: there.metrics } : {}) });
@@ -1217,7 +1350,7 @@ export function tellRuns(d: Deps, ids: string[]) {
 /** On start-up: the runs that were going are found again (the loop sees whether each still runs). */
 export function resume(d: Deps) {
   useDeps(d);
-  if (listRuns(d.db, { status: ACTIVE, limit: 1 }).length) wake();
+  if (listRuns(d.db, { status: ACTIVE, limit: 1 }).length || morningDue(d.db)) wake();
   // The records of runs that ended under an older rule for their metrics are fixed in the background, a little later.
   const t = setTimeout(() => void repairEnded(d), 5000);
   t.unref?.();

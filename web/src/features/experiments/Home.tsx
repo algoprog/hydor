@@ -11,6 +11,8 @@ import { Button, cx, Empty, inputCls } from '../../components/ui';
 import { bestRun, keyMetricOf, runKey, valueOf } from './analysis';
 import { gpuWords, isActive, keyMetrics, leftWords, num, progressOf, statusTone, statusWords, useSeries } from './api';
 import { Sparkline } from './Charts';
+import { LOCALE } from '../../i18n/locale';
+import { nightDay, saidByStatus } from './nightWords';
 import { RunsTable, type RunsSort } from './RunsTable';
 import { agoWords, byCategory, type Entry, EvaluationLine, findEntries, FindBox, fullDate, GpuMeters, lastOf, QueueLine, runsWords } from './Sidebar';
 
@@ -40,7 +42,7 @@ function GoingCard({ r, title, series, onOpen }: { r: RunRecord; title: string; 
           {title}
         </div>
       )}
-      {waiting && r.why && (
+      {waiting && r.why && !saidByStatus(r.why) && (
         <div translate="no" className="line-clamp-2 text-[12px] text-fg-3">
           {r.why}
         </div>
@@ -164,6 +166,8 @@ export function Home({
   onOpenExperiment,
   onNewRun,
   placeOf,
+  night,
+  onLeaveNight,
 }: {
   /** null while they load. */
   runs: RunRecord[] | null;
@@ -182,6 +186,9 @@ export function Home({
   onOpenExperiment: (group: string) => void;
   onNewRun: () => void;
   placeOf: (r: RunRecord) => { id: string; name: string };
+  /** The night the address names (?night=, from the morning's notice): its runs show first, and the latest ones not. */
+  night: { date: string; runs: RunRecord[] | null } | null;
+  onLeaveNight: () => void;
   evaluations: EvaluationListed[];
   /** The ids of those being scored now. */
   scoring: Set<string>;
@@ -241,6 +248,39 @@ export function Home({
       {narrow && <Top runs={all} queue={queue} q={q} onQ={onQ} onOpenRun={onOpenRun} />}
       {runs === null && error && <p className="text-[13px] text-fg-3">{error}</p>}
 
+      {night && (
+        <section>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h2 className="mr-auto text-[13px] font-semibold text-fg">
+              <span>The night of</span> <span>{nightDay(night.date)!.toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            </h2>
+            <button type="button" onClick={onLeaveNight} className="rounded-lg px-1 py-1 text-[12.5px] text-accent hover:underline">
+              Show the latest runs
+            </button>
+          </div>
+          {!night.runs ? (
+            <div className="h-40 animate-pulse rounded-xl border border-line bg-bg-1" aria-hidden />
+          ) : night.runs.length ? (
+            <RunsTable
+              runs={night.runs}
+              columns={NO_COLUMNS}
+              experiment={(r) => (r.group ? (titleOf.get(r.group) ?? r.group) : null)}
+              summary
+              where={places.size > 1 ? (r) => placeOf(r).name : undefined}
+              picked={picked}
+              onPick={onPick}
+              onPickAll={(rs, on) => onPickMany(rs, on)}
+              onOpen={onOpenRun}
+              sort={sort}
+              onSort={setSort}
+              limit={100}
+            />
+          ) : (
+            <p className="py-3 text-[13px] text-fg-3">No run of that night is kept.</p>
+          )}
+        </section>
+      )}
+
       {now.length > 0 && (
         <section>
           <h2 className="mb-2 text-[13px] font-semibold text-fg">Running now</h2>
@@ -279,7 +319,7 @@ export function Home({
         )}
       </section>
 
-      {(runs === null || all.length > 0) && (
+      {!night && (runs === null || all.length > 0) && (
         <section data-intro="exp-runs">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <h2 className="mr-auto text-[13px] font-semibold text-fg">Latest runs</h2>
