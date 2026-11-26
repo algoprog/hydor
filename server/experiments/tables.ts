@@ -183,6 +183,12 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
   const runs = ended.filter((r) => cols.some((c) => valueOf(r, c) !== undefined));
   if (runs.length < ended.length) notes.push(`${ended.length - runs.length} run${ended.length - runs.length === 1 ? ' has' : 's have'} none of these metrics.`);
   const rows = rowsOf(spec, runs);
+  // Rows by a setting no run has would be one row of everything, read as so many seeds: that is said.
+  const by = spec.rows?.startsWith('param:') ? spec.rows.slice(6) : null;
+  if (by && runs.length && !runs.some((r) => r.params?.[by] !== undefined)) {
+    const have = [...new Set(runs.flatMap((r) => Object.keys(r.params ?? {})))].sort();
+    notes.push(`No run has a setting called “${by}”, so all ${runs.length} runs are one row and its spread is over runs, not seeds. ${have.length ? `Their settings are: ${have.join(', ')}.` : 'They have no settings: make rows by experiment, or start the runs with settings (params).'}`);
+  }
   const base = rows.find((r) => r.key === spec.baseline) ?? rows[0];
   if (spec.baseline && base && base.key !== spec.baseline) notes.push(`There is no row “${spec.baseline}”: the first row is the baseline.`);
   const alpha = spec.alpha && spec.alpha > 0 && spec.alpha < 1 ? spec.alpha : 0.05;

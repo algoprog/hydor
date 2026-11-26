@@ -18,7 +18,7 @@ import { allowedFolder, ChangedError, check, cleanSpec, createEvaluation, evalua
 import type { Candidate, Evolution } from '../../shared/evolve.ts';
 import { candidateDetail, candidatesOf, checkEvolveSpec, EVOLVE, listEvolutions, mustEvolution, startEvolution } from './evolve.ts';
 import { cleanJob, onCallSession, placeOf, placesLine, runAgain, settingsOf, stopRun, submit, waitRuns, whereWords } from './queue.ts';
-import { NIGHT_CLUSTER, tonightWords } from './night.ts';
+import { NIGHT_CLUSTER, nightZone, tonightMore, tonightWords } from './night.ts';
 import { keepUntracked, keptWords, localShell } from './capture.ts';
 import { agentBaseEnv } from '../env.ts';
 import { sawEnded } from './notices.ts';
@@ -34,6 +34,13 @@ async function notInGit(r: RunRecord): Promise<string> {
   return keptWords(await keepUntracked(localShell(r.cwd, { ...agentBaseEnv(), ...r.env }), r.command, r.cwd, null).catch(() => ({ kept: [], notKept: [] })));
 }
 
+/** For this computer's night runs: how long until the night, the time zone of its hours, and which code will run. */
+function nightMore(ctx: RunCtx, where: string | undefined): { startsMore?: string } {
+  if (placeOf(where).kind === 'machine') return {};
+  const more = tonightMore(settingsOf(ctx.deps.db), { tz: nightZone(ctx.deps.db) });
+  return more ? { startsMore: more } : {};
+}
+
 /** When a night run to `where` will start, in a sentence ("It will start tonight, between 23:00 and 07:00"). */
 function tonight(ctx: RunCtx, where: string | undefined): string {
   const p = placeOf(where);
@@ -44,7 +51,7 @@ function tonight(ctx: RunCtx, where: string | undefined): string {
 async function started(r: RunRecord, ctx: RunCtx): Promise<string> {
   const note = await notInGit(r);
   const where = r.remote ? `m:${r.remote.machine}` : r.where;
-  return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), ...(r.when ? { when: r.when, starts: tonight(ctx, where) } : {}), name: r.name, page: `/experiments/${r.id}`, ...(note ? { note } : {}) });
+  return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), ...(r.when ? { when: r.when, starts: tonight(ctx, where), ...nightMore(ctx, where) } : {}), name: r.name, page: `/experiments/${r.id}`, ...(note ? { note } : {}) });
 }
 
 const failed = (e: unknown): ToolOutput => ({ text: (e as Error)?.message ?? String(e), isError: true });
@@ -250,7 +257,7 @@ function sweepTool(ctx: RunCtx): RunTool {
         if (no) return failed(no);
         const onCall = a.onCall && typeof a.onCall === 'object' && !a.onCall.agent && !ctx.step ? { ...a.onCall, agent: agentOf(ctx) } : a.onCall;
         const s = await startSweep(ctx.deps, { ...a, ...(onCall ? { onCall } : {}) }, { cwd: ctx.cwd, startedBy: startedBy(ctx) });
-        return json({ sweep: s.sweep.id, group: s.sweep.group, runs: s.runs.map((r) => r.id), ...(night ? { when: 'night', starts: tonight(ctx, where) } : {}), page: `/experiments?sweep=${s.sweep.id}` });
+        return json({ sweep: s.sweep.id, group: s.sweep.group, runs: s.runs.map((r) => r.id), ...(night ? { when: 'night', starts: tonight(ctx, where), ...nightMore(ctx, where) } : {}), page: `/experiments?sweep=${s.sweep.id}` });
       } catch (e) {
         return failed(e);
       }
@@ -450,7 +457,7 @@ function otherScores(db: RunCtx['deps']['db'], s: EvalScore) {
     .filter((x) => x.status === 'done' && x.seal === s.seal && (x.folder !== s.folder || x.branch !== s.branch))
     .filter((x) => !seen.has(`${x.folder}\n${x.branch}`) && !!seen.add(`${x.folder}\n${x.branch}`))
     .slice(0, 5)
-    .map((x) => ({ ...(x.branch ? { branch: x.branch } : { folder: x.folder }), mean: x.mean, std: x.std, seeds: x.seeds }));
+    .map((x) => ({ score: x.id, ...(x.branch ? { branch: x.branch } : {}), folder: x.folder, ...(x.commit ? { commit: x.commit.slice(0, 10) } : {}), ...(x.endedAt ? { at: new Date(x.endedAt).toISOString() } : {}), mean: x.mean, std: x.std, seeds: x.seeds }));
 }
 
 const folderArg = (a: Record<string, any>, ctx: RunCtx) => (typeof a.cwd === 'string' && a.cwd.trim() ? path.resolve(ctx.cwd, a.cwd.trim().replace(/^~(?=$|\/)/, config.home)) : undefined);

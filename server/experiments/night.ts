@@ -77,6 +77,21 @@ export function tonightWords(h: Hours, machine?: string): string {
 /** The time zone the night's hours are read in: the person's, as their browser reported it (the tests leave it unset: this computer's). */
 export const nightZone = (db: DB): string | undefined => kvGet(db, 'user.tz') || undefined;
 
+/**
+ * For an agent, beside when a night run will start: how long until then, whose clock the hours are on, and that it
+ * runs the code its folder has when it starts (nothing is fixed when it is queued). Empty when there is no night.
+ */
+export function tonightMore(h: Hours, o: { tz?: string; at?: number } = {}): string {
+  if (h.nightFrom === h.nightTo) return '';
+  const at = o.at ?? clock.now();
+  const zone = o.tz ? `The hours are in ${o.tz} time. ` : '';
+  const code = 'It runs the code as its folder has it when it starts, so leave that folder and its branch as they should run.';
+  if (nightAt(at, h, o.tz)) return `${zone}It is night now, so it starts as soon as nothing else waits. ${code}`;
+  const left = (minutesOf(h.nightFrom) - wall(at, o.tz).now + 1440) % 1440;
+  const about = left >= 90 ? `${Math.round(left / 60)} hours` : left >= 60 ? 'an hour' : `${Math.max(1, left)} minutes`;
+  return `${zone}That is in about ${about}. ${code}`;
+}
+
 /** A night run in this computer's own queue (one sent to another machine is that machine's). */
 export const isNightHere = (r: Pick<RunRecord, 'when' | 'remote' | 'where'>) => r.when === 'night' && !r.remote && !/^[cm]:/.test(r.where ?? '');
 

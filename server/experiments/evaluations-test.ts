@@ -534,7 +534,7 @@ test('the baseline is the person’s; scores are compared with it', async () => 
   assert.equal(alone.status, 'done', alone.why);
   assert.match(alone.noBaseline, /There is no baseline yet.*under others: compare with those yourself, without running them again\.$/);
   const better0 = alone.others.find((x: { branch?: string }) => x.branch === 'better');
-  assert.deepEqual(Object.keys(better0), ['branch', 'mean', 'std', 'seeds']);
+  assert.deepEqual(Object.keys(better0), ['score', 'branch', 'folder', 'commit', 'at', 'mean', 'std', 'seeds']);
   near(better0.mean, 0.92);
   assert.deepEqual(better0.seeds, [1, 2, 3]);
   assert.equal(alone.others.filter((x: { branch?: string }) => x.branch === 'better').length, 1, 'the latest of each');

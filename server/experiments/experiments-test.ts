@@ -39,7 +39,7 @@ import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
 import { MAX_METRICS, nanText, oomText, parseLine, Tracker } from './metrics.ts';
 import { cleanJob, endLine, forgetLive, forgetNotices, onCallBrief, repairEnded, setSettings, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
-import { clock, morningWords, NIGHT_AGAIN, NIGHT_BEHIND, nightAt } from './night.ts';
+import { clock, morningWords, NIGHT_AGAIN, NIGHT_BEHIND, nightAt, tonightMore } from './night.ts';
 import { addEvent, getInfo, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveInfo, saveSeries, saveTable, seriesOf, updateRun, waitStarted, workOut } from './records.ts';
 import { useMachines } from './remote.ts';
 import { holm, lgamma, pairedBootstrap, pairedT, tTwoSided, welch } from './stats.ts';
@@ -727,6 +727,10 @@ test('rows by a setting, labels, runs not ended left out; recompute after a run 
   insertRun(db, { id: 'tlr4aaaa', spec: { command: 'x', cwd: tmp, group: 'lr', params: { lr: 0.01 } }, status: 'running' });
   const spec = { group: 'lr', rows: 'param:lr' as const, columns: [{ metric: 'acc', better: 'max' as const }], labels: { '0.0003': 'Ours' }, test: 'none' as const };
   const t = workOut(db, spec, 'tlr00001');
+  // Rows by a setting no run has are one row of everything: the table says so, and names the settings there are.
+  const lost = workOut(db, { ...spec, rows: 'param:command' as const, labels: undefined }, 'tlost001');
+  assert.equal(lost.rows.length, 1);
+  assert.match((lost.notes ?? []).join(' '), /No run has a setting called “command”, so all \d+ runs are one row and its spread is over runs, not seeds\. Their settings are: .*lr/);
   assert.deepEqual(
     t.rows.map((r) => [r.key, r.label]),
     [
@@ -1761,6 +1765,11 @@ test('night hours: the night an hour is in, across midnight; the settings and wh
   assert.equal(nightAt(utc(1, 3), h, 'Asia/Tokyo'), null, 'noon in Tokyo');
   assert.equal(nightAt(utc(1, 15), h, 'Asia/Tokyo'), '2026-01-01', 'midnight in Tokyo, the 2nd there already: the night that began on the 1st');
   assert.equal(nightAt(utc(5, 4, 30), h, 'Not/AZone'), nightAt(utc(5, 4, 30), h), 'a zone that is none: this computer’s clock');
+  // What an agent is told beside "It will start tonight…": how long, whose hours, which code.
+  assert.equal(tonightMore(h, { tz: 'America/New_York', at: utc(5, 19, 29) }), 'The hours are in America/New_York time. That is in about 9 hours. It runs the code as its folder has it when it starts, so leave that folder and its branch as they should run.');
+  assert.match(tonightMore(h, { tz: 'America/New_York', at: utc(5, 4, 30) }), /^The hours are in America\/New_York time\. It is night now, so it starts as soon as nothing else waits\./);
+  assert.match(tonightMore(h, { tz: 'America/New_York', at: utc(5, 3, 20) }), /That is in about 40 minutes\./);
+  assert.equal(tonightMore({ nightFrom: '03:00', nightTo: '03:00' }), '');
 
   assert.equal(morningWords({ done: 5, failed: 1, stopped: 0, running: 0, waiting: 2 }), 'Last night: 5 runs done, 1 failed, 2 still wait for tonight');
   assert.equal(morningWords({ done: 1, failed: 0, stopped: 0, running: 1, waiting: 1 }), 'Last night: 1 run done, 1 still running, 1 still waits for tonight');
