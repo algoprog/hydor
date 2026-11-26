@@ -458,7 +458,7 @@ class Engine:
             result = self._decode('slm', *args, stats)
         t_llm, t_slm = stats['llm'], stats['slm']
         word, nxt, conf, conf_next = result
-        theta = theta_for(rel.calibration, used, precision)
+        theta = self.theta_of(req, used, precision)
         show = bool(conf >= theta)
         show_next = bool(show and nxt and conf_next >= theta)
         total = (time.perf_counter() - t0) * 1000
@@ -471,6 +471,15 @@ class Engine:
         if used != 'llm':                           # Qwen3.5 alone does not use the small model
             out['model'] = slot.kind
         return out
+
+    def theta_of(self, req: dict, plan: str, precision: float) -> float:
+        """The confidence a word of this plan needs: the request's own threshold for the plan (`theta`, which the app fits to
+        the person's writing), else the release's at the asked precision."""
+        own = req.get('theta')
+        value = own.get(plan) if isinstance(own, dict) else None
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and np.isfinite(value):
+            return float(value)
+        return theta_for(self.release.calibration, plan, precision)
 
     def _empty(self, t0: float, req: dict) -> dict:
         total = (time.perf_counter() - t0) * 1000
@@ -534,7 +543,7 @@ class Engine:
         word = text_after(d.produced, R)
         conf = d.conf
         nxt, conf_next = '', 0.0
-        theta = theta_for(rel.calibration, plan, precision)
+        theta = self.theta_of(req, plan, precision)
         if want_next and d.ended and not d.eot and conf >= theta:
             d2 = decode(row_fn, rel.index, b'', d.path, int(self.opts['max_tokens']), cancelled)
             nxt, conf_next = next_word_text(d2.produced), d2.conf

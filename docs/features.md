@@ -1696,7 +1696,11 @@ agents that speak ACP and take MCP servers.
   and 2.5 GB of it free (Automatic, On or Off; without it the small model alone makes the suggestions, and the section says
   why); Choose by language picks, for the language of the text, the better of the two. It shows in message boxes, in
   Docs, in notes and in other text boxes (follow-ups, the queue, the Ask panels), each with its switch, and each browser
-  can turn it off for itself. How sure before showing (more, the default; balanced; surer; an agent can set up to 60%), the next word,
+  can turn it off for itself. A guess that arrives while you are still typing shows what is left of it when the letters
+  typed meanwhile match. The bar a guess must pass to show starts as measured on other people's text and is then fitted
+  to your writing: every guess, shown or not, is checked against the word you go on to type, as counts by how sure it was
+  (never text), and once 400 of a kind are judged that kind gets its own bar, within a third to one and a half times the
+  app's own; Settings says how far this is, and Reset the numbers starts it again. How sure before showing (more, the default; balanced; surer; an agent can set up to 60%), the next word,
   and how many words it reads of what you typed and of the agent's reply or the document above the paragraph are set
   there too, and the session's earlier words feed its guesses as you type a message. The small model learns from what you
   write: your messages to agents (not in sessions with memory off or confidential, and not the text apps, scheduled tasks
@@ -1711,7 +1715,7 @@ agents that speak ACP and take MCP servers.
   Forget what it learned goes back to the model that came with the app. **How it's helping** counts how many keystrokes
   the suggestions saved (and their share of your typing) and how many were right (taken with Tab or →, or typed through
   by you, against the ones where you typed something else), with today, this week and the total behind a button and
-  **Reset the numbers**; only counts are kept, never any text. Agents read and change all of it
+  **Reset the numbers** (which starts the fitting of the bar again too); only counts are kept, never any text. Agents read and change all of it
   (`GET` and `PUT /api/suggest`, whose status has the numbers, and the settings table), and the browser's switch through `PUT /device`.
 - **Your language**: the app in English, German, Spanish, French, Brazilian Portuguese, Greek, Japanese or Chinese
   (Simplified) (Settings → General → Language), and the guide too, with dates and times written that way and

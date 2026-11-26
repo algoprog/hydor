@@ -316,7 +316,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Taille du modèle de langage**](/settings?s=suggest&find=Language%20model%20size) : Le modèle de langage en 8 bits (meilleur) ou en 4 bits (plus petit, un peu moins bon).
 - [**Certitude avant d’afficher**](/settings?s=suggest&find=How%20sure%20before%20showing) : Niveau de certitude requis pour afficher une suggestion : plus de suggestions, ou moins mais plus souvent justes.
 - [**Afficher le mot suivant**](/settings?s=suggest&find=Show%20the%20next%20word) : Affiche aussi le mot suivant, en plus pâle.
-- [**Réinitialiser les chiffres**](/settings?s=suggest&find=Reset%20the%20numbers) : Recommence à compter de zéro les frappes économisées et les suggestions qui étaient justes.
+- [**Réinitialiser les chiffres**](/settings?s=suggest&find=Reset%20the%20numbers) : Remet à zéro le compte des frappes économisées et des suggestions justes, et réapprend quel degré de certitude une suggestion doit atteindre.
 - [**Dans les zones de message**](/settings?s=suggest&find=In%20message%20boxes) : Suggestions dans la zone où vous écrivez un message à un agent.
 - [**Dans les documents**](/settings?s=suggest&find=In%20documents) : Suggestions pendant que vous écrivez dans un document.
 - [**Dans les notes**](/settings?s=suggest&find=In%20notes) : Suggestions dans les notes.

@@ -322,7 +322,7 @@ Beim Tippen kann Hydor den Rest des Wortes, das du gerade schreibst, grau hinter
 
 - **Tab** übernimmt das graue Wort. Drücke die Taste noch einmal, um das nächste zu übernehmen.
 - **→** (der Pfeil nach rechts) übernimmt beide Wörter auf einmal, wenn der Cursor am Ende des Textes steht.
-- **Esc** blendet sie bis zum nächsten Wort aus. Tippe einfach weiter, dann verschwinden sie von selbst; tippst du die Buchstaben, die sie zeigen, bleiben sie bestehen, nur kürzer.
+- **Esc** blendet sie bis zum nächsten Wort aus. Tippst du weiter, verschwinden sie von selbst; tippst du die Buchstaben, die sie zeigen, bleiben sie stehen und werden kürzer. Kommt eine Vermutung an, während du noch tippst, zeigt sie, was von ihr übrig ist, sofern die inzwischen getippten Buchstaben zu ihr passen.
 - Im Nachrichtenfeld behält ein geöffnetes `@`- oder `/`-Menü Tab und Esc für sich, und **Shift+Tab** ändert weiterhin den Berechtigungsmodus. Wenn nichts Graues angezeigt wird, macht jede Taste das, was sie immer gemacht hat.
 
 Nichts, was du tippst, verlässt deinen Computer: Die Vorschläge kommen von Modellen, die auf ihm laufen. Sie ist von Anfang an eingeschaltet und richtet sich beim ersten Tippen von selbst ein.
@@ -359,6 +359,8 @@ Diese Einstellungen gelten einmal für die ganze App. Eine Ausnahme ist **[In di
 
 Jeder Vorschlag hat eine gewisse Wahrscheinlichkeit, richtig zu sein, und er wird nur angezeigt, wenn diese Wahrscheinlichkeit hoch genug ist. **[Wie sicher, bevor angezeigt wird](/settings?s=suggest&find=How%20sure%20before%20showing)** legt die Schwelle fest: **Mehr** (die Voreinstellung) zeigt mehr Vorschläge, und mehr davon sind falsch; **Ausgewogen** liegt in der Mitte und zielt auf etwa vier richtige von zehn angezeigten Vorschlägen; **Sicherer** zeigt weniger, und mehr davon sind richtig. Ein Agent kann die Schwelle auch noch höher setzen, sodass nur die sichersten Vorschläge erscheinen. Mit **[Nächstes Wort anzeigen](/settings?s=suggest&find=Show%20the%20next%20word)** schaltest du das blassere zweite Wort aus, sodass nur der Rest des Wortes erscheint, das du gerade tippst.
 
+Die Schwelle, mit der die App beginnt, wurde an Texten anderer Menschen gemessen und wird daher anschließend an deine angepasst. Jede Vermutung, ob angezeigt oder nicht, wird mit dem Wort verglichen, das du dann tatsächlich tippst, und nur eine Zählung wird behalten: wie sicher das Modell war und ob es richtig lag, niemals Text. Ein Wort, das du nicht zu Ende schreibst oder mit der Rücktaste korrigierst, bevor die Vermutung angezeigt wurde, wird nicht gezählt. Sobald 400 Vermutungen einer Art bewertet sind (von beiden Modellen zusammen, vom Sprachmodell allein oder vom kleinen Modell allein), bekommt diese Art eine eigene Schwelle. Sie wird so gesetzt, dass der Anteil der richtigen unter den angezeigten dem entspricht, den du gewählt hast, und liegt nie unter einem Drittel oder über dem Anderthalbfachen der eigenen Schwelle der App. Was du in letzter Zeit geschrieben hast, zählt mehr als das, was du vor langer Zeit geschrieben hast. Unter der Auswahl zeigt eine Zeile, wie weit das ist, **Lernt aus deinem Schreiben (120 von 400)**, und wenn es abgeschlossen ist, **Wie sicher ein Vorschlag sein muss, ist auf dein Schreiben abgestimmt (900 Antworten bewertet).** Die Zählung beginnt von vorn, wenn die App eine neue Version des kleinen Modells mitbringt, wenn das erste Modell aus deinen Texten erstellt wird und wenn du [die Zahlen zurücksetzt](#how-much-it-helps).
+
 ### Was es liest
 
 Für seine Vorschläge liest es die Wörter, die du vor dem Cursor getippt hast, und das, worauf du antwortest: die letzte Antwort des Agenten bei einer Nachricht oder den Text über dem Absatz in einem Dokument.
@@ -388,7 +390,7 @@ Solange ein Durchlauf läuft, hat diese Zeile **Pausieren** und **Stoppen**. **P
 
 Unter **So hilft es dir** im selben Bereich zeigen zwei Zeilen, was die Vorschläge bisher für dich getan haben: die **gesparten Tastenanschläge** (und welchen Anteil deines Tippens das ausmacht) und wie viele Vorschläge von den bewerteten **Richtig** waren, dazu, wie viele du mit Tab übernommen hast. Ein Vorschlag ist richtig, wenn du ihn übernommen hast (Tab oder → für zwei Wörter) oder das ganze graue Wort selbst getippt hast; er ist falsch, wenn du etwas anderes getippt hast, während er angezeigt wurde. Einer, den du mit Esc ausgeblendet hast oder der verschwunden ist, weil du woanders geklickt, die Nachricht gesendet oder den Cursor bewegt hast, zählt weder als richtig noch als falsch. Jedes Tab oder → spart die Buchstaben, die es einfügt, abzüglich der einen Taste, die du gedrückt hast.
 
-**Details anzeigen** ergänzt heute, diese Woche und die Gesamtsumme seit Beginn der Zählung, und **[Zahlen zurücksetzen](/settings?s=suggest&find=Reset%20the%20numbers)** beginnt nach deiner Bestätigung wieder bei null. Es werden nur Zähler gespeichert, nie das, was du getippt hast, und sie ändern nichts an der Funktionsweise der Vorschläge.
+**Details anzeigen** ergänzt heute, diese Woche und die Gesamtsumme seit Beginn der Zählung, und **[Zahlen zurücksetzen](/settings?s=suggest&find=Reset%20the%20numbers)** beginnt nach deiner Bestätigung wieder bei null. Behalten werden nur Zählungen, nie das, was du getippt hast. Beim Zurücksetzen beginnt auch das [Anpassen, wie sicher eine Vermutung sein muss](#how-sure-it-must-be), von vorn.
 
 ## Eine Nachricht diktieren
 
@@ -519,6 +521,7 @@ Sie hört dafür auf zuzuhören, um das zu sagen, und hört danach wieder zu. Si
 - „Läuft das Sprachmodell für die Wortvorschläge? Wenn nicht, warum?“
 - „Schalte die Wortvorschläge nur in diesem Browser aus.“
 - „Wie viele Tastenanschläge haben mir die Wortvorschläge erspart?“
+- „Haben die Wortvorschläge schon an mein Schreiben angepasst, wie sicher sie sein müssen?“
 - „Schalte die Spracherkennung auf diesem Computer ein, mit dem Modell Klein.“
 - „Verwende meinen Sprachserver unter http://192.168.1.20:8000/v1 für das Diktieren, mit dem Modell whisper-large-v3.“
 - „Welche Whisper-Modelle sind auf diesem Computer, und wie viel Platz brauchen sie? Entferne die, die nicht verwendet werden.“

@@ -23,7 +23,15 @@ export interface SuggestRequest {
   client?: string;
 }
 
-/** A suggestion, or nothing to show (show false). */
+/** Which models made a suggestion: mix (both), llm (Qwen3.5 alone), slm (the small model alone). */
+export type SuggestPlan = 'mix' | 'llm' | 'slm';
+
+export const SUGGEST_PLANS = ['mix', 'llm', 'slm'] as const satisfies readonly SuggestPlan[];
+
+/**
+ * A suggestion. With show false it is not shown, but `word` and `conf` still say what was guessed: the page keeps it
+ * unseen, to learn how often a guess that sure is right for this person.
+ */
 export interface SuggestResponse {
   /** The rest of the word being typed ('' when the word is complete). */
   word: string;
@@ -36,7 +44,7 @@ export interface SuggestResponse {
   show: boolean;
   showNext: boolean;
   /** mix: both models; llm: Qwen3.5 alone; slm: the small model alone. */
-  plan?: 'mix' | 'llm' | 'slm';
+  plan?: SuggestPlan;
   /** The language guessed (a FLORES code such as eng_Latn), when it was sure. */
   lang?: string;
   /**
@@ -140,6 +148,34 @@ export const SUGGEST_COUNT_KEYS = ['shown', 'taken', 'typedThrough', 'wrong', 's
 /** The most one POST /api/suggest/usage may add to each count. */
 export const SUGGEST_USAGE_CAP = 5000;
 
+/** The bins of how sure a guess was (conf 0..1, each 1/40 wide) that judged guesses are counted in. */
+export const SUGGEST_BINS = 40;
+
+/** Judged guesses by how sure they were: how many there were in each bin, and how many of them were right. */
+export interface SuggestBins {
+  right: number[];
+  total: number[];
+}
+
+/**
+ * Guesses judged against what the person then typed, as counts per plan (never any text): shown or not, so that the
+ * thresholds can be fitted to their writing.
+ */
+export type SuggestJudged = Partial<Record<SuggestPlan, SuggestBins>>;
+
+/** The judged answers a plan needs before its threshold is fitted to the person's writing. */
+export const SUGGEST_FIT_MIN = 400;
+
+/**
+ * Whether how sure a suggestion must be is fitted to the person's writing: `judged` answers counted (the older ones
+ * weigh less as new ones come), of the `needed` a plan needs.
+ */
+export interface SuggestThresholds {
+  judged: number;
+  needed: number;
+  fitted: boolean;
+}
+
 /** How many local days of counts are kept (today and the 30 before). */
 export const SUGGEST_USAGE_DAYS = 31;
 
@@ -195,6 +231,8 @@ export interface SuggestStatus {
   stats?: { requests: number; p50Ms?: number; p90Ms?: number };
   /** How many keystrokes suggestions saved and how many were right (counts kept on the server; Reset starts them again). */
   usage: SuggestUsage;
+  /** Whether the thresholds are fitted to the person's writing, from the guesses judged (Reset starts them again too). */
+  thresholds: SuggestThresholds;
 }
 
 /** GET and PUT /api/suggest */

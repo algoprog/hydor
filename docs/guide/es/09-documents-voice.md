@@ -322,7 +322,7 @@ Mientras escribes, Hydor puede mostrar en gris, después del cursor, el resto de
 
 - **Tab** acepta la palabra en gris. Púlsala otra vez para aceptar la siguiente.
 - **→** (la flecha derecha), con el cursor al final del texto, acepta las dos palabras a la vez.
-- **Esc** las oculta hasta la palabra siguiente. Sigue escribiendo y desaparecen solas; escribe las letras que muestran y se quedan, más cortas.
+- **Esc** las oculta hasta la próxima palabra. Si sigues escribiendo, desaparecen solas; si escribes las letras que muestran, se quedan, más cortas. Una sugerencia que llega mientras todavía estás escribiendo muestra lo que queda de ella, si las letras que escribiste entretanto coinciden con las suyas.
 - En el cuadro de mensaje, un menú `@` o `/` abierto se queda con Tab y Esc, y **Shift+Tab** sigue cambiando el modo de permisos. Cuando no se muestra nada en gris, cada tecla hace lo de siempre.
 
 Nada de lo que escribes sale de tu computadora: las predicciones las hacen modelos que se ejecutan en ella. Está activado desde el principio y se configura solo la primera vez que escribes.
@@ -359,6 +359,8 @@ Estos ajustes se definen una sola vez para toda la app. **[Mostrar en este naveg
 
 Cada predicción tiene una probabilidad de ser correcta, y solo se muestra cuando esa probabilidad es lo bastante alta. **[Seguridad antes de mostrar](/settings?s=suggest&find=How%20sure%20before%20showing)** fija el umbral: **Más** (la opción predeterminada) muestra más predicciones, y más de ellas son erróneas; **Equilibrado** es el punto medio, con el objetivo de unas cuatro predicciones correctas de cada diez mostradas; **Más segura** muestra menos, y más de ellas son correctas. Un agente también puede subir el umbral aún más, para mostrar solo las más seguras. **[Mostrar la palabra siguiente](/settings?s=suggest&find=Show%20the%20next%20word)** desactiva la segunda palabra, más tenue, de modo que solo se muestre el resto de la palabra que estás escribiendo.
 
+El umbral con el que empieza la app se midió con textos de otras personas, así que después se ajusta a los tuyos. Cada sugerencia, se muestre o no, se compara con la palabra que acabas escribiendo, y solo se guarda un recuento: qué tan seguro estaba el modelo y si acertó, nunca el texto. No se cuenta una palabra que dejas sin terminar, o que corriges con Backspace antes de que se mostrara la sugerencia. Cuando se han evaluado 400 sugerencias de un tipo (de los dos modelos juntos, del modelo de lenguaje solo o del modelo pequeño solo), ese tipo recibe un umbral propio, fijado para que la proporción de aciertos entre las mostradas sea la que elegiste, y nunca inferior a un tercio del umbral de la app ni superior a una vez y media ese umbral. Lo que escribiste hace poco cuenta más que lo que escribiste hace mucho. Debajo de la opción, una línea indica cuánto falta, **Aprendiendo de tu forma de escribir (120 de 400)**, y cuando termina, **El nivel de seguridad que se le exige está ajustado a tu forma de escribir (900 respuestas evaluadas).** El recuento vuelve a empezar cuando la app trae una versión nueva del modelo pequeño, cuando se crea el primer modelo a partir de lo que escribes y cuando [restableces las cifras](#how-much-it-helps).
+
 ### Qué lee
 
 Para predecir, lee las palabras que escribiste antes del cursor y aquello a lo que estás respondiendo: la última respuesta del agente en un mensaje, o el texto que hay encima del párrafo en un documento.
@@ -388,7 +390,7 @@ Mientras un proceso está en marcha, esa línea tiene **Pausar** y **Detener**. 
 
 En **Cómo te está ayudando**, dentro de la misma sección, dos líneas muestran lo que han hecho por ti las sugerencias hasta ahora: las **pulsaciones ahorradas** (y qué parte de lo que escribes representan), y cuántas sugerencias fueron **acertadas** de las que se evaluaron, con cuántas aceptaste con Tab. Una sugerencia es correcta cuando la aceptaste (con Tab, o con → para dos palabras) o escribiste tú mismo la palabra gris completa; es errónea cuando escribiste otra cosa mientras se mostraba. Una que ocultaste con Esc, o que desapareció al hacer clic en otro sitio, enviar el mensaje o mover el cursor, no cuenta como ninguna de las dos. Cada Tab o → ahorra las letras que añade, menos la tecla que pulsaste.
 
-**Mostrar los detalles** añade hoy, esta semana y el total desde que empezaron los números, y **[Restablecer los números](/settings?s=suggest&find=Reset%20the%20numbers)** los vuelve a poner en cero, después de que lo confirmes. Solo se guardan recuentos, nunca lo que escribiste, y no cambian el funcionamiento de las sugerencias.
+**Mostrar los detalles** añade hoy, esta semana y el total desde que empezaron los números, y **[Restablecer los números](/settings?s=suggest&find=Reset%20the%20numbers)** los vuelve a poner en cero, después de que lo confirmes. Solo se guardan recuentos, nunca lo que escribiste. Al restablecerlas también vuelve a empezar el [ajuste de la seguridad necesaria](#how-sure-it-must-be).
 
 ## Dictar un mensaje
 
@@ -519,6 +521,7 @@ Deja de escuchar para decir esto, y luego vuelve a escuchar. Las sesiones de tus
 - «¿Está funcionando el modelo de lenguaje de las sugerencias de palabras? Si no, ¿por qué?»
 - «Desactiva las sugerencias de palabras solo en este navegador.»
 - «¿Cuántas pulsaciones de teclas me han ahorrado las sugerencias de palabras?»
+- “¿Las sugerencias de palabras ya ajustaron a mi forma de escribir lo seguras que deben estar?”
 - «Activa el reconocimiento de voz en esta computadora, con el modelo Pequeño.»
 - «Usa mi servidor de voz en http://192.168.1.20:8000/v1 para el dictado, con el modelo whisper-large-v3.»
 - «¿Qué modelos whisper hay en esta computadora y cuánto espacio ocupan? Quita los que no se usen.»

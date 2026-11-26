@@ -245,6 +245,12 @@ threads). Kept by each browser (`shared/device.ts`): show word suggestions in th
   other field): adds to the counts kept in `kv` (`suggest.usage`: totals since `since`, and one bucket per local day, the
   last 31); `DELETE /api/suggest/usage` starts them again. `status.usage` = `{since, total, today, week}` (week: the last
   7 days). Counts only, never any text.
+- The thresholds are fitted to the person's writing (`server/suggest/fit.ts`): the page judges every guess, shown or not,
+  against the word then typed and sends `judged` in the same batch (per plan, 40 bins of confidence, `right` and `total`).
+  They are kept in `kv` (`suggest.judged`) under the model kind, the release revision and `SCORE_VERSION`, halved when a
+  plan passes 3,000. A plan with 400 or more gets the lowest bin edge above which at least 60 guesses were judged and
+  were right as often as the precision set, within a third to 1.5 times the release's threshold; the worker takes it as
+  `theta` in each request.
 
 ## What it counts (`shared/suggest.ts` SuggestCounts)
 

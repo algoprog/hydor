@@ -27935,5 +27935,15 @@
   "“{0}”, {1}: its significance mark is missing.": "“{0}”, {1}: falta a marca de significância.",
   "“{0}”, {1}: its significance mark is no longer earned.": "“{0}”, {1}: a marca de significância não se justifica mais.",
   "“{0}”, {1}: its significance mark is not the one its runs give now.": "“{0}”, {1}: a marca de significância não é a que as execuções indicam agora.",
-  "“{0}”, {1}: {2} in the paper, {3} now.": "“{0}”, {1}: {2} no artigo, {3} agora."
+  "“{0}”, {1}: {2} in the paper, {3} now.": "“{0}”, {1}: {2} no artigo, {3} agora.",
+  "How sure it must be is fitted to your writing ({0} answers judged).": "A certeza necessária está ajustada à sua escrita (respostas avaliadas: {0}).",
+  "Learning from your writing ({0} of {1})": "Aprendendo com a sua escrita ({0} de {1})",
+  "Starts counting again from nothing, and learns again how sure a suggestion must be": "Recomeça a contagem do zero e aprende de novo quanta certeza uma sugestão precisa ter",
+  "Starts counting the keystrokes saved and the suggestions that were right from nothing again, and learns again how sure a suggestion must be": "Recomeça do zero a contagem de teclas economizadas e de sugestões certas, e aprende de novo quanta certeza uma sugestão precisa ter",
+  "The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. What was learned about how sure to be starts again too.": "As teclas economizadas e as sugestões certas voltam a zero, e a contagem recomeça agora. O que foi aprendido sobre quanta certeza é necessária também recomeça.",
+  "judged.{0}.{1}: {2} whole numbers from 0 to {3}": "judged.{0}.{1}: {2} números inteiros de 0 a {3}",
+  "judged.{0}: more right than judged": "judged.{0}: mais acertos do que avaliações",
+  "judged.{0}: not a plan ({1})": "judged.{0}: não é um plano ({1})",
+  "judged.{0}: { right, total }": "judged.{0}: { right, total }",
+  "judged: an object by plan ({0})": "judged: um objeto por plano ({0})"
 }

@@ -322,7 +322,7 @@ Pendant que vous écrivez, Hydor peut afficher en gris, après le curseur, la fi
 
 - **Tab** accepte le mot en gris. Appuyez à nouveau pour accepter le suivant.
 - **→** (la flèche droite), avec le curseur à la fin du texte, accepte les deux mots d’un coup.
-- **Esc** les masque jusqu’au mot suivant. Continuez à écrire et ils disparaissent d’eux-mêmes ; tapez les lettres qu’ils montrent et ils restent, raccourcis.
+- **Esc** les masque jusqu’au mot suivant. Si vous continuez à taper, ils disparaissent d’eux-mêmes ; si vous tapez les lettres qu’ils affichent, ils restent, en plus court. Une proposition qui arrive alors que vous tapez encore montre ce qu’il en reste, si les lettres tapées entre-temps sont bien les siennes.
 - Dans la zone de message, un menu `@` ou `/` ouvert garde Tab et Esc pour lui, et **Maj+Tab** change toujours le mode d’autorisation. Quand rien de gris n’est affiché, chaque touche fait ce qu’elle a toujours fait.
 
 Rien de ce que vous tapez ne quitte votre ordinateur : les suggestions sont produites par des modèles qui s’exécutent dessus. Elle est activée dès le départ et s’installe d’elle-même la première fois que vous tapez.
@@ -359,6 +359,8 @@ Ces réglages sont définis une fois pour toute l’app. **[Afficher dans ce nav
 
 Chaque suggestion a une chance d’être juste, et elle n’est affichée que si cette chance est assez élevée. **[Certitude avant d’afficher](/settings?s=suggest&find=How%20sure%20before%20showing)** fixe le seuil : **Plus** (par défaut) affiche davantage de suggestions, dont plus d’erreurs ; **Équilibré** est le juste milieu, visant environ quatre suggestions justes sur dix affichées ; **Plus sûr** en affiche moins, mais davantage sont justes. Un agent peut aussi placer le seuil encore plus haut, pour ne garder que les plus sûres. **[Afficher le mot suivant](/settings?s=suggest&find=Show%20the%20next%20word)** désactive le second mot, plus pâle, de sorte que seule la fin du mot en cours de saisie s’affiche.
 
+La barre de départ de l’app a été mesurée sur les textes d’autres personnes ; elle est donc ensuite ajustée aux vôtres. Chaque proposition, affichée ou non, est comparée au mot que vous tapez ensuite, et seul un décompte est conservé : le degré de certitude du modèle et le fait qu’il ait eu raison ou non, jamais de texte. Un mot que vous laissez inachevé, ou que vous corrigez avec Retour arrière avant que la proposition ait été affichée, n’est pas compté. Une fois 400 propositions d’un même type jugées (venant des deux modèles ensemble, du modèle de langue seul ou du petit modèle seul), ce type reçoit sa propre barre, réglée pour que la part de propositions justes parmi celles affichées soit celle que vous avez choisie, sans jamais descendre sous un tiers de la barre de l’app ni dépasser une fois et demie celle-ci. Ce que vous avez écrit récemment compte plus que ce que vous avez écrit il y a longtemps. Sous le choix, une ligne indique l’avancement, **Apprentissage à partir de vos écrits (120 sur 400)**, puis, une fois terminé, **Le degré de certitude exigé est ajusté à votre façon d’écrire (900 réponses évaluées).** Le décompte recommence quand l’app apporte une nouvelle version du petit modèle, quand le premier modèle est créé à partir de vos écrits et quand vous [réinitialisez les chiffres](#how-much-it-helps).
+
 ### Ce qu’il lit
 
 Pour deviner, il lit les mots que vous avez tapés avant le curseur, ainsi que ce à quoi vous répondez : la dernière réponse de l’agent dans un message, ou le texte au-dessus du paragraphe dans un document.
@@ -388,7 +390,7 @@ Tant qu’un cycle est en cours, cette ligne propose **Pause** et **Arrêter**. 
 
 Sous **Comment ça vous aide**, dans la même section, deux lignes montrent ce que les suggestions ont fait pour vous jusqu’ici : les **frappes économisées** (et la part de votre saisie qu’elles représentent), et le nombre de suggestions **justes** parmi celles qui ont été évaluées, avec le nombre de celles que vous avez prises avec Tab. Une suggestion est juste quand vous l’avez acceptée (Tab, ou → pour deux mots) ou que vous avez tapé vous-même tout le mot gris ; elle est fausse quand vous avez tapé autre chose pendant qu’elle s’affichait. Une suggestion que vous avez masquée avec Esc, ou qui a disparu parce que vous avez cliqué ailleurs, envoyé le message ou déplacé le curseur, n’est ni l’un ni l’autre. Chaque Tab ou → économise les lettres qu’il ajoute, moins la touche que vous avez pressée.
 
-**Afficher les détails** ajoute aujourd’hui, cette semaine et le total depuis le début des compteurs, et **[Réinitialiser les chiffres](/settings?s=suggest&find=Reset%20the%20numbers)** les remet à zéro, après confirmation. Seuls des totaux sont conservés, jamais ce que vous avez tapé, et ils ne changent pas le fonctionnement des suggestions.
+**Afficher les détails** ajoute aujourd’hui, cette semaine et le total depuis le début des compteurs, et **[Réinitialiser les chiffres](/settings?s=suggest&find=Reset%20the%20numbers)** les remet à zéro, après confirmation. Seuls des décomptes sont conservés, jamais ce que vous avez tapé. La réinitialisation relance aussi l’[ajustement du degré de certitude exigé](#how-sure-it-must-be).
 
 ## Dicter un message
 
@@ -519,6 +521,7 @@ Il cesse d’écouter pour dire ces messages, puis écoute de nouveau. Les sessi
 - « Le modèle de langage tourne-t-il pour les suggestions de mots ? Sinon, pourquoi ? »
 - « Désactive les suggestions de mots dans ce navigateur uniquement. »
 - « Combien de frappes les suggestions de mots m’ont-elles fait économiser ? »
+- « Est-ce que les suggestions de mots ont déjà ajusté à ma façon d’écrire le degré de certitude qu’elles doivent atteindre ? »
 - « Active la reconnaissance vocale sur cet ordinateur, avec le modèle Petit. »
 - « Utilise mon serveur de reconnaissance vocale à l’adresse http://192.168.1.20:8000/v1 pour la dictée, avec le modèle whisper-large-v3. »
 - « Quels modèles whisper se trouvent sur cet ordinateur, et quelle place prennent-ils ? Retire ceux qui ne sont pas utilisés. »

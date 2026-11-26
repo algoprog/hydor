@@ -2,7 +2,7 @@
 // shows, what Tab and → take. No React and no DOM here, so each rule is a plain function a test can run
 // (logic-test.ts); controller.ts keeps the state of one text box and calls them, and the textarea and Docs adapters
 // only read and write their field.
-import { SUGGEST_COUNT_KEYS, SUGGEST_USAGE_CAP, type SuggestCounts, type SuggestRequest, type SuggestResponse, type SuggestSettings, type SuggestState, type SuggestSurface } from '@shared/suggest';
+import { SUGGEST_BINS, SUGGEST_COUNT_KEYS, SUGGEST_PLANS, SUGGEST_USAGE_CAP, type SuggestCounts, type SuggestJudged, type SuggestPlan, type SuggestRequest, type SuggestResponse, type SuggestSettings, type SuggestState, type SuggestSurface } from '@shared/suggest';
 
 /** Where a text box is, as Settings → Capabilities → Word suggestions names the places: message boxes, documents, notes, other boxes. */
 export type Place = 'chat' | 'docs' | 'notes' | 'other';
@@ -229,6 +229,76 @@ export function judgeTyped(g: Grey, typed: string): Typed {
 export function backspaced(prev: Field | null, cur: Field): boolean {
   return !!prev && prev.after === cur.after && prev.id === cur.id && cur.before.length < prev.before.length && prev.before.startsWith(cur.before);
 }
+
+// ---- judging guesses, shown or not: counts by how sure they were (never any text)
+
+/** A guess at the word being typed: what the box was when it was asked, the letters guessed after the caret, and how sure. */
+export interface Guess {
+  base: Field;
+  word: string;
+  plan: SuggestPlan;
+  conf: number;
+}
+
+/**
+ * The guess an answer about `base` holds, shown or not: the letters of the word (without the space already typed) and
+ * how sure. null when it has no word, no plan or no confidence (there is nothing to judge).
+ */
+export function guessOf(base: Field, r: SuggestResponse | null | undefined): Guess | null {
+  if (!r || !r.plan || !(r.conf > 0)) return null;
+  let word = r.word ?? '';
+  if (/\s$/.test(base.before)) word = word.replace(/^\s+/, '');
+  return word.trim() ? { base, word, plan: r.plan, conf: r.conf } : null;
+}
+
+/**
+ * Whether the guess `word` was right, from what was typed since it was asked (`typed`): true once the word is typed
+ * and something that ends it (a space, punctuation) follows; false once the person finished another word; undefined
+ * while they are still typing it.
+ */
+export function verdictOf(word: string, typed: string): boolean | undefined {
+  const ends = (s: string) => Array.from(s).some((c) => !WORD.test(c));
+  if (typed.startsWith(word)) {
+    const rest = typed.slice(word.length);
+    if (!rest) return undefined;
+    // (A guess that ends in punctuation has ended the word itself.)
+    return !WORD.test(String.fromCodePoint(rest.codePointAt(0)!)) || !WORD.test(lastChar(word));
+  }
+  let i = 0;
+  while (i < typed.length && typed[i] === word[i]) i++;
+  if (i === typed.length) return undefined;
+  return ends(typed.slice(i)) ? false : undefined;
+}
+
+/** The bin a confidence falls in (0..1 cut in SUGGEST_BINS equal parts). */
+export const binOf = (conf: number) => Math.max(0, Math.min(SUGGEST_BINS - 1, Math.floor(conf * SUGGEST_BINS)));
+
+const emptyBins = () => ({ right: new Array<number>(SUGGEST_BINS).fill(0), total: new Array<number>(SUGGEST_BINS).fill(0) });
+
+/** One judged guess added to the counts (a bin never past what one request may send). */
+export function addVerdict(j: SuggestJudged, plan: SuggestPlan, conf: number, right: boolean): void {
+  const b = (j[plan] ??= emptyBins());
+  const i = binOf(conf);
+  if (b.total[i] >= SUGGEST_USAGE_CAP) return;
+  b.total[i]++;
+  if (right) b.right[i]++;
+}
+
+/** `add` put into `into` (a batch that could not be sent, joining the next). */
+export function mergeJudged(into: SuggestJudged, add: SuggestJudged): void {
+  for (const plan of SUGGEST_PLANS) {
+    const a = add[plan];
+    if (!a) continue;
+    const b = (into[plan] ??= emptyBins());
+    for (let i = 0; i < SUGGEST_BINS; i++) {
+      const n = Math.min(a.total[i], SUGGEST_USAGE_CAP - b.total[i]);
+      b.total[i] += n;
+      b.right[i] += Math.min(a.right[i], n);
+    }
+  }
+}
+
+export const hasJudged = (j: SuggestJudged) => SUGGEST_PLANS.some((p) => j[p]?.total.some((n) => n > 0));
 
 /** A share as a whole percent (0 when there is nothing to divide by). */
 const percent = (part: number, whole: number) => (whole > 0 ? Math.round((100 * part) / whole) : 0);

@@ -27934,5 +27934,15 @@
   "“{0}”, {1}: its significance mark is missing.": "“{0}”, {1}: falta su marca de significancia.",
   "“{0}”, {1}: its significance mark is no longer earned.": "“{0}”, {1}: su marca de significancia ya no está justificada.",
   "“{0}”, {1}: its significance mark is not the one its runs give now.": "“{0}”, {1}: su marca de significancia no es la que dan ahora sus ejecuciones.",
-  "“{0}”, {1}: {2} in the paper, {3} now.": "“{0}”, {1}: {2} en el artículo, {3} ahora."
+  "“{0}”, {1}: {2} in the paper, {3} now.": "“{0}”, {1}: {2} en el artículo, {3} ahora.",
+  "How sure it must be is fitted to your writing ({0} answers judged).": "El nivel de seguridad que se le exige está ajustado a tu forma de escribir ({0} respuestas evaluadas).",
+  "Learning from your writing ({0} of {1})": "Aprendiendo de tu forma de escribir ({0} de {1})",
+  "Starts counting again from nothing, and learns again how sure a suggestion must be": "Vuelve a contar desde cero y aprende de nuevo cuán segura debe estar una sugerencia",
+  "Starts counting the keystrokes saved and the suggestions that were right from nothing again, and learns again how sure a suggestion must be": "Vuelve a contar desde cero las pulsaciones ahorradas y las sugerencias acertadas, y aprende de nuevo cuán segura debe estar una sugerencia",
+  "The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. What was learned about how sure to be starts again too.": "Las pulsaciones ahorradas y las sugerencias acertadas vuelven a cero, y el recuento empieza de nuevo ahora. Lo aprendido sobre cuánta seguridad exigir también empieza de nuevo.",
+  "judged.{0}.{1}: {2} whole numbers from 0 to {3}": "judged.{0}.{1}: {2} números enteros de 0 a {3}",
+  "judged.{0}: more right than judged": "judged.{0}: hay más acertadas que evaluadas",
+  "judged.{0}: not a plan ({1})": "judged.{0}: no es un plan ({1})",
+  "judged.{0}: { right, total }": "judged.{0}: { right, total }",
+  "judged: an object by plan ({0})": "judged: un objeto por plan ({0})"
 }

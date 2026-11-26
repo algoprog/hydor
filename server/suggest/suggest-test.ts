@@ -29,6 +29,7 @@ import { merge, readSettings, trainThreads, writeSettings } from './settings.ts'
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
 import { SMALL_MODEL, SMALL_MODEL_NEEDS } from './pins.ts';
 import { addUsage, cleanUsage, dayBefore, dayKey, readUsage, resetUsage, USAGE_KEY } from './usage.ts';
+import { addJudged, cleanJudged, fitTheta, fittedThetas, JUDGED_KEY, readJudged, scoreKey, thetaFor, thresholdsOf, withPoints, SCORE_VERSION } from './fit.ts';
 
 const DATA = process.env.DATA_DIR ?? '';
 if (!DATA.startsWith('/tmp/')) {
@@ -117,6 +118,7 @@ while True:
             if m['id'] in cancelled: out({'id': m['id'], 'cancelled': True}); continue
         if 'block' in text: time.sleep(2.6)
         if 'broken' in text: out({'id': m['id'], 'error': 'no'}); continue
+        if 'unsure' in text: out({'id': m['id'], 'word': 'ing', 'next': '', 'conf': 0.05, 'conf_next': 0.0, 'theta': 0.4, 'show': False, 'show_next': False, 'plan': 'mix', 'ms': {'total': 9}}); continue
         out({'id': m['id'], 'word': 'ing', 'next': ' the', 'conf': 0.7, 'conf_next': 0.6, 'theta': 0.4, 'show': True, 'show_next': True, 'plan': 'slm', 'lang': 'eng_Latn', 'model': 'base', 'ms': {'total': 12, 'llm': 0, 'slm': 12}})
     else: out({'id': m['id'], 'error': 'unknown op'})
 `,
@@ -149,6 +151,8 @@ for (const f of SMALL_MODEL_NEEDS) {
   fs.mkdirSync(path.dirname(path.join(release, f)), { recursive: true });
   fs.writeFileSync(path.join(release, f), '{}');
 }
+// The release's thresholds, which a fit to the person's writing is held to.
+fs.writeFileSync(path.join(release, 'calibration.json'), JSON.stringify({ mix: { '0.2': 0.1, '0.4': 0.3 }, slm: { '0.2': 0.12, '0.4': 0.2 } }));
 Object.assign(process.env, { HYDOR_SUGGEST_PYTHON: fakePython, HYDOR_SUGGEST_MODEL_DIR: release, HYDOR_SUGGEST_GGUF: gguf, HYDOR_SUGGEST_LLAMA_SERVER: fakeLlama });
 delete process.env.HYDOR_SUGGEST;
 
@@ -2041,6 +2045,106 @@ test('usage: today and the week are summed by local day, the last 31 days are ke
   const d = readUsage(udb, now);
   assert.deepEqual([d.since, d.total, d.today], [5, counts({ saved: 4 }), counts({ shown: 2 })], 'what is not a count reads as 0');
   udb.close();
+});
+
+// ---- the thresholds fitted to the person's writing ------------------------------------------------------------------
+
+/** Bins with `[conf, judged, right]` guesses in them. */
+const bins = (...points: [number, number, number][]) => {
+  const b = { right: new Array<number>(40).fill(0), total: new Array<number>(40).fill(0) };
+  for (const [conf, total, right] of points) {
+    const i = Math.min(39, Math.floor(conf * 40 + 1e-9));
+    b.total[i] += total;
+    b.right[i] += right;
+  }
+  return b;
+};
+
+test('the release\u2019s thresholds are read as the worker reads them', () => {
+  const cal = withPoints({ mix: { '0.3': 0.2, '0.4': 0.3, '0.5': 0.5 }, llm: { '0.3': 0.25 } }, { mix: { '0.2': 0.08, '0.3': 0.9 }, slm: { '0.2': 0.1 } });
+  assert.deepEqual(cal.mix, { '0.2': 0.08, '0.3': 0.2, '0.4': 0.3, '0.5': 0.5 }, 'points the release does not list are added; its own stay');
+  assert.equal(cal.slm, undefined, 'no table is made for a plan without one');
+  const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-9, `${a} is ${b}`);
+  near(thetaFor(cal, 'mix', 0.35), 0.25);
+  near(thetaFor(cal, 'mix', 0.1), 0.08);
+  near(thetaFor(cal, 'mix', 0.6), 0.5);
+  near(thetaFor(cal, 'slm', 0.4), 0.3);
+  near(thetaFor({}, 'slm', 0.4), 0.4);
+});
+
+test('a threshold is fitted from 400 judged guesses on: the lowest edge right often enough, within bounds of the release\u2019s', () => {
+  const release = 0.3;
+  assert.equal(fitTheta(undefined, release, 0.2), undefined);
+  assert.equal(fitTheta(bins([0.5, 399, 300]), release, 0.2), undefined, 'too few');
+  // None right around 0.05, 10% around 0.1, 30% around 0.2, 80% around 0.6: from 0.075 up, 32% are right.
+  const b = bins([0.05, 600, 0], [0.1, 200, 20], [0.2, 200, 60], [0.6, 100, 80]);
+  assert.equal(fitTheta(b, 0.15, 0.2), 0.075);
+  assert.equal(fitTheta(bins([0.1, 400, 40], [0.2, 200, 100]), release, 0.4), 0.125, 'the lowest edge whose guesses at or above it are right 40% of the time');
+  assert.ok(Math.abs(fitTheta(bins([0.5, 400, 400]), release, 0.2)! - 0.1) < 1e-9, 'never under a third of the release\u2019s');
+  const near = (a: number | undefined, x: number) => assert.ok(Math.abs(a! - x) < 1e-9, `${a} is ${x}`);
+  near(fitTheta(bins([0.7, 400, 0], [0.9, 100, 90]), release, 0.4), 0.45); // nor over one and a half times it
+  // At least 60 guesses at or above the edge: a handful of sure ones does not make it.
+  assert.equal(fitTheta(bins([0.05, 400, 0], [0.9, 59, 59]), release, 0.2), release, 'no edge does: the release\u2019s own');
+  const f = fittedThetas({ mix: bins([0.15, 500, 250]), slm: bins([0.15, 100, 50]) }, { mix: { '0.2': 0.3 } }, 0.2);
+  assert.deepEqual(Object.keys(f), ['mix'], 'a plan without enough keeps the release\u2019s');
+  assert.deepEqual(thresholdsOf({}), { judged: 0, needed: 400, fitted: false });
+  assert.deepEqual(thresholdsOf({ mix: bins([0.1, 120, 1]), llm: bins([0.1, 30, 1]) }), { judged: 120, needed: 400, fitted: false }, 'the plan nearest to it');
+  assert.deepEqual(thresholdsOf({ mix: bins([0.1, 500, 1]), llm: bins([0.1, 450, 1]), slm: bins([0.1, 30, 1]) }), { judged: 950, needed: 400, fitted: true }, 'those that are fitted');
+  assert.notEqual(scoreKey(true, 'r1'), scoreKey(false, 'r1'));
+  assert.equal(scoreKey(false, 'r1'), `published:r1:${SCORE_VERSION}`);
+});
+
+test('judged counts are checked, kept by model, and halved past 3,000', () => {
+  assert.deepEqual(cleanJudged({}), {});
+  const good = bins([0.3, 10, 4]);
+  assert.deepEqual(cleanJudged({ judged: { mix: good } }), { mix: good });
+  for (const wrong of [3, { all: good }, { mix: { right: good.right } }, { mix: { ...good, text: 'a' } }, { mix: { right: good.right.slice(1), total: good.total } }, { mix: { right: good.total, total: good.right } }, { mix: bins([0.3, 5001, 0]) }, { mix: bins([0.3, 1.5, 0]) }])
+    assert.throws(() => cleanJudged({ judged: wrong }), HttpError, JSON.stringify(wrong).slice(0, 80));
+  const jdb = openDb(path.join(tmp, 'judged.db'));
+  addJudged(jdb, 'published:a:1', { mix: bins([0.3, 2000, 1000]) });
+  addJudged(jdb, 'published:a:1', { mix: bins([0.5, 1000, 400]), slm: bins([0.1, 4, 2]) });
+  assert.equal(readJudged(jdb, 'published:a:1').mix!.total.reduce((a, b) => a + b), 3000, '3,000 is not past it');
+  addJudged(jdb, 'published:a:1', { mix: bins([0.5, 2, 2]) });
+  const k = readJudged(jdb, 'published:a:1');
+  assert.deepEqual([k.mix!.total[12], k.mix!.right[12], k.mix!.total[20], k.mix!.right[20], k.slm!.total[4]], [1000, 500, 501, 201, 4], 'every bin of the plan halved, the other plan not');
+  assert.deepEqual(readJudged(jdb, 'personal:a:1'), {}, 'another model starts afresh');
+  for (const key of ['b', 'c', 'd', 'e']) addJudged(jdb, key, { mix: bins([0.3, 1, 1]) });
+  assert.deepEqual(Object.keys(JSON.parse(kvGet(jdb, JUDGED_KEY)!)), ['b', 'c', 'd', 'e'], 'the latest four models are kept');
+  kvSet(jdb, JUDGED_KEY, '{nonsense');
+  assert.deepEqual(readJudged(jdb, 'b'), {});
+  jdb.close();
+});
+
+test('judged guesses come in with the usage, set the thresholds the worker is given, and Reset forgets them', async () => {
+  await app.inject({ method: 'PUT', url: '/api/suggest', payload: { enabled: true, llm: 'off', precision: 0.2, where: { chat: true } } });
+  await app.inject({ method: 'DELETE', url: '/api/suggest/usage' });
+  assert.deepEqual((await get()).status.thresholds, { judged: 0, needed: 400, fitted: false });
+  const asked = async (text: string) => {
+    const r = await until('an answer', async () => {
+      const x = await ask({ surface: 'chat', text });
+      return x.statusCode === 200 ? x : null;
+    });
+    return { answer: r.json(), sent: logLines().filter((l) => l.op === 'suggest').pop() };
+  };
+  const unsure = await asked('unsure of it');
+  assert.deepEqual([unsure.answer.show, unsure.answer.word, unsure.answer.conf, unsure.answer.plan], [false, 'ing', 0.05, 'mix'], 'a guess not shown still reaches the page');
+  assert.equal(unsure.sent.theta, undefined, 'the release\u2019s thresholds until enough is judged');
+  const bad = await postUsage({ shown: 1, judged: { mix: { right: [1], total: [1] } } });
+  assert.equal(bad.statusCode, 400);
+  assert.match(bad.json().message, /judged/);
+  assert.equal((await get()).status.usage.total.shown, 0, 'a refused body adds nothing, not even its counts');
+  const some = await postUsage({ judged: { mix: bins([0.05, 100, 2]) } });
+  assert.deepEqual(some.json().thresholds, { judged: 100, needed: 400, fitted: false });
+  assert.equal((await asked('still learning')).sent.theta, undefined);
+  const more = await postUsage({ shown: 3, judged: { mix: bins([0.05, 200, 4], [0.075, 200, 90]) } });
+  assert.deepEqual(more.json().thresholds, { judged: 500, needed: 400, fitted: true });
+  assert.equal(more.json().usage.total.shown, 3);
+  assert.deepEqual((await asked('fitted now')).sent.theta, { mix: 0.075 }, 'right 20% of the time from 0.075 up');
+  await app.inject({ method: 'PUT', url: '/api/suggest', payload: { precision: 0.5 } });
+  assert.equal((await asked('surer')).sent.theta.mix, 0.3, 'surer: no edge is right half the time, so the release\u2019s (its last point)');
+  const reset = await app.inject({ method: 'DELETE', url: '/api/suggest/usage' });
+  assert.deepEqual(reset.json().status.thresholds, { judged: 0, needed: 400, fitted: false });
+  assert.equal((await asked('afresh')).sent.theta, undefined);
 });
 
 const only = process.argv[2];

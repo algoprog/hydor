@@ -176,6 +176,15 @@ function Status({ settings, status }: { settings: Settings; status: SuggestStatu
   );
 }
 
+/** Whether how sure it must be is fitted to the person's writing, or how far that is. */
+function Fitted({ t }: { t: SuggestStatus['thresholds'] }) {
+  return (
+    <span className="block text-[12px] text-fg-3">
+      {t.fitted ? `How sure it must be is fitted to your writing (${int(t.judged)} answers judged).` : `Learning from your writing (${int(t.judged)} of ${int(t.needed)})`}
+    </span>
+  );
+}
+
 /** What a set of counts says, in two whole sentences (only numbers in them, so each is translated as one). */
 function Numbers({ counts }: { counts: SuggestCounts }) {
   const n = summarise(counts);
@@ -226,14 +235,14 @@ function Helping({ status, off }: { status: SuggestStatus; off: boolean }) {
           {counted && <Row label={`Since ${day(u.since)}`} hint={<Numbers counts={u.total} />} />}
           <Row
             label="Reset the numbers"
-            hint="Starts counting again from nothing; it does not change how suggestions work"
+            hint="Starts counting again from nothing, and learns again how sure a suggestion must be"
             control={
               <Button
                 size="sm"
                 variant="danger"
                 disabled={busy || !counted}
                 onClick={async () => {
-                  const ok = await confirm({ title: 'Reset the numbers?', body: 'The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. Nothing else changes.', confirm: 'Reset', danger: true });
+                  const ok = await confirm({ title: 'Reset the numbers?', body: 'The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. What was learned about how sure to be starts again too.', confirm: 'Reset', danger: true });
                   if (!ok) return;
                   setBusy(true);
                   discardUsage();
@@ -325,7 +334,9 @@ export function SuggestSettings() {
           label="How sure before showing"
           hint="More shows more guesses, some of them wrong; Surer shows fewer, and more of them are right"
           control={<Segmented size="sm" value={nearestSure(settings.precision)} onChange={(id) => set({ precision: SURE.find((x) => x.id === id)!.value })} options={SURE.map((x) => ({ value: x.id, label: x.label }))} />}
-        />
+        >
+          {!off && status.thresholds && <Fitted t={status.thresholds} />}
+        </Row>
         <Row label="Show the next word" hint="Also shows the word after it, dimmer; press Tab again to take it" control={<Switch on={settings.nextWord} label="Show the next word" onChange={(nextWord) => set({ nextWord })} />} />
       </Group>
       <Helping status={status} off={off} />

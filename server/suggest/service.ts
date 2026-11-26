@@ -1,14 +1,18 @@
 // Word suggestions on the server: the settings, setting things up, the two processes (the small model's Python worker and
 // llama-server for Qwen3.5), the suggestions asked of them (only the newest of each browser tab is kept), what the session
 // cache is fed, and personalising on its schedule. docs/plans/word-suggestions.md describes the whole.
+import fs from 'node:fs';
 import os from 'node:os';
-import { type SuggestCounts, type SuggestRequest, type SuggestResponse, type SuggestSettings, type SuggestState, type SuggestStatus, type SuggestUsage } from '../../shared/suggest.ts';
+import path from 'node:path';
+import { type SuggestCounts, type SuggestJudged, type SuggestPlan, type SuggestRequest, type SuggestResponse, type SuggestSettings, type SuggestState, type SuggestStatus, type SuggestThresholds, type SuggestUsage } from '../../shared/suggest.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { ownWords } from '../memory/learn.ts';
 import { availableMemory } from '../models/machine.ts';
 import { childEnv, PyWorker, type Reply } from './engine.ts';
+import { addJudged, fittedThetas, readJudged, resetJudged, scoreKey, thresholdsOf, withPoints, type Calibration } from './fit.ts';
 import { LlamaServer } from './llm.ts';
+import { SMALL_MODEL } from './pins.ts';
 import { llmThreads, merge, readSettings, workerThreads, writeSettings } from './settings.ts';
 import { leftoverTraining, reapLeftovers } from './procs.ts';
 import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseCalibration, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, tidyReleases, unsupportedSystem, workerScript } from './setup.ts';
@@ -103,6 +107,9 @@ export class SuggestService {
   private sent = new Map<string, { n: number; m: number }>();
   private times: number[] = [];
   private requests = 0;
+  /** The fitted thresholds for a score key and precision, until what was judged changes. */
+  private fit: { key: string; theta: Partial<Record<SuggestPlan, number>> } | null = null;
+  private releaseCal: { dir: string; calibration: Calibration } | null = null;
   readonly llm: LlamaServer;
   readonly trainer: Trainer;
 
@@ -195,6 +202,7 @@ export class SuggestService {
       model: this.modelStatus(),
       training: this.trainingStatus(),
       usage: readUsage(this.db),
+      thresholds: this.thresholds(),
     };
     if (s.enabled && suggestDisabled()) Object.assign(status, { detail: 'Word suggestions are off on this server (HYDOR_SUGGEST=off)' });
     else if (s.enabled && unsupportedSystem()) Object.assign(status, { state: 'failed', detail: unsupportedSystem() });
@@ -266,17 +274,62 @@ export class SuggestService {
 
   // ---- what it did ----------------------------------------------------------------------------------------------
 
-  /** Adds counts the page sent (checked by `cleanUsage`): nothing is broadcast, the page reads them when it needs them. */
-  addUsage(c: SuggestCounts): SuggestUsage {
+  /**
+   * Adds the counts the page sent (checked by `cleanUsage` and `cleanJudged`): nothing is broadcast, the page reads
+   * them when it needs them.
+   */
+  addUsage(c: SuggestCounts, judged: SuggestJudged = {}): { usage: SuggestUsage; thresholds: SuggestThresholds } {
     addUsage(this.db, c);
-    return readUsage(this.db);
+    addJudged(this.db, this.scoreKey(), judged);
+    this.fit = null;
+    return { usage: readUsage(this.db), thresholds: this.thresholds() };
   }
 
-  /** Starts the counts again from nothing. */
+  /** Starts the counts again from nothing, and what was judged with them. */
   resetUsage(): SuggestState {
     resetUsage(this.db);
+    resetJudged(this.db);
+    this.fit = null;
     this.changed();
     return this.state();
+  }
+
+  // ---- how sure a suggestion must be ----------------------------------------------------------------------------
+
+  private scoreKey(): string {
+    return scoreKey(hasPersonal(), process.env.HYDOR_SUGGEST_MODEL_DIR ? 'local' : SMALL_MODEL.revision);
+  }
+
+  private thresholds(): SuggestThresholds {
+    return thresholdsOf(readJudged(this.db, this.scoreKey()));
+  }
+
+  /** The release's thresholds, with the app's points (none while its file is not there). */
+  private calibration(): Calibration {
+    const dir = releaseDir();
+    if (!dir) return {};
+    if (this.releaseCal?.dir !== dir) {
+      try {
+        const own = JSON.parse(fs.readFileSync(path.join(dir, 'calibration.json'), 'utf8')) as Calibration;
+        this.releaseCal = { dir, calibration: withPoints(own, releaseCalibration()) };
+      } catch {
+        return {};
+      }
+    }
+    return this.releaseCal.calibration;
+  }
+
+  /** The thresholds fitted to the person's writing, for the plans with enough judged guesses. */
+  private fitted(precision: number): Partial<Record<SuggestPlan, number>> {
+    const score = this.scoreKey();
+    const key = `${score}|${precision}`;
+    if (this.fit?.key !== key) {
+      const calibration = this.calibration();
+      // Without the release's table there is nothing to hold a fit to.
+      if (!Object.keys(calibration).length) return {};
+      this.fit = { key, theta: fittedThetas(readJudged(this.db, score), calibration, precision) };
+    }
+    return this.fit.theta;
   }
 
   // ---- the settings ---------------------------------------------------------------------------------------------
@@ -692,6 +745,7 @@ export class SuggestService {
         }
         const s = this.st;
         const r = job.req;
+        const theta = this.fitted(s.precision);
         const sent = w.request(
           {
             op: 'suggest',
@@ -702,6 +756,7 @@ export class SuggestService {
             ...(r.doc ? { doc: r.doc } : {}),
             ...(r.session ? { session: r.session } : {}),
             precision: s.precision,
+            ...(Object.keys(theta).length ? { theta } : {}),
             next: s.nextWord,
             cache: s.sessionCache && r.surface === 'chat' && !!r.session,
             switch: s.switchByLanguage,

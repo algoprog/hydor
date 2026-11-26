@@ -32,11 +32,11 @@ export function dayBefore(ms: number, back: number): string {
   return dayKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() - back, 12).getTime());
 }
 
-/** A body's counts, checked: whole numbers from 0 to the cap, nothing else in it. A missing count is 0. */
+/** A body's counts, checked: whole numbers from 0 to the cap, nothing else in it but `judged` (fit.ts cleanJudged). A missing count is 0. */
 export function cleanUsage(body: unknown): SuggestCounts {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'Send the counts as an object');
   const b = body as Record<string, unknown>;
-  for (const k of Object.keys(b)) if (!(SUGGEST_COUNT_KEYS as readonly string[]).includes(k)) throw new HttpError(400, `${k}: not a count (${SUGGEST_COUNT_KEYS.join(', ')})`);
+  for (const k of Object.keys(b)) if (k !== 'judged' && !(SUGGEST_COUNT_KEYS as readonly string[]).includes(k)) throw new HttpError(400, `${k}: not a count (${SUGGEST_COUNT_KEYS.join(', ')})`);
   const out = none();
   for (const k of SUGGEST_COUNT_KEYS) {
     const v = b[k];

@@ -29788,5 +29788,15 @@
   "“{0}”, {1}: its significance mark is missing.": "«{0}», {1}: λείπει η σήμανση σημαντικότητας.",
   "“{0}”, {1}: its significance mark is no longer earned.": "«{0}», {1}: η σήμανση σημαντικότητας δεν δικαιολογείται πλέον.",
   "“{0}”, {1}: its significance mark is not the one its runs give now.": "«{0}», {1}: η σήμανση σημαντικότητας δεν είναι αυτή που δίνουν τώρα οι εκτελέσεις.",
-  "“{0}”, {1}: {2} in the paper, {3} now.": "«{0}», {1}: {2} στην εργασία, {3} τώρα."
+  "“{0}”, {1}: {2} in the paper, {3} now.": "«{0}», {1}: {2} στην εργασία, {3} τώρα.",
+  "How sure it must be is fitted to your writing ({0} answers judged).": "Το πόσο σίγουρη πρέπει να είναι έχει προσαρμοστεί στη γραφή σας (αξιολογημένες απαντήσεις: {0}).",
+  "Learning from your writing ({0} of {1})": "Εκμάθηση από τη γραφή σας ({0} από {1})",
+  "Starts counting again from nothing, and learns again how sure a suggestion must be": "Ξεκινά ξανά τη μέτρηση από το μηδέν και μαθαίνει ξανά πόσο σίγουρη πρέπει να είναι μια πρόταση",
+  "Starts counting the keystrokes saved and the suggestions that were right from nothing again, and learns again how sure a suggestion must be": "Ξεκινά ξανά από το μηδέν τη μέτρηση των πληκτρολογήσεων που εξοικονομήθηκαν και των προτάσεων που ήταν σωστές, και μαθαίνει ξανά πόσο σίγουρη πρέπει να είναι μια πρόταση",
+  "The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. What was learned about how sure to be starts again too.": "Οι πληκτρολογήσεις που εξοικονομήθηκαν και οι προτάσεις που ήταν σωστές μηδενίζονται, και η μέτρηση ξεκινά ξανά τώρα. Ξεκινά επίσης από την αρχή ό,τι είχε μαθευτεί για το πόσο σίγουρη πρέπει να είναι μια πρόταση.",
+  "judged.{0}.{1}: {2} whole numbers from 0 to {3}": "judged.{0}.{1}: {2} ακέραιοι αριθμοί από 0 έως {3}",
+  "judged.{0}: more right than judged": "judged.{0}: περισσότερα right από judged",
+  "judged.{0}: not a plan ({1})": "judged.{0}: δεν είναι σχέδιο ({1})",
+  "judged.{0}: { right, total }": "judged.{0}: { right, total }",
+  "judged: an object by plan ({0})": "judged: αντικείμενο ανά σχέδιο ({0})"
 }

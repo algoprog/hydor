@@ -322,7 +322,7 @@ Enquanto você digita, o Hydor pode mostrar em cinza, depois do cursor, o resto 
 
 - **Tab** aceita a palavra em cinza. Pressione de novo para aceitar a próxima.
 - **→** (a seta para a direita), com o cursor no fim do texto, aceita as duas palavras de uma vez.
-- **Esc** as esconde até a próxima palavra. Continue digitando e elas somem sozinhas; digite as letras que elas mostram e elas continuam, mais curtas.
+- **Esc** esconde as palavras até a próxima. Se você continuar digitando, elas somem sozinhas; se digitar as letras que elas mostram, elas permanecem, mais curtas. Um palpite que chega enquanto você ainda está digitando mostra o que sobrou dele, se as letras digitadas nesse meio-tempo forem as dele.
 - Na caixa de mensagem, um menu `@` ou `/` aberto fica com Tab e Esc para si, e **Shift+Tab** continua mudando o modo de permissão. Quando não há nada em cinza, cada tecla faz o que sempre fez.
 
 Nada do que você digita sai do seu computador: os palpites são feitos por modelos que rodam nele. Ele vem ativado desde o início e se configura sozinho na primeira vez que você digita.
@@ -359,6 +359,8 @@ Isso é definido uma vez para o app. **[Mostrar neste navegador](/settings?s=sug
 
 Cada palpite tem uma chance de estar certo, e ele só é mostrado quando essa chance é alta o bastante. **[Segurança antes de mostrar](/settings?s=suggest&find=How%20sure%20before%20showing)** define o limite: **Mais** (o padrão) mostra mais palpites, e mais deles errados; **Equilibrado** é o meio-termo, visando a cerca de quatro acertos em cada dez palpites mostrados; **Mais seguro** mostra menos, e mais deles certos. Um agente também pode definir o limite ainda mais alto, só para os mais certeiros. **[Mostrar a palavra seguinte](/settings?s=suggest&find=Show%20the%20next%20word)** desativa a segunda palavra, mais apagada, de modo que só o resto da palavra que você está digitando apareça.
 
+A exigência com que o app começa foi medida em textos de outras pessoas, por isso ela é depois ajustada aos seus. Cada palpite, mostrado ou não, é comparado com a palavra que você acaba digitando, e só uma contagem é guardada: quanta certeza o modelo tinha e se ele acertou, nunca o texto. Uma palavra que você deixa incompleta, ou que corrige com Backspace antes de o palpite ser mostrado, não é contada. Quando 400 palpites de um mesmo tipo já foram avaliados (dos dois modelos juntos, só do modelo de linguagem ou só do modelo pequeno), esse tipo ganha uma exigência própria, definida para que a proporção de acertos entre os mostrados seja a que você escolheu, e nunca menor que um terço da exigência do app nem maior que uma vez e meia esse valor. O que você escreveu recentemente pesa mais do que o que escreveu há muito tempo. Abaixo da escolha, uma linha diz o andamento, **Aprendendo com a sua escrita (120 de 400)**, e, quando termina, **A certeza necessária está ajustada à sua escrita (respostas avaliadas: 900).** A contagem recomeça quando o app traz uma nova versão do modelo pequeno, quando o primeiro modelo é criado a partir da sua escrita e quando você [zera os números](#how-much-it-helps).
+
 ### O que ele lê
 
 Para adivinhar, ele lê as palavras que você digitou antes do cursor e aquilo a que você está respondendo: a última resposta do agente em uma mensagem, ou o texto acima do parágrafo em um documento.
@@ -388,7 +390,7 @@ Enquanto uma execução está em andamento, essa linha tem **Pausar** e **Parar*
 
 Em **Como está ajudando**, na mesma seção, duas linhas mostram o que as sugestões fizeram por você até agora: as **teclas economizadas** (e que parte da sua digitação isso representa) e quantas sugestões estavam **certas** entre as que foram avaliadas, com quantas você aceitou com Tab. Uma sugestão está certa quando você a aceitou (Tab, ou → para duas palavras) ou digitou você mesmo a palavra inteira em cinza; está errada quando você digitou outra coisa enquanto ela aparecia. Uma que você escondeu com Esc, ou que sumiu quando você clicou em outro lugar, enviou a mensagem ou moveu o cursor, não conta como nenhuma das duas. Cada Tab ou → economiza as letras que acrescenta, menos a tecla que você pressionou.
 
-**Mostrar os detalhes** acrescenta hoje, esta semana e o total desde que os números começaram, e **[Zerar os números](/settings?s=suggest&find=Reset%20the%20numbers)** recomeça a contagem do zero, depois que você confirma. Só as contagens são guardadas, nunca o que você digitou, e elas não mudam o funcionamento das sugestões.
+**Mostrar os detalhes** acrescenta hoje, esta semana e o total desde que os números começaram, e **[Zerar os números](/settings?s=suggest&find=Reset%20the%20numbers)** recomeça a contagem do zero, depois que você confirma. Só contagens são guardadas, nunca o que você digitou. Zerar também reinicia o [ajuste de quanta certeza é necessária](#how-sure-it-must-be).
 
 ## Ditar uma mensagem
 
@@ -519,6 +521,7 @@ Ele para de escutar para dizer isso e depois escuta de novo. Sessões em suas ou
 - "O modelo de linguagem das sugestões de palavras está em execução? Se não, por quê?"
 - "Desative as sugestões de palavras só neste navegador."
 - “Quantas teclas as sugestões de palavras me pouparam de digitar?”
+- “As sugestões de palavras já ajustaram à minha escrita o grau de certeza que precisam ter?”
 - "Ative o reconhecimento de fala neste computador, com o modelo Pequeno."
 - "Use meu servidor de fala em http://192.168.1.20:8000/v1 para o ditado, com o modelo whisper-large-v3."
 - "Quais modelos whisper estão neste computador e quanto espaço ocupam? Remova os que não estão em uso."

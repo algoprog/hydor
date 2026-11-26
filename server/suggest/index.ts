@@ -4,6 +4,7 @@
 import type { SuggestRequest } from '../../shared/suggest.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps, Feature } from '../features/types.ts';
+import { cleanJudged } from './fit.ts';
 import { SuggestService } from './service.ts';
 import { cleanUsage } from './usage.ts';
 
@@ -69,8 +70,11 @@ export const suggest: Feature = {
     d.app.post('/api/suggest/train/pause', async () => s.pause());
     d.app.delete('/api/suggest/train', async () => s.stopTraining());
     d.app.delete('/api/suggest/personal', async () => s.forget());
-    // What suggestions did, as counts: the page sends them in batches.
-    d.app.post('/api/suggest/usage', async (req) => ({ usage: s.addUsage(cleanUsage(req.body ?? {})) }));
+    // What suggestions did, and the guesses judged, as counts: the page sends them in batches.
+    d.app.post('/api/suggest/usage', async (req) => {
+      const body = req.body ?? {};
+      return s.addUsage(cleanUsage(body), cleanJudged(body));
+    });
     d.app.delete('/api/suggest/usage', async () => s.resetUsage());
   },
   start() {

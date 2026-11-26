@@ -316,7 +316,7 @@
 - [**语言模型大小**](/settings?s=suggest&find=Language%20model%20size)：8 位（更好）或 4 位（更小，稍差）的语言模型。
 - [**显示前的把握程度**](/settings?s=suggest&find=How%20sure%20before%20showing)：建议需要多确定才会显示：显示更多，或显示更少但更常猜对。
 - [**显示下一个词**](/settings?s=suggest&find=Show%20the%20next%20word)：同时显示其后的一个词，颜色更淡。
-- [**重置数字**](/settings?s=suggest&find=Reset%20the%20numbers)：从零开始重新统计节省的按键次数和正确的建议数。
+- [**重置数字**](/settings?s=suggest&find=Reset%20the%20numbers)：将节省的按键次数和正确建议数重新从零开始统计，并重新学习一条建议需要有多大把握。
 - [**在消息框中**](/settings?s=suggest&find=In%20message%20boxes)：在你给智能体写消息的输入框中给出建议。
 - [**在文档中**](/settings?s=suggest&find=In%20documents)：在文档中写作时给出建议。
 - [**在备注中**](/settings?s=suggest&find=In%20notes)：在备注中给出建议。

@@ -27935,5 +27935,15 @@
   "“{0}”, {1}: its significance mark is missing.": "「{0}」、{1}：有意性の記号がありません。",
   "“{0}”, {1}: its significance mark is no longer earned.": "「{0}」、{1}：有意性の記号を付ける条件を満たさなくなりました。",
   "“{0}”, {1}: its significance mark is not the one its runs give now.": "「{0}」、{1}：有意性の記号が、現在の実行結果から得られるものと一致していません。",
-  "“{0}”, {1}: {2} in the paper, {3} now.": "「{0}」、{1}：論文では{2}、現在は{3}です。"
+  "“{0}”, {1}: {2} in the paper, {3} now.": "「{0}」、{1}：論文では{2}、現在は{3}です。",
+  "How sure it must be is fitted to your writing ({0} answers judged).": "提案に必要な確信度は、文章の書き方に合わせて調整されています（判定済みの回答：{0}件）。",
+  "Learning from your writing ({0} of {1})": "文章の書き方を学習中（{0}/{1}）",
+  "Starts counting again from nothing, and learns again how sure a suggestion must be": "ゼロから数え直し、提案に必要な確信度も学習し直します",
+  "Starts counting the keystrokes saved and the suggestions that were right from nothing again, and learns again how sure a suggestion must be": "節約できたキー入力数と正しかった提案の数をゼロから数え直し、提案に必要な確信度も学習し直します",
+  "The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. What was learned about how sure to be starts again too.": "節約できたキー入力数と正しかった提案の数がゼロに戻り、今から数え直します。提案に必要な確信度について学習した内容も、最初からやり直しになります。",
+  "judged.{0}.{1}: {2} whole numbers from 0 to {3}": "judged.{0}.{1}：0から{3}までの整数を{2}個指定してください",
+  "judged.{0}: more right than judged": "judged.{0}：正しかった件数が判定した件数を超えています",
+  "judged.{0}: not a plan ({1})": "judged.{0}：プランではありません（{1}）",
+  "judged.{0}: { right, total }": "judged.{0}: { right, total }",
+  "judged: an object by plan ({0})": "judged：プランごとのオブジェクトが必要です（{0}）"
 }

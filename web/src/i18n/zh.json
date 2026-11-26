@@ -29785,5 +29785,15 @@
   "“{0}”, {1}: its significance mark is missing.": "“{0}”，{1}：缺少显著性标记。",
   "“{0}”, {1}: its significance mark is no longer earned.": "“{0}”，{1}：显著性标记已不再成立。",
   "“{0}”, {1}: its significance mark is not the one its runs give now.": "“{0}”，{1}：显著性标记与现在各次运行得出的结果不一致。",
-  "“{0}”, {1}: {2} in the paper, {3} now.": "“{0}”，{1}：论文中是 {2}，现在是 {3}。"
+  "“{0}”, {1}: {2} in the paper, {3} now.": "“{0}”，{1}：论文中是 {2}，现在是 {3}。",
+  "How sure it must be is fitted to your writing ({0} answers judged).": "建议需要有多大把握，已根据你的写作情况调整（已评判 {0} 个回答）。",
+  "Learning from your writing ({0} of {1})": "正在从你的写作中学习（{0}/{1}）",
+  "Starts counting again from nothing, and learns again how sure a suggestion must be": "重新从零开始统计，并重新学习一条建议需要有多大把握",
+  "Starts counting the keystrokes saved and the suggestions that were right from nothing again, and learns again how sure a suggestion must be": "将节省的按键次数和正确建议数重新从零开始统计，并重新学习一条建议需要有多大把握",
+  "The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. What was learned about how sure to be starts again too.": "节省的按键次数和正确建议数将归零，并从现在起重新统计。关于需要有多大把握的学习结果也会从头开始。",
+  "judged.{0}.{1}: {2} whole numbers from 0 to {3}": "judged.{0}.{1}：{2} 个从 0 到 {3} 的整数",
+  "judged.{0}: more right than judged": "judged.{0}：正确数多于评判数",
+  "judged.{0}: not a plan ({1})": "judged.{0}：不是一种方案（{1}）",
+  "judged.{0}: { right, total }": "judged.{0}: { right, total }",
+  "judged: an object by plan ({0})": "judged：按方案划分的对象（{0}）"
 }

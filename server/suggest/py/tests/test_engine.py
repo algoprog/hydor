@@ -405,6 +405,35 @@ class EngineTests(unittest.TestCase):
         self.assertAlmostEqual(e.suggest(ask)['theta'], 0.04)
         self.assertEqual(e.release.own_calibration, own)
 
+    def test_a_threshold_of_the_request_is_used_for_its_plan_to_show_and_to_decode_on(self):
+        fake = helpers.FakeLlama(self.Vq)
+        self.addCleanup(fake.stop)
+        e = self.engine(fake.url)
+        base = len(self.tok.encode('\n\n', add_special_tokens=False).ids) + len(self.tok.encode('the quick', add_special_tokens=False).ids)
+        fake.script = llm_script(self.tok, self.Vq, ' brown fox today', base)
+        ask = {'surface': 'doc', 'text': 'the quick bro', 'next': True, 'precision': 0.4}
+        plain = e.suggest(ask)
+        self.assertEqual(plain['plan'], 'llm')
+        self.assertAlmostEqual(plain['theta'], 0.35)
+        self.assertTrue(plain['show'])
+        self.assertTrue(plain['next'])
+        # one over the word's confidence: hidden (the word is still answered), and no next word is decoded
+        n = len(fake.requests)
+        high = e.suggest({**ask, 'theta': {'llm': 1.01}})
+        n_high = len(fake.requests) - n
+        self.assertAlmostEqual(high['theta'], 1.01)
+        self.assertEqual((high['show'], high['next'], high['show_next']), (False, '', False))
+        self.assertEqual((high['word'], high['conf']), (plain['word'], plain['conf']))
+        n = len(fake.requests)
+        low = e.suggest({**ask, 'theta': {'llm': 0.0}})
+        self.assertAlmostEqual(low['theta'], 0.0)
+        self.assertTrue(low['show'])
+        self.assertEqual(low['next'], plain['next'])
+        self.assertGreater(len(fake.requests) - n, n_high)
+        # another plan's threshold, or one that is no number, leaves the release's
+        for theta in ({'mix': 0.99, 'slm': 0.99}, {'llm': None}, {'llm': True}, {'llm': float('nan')}, {}, None, 0.5):
+            self.assertAlmostEqual(e.suggest({**ask, 'theta': theta})['theta'], 0.35, msg=repr(theta))
+
     def test_a_load_that_fails_does_not_keep_the_added_thresholds(self):
         e = self.engine()
         before = e.release.calibration

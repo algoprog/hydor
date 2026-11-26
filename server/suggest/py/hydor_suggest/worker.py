@@ -8,8 +8,9 @@ It reads requests as JSON lines on stdin and answers each with one JSON line on 
         -> {"id", "ok": true, "model": "base"|"personal", "languages": {lang: the person's tokens}}
         (calibration: thresholds measured for the release at precisions its calibration.json does not list; its own come first)
   {"id", "op": "suggest", "surface": "chat"|"doc"|"text", "text", "reply"?, "prev"?, "doc"?, "session"?, "precision": 0.2,
-        "next": true, "cache": true, "switch": true, "typed_words": 100, "context_words": 100}
-        (typed_words: how many words of the typed text before the caret are read; context_words: how many of the reply (chat) or the
+        "next": true, "cache": true, "switch": true, "typed_words": 100, "context_words": 100, "theta"?: {"mix"?, "llm"?, "slm"?}}
+        (theta: thresholds fitted to the person's writing, used for their plan in place of the release's, for the word and
+        the next one; typed_words: how many words of the typed text before the caret are read; context_words: how many of the reply (chat) or the
         document (doc); 0 reads none of the context; both default to the load options', else 100)
         -> {"id", "word", "next", "conf", "conf_next", "theta", "show", "show_next", "plan", "lang"?, "model"?, "ms": {...}}
         (model: "base" | "personal", the small model that answered; both are loaded, the personal one answers in the languages the

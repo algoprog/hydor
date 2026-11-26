@@ -316,7 +316,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Größe des Sprachmodells**](/settings?s=suggest&find=Language%20model%20size): Das Sprachmodell in 8 Bit (besser) oder 4 Bit (kleiner, etwas schlechter).
 - [**Wie sicher, bevor angezeigt wird**](/settings?s=suggest&find=How%20sure%20before%20showing): Wie sicher ein Vorschlag sein muss, um angezeigt zu werden: mehr Vorschläge oder weniger, die öfter stimmen.
 - [**Nächstes Wort anzeigen**](/settings?s=suggest&find=Show%20the%20next%20word): Auch das Wort danach, blasser.
-- [**Zahlen zurücksetzen**](/settings?s=suggest&find=Reset%20the%20numbers): Beginnt die Zählung der gesparten Tastenanschläge und der richtigen Vorschläge wieder bei null.
+- [**Zahlen zurücksetzen**](/settings?s=suggest&find=Reset%20the%20numbers): Beginnt beim Zählen der gesparten Tastenanschläge und der richtigen Vorschläge wieder bei null und lernt neu, wie sicher ein Vorschlag sein muss.
 - [**In Nachrichtenfeldern**](/settings?s=suggest&find=In%20message%20boxes): Vorschläge im Feld, in dem du eine Nachricht an einen Agenten schreibst.
 - [**In Dokumenten**](/settings?s=suggest&find=In%20documents): Vorschläge beim Schreiben in einem Dokument.
 - [**In Notizen**](/settings?s=suggest&find=In%20notes): Vorschläge in Notizen.

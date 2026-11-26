@@ -316,7 +316,7 @@
 - [**言語モデルのサイズ**](/settings?s=suggest&find=Language%20model%20size)：言語モデルを8ビット（高精度）または4ビット（小さい分、やや精度が下がる）で使います。
 - [**表示する確信度**](/settings?s=suggest&find=How%20sure%20before%20showing)：候補を表示するために必要な確信度：多めに表示するか、少なめでより正確にするか。
 - [**次の単語を表示**](/settings?s=suggest&find=Show%20the%20next%20word)：その次の単語も、薄く表示します。
-- [**数値をリセット**](/settings?s=suggest&find=Reset%20the%20numbers)：節約したキー入力数と、正解した提案数を、ゼロから数え直します。
+- [**数値をリセット**](/settings?s=suggest&find=Reset%20the%20numbers)：節約できたキー入力数と正しかった提案の数をゼロから数え直し、提案に必要な確信度も学習し直します。
 - [**メッセージ欄**](/settings?s=suggest&find=In%20message%20boxes)：エージェントにメッセージを書く欄での候補。
 - [**ドキュメント内**](/settings?s=suggest&find=In%20documents)：ドキュメントを書くときの候補。
 - [**メモ内**](/settings?s=suggest&find=In%20notes)：メモでの候補。

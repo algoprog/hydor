@@ -322,7 +322,7 @@ While you type, Hydor can show the rest of the word you are writing in grey afte
 
 - **Tab** takes the grey word. Press it again to take the next one.
 - **→** (the right arrow), with the cursor at the end of the text, takes both words at once.
-- **Esc** hides them until the next word. Keep typing and they go away by themselves; type the letters they show and they stay, shorter.
+- **Esc** hides them until the next word. Keep typing and they go away by themselves; type the letters they show and they stay, shorter. A guess that arrives while you are still typing shows what is left of it, if the letters you typed meanwhile are its own.
 - In the message box, an open `@` or `/` menu keeps Tab and Esc for itself, and **Shift+Tab** still changes the permission mode. When nothing grey is showing, every key does what it always did.
 
 Nothing you type leaves your computer: the guesses are made by models that run on it. It is on from the start, and sets itself up the first time you type.
@@ -359,6 +359,8 @@ These are set once for the app. **[Show in this browser](/settings?s=suggest&fin
 
 Every guess has a chance of being right, and a guess is shown only when that chance is high enough. **[How sure before showing](/settings?s=suggest&find=How%20sure%20before%20showing)** sets the bar: **More** (the default) shows more guesses, and more of them are wrong; **Balanced** is the middle, aiming at about four right guesses in ten shown; **Surer** shows fewer, and more of those are right. An agent can also set the bar higher still, for the surest ones only. **[Show the next word](/settings?s=suggest&find=Show%20the%20next%20word)** turns the dimmer second word off, so only the rest of the word you are typing shows.
 
+The bar the app starts with was measured on other people's text, so it is then fitted to yours. Each guess, shown or not, is checked against the word you go on to type, and only a count is kept: how sure the model was, and whether it was right, never any text. A word you leave unfinished, or correct with Backspace before it was shown, is not counted. Once 400 guesses of one kind are judged (from both models together, the language model alone or the small model alone), that kind gets a bar of its own, set so that the share of right ones among those shown is the one you chose, and never lower than a third of the app's own bar or higher than one and a half times it. What you wrote lately counts for more than what you wrote long ago. Under the choice, a line says how far this is, **Learning from your writing (120 of 400)**, and once it is done, **How sure it must be is fitted to your writing (900 answers judged).** The count starts again when the app brings a new version of the small model, when the first model is made from your writing, and when you [reset the numbers](#how-much-it-helps).
+
 ### What it reads
 
 To guess, it reads the words you typed before the cursor, and what you are answering: the agent's last reply in a message, or the text above the paragraph in a document.
@@ -388,7 +390,7 @@ While a run is going, that line has **Pause** and **Stop**. **Pause** stops the 
 
 Under **How it's helping** in the same section, two lines show what the suggestions have done for you so far: the **keystrokes saved** (and what share of your typing that is), and how many suggestions were **right** of those that were judged, with how many you took with Tab. A suggestion is right when you took it (Tab, or → for two words) or typed the whole grey word yourself; it is wrong when you typed something else while it showed. One you hid with Esc, or that went away when you clicked elsewhere, sent the message or moved the cursor, is neither. Each Tab or → saves the letters it adds, less the one key you pressed.
 
-**Show the details** adds today, this week and the total since the numbers began, and **[Reset the numbers](/settings?s=suggest&find=Reset%20the%20numbers)** starts them again from nothing, after you confirm. Only counts are kept, never what you typed, and they do not change how suggestions work.
+**Show the details** adds today, this week and the total since the numbers began, and **[Reset the numbers](/settings?s=suggest&find=Reset%20the%20numbers)** starts them again from nothing, after you confirm. Only counts are kept, never what you typed. Resetting also starts [fitting how sure it must be](#how-sure-it-must-be) again.
 
 ## Dictate a message
 
@@ -519,6 +521,7 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Is the language model running for word suggestions? If not, why?"
 - "Turn word suggestions off in this browser only."
 - "How many keystrokes have word suggestions saved me?"
+- "Have word suggestions fitted how sure they must be to my writing yet?"
 - "Turn on speech recognition on this computer, with the Small model."
 - "Use my speech server at http://192.168.1.20:8000/v1 for dictation, with the model whisper-large-v3."
 - "Which whisper models are on this computer, and how much space do they take? Remove the ones not in use."

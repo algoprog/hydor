@@ -1,8 +1,8 @@
 // Script tests for word suggestions' rules (logic.ts) and one text box's controller (suggester.ts). Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/suggest/suggest-test.ts && node dist/dev/suggest-test.js
-import type { SuggestCounts, SuggestRequest, SuggestResponse } from '@shared/suggest';
-import { addCounts, afterSpace, allowed, atWordEnd, backspaced, charCount, consume, greyOf, hasCounts, judgeTyped, noCounts, requestOf, savedBy, splitCounts, startsWord, summarise, takeAll, takenCounts, takeWord, typedBetween, typedChars, type Field, type Gate } from './logic';
-import { DEBOUNCE_MS, Suggester, type Adapter } from './suggester';
+import type { SuggestCounts, SuggestJudged, SuggestRequest, SuggestResponse } from '@shared/suggest';
+import { addCounts, addVerdict, afterSpace, allowed, atWordEnd, backspaced, binOf, charCount, consume, greyOf, guessOf, hasCounts, hasJudged, judgeTyped, mergeJudged, noCounts, requestOf, savedBy, splitCounts, startsWord, summarise, takeAll, takenCounts, takeWord, typedBetween, typedChars, verdictOf, type Field, type Gate } from './logic';
+import { DEBOUNCE_MS, MAX_FLIGHT_MS, Suggester, type Adapter } from './suggester';
 
 let failed = 0;
 let passed = 0;
@@ -132,6 +132,27 @@ eq(splitCounts(noCounts()), [], 'nothing to send');
 eq(splitCounts({ ...noCounts(), typedChars: 12000, saved: 7 }, 5000).map((c) => [c.typedChars, c.saved]), [[5000, 7], [5000, 0], [2000, 0]], 'no count above the cap in one piece');
 eq(summarise({ shown: 10, taken: 3, typedThrough: 2, wrong: 5, saved: 30, typedChars: 70 }), { saved: 30, savedShare: 30, right: 5, judged: 10, rightShare: 50, taken: 3 }, 'the numbers shown');
 eq(summarise(noCounts()), { saved: 0, savedShare: 0, right: 0, judged: 0, rightShare: 0, taken: 0 }, 'no division by nothing');
+
+// ---- judging guesses, shown or not
+eq(guessOf(f('Hello w'), ans({ word: 'orld', conf: 0.05, show: false, plan: 'mix' })), { base: f('Hello w'), word: 'orld', plan: 'mix', conf: 0.05 }, 'a hidden word is a guess');
+eq(guessOf(f('Hello '), ans({ word: ' world', conf: 0.2, plan: 'llm' }))?.word, 'world', 'after a space, without the space');
+eq([guessOf(f('Hello'), ans({ word: '', plan: 'mix' })), guessOf(f('a'), ans({ word: 'b', conf: 0, plan: 'mix' })), guessOf(f('a'), ans({ word: 'b' })), guessOf(f('a'), null)], [null, null, null, null], 'no word, no confidence, no plan, no answer: nothing to judge');
+eq([verdictOf('orld', ''), verdictOf('orld', 'or'), verdictOf('orld', 'orld')], [undefined, undefined, undefined], 'still typing the word');
+eq([verdictOf('orld', 'orld '), verdictOf('orld', 'orld.'), verdictOf('orld', 'orld\n')], [true, true, true], 'typed, and ended');
+eq([verdictOf('orld', 'orlds'), verdictOf('orld', "orld'")], [false, false], 'a longer word is another word');
+eq([verdictOf('orld', 'ork'), verdictOf('orld', 'ork '), verdictOf('orld', 'or '), verdictOf('orld', ' ')], [undefined, false, false, false], 'another word: wrong once it is finished');
+eq([verdictOf('ld,', 'ld,'), verdictOf('ld,', 'ld, '), verdictOf('.g.', '.g.')], [undefined, true, undefined], 'punctuation inside the guess is part of it');
+eq([binOf(0), binOf(0.024), binOf(0.025), binOf(0.5), binOf(1), binOf(-1)], [0, 0, 1, 20, 39, 0], 'bins of 0.025');
+const j1: SuggestJudged = {};
+ok(!hasJudged(j1), 'nothing judged');
+addVerdict(j1, 'mix', 0.3, true);
+addVerdict(j1, 'mix', 0.3, false);
+const j2: SuggestJudged = {};
+addVerdict(j2, 'mix', 0.3, true);
+addVerdict(j2, 'slm', 0.9, false);
+mergeJudged(j1, j2);
+ok(hasJudged(j1), 'something judged');
+eq([j1.mix?.total[12], j1.mix?.right[12], j1.slm?.total[36], j1.slm?.right[36], j1.llm, j1.mix?.total.length], [3, 2, 1, 0, undefined, 40], 'counts per plan and bin');
 
 // ---- one box
 interface Box {
@@ -509,6 +530,249 @@ async function run() {
   s.reset();
 }
 
+/** A box whose requests are answered when the test says so, with what was judged. */
+function slow(text: string) {
+  const b = box(text);
+  const sent: SuggestRequest[] = [];
+  const answers: ((r: SuggestResponse | null) => void)[] = [];
+  const judged: [string, number, boolean][] = [];
+  const state = { aborted: 0, open: 0, most: 0, tally: noCounts() };
+  const s = new Suggester(b.adapter, () => {}, {
+    send: (req, signal) => {
+      sent.push(req);
+      state.open++;
+      state.most = Math.max(state.most, state.open);
+      signal.addEventListener('abort', () => (state.aborted++, state.open--));
+      return new Promise((res) => answers.push((r) => (signal.aborted || state.open--, res(r))));
+    },
+    gate: () => on,
+    client: 'tab1',
+    count: (c) => (state.tally = addCounts(state.tally, c)),
+    judge: (plan, conf, right) => judged.push([plan, conf, right]),
+  });
+  const type = (t: string) => {
+    for (const c of t) (b.type(c), s.sync());
+  };
+  const settle = () => sleep(DEBOUNCE_MS + 25);
+  const answer = async (r: SuggestResponse | null, i = answers.length - 1) => (answers[i](r), await sleep(5));
+  s.sync();
+  return { b, s, sent, judged, state, type, settle, answer };
+}
+
+const guess = (word: string, p: Partial<SuggestResponse> = {}) => ans({ word, plan: 'mix', conf: 0.5, next: '', showNext: false, ...p });
+const hide = (word: string, conf = 0.05) => guess(word, { conf, show: false });
+
+async function keeping() {
+  // a burst of three letters during one slow request: the answer is used up by them and what is left shows
+  let t = slow('Hello w');
+  await t.settle();
+  t.type('orl');
+  await t.settle();
+  eq([t.sent.length, t.state.most, t.state.aborted], [1, 1, 0], 'typing on does not stop the request, and no second one is sent');
+  await t.answer(guess('orld'));
+  eq(t.s.grey, { word: 'd', next: '' }, 'the rest of the late answer shows');
+  eq(t.state.tally, { ...noCounts(), shown: 1, typedChars: 3 }, 'counted as shown, the three letters as typed');
+  await t.settle();
+  eq([t.sent.length, t.sent[1].text, t.state.most], [2, 'Hello worl', 1], 'then one request for the box as it is now');
+  await t.answer(hide('d'));
+  eq(t.s.grey, { word: 'd', next: '' }, 'a follow-up with nothing to show leaves the letters being typed');
+  t.type('d');
+  eq(t.state.tally.typedThrough, 1, 'typed through: right');
+  t.s.reset();
+
+  // a letter that does not match drops the answer and asks again
+  t = slow('Hello w');
+  await t.settle();
+  t.type('x');
+  await t.answer(guess('orld'));
+  eq([t.s.grey, t.state.tally.shown], [null, 0], 'an answer that does not fit is dropped, and not counted');
+  await t.settle();
+  eq([t.sent.length, t.sent[1].text, t.state.aborted], [2, 'Hello wx', 0], 'and one request is sent');
+  t.s.reset();
+
+  // a follow-up with another word replaces what shows
+  t = slow('Hello w');
+  await t.settle();
+  t.type('o');
+  await t.answer(guess('orld'));
+  await t.settle();
+  await t.answer(guess('ods'));
+  eq([t.s.grey?.word, t.state.tally.shown], ['ods', 2], 'a newer answer replaces the old rest');
+  t.s.reset();
+
+  // typing the letters of what shows while the follow-up is out does not stop it either
+  t = slow('Hello w');
+  await t.settle();
+  t.type('o');
+  await t.answer(guess('orld'));
+  await t.settle();
+  t.type('r');
+  eq([t.s.grey?.word, t.state.aborted], ['ld', 0], 'the rest shows on, the follow-up stays out');
+  await t.answer(guess('ld'));
+  eq(t.s.grey?.word, 'ld', 'an older answer changes nothing that shows');
+  await t.settle();
+  eq([t.sent.length, t.sent[2].text], [3, 'Hello wor'], 'and the box as it is now is asked about');
+  t.s.reset();
+
+  // Backspace, a caret move, a blur and Esc make the request stale: it is stopped
+  t = slow('Hello w');
+  await t.settle();
+  t.b.back();
+  t.s.sync();
+  eq(t.state.aborted, 1, 'Backspace stops it');
+  await t.answer(guess('orld'), 0);
+  eq(t.s.grey, null, 'and its answer is not shown');
+  await t.settle();
+  eq(t.sent.length, 2, 'one new request');
+  t.b.moveTo(2);
+  t.s.sync();
+  eq(t.state.aborted, 2, 'a caret move stops it');
+  t.b.moveTo(6);
+  t.s.sync();
+  await t.settle();
+  t.s.reset();
+  eq(t.state.aborted, 3, 'a blur stops it');
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(guess('orld'));
+  t.type('z');
+  await t.settle();
+  t.s.grey = { word: 'q', next: '' };
+  t.s.key(key('Escape'));
+  eq([t.state.aborted, t.s.grey], [1, null], 'Esc stops it');
+  t.s.reset();
+
+  // a request that hangs is given up on at a later keystroke
+  t = slow('Hello w');
+  await t.settle();
+  const realNow = Date.now;
+  Date.now = () => realNow() + MAX_FLIGHT_MS + 1;
+  try {
+    t.type('o');
+  } finally {
+    Date.now = realNow;
+  }
+  eq(t.state.aborted, 1, 'out too long: stopped');
+  await t.settle();
+  eq(t.sent.at(-1)?.text, 'Hello wo', 'and asked afresh');
+  t.s.reset();
+
+  // an answer before the box's own event was handled does not use the letter twice
+  t = slow('Hello w');
+  await t.settle();
+  t.b.type('o');
+  await t.answer(guess('orld'));
+  t.s.sync();
+  eq([t.s.grey?.word, t.state.tally.wrong, t.state.tally.typedChars], ['rld', 0, 1], 'read once');
+  t.s.reset();
+}
+
+async function judging() {
+  // a hidden guess, judged when the word is finished
+  let t = slow('Hello w');
+  await t.settle();
+  await t.answer(hide('orld'));
+  eq([t.s.grey, t.state.tally.shown], [null, 0], 'hidden: nothing shows');
+  t.type('orld');
+  eq(t.judged, [], 'not before the word is ended');
+  t.type(' ');
+  eq(t.judged[0], ['mix', 0.05, true], 'the word typed is the guess');
+  t.s.reset();
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(hide('orld'));
+  t.type('ould.');
+  eq(t.judged, [['mix', 0.05, false]], 'another word: wrong');
+  t.s.reset();
+
+  // one for each place in the word, a late one included, all judged together
+  t = slow('Hello w');
+  await t.settle();
+  t.type('o');
+  await t.answer(hide('orld', 0.1));
+  await t.settle();
+  await t.answer(hide('rld', 0.2));
+  t.type('rld ');
+  eq(t.judged, [['mix', 0.1, true], ['mix', 0.2, true]], 'the late guess and the next one');
+  t.s.reset();
+  // an answer that arrives once the word is already finished is judged at once
+  t = slow('Hello w');
+  await t.settle();
+  t.type('as ');
+  await t.answer(hide('orld'));
+  eq(t.judged, [['mix', 0.05, false]], 'judged as it arrives');
+  t.s.reset();
+
+  // no verdict: a deletion, a caret move, a blur, a paste
+  for (const [what, spoil] of [
+    ['a deletion', (x: ReturnType<typeof slow>) => (x.type('ox'), x.b.back(), x.s.sync(), x.type('rld '))],
+    ['a caret move', (x: ReturnType<typeof slow>) => (x.b.moveTo(2), x.s.sync(), x.b.moveTo(7), x.s.sync(), x.type('orld '))],
+    ['a blur', (x: ReturnType<typeof slow>) => (x.s.reset(), x.s.sync(), x.type('orld '))],
+    ['a paste', (x: ReturnType<typeof slow>) => (x.b.type('orld and more '), x.s.sync())],
+  ] as const) {
+    t = slow('Hello w');
+    await t.settle();
+    await t.answer(hide('orld'));
+    spoil(t);
+    eq(t.judged, [], `${what}: no verdict`);
+    t.s.reset();
+  }
+
+  // shown: typed through and taken are right (once), something else is wrong
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(guess('orld'));
+  t.type('orld');
+  eq(t.judged, [['mix', 0.5, true]], 'typed through: right at its last letter');
+  t.type('ly ');
+  eq(t.judged.length, 1, 'and only once');
+  t.s.reset();
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(guess('orld'));
+  t.s.key(key('Tab'));
+  t.type(' ');
+  eq(t.judged, [['mix', 0.5, true]], 'Tab: right, once');
+  t.s.reset();
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(guess('orld'));
+  t.type('a ');
+  eq(t.judged, [['mix', 0.5, false]], 'another letter: wrong, once');
+  t.s.reset();
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(guess('orld'));
+  t.b.back();
+  t.s.sync();
+  eq(t.judged, [['mix', 0.5, false]], 'Backspace on a shown one: wrong');
+  t.s.reset();
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(guess('orld'));
+  t.b.moveTo(2);
+  t.s.sync();
+  eq(t.judged, [], 'a caret move on a shown one: no verdict');
+  t.s.reset();
+  // Esc hides a suggestion: its guess is still judged against the word typed
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(guess('orld'));
+  t.s.key(key('Escape'));
+  t.type('orld ');
+  eq(t.judged, [['mix', 0.5, true]], 'hidden with Esc, judged by the word');
+  t.s.reset();
+  // the next word, taken up as the grey word, is not judged
+  t = slow('Hello w');
+  await t.settle();
+  await t.answer(guess('orld', { next: ' is', showNext: true }));
+  t.type('orld is ');
+  eq(t.judged, [['mix', 0.5, true]], 'only the word');
+  t.s.reset();
+}
+
 await run();
+await keeping();
+await judging();
 console.log(failed ? `${failed} failed, ${passed} passed` : `All ${passed} checks passed`);
 process.exit(failed ? 1 : 0);

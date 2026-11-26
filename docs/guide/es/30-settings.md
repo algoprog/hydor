@@ -316,7 +316,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Tamaño del modelo de lenguaje**](/settings?s=suggest&find=Language%20model%20size): El modelo de lenguaje en 8 bits (mejor) o en 4 bits (más pequeño, algo peor).
 - [**Seguridad antes de mostrar**](/settings?s=suggest&find=How%20sure%20before%20showing): Qué tan segura debe ser una sugerencia para mostrarse: más sugerencias, o menos pero con más aciertos.
 - [**Mostrar la palabra siguiente**](/settings?s=suggest&find=Show%20the%20next%20word): También la palabra siguiente, más tenue.
-- [**Restablecer los números**](/settings?s=suggest&find=Reset%20the%20numbers): Vuelve a empezar desde cero el conteo de las pulsaciones ahorradas y de las sugerencias acertadas.
+- [**Restablecer los números**](/settings?s=suggest&find=Reset%20the%20numbers): Vuelve a contar desde cero las pulsaciones ahorradas y las sugerencias acertadas, y aprende de nuevo cuán segura debe estar una sugerencia.
 - [**En los cuadros de mensaje**](/settings?s=suggest&find=In%20message%20boxes): Sugerencias en el cuadro donde escribes un mensaje a un agente.
 - [**En documentos**](/settings?s=suggest&find=In%20documents): Sugerencias mientras escribes en un documento.
 - [**En notas**](/settings?s=suggest&find=In%20notes): Sugerencias en las notas.

@@ -131,6 +131,15 @@ class WorkerTests(unittest.TestCase):
         w.send(id=8, op='suggest', surface='text', text='hello wor', precision=0.2)
         self.assertAlmostEqual(w.answer(8)['theta'], 0.1)
 
+    def test_the_threshold_of_a_request_reaches_the_engine(self):
+        w = self.start()
+        w.send(id=1, op='load', model_dir=self.release, threads=2)
+        w.answer(1)
+        w.send(id=2, op='suggest', surface='text', text='hello wor', theta={'slm': 0.77})
+        self.assertAlmostEqual(w.answer(2)['theta'], 0.77)
+        w.send(id=3, op='suggest', surface='text', text='hello wor')
+        self.assertAlmostEqual(w.answer(3)['theta'], 0.1)
+
     def test_non_ascii_text_goes_through(self):
         w = self.start()
         w.send(id=1, op='load', model_dir=self.release, threads=2)
