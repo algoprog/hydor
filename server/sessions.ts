@@ -356,6 +356,9 @@ export function onThisComputer(list: unknown): { paths: string[]; images: ImageI
   return out;
 }
 
+/** A live session's program between turns: idle, with no background task of its own still running. */
+const resting = (a: LiveAdapter) => !a.exited && a.state.status === 'idle' && !a.state.backgroundTasks?.length;
+
 function alive(pid: number): boolean {
   try {
     const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
@@ -1218,8 +1221,10 @@ export class SessionManager extends EventEmitter {
       }
     });
     t.on('reset', () => this.emit('items', key, [], 0, true));
-    // A program subagent that runs is live too: its last turn is open until it ends.
-    await t.load(this.lives.has(key) || !!this.external.get(key) || !!this.programRunning(key));
+    // A program subagent that runs is live too: its last turn is open until it ends. A live session resting between
+    // turns has its last turn closed, or opening it later would show that turn as still going.
+    const l = this.lives.get(key);
+    await t.load((!!l && !resting(l.adapter)) || !!this.external.get(key) || !!this.programRunning(key));
     return t;
   }
 
@@ -1363,6 +1368,19 @@ export class SessionManager extends EventEmitter {
         if ((lastStatus === 'idle' || lastStatus === 'error') && busy(was)) this.endedTurns.set(key, turnBegan || Date.now());
         // A turn ended: the next queued message goes out.
         if (adapter.state.status === 'idle' && (was === 'working' || was === 'waiting')) setTimeout(() => this.dispatchQueued(key), 300);
+        // Resting now (idle, no background task left): its last turn is closed, even when the result's own check
+        // (below) found it still busy, as it is while background agents run on after the reply.
+        if (resting(adapter)) {
+          setTimeout(() => {
+            const tl = this.timelines.get(key);
+            if (!tl || this.lives.get(key)?.adapter !== adapter || !resting(adapter)) return;
+            tl.readMore()
+              .then(() => {
+                if (resting(adapter)) tl.endTurn();
+              })
+              .catch(() => {});
+          }, 700);
+        }
       }
     });
     // Each model call, for the spending caps.
