@@ -186,7 +186,7 @@ agents that speak ACP and take MCP servers.
   projects, tier, next run and what it spent this month. On a computer it has a column beside the rail, as Apps'
   (the logo, **New**, whose menu has New agent, Install an agent from a file and Import Claude Code agent files, and Hide;
   then All agents, Your agents, Needs you and On a schedule when some of yours are, Everywhere and each project that has
-  agents of its own, a row for each built-in agent that opens its page (the page lists them too only while the column is hidden, or when a search finds them), and Schedules), a row with the place's name and a
+  agents of its own, Built in (the agents that come with the app; All agents lists them too, under yours), and Schedules), a row with the place's name and a
   find box (by name and line), and an agent's own page keeps the column beside it; a phone keeps its header, tabs and
   chips. **New agent** opens a window in two steps: you say what it should
   do (or pick an idea: Paper digest, Weekly report, Change reviewer, Translator) and the helper model drafts its instructions,

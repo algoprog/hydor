@@ -5,7 +5,7 @@
 // and in its menu its Versions and Download as a file; Install installs one from a file.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { BellRing, CalendarClock, CalendarDays, ChevronDown, Copy, Download, FileDown, FileUp, Globe, History, LayoutGrid, MessageSquarePlus, MoreHorizontal, Plus, Search, Settings2, Sparkles, Trash2, User, X } from 'lucide-react';
+import { BellRing, CalendarClock, CalendarDays, ChevronDown, Copy, Download, FileDown, FileUp, Globe, History, LayoutGrid, MessageSquarePlus, MoreHorizontal, Package, Plus, Search, Settings2, Sparkles, Trash2, User, X } from 'lucide-react';
 import { agentFileName } from '@shared/agent-files';
 import { DEFAULT_ASSISTANT, hasOutput, type Assistant, type AssistantsState } from '@shared/assistants';
 import type { ScheduledTask, TaskDraft } from '@shared/automations';
@@ -344,7 +344,7 @@ function AgentDetail({ id, onEdit, wide }: { id: string; onEdit: (a: Partial<Ass
 // ---- the page --------------------------------------------------------------------------------------------------
 
 /** Where the page is, on a computer: all the agents, a part of them, one of the ready-made ones' pages (an address of its own) or Schedules. */
-type Place = 'all' | 'mine' | 'needs' | 'scheduled' | 'everywhere' | 'schedules' | `project:${string}`;
+type Place = 'all' | 'mine' | 'builtin' | 'needs' | 'scheduled' | 'everywhere' | 'schedules' | `project:${string}`;
 
 /** The address that keeps a place (so a link opens it): /agents, /agents?place=mine, /agents/schedules. */
 function addressOf(p: Place): string {
@@ -353,7 +353,7 @@ function addressOf(p: Place): string {
   return `/agents?place=${encodeURIComponent(p)}`;
 }
 
-const PLACE_TITLES: Record<string, string> = { all: 'All agents', mine: 'Your agents', needs: 'Needs you', scheduled: 'On a schedule', everywhere: 'Everywhere', schedules: 'Schedules' };
+const PLACE_TITLES: Record<string, string> = { all: 'All agents', mine: 'Your agents', builtin: 'Built in', needs: 'Needs you', scheduled: 'On a schedule', everywhere: 'Everywhere', schedules: 'Schedules' };
 
 /** New agent, with Import and Install under it: the page's actions, in the row of the logo on a computer. */
 function NewAgentMenu({ onImport, onInstall }: { onImport: () => void; onInstall: () => void }) {
@@ -387,7 +387,6 @@ export function AgentsPage() {
   const spaces = useSpaces();
   const act = useAgentActivity();
   const wide = useMediaQuery('(min-width: 1024px)');
-  const sideOpen = useUI((s) => s.sideOpen);
   const [edit, setEdit] = useState<Partial<Assistant> | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [find, setFind] = useState('');
@@ -417,7 +416,7 @@ export function AgentsPage() {
   const everywhere = mine.filter((a) => !a.projects?.length).length;
   // The place, on a computer: from the address (a place that is gone, as a project, shows All agents). Narrower, the chips pick the filter.
   const asked = q.get('place');
-  const place: Place = schedules ? 'schedules' : !wide || id ? 'all' : asked === 'mine' || asked === 'needs' || asked === 'scheduled' || asked === 'everywhere' ? asked : asked?.startsWith('project:') && projects.some((s) => `project:${s.id}` === asked) ? (asked as Place) : 'all';
+  const place: Place = schedules ? 'schedules' : !wide || id ? 'all' : asked === 'mine' || asked === 'builtin' || asked === 'needs' || asked === 'scheduled' || asked === 'everywhere' ? asked : asked?.startsWith('project:') && projects.some((s) => `project:${s.id}` === asked) ? (asked as Place) : 'all';
   const by = wide ? (place === 'all' || place === 'mine' || place === 'schedules' ? 'all' : place.startsWith('project:') ? place.slice(8) : place) : filter;
   const words = (wide ? find : '').trim().toLowerCase();
   const found = (a: Assistant) => !words || `${a.name} ${a.description || a.instructions.slice(0, 160)}`.toLowerCase().includes(words);
@@ -433,9 +432,9 @@ export function AgentsPage() {
             : !!a.projects?.includes(by)) && found(a),
   );
   const builtinsShown = builtins.filter(found);
-  // The built-in agents have rows of their own in the column: the page lists them only while the column is hidden (or
-  // on a phone), and among what a search finds.
-  const showBuiltins = !wide || (place === 'all' && (!sideOpen || !!words));
+  // All agents lists them all: yours, then the ones that come with the app (Built in lists only those). A phone lists
+  // the built-in ones under its chips whatever they pick.
+  const showBuiltins = !wide || place === 'all' || place === 'builtin';
   useEffect(() => setFind(''), [place]);
   const chip = (key: string, label: string, n?: number) => (
     <button
@@ -457,6 +456,7 @@ export function AgentsPage() {
         <nav aria-label="Places in Agents" className="space-y-0.5">
           <PlaceRow on={!id && place === 'all'} icon={icon(LayoutGrid)} label="All agents" count={st ? mine.length + builtins.length : 0} onClick={() => go(addressOf('all'))} />
           <PlaceRow on={place === 'mine' || (!!id && !builtins.some((a) => a.id === id) && mine.some((a) => a.id === id))} icon={icon(User)} label="Your agents" count={mine.length} onClick={() => go(addressOf('mine'))} />
+          {builtins.length > 0 && <PlaceRow on={place === 'builtin' || (!!id && builtins.some((a) => a.id === id))} icon={icon(Package)} label="Built in" count={builtins.length} onClick={() => go(addressOf('builtin'))} />}
           {(needs > 0 || place === 'needs') && <PlaceRow on={place === 'needs'} icon={icon(BellRing)} label="Needs you" count={needs} onClick={() => go(addressOf('needs'))} />}
           {(scheduledCount > 0 || place === 'scheduled') && <PlaceRow on={place === 'scheduled'} icon={icon(CalendarClock)} label="On a schedule" count={scheduledCount} onClick={() => go(addressOf('scheduled'))} />}
           {projects.length > 0 && (
@@ -473,14 +473,6 @@ export function AgentsPage() {
                   count={mine.filter((a) => a.projects?.includes(s.id)).length}
                   onClick={() => go(addressOf(`project:${s.id}`))}
                 />
-              ))}
-            </>
-          )}
-          {builtins.length > 0 && (
-            <>
-              <PlacesLabel>Built in</PlacesLabel>
-              {builtins.map((a) => (
-                <PlaceRow key={a.id} on={id === a.id} icon={<AssistantIcon icon={a.icon} size={15} plain className="text-fg-3" />} label={a.name} onClick={() => go(`/agents/${enc(a.id)}`)} />
               ))}
             </>
           )}
@@ -569,7 +561,7 @@ export function AgentsPage() {
                 </div>
               ) : (
                 <>
-                  {!mine.length ? (
+                  {place === 'builtin' ? null : !mine.length ? (
                     place !== 'all' && place !== 'mine' && wide ? (
                       <div className="py-6 text-center text-[13px] text-fg-3">None here.</div>
                     ) : (
@@ -608,26 +600,35 @@ export function AgentsPage() {
                   )}
                   {showBuiltins && builtinsShown.length > 0 && (
                     <section>
-                      <h2 className="mb-2 text-[13px] font-medium text-fg-3">Built in</h2>
-                      <div className="flex flex-wrap gap-1.5">
-                        {/* Built-in identities stay English in German; authored agents keep their words in every language. */}
-                        {builtinsShown.map((a) => (
-                          <button
-                            key={a.id}
-                            type="button"
-                            onClick={() => go(`/agents/${enc(a.id)}`)}
-                            title={a.description}
-                            translate={assistantTranslate(a)}
-                            className="flex items-center gap-2 rounded-full border border-line bg-panel py-1 pr-3 pl-1 text-[13px] hover:border-line-2"
-                          >
-                            <AssistantIcon icon={a.icon} size={12} />
-                            {a.name}
-                            {a.id === DEFAULT_ASSISTANT && <span className="text-[11.5px] text-fg-3">· the default</span>}
-                          </button>
-                        ))}
-                      </div>
+                      {place !== 'builtin' && <h2 className="mb-2 text-[13px] font-medium text-fg-3">Built in</h2>}
+                      {wide ? (
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {builtinsShown.map((a) => (
+                            <AgentCard key={a.id} a={a} spaces={spaces} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {/* Built-in identities stay English in German; authored agents keep their words in every language. */}
+                          {builtinsShown.map((a) => (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => go(`/agents/${enc(a.id)}`)}
+                              title={a.description}
+                              translate={assistantTranslate(a)}
+                              className="flex items-center gap-2 rounded-full border border-line bg-panel py-1 pr-3 pl-1 text-[13px] hover:border-line-2"
+                            >
+                              <AssistantIcon icon={a.icon} size={12} />
+                              {a.name}
+                              {a.id === DEFAULT_ASSISTANT && <span className="text-[11.5px] text-fg-3">· the default</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </section>
                   )}
+                  {place === 'builtin' && !builtinsShown.length && <div className="py-6 text-center text-[13px] text-fg-3">None here.</div>}
                 </>
               )}
             </div>
