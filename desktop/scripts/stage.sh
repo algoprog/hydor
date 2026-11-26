@@ -64,13 +64,16 @@ mkdir -p "$out/server" "$out/node"
 
 echo "== The server"
 cd "$root"
-# What the server reads from its own folder as it runs (APP_ROOT in server/config.ts).
+# What the server reads from its own folder as it runs (APP_ROOT in server/config.ts). scripts/agent-tools/bin and lib are
+# the waitfor, edits and sym programs, which every agent gets on its PATH through launchers the server writes
+# (server/shelltools); not their test/ or fixtures/. tar keeps their executable bits.
 # (tar rather than rsync: macOS 15 ships openrsync, which lacks some of rsync's options.)
 tar -cf - \
   package.json package-lock.json CHANGELOG.md LICENSE NOTICE \
   dist/server dist/web \
   server/find/shipped-vectors.json server/memory/embed_worker.py server/images/picture_worker.py server/documents/pdf/fonts \
   server/computer/x11-helper.py server/computer/windows-helper.cs \
+  scripts/agent-tools/bin scripts/agent-tools/lib \
   web/src/i18n docs/guide catalog skills plugins |
   tar -xf - -C "$out/server"
 (cd "$out/server" && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
@@ -109,6 +112,18 @@ else
   "$out/node/bin/node" -e 'console.log("node", process.version, process.arch)'
 fi
 rm -rf "$tmp"
+
+# The programs every agent gets on its PATH (waitfor, edits, sym) run on the app's own Node.js, from where they are staged.
+echo "== The agents' command-line tools"
+if [ "$os" = win32 ]; then appnode="$out/node/node.exe"; else appnode="$out/node/bin/node"; fi
+for t in waitfor edits sym; do
+  [ -f "$out/server/scripts/agent-tools/bin/$t" ] || { echo "scripts/agent-tools/bin/$t is not in the staged server." >&2; exit 1; }
+  "$appnode" "$out/server/scripts/agent-tools/bin/$t" --help > /dev/null
+done
+tsfile="$(mktemp -d)/check.ts"
+printf 'export function greet(name: string) {\n  return name;\n}\n' > "$tsfile"
+"$appnode" "$out/server/scripts/agent-tools/bin/sym" --outline "$(native "$tsfile")" | grep -q '1-3'
+rm -rf "$(dirname "$tsfile")"
 
 if [ "$os" != win32 ]; then
   echo "== tmux"

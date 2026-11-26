@@ -1,6 +1,6 @@
 # Agents
 
-An agent is who a session works as: its instructions, what it may use, where and when it works, the model tier it thinks with, which other agents it hands work to, and what it may spend in a month. This topic covers the Agents page, the agents that come with the app, making your own by saying what it should do, changing one, where an agent works, its schedules, tiers, agents that hand work to other agents, a monthly budget, an agent's versions and the examples that check it, starting and switching sessions as an agent, sharing an agent as a file, importing Claude Code's agent files, the task folders a session gets when you pick no folder, and having agents clean up after a task.
+An agent is who a session works as: its instructions, what it may use, where and when it works, the model tier it thinks with, which other agents it hands work to, and what it may spend in a month. This topic covers the Agents page, the agents that come with the app, making your own by saying what it should do, changing one, where an agent works, its schedules, tiers, agents that hand work to other agents, a monthly budget, an agent's versions and the examples that check it, starting and switching sessions as an agent, sharing an agent as a file, importing Claude Code's agent files, task folders, having agents clean up after a task, and the three commands every agent finds in its shell.
 
 ![The Agents page: your agents, each in a card with how it is doing, and the built-in ones under them](images/agents.webp)
 
@@ -511,6 +511,27 @@ It keeps what you asked for and work someone still has to review or merge (such 
 
 Turn it off and agents leave what they made in place. Either way, agents follow the change from their next session (Custom from its next message).
 
+## Three commands every agent has
+
+Every session the app starts, whether it works with Claude Code, Codex or Custom, finds three small commands in its shell, and is told what they are for. You do nothing to get them: the app puts them there itself, in the desktop apps for Mac, Windows and Linux, in Docker and in a copy you run from the repository, and they need nothing installed on your computer.
+
+- **`waitfor`** waits for a long job to finish in one call, where an agent would otherwise check again and again every few seconds. It can wait for a program to exit, a file to appear, a line to show up in a log, a web address to answer, a Slurm job on a cluster to leave its queue, or a command to succeed. It can stop at the first line of a log that says the job crashed, show the end of the log when it is done, and give up after a time you set. It can also start a command itself and wait for it. An agent runs it as a background command when the wait may take more than a few minutes, so the conversation carries on meanwhile.
+- **`edits`** makes several exact search-and-replace changes, in as many files as needed, in one call. Nothing is written unless every change finds its text exactly once, so a change that does not fit leaves your files as they were. It prints the lines it changed with their numbers, so the agent does not have to read the files again.
+- **`sym`** finds where something is defined (a function, a class, a type) and prints all of it with its exact line numbers, in TypeScript, JavaScript, Python and Rust files. It can also list where a name is used and the declarations in a file. It reads the code, so a brace in a string or a comment does not confuse it, and it needs no index. For plain text and other languages, agents keep using grep.
+
+In short, agents spend fewer calls on waiting, on editing in several places and on reading code. Each command explains itself with `--help`, which is what an agent reads when it wants an option.
+
+A few limits:
+
+- Waiting for a systemd service works on Linux only.
+- On Windows, waiting for a program by its name needs PowerShell, and waiting on a command or a Slurm job needs [Git for Windows](https://git-scm.com/download/win), which agents' commands need anyway (they run in Git's bash).
+- `sym` knows definitions in TypeScript, JavaScript, Python and Rust files, and says so when it cannot tell where one ends.
+- A session that works in one browser tab has no shell, so it does not get them.
+
+The app tries each command once when it starts, the way an agent's shell runs it, and tells agents only about the ones that worked, so a command that cannot run on your computer is never offered. Agents follow a change from their next session (Custom from its next message).
+
+To turn this off, start the app with the environment variable `HYDOR_SHELL_TOOLS=0` (in `~/.config/hydor.env` for the desktop apps and the service, or in `.env` for Docker). Agents then get no extra commands and hear nothing about them. There is no switch for it in Settings. Sessions already running keep the commands they started with.
+
 ## Where else agents come in
 
 - **Projects**: a project can say which agent its sessions start as ("Its sessions start as"); picking the project on the start page picks it. Its **Agents** tab shows the agents that work in it. See [Projects](/guide/projects).
@@ -541,3 +562,5 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - "Give my Weekly report agent two examples, one for a quiet week and one for a busy one, with what a good report must say, and try them."
 - "Download my Bookkeeper agent as a file, and tell me what I'll need to set again on my laptop."
 - "Put new task folders in ~/Documents/Tasks from now on."
+- "Which commands do my agents get in their shell, and how do I turn them off?"
+- "Run the training script and wait for it to finish, stopping early if the log shows an error."

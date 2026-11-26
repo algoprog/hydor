@@ -35,6 +35,7 @@ const RULES = [
   { name: 'plugins', from: 'docs/development.md "Testing"', tests: ['server/plugins/plugins-test.ts'], paths: [/^plugins\//] },
   { name: 'check', from: 'scripts/check.mjs and scripts/test.mjs', tests: ['server/check-test.ts'], paths: [/^scripts\/(check|test)\.mjs$/] },
   { name: 'agent-tools', from: 'scripts/agent-tools/README.md', tests: ['server/agent-tools-test.ts'], paths: [/^scripts\/agent-tools\//] },
+  { name: 'shelltools', from: 'server/shelltools/shelltools-test.ts', tests: ['server/shelltools/shelltools-test.ts'], paths: [/^desktop\/scripts\/(stage\.sh|smoke\.mjs)$/, /^desktop\/(electron-builder|main)\.cjs$/, /^Dockerfile$/, /^\.dockerignore$/] },
 ];
 
 const ROOTS = ['server', 'shared', 'web/src']; // where source files and their tests live (as scripts/test.mjs walks)

@@ -7,6 +7,7 @@ import * as py from './decl-py.mjs';
 import * as rs from './decl-rs.mjs';
 import { findDeclsHeuristic, outlineHeuristic, braceEnd, indentEnd } from './heuristic.mjs';
 import { escapeRe } from './search.mjs';
+import { moduleStem } from './paths.mjs';
 
 const MODS = { ts, js: ts, py, rs };
 export const modFor = (lang) => MODS[family(lang)];
@@ -115,9 +116,7 @@ function containerMatches(d, qualifier, ctx) {
   }
   if (family(ctx.lang) === 'py' && d.loc === 'top' && q.length === 1) {
     // module.func: file stem (or package directory for __init__.py)
-    const base = path.basename(ctx.path).replace(/\.pyi?$/, '');
-    const stem = base === '__init__' ? path.basename(path.dirname(ctx.path)) : base;
-    if (stem === q[0]) return true;
+    if (moduleStem(ctx.path) === q[0]) return true;
   }
   return false;
 }

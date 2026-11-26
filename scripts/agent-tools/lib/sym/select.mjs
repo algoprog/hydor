@@ -1,6 +1,7 @@
 // Filtering and ordering of definitions.
 import path from 'node:path';
 import { isTestPath } from './search.mjs';
+import { isWithin, relSegments } from './paths.mjs';
 
 const ALIASES = {
   fn: 'function', def: 'function', func: 'function', var: 'variable', let: 'variable', cls: 'class',
@@ -50,11 +51,11 @@ export function sortDefs(defs, { cwd, inPaths }) {
   const inAbs = (inPaths || []).map((p) => path.resolve(cwd, p));
   const score = (d) => {
     const abs = path.resolve(cwd, d.file);
-    for (let i = 0; i < inAbs.length; i++) if (abs === inAbs[i] || abs.startsWith(inAbs[i] + path.sep)) return i;
+    for (let i = 0; i < inAbs.length; i++) if (isWithin(abs, inAbs[i])) return i;
     return inAbs.length;
   };
   const depth = (d) => {
-    const rel = path.relative(cwd, path.resolve(cwd, d.file)).split(path.sep);
+    const rel = relSegments(cwd, d.file);
     const ups = rel.filter((x) => x === '..').length;
     return ups * 100 + rel.length;
   };

@@ -43,6 +43,55 @@ Notes:
 
 class FormatError extends Error {}
 
+// ---------------------------------------------------------------- platform
+// EDITS_FAKE_PLATFORM=win32, EDITS_FAKE_RENAME_FAILS=N[@NAME] (the first N renames onto each target whose path contains
+// NAME fail with EPERM) and EDITS_FAKE_CHMOD_FAIL=1 are hidden seams: the test-suite uses them to run the Windows
+// behaviour on Linux.
+const IS_WIN = (process.env.EDITS_FAKE_PLATFORM || process.platform) === 'win32';
+const RENAME_RETRY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const RENAME_ATTEMPTS = 5;
+const RENAME_BACKOFF_MS = 15; // doubles before each further attempt: 15, 30, 60, 120
+const FAKE_RENAME = (() => {
+  const m = /^(\d+)(?:@(.+))?$/.exec(process.env.EDITS_FAKE_RENAME_FAILS || '');
+  return m ? { n: Number(m[1]), match: m[2] || '' } : null;
+})();
+const fakeRenameUsed = new Map();
+
+function sleepSync(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }
+
+function renameOnce(tmp, target) {
+  if (FAKE_RENAME && target.includes(FAKE_RENAME.match)) {
+    const used = fakeRenameUsed.get(target) || 0;
+    if (used < FAKE_RENAME.n) {
+      fakeRenameUsed.set(target, used + 1);
+      throw Object.assign(new Error(`EPERM: operation not permitted, rename '${tmp}' -> '${target}'`), { code: 'EPERM' });
+    }
+  }
+  fs.renameSync(tmp, target);
+}
+
+// On Windows an antivirus scanner or an editor can hold the target for a moment, which makes the rename fail with
+// EPERM / EBUSY / EACCES: try a few times with a short backoff before giving up. Elsewhere there is one attempt.
+function renameWithRetry(tmp, target) {
+  const attempts = IS_WIN ? RENAME_ATTEMPTS : 1;
+  for (let i = 1; ; i++) {
+    try { renameOnce(tmp, target); return; } catch (e) {
+      if (i >= attempts || !RENAME_RETRY_CODES.has(e.code)) throw e;
+      sleepSync(RENAME_BACKOFF_MS * 2 ** (i - 1));
+    }
+  }
+}
+
+// Windows has no Unix owner or mode bits worth keeping: a failing chown / chmod must not fail the edit there.
+function setOwnerAndMode(fd, mode, uid, gid) {
+  if (uid != null) { try { fs.fchownSync(fd, uid, gid); } catch { /* best effort */ } }
+  if (mode == null) return;
+  try {
+    if (process.env.EDITS_FAKE_CHMOD_FAIL) throw Object.assign(new Error('EPERM: operation not permitted, fchmod'), { code: 'EPERM' });
+    fs.fchmodSync(fd, mode & 0o7777);
+  } catch (e) { if (!IS_WIN) throw e; }
+}
+
 // ---------------------------------------------------------------- arguments
 function parseArgs(argv) {
   const o = { dryRun: false, context: 2, maxChars: 2500, check: null, file: null };
@@ -214,7 +263,7 @@ function parseScript(buf) {
 
 // ------------------------------------------------------------ path helpers
 function resolvePath(p) {
-  if (p === '~' || p.startsWith('~/')) p = path.join(os.homedir(), p.slice(1));
+  if (p === '~' || p.startsWith('~/') || (IS_WIN && p.startsWith('~\\'))) p = path.join(os.homedir(), p.slice(1));
   return path.resolve(p);
 }
 
@@ -521,12 +570,11 @@ function writeAtomic(target, data, mode, uid, gid) {
   try {
     fd = fs.openSync(tmp, 'wx', mode == null ? 0o666 : 0o600);
     fs.writeFileSync(fd, data);
-    if (uid != null) { try { fs.fchownSync(fd, uid, gid); } catch { /* best effort */ } }
-    if (mode != null) fs.fchmodSync(fd, mode & 0o7777);
+    setOwnerAndMode(fd, mode, uid, gid);
     fs.fsyncSync(fd);
     fs.closeSync(fd);
     fd = undefined;
-    fs.renameSync(tmp, target);
+    renameWithRetry(tmp, target);
   } catch (e) {
     if (fd !== undefined) { try { fs.closeSync(fd); } catch { /* ignore */ } }
     try { fs.unlinkSync(tmp); } catch { /* ignore */ }
@@ -750,7 +798,8 @@ function runCheck(groups, argString, maxChars) {
     ? splitArgs(argString)
     : groups.filter((g) => g.changed || groups.every((x) => !x.changed)).map((g) => {
       const rel = path.relative(root, g.target);
-      return rel.startsWith('..') || path.isAbsolute(rel) ? g.target : rel;
+      if (rel.startsWith('..') || path.isAbsolute(rel)) return g.target;
+      return IS_WIN ? rel.split(path.sep).join('/') : rel; // forward slashes survive sh on Windows
     });
   const r = spawnSync('sh', ['-c', 'exec "$@" 2>&1', 'sh', ...cmd, ...args], {
     cwd: root, env: process.env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],

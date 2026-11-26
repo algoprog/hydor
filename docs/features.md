@@ -230,6 +230,14 @@ agents that speak ACP and take MCP servers.
   Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a project, and
   one session (the start page's Options, or the session's menu); the more specific wins. A changed session's
   agent follows the new ones from the next message. CLAUDE.md and AGENTS.md still work, and can be edited there too.
+- **Three commands in every agent's shell**: `waitfor` (wait for a long job in one call: a program, a file, a line in a
+  log, a web address, a Slurm job, a systemd unit (Linux only) or a command, stopping at the first crash line, with the end of the log
+  shown), `edits` (several exact search-and-replace edits across files in one atomic call, printing the changed lines)
+  and `sym` (a definition with its whole body and exact line range, its references, or a file's declarations, in
+  TypeScript, JavaScript, Python and Rust). Claude Code, Codex, Custom and the other agents find them on their PATH and
+  are told what they do, in the desktop apps for Mac, Windows and Linux, in Docker and in a copy run from the
+  repository, with nothing to install. The app tries each once as it starts and tells agents only about those that
+  work. `HYDOR_SHELL_TOOLS=0` turns it off; there is no setting for it.
 - **Agents that work the app**: every agent knows the app's own guide (the `app_guide` tool) and answers questions
   about it from there, with links to the place. Ask it to change a setting or set something up (a project, an
   assistant, a scheduled task, memory notes…) and it does it through the app's API (`app_api`): reading runs at

@@ -1562,7 +1562,7 @@ export class SessionManager extends EventEmitter {
     if (agent === 'claude') {
       const sessionId = opts.sessionId ?? crypto.randomUUID();
       // What the app's capabilities add: instructions (memory, the assistant), MCP servers, environment.
-      const add = await spawnAdditions({ agent, key: `claude:${sessionId}`, cwd, runId, resume: !!opts.resume || !!opts.forkFrom, extra: opts.extra ?? sessionExtra(this.db, `claude:${sessionId}`), prompt: opts.prompt, model: opts.model });
+      const add = await spawnAdditions({ agent, key: `claude:${sessionId}`, cwd, runId, resume: !!opts.resume || !!opts.forkFrom, extra: opts.extra ?? sessionExtra(this.db, `claude:${sessionId}`), prompt: opts.prompt, model: opts.model, path: env.PATH });
       Object.assign(env, add.env);
       const o = { cwd, sessionId, resume: !!opts.resume, forkFrom: opts.forkFrom, forkAt: opts.forkAt, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add, runId };
       const meta: RunMeta = { runId, agent, key: `claude:${sessionId}`, createdAt: Date.now(), cwd, opts: { ...o, account, apiCredit: !!credit || undefined } };
@@ -1582,7 +1582,7 @@ export class SessionManager extends EventEmitter {
       return l;
     }
     const known = opts.threadId ? `codex:${opts.threadId}` : undefined;
-    const add = await spawnAdditions({ agent, key: known, cwd, runId, resume: !!opts.threadId, extra: opts.extra ?? (known ? sessionExtra(this.db, known) : {}), prompt: opts.prompt, model: opts.model });
+    const add = await spawnAdditions({ agent, key: known, cwd, runId, resume: !!opts.threadId, extra: opts.extra ?? (known ? sessionExtra(this.db, known) : {}), prompt: opts.prompt, model: opts.model, path: env.PATH });
     Object.assign(env, add.env);
     // Keep the bearer in the runner environment, never in the command or run metadata.
     const wikiHookCommand = env.HYDOR_WIKI_AUTO_HOOKS === '1' ? codexWikiHookCommand() : undefined;
@@ -1627,7 +1627,7 @@ export class SessionManager extends EventEmitter {
     const runId = crypto.randomBytes(6).toString('hex');
     // Console asks the app to get its model ready (start a vLLM server) at this run's own address.
     if (def.id === CONSOLE_ID) env.HYDOR_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
-    const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt, model: opts.model });
+    const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt, model: opts.model, path: env.PATH });
     Object.assign(env, add.env, acpEnvFor(def.command, env));
     const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, effort: opts.effort, account, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent: 'acp', key: `acp:${id}`, createdAt: Date.now(), cwd, opts: o };

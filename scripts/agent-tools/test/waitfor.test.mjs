@@ -1,7 +1,7 @@
 // Tests for bin/waitfor.  Run: node --test scripts/agent-tools/test/waitfor.test.mjs
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -888,4 +888,362 @@ test('regex flags: /pattern/flags is accepted everywhere, plain patterns stay as
   r = await run(['--help']);
   assert.match(r.stdout, /\/pattern\/flags \(flags i, m, s, u\)/);
   assert.match(r.stdout, /truncated and regrown/);
+});
+
+// ---------------------------------------------------------------- macOS / Windows code paths, run on Linux
+// WAITFOR_FAKE_PLATFORM (hidden seam) makes waitfor take the darwin / win32 branches; fake ps / powershell / taskkill
+// scripts first on PATH stand in for the real tools, the way systemctl and squeue are faked above.
+// ps and powershell print their table from $FAKE_DIR/<tool>.out.<call number> (else <tool>.out), after the rows a
+// real process listing would always contain: waitfor itself, its caller and grandparent, and the listing tool.
+const MARK = 'zzmark';
+fakeScript('ps', `
+printf '%s|%s\\n' "$*" "$COLUMNS" >> "$FAKE_DIR/ps.args"
+n=$(cat "$FAKE_DIR/ps.count" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "$FAKE_DIR/ps.count"
+[ -f "$FAKE_DIR/ps.fail" ] && { echo "ps: Operation not permitted" >&2; exit 1; }
+f="$FAKE_DIR/ps.out.$n"; [ -f "$f" ] || f="$FAKE_DIR/ps.out"
+printf '%7s %5s %-4s %s\\n' 1 0 Ss /sbin/launchd
+printf '%7s %5s %-4s %s\\n' 888 1 Ss "/bin/zsh -l -c ${MARK} grandparent"
+printf '%7s %5s %-4s %s\\n' "$FAKE_PARENT" 888 S "sh -c waitfor --proc ${MARK} caller"
+printf '%7s %5s %-4s %s\\n' "$PPID" "$FAKE_PARENT" S "node /opt/agent tools/bin/waitfor --proc ${MARK}"
+printf '%7s %5s %-4s %s\\n' "$$" "$PPID" R "ps -axo pid=,ppid=,stat=,command= ${MARK}"
+cat "$f" 2>/dev/null
+exit 0
+`);
+fakeScript('powershell', `
+printf '%s\\n' "$*" >> "$FAKE_DIR/powershell.args"
+n=$(cat "$FAKE_DIR/powershell.count" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "$FAKE_DIR/powershell.count"
+[ -f "$FAKE_DIR/powershell.fail" ] && { echo "powershell: access denied" >&2; exit 1; }
+f="$FAKE_DIR/cim.out.$n"; [ -f "$f" ] || f="$FAKE_DIR/cim.out"
+sed -e "s/@SELF@/$PPID/g" -e "s/@PARENT@/$FAKE_PARENT/g" -e "s/@PS@/$$/g" "$f"
+`);
+// taskkill /PID n /T /F: logs its arguments and kills the tree below n
+fakeScript('taskkill', `
+printf '%s\\n' "$*" >> "$FAKE_DIR/taskkill.args"
+pkill -9 -P "$2" 2>/dev/null
+kill -9 "$2" 2>/dev/null
+exit 0
+`);
+const EMPTY_BIN = path.join(TMP, 'emptybin');
+fs.mkdirSync(EMPTY_BIN);
+function platEnv(platform, extra = {}) {
+  return fakeEnv({ WAITFOR_FAKE_PLATFORM: platform, FAKE_PARENT: String(process.pid), ...extra });
+}
+const writeOut = (dir, name, text) => fs.writeFileSync(path.join(dir, name), text);
+const lines = (file) => fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
+
+test('ps parser: pid, ppid, state and the whole command line (macOS sample, spaces, zombies, no command)', async () => {
+  const sample = [
+    '    1     0 Ss   /sbin/launchd',
+    '  412     1 S    /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --type=renderer --lang=en-US',
+    '  913   412 Z+   (sh)',
+    '  914     1 R<s+ node /Users/dev/my project/bin/waitfor --proc "a b"',
+    ' 5000     1 U',
+    'not a process line',
+    '',
+  ].join('\n');
+  const r = spawnSync(process.execPath, [BIN, '--_parse', 'ps'], { input: sample, encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(r.stdout), [
+    { pid: 1, ppid: 0, state: 'Ss', cmd: '/sbin/launchd' },
+    { pid: 412, ppid: 1, state: 'S', cmd: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --type=renderer --lang=en-US' },
+    { pid: 913, ppid: 412, state: 'Z+', cmd: '(sh)' },
+    { pid: 914, ppid: 1, state: 'R<s+', cmd: 'node /Users/dev/my project/bin/waitfor --proc "a b"' },
+    { pid: 5000, ppid: 1, state: 'U', cmd: '' },
+  ]);
+  // CRLF line ends do not leak into the command
+  const crlf = spawnSync(process.execPath, [BIN, '--_parse', 'ps'], { input: '  7  1 S  sleep 5\r\n', encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(crlf.stdout), [{ pid: 7, ppid: 1, state: 'S', cmd: 'sleep 5' }]);
+});
+
+test('CIM parser: array, single object, null CommandLine, empty output, BOM, bad JSON', async () => {
+  const parse = (text) => JSON.parse(spawnSync(process.execPath, [BIN, '--_parse', 'cim'], { input: text, encoding: 'utf8' }).stdout);
+  const many = '[{"ProcessId":0,"ParentProcessId":0,"CommandLine":null},{"ProcessId":4,"ParentProcessId":0,"CommandLine":null},'
+    + '{"ProcessId":5120,"ParentProcessId":4400,"CommandLine":"\\"C:\\\\Program Files\\\\nodejs\\\\node.exe\\" C:\\\\work\\\\train.js --epochs 5"}]';
+  assert.deepEqual(parse(many), [
+    { pid: 0, ppid: 0, state: '', cmd: '' },
+    { pid: 4, ppid: 0, state: '', cmd: '' },
+    { pid: 5120, ppid: 4400, state: '', cmd: '"C:\\Program Files\\nodejs\\node.exe" C:\\work\\train.js --epochs 5' },
+  ]);
+  assert.deepEqual(parse('{"ProcessId":77,"ParentProcessId":5,"CommandLine":"x.exe a"}\r\n'), [{ pid: 77, ppid: 5, state: '', cmd: 'x.exe a' }]);
+  assert.deepEqual(parse('\uFEFF[{"ProcessId":8,"ParentProcessId":1,"CommandLine":"a"}]'), [{ pid: 8, ppid: 1, state: '', cmd: 'a' }]);
+  assert.deepEqual(parse(''), []);
+  assert.deepEqual(parse('null'), []);
+  assert.match(parse('not json'), /^ERR /);
+});
+
+test('darwin --pid: listed pid keeps waiting, a zombie or an unlisted pid counts as exited; ps gets the documented arguments', async () => {
+  const { dir, env } = platEnv('darwin');
+  writeOut(dir, 'ps.out.1', '4242     1 S    /usr/bin/python3 train.py\n');
+  writeOut(dir, 'ps.out.2', '4242     1 S    /usr/bin/python3 train.py\n');
+  writeOut(dir, 'ps.out.3', '4242     1 Z+   (python3)\n');
+  const r = await run(['--pid', '4242', '--every', '100ms', '--timeout', '8s'], { env });
+  assert.equal(r.code, 0, r.stdout);
+  assert.match(first(r), /^done: pid 4242 exited after [01]s$/);
+  assert.equal(Number(fs.readFileSync(path.join(dir, 'ps.count'), 'utf8')), 3);
+  assert.equal(lines(path.join(dir, 'ps.args'))[0], '-axo pid=,ppid=,stat=,command=|100000');
+  const { env: env2 } = platEnv('darwin');
+  const r2 = await run(['--pid', '4242,999999', '--every', '100ms', '--timeout', '8s'], { env: env2 });
+  assert.equal(r2.code, 0);
+  assert.match(first(r2), /^done: pid 4242,999999 exited/);
+});
+
+test('darwin --pid: all pids must be gone; a pid that stays listed times out', async () => {
+  const { dir, env } = platEnv('darwin');
+  writeOut(dir, 'ps.out', '4242     1 S    sleep 1000\n');
+  const r = await run(['--pid', '4242', '--every', '100ms', '--timeout', '700ms'], { env });
+  assert.equal(r.code, 124);
+  assert.match(first(r), /^timeout after \ds: still waiting for pid 4242 running/);
+});
+
+test('darwin --pid: a ps that fails is not "gone"; 5 failures in a row stop with exit 3', async () => {
+  const { dir, env } = platEnv('darwin');
+  writeOut(dir, 'ps.fail', '');
+  const r = await run(['--pid', '4242', '--every', '50ms', '--timeout', '8s'], { env });
+  assert.equal(r.code, 3);
+  assert.match(first(r), /^error: --pid: listing processes failed 5 times in a row: ps: Operation not permitted$/);
+  assert.equal(Number(fs.readFileSync(path.join(dir, 'ps.count'), 'utf8')), 5);
+});
+
+test('darwin: no ps on PATH is a runtime error (exit 3)', async () => {
+  const r = await run(['--proc', 'x', '--every', '50ms', '--timeout', '8s'], { env: { PATH: EMPTY_BIN, WAITFOR_FAKE_PLATFORM: 'darwin' } });
+  assert.equal(r.code, 3);
+  assert.match(first(r), /^error: ps not found/);
+});
+
+test('darwin --proc: matches full command lines; skips waitfor, its callers, its own ps and zombies; names the pid', async () => {
+  const { dir, env } = platEnv('darwin');
+  writeOut(dir, 'ps.out', [
+    '  300     1 S    /usr/bin/python3 /Users/dev/my project/train.py --epochs 5',
+    `  301     1 Z    ${MARK}-zombie`,
+    `  302     1 S    /opt/tool/bin/worker --name ${MARK} --verbose`,
+  ].join('\n') + '\n');
+  const r = await run(['--proc', MARK, '--every', '100ms', '--timeout', '600ms'], { env });
+  assert.equal(r.code, 124);
+  assert.match(first(r), new RegExp(`^timeout after \\ds: still waiting for proc /${MARK}/ still running \\(pid 302\\)$`));
+  // the command line has spaces: a regex over the whole line finds the first process
+  const r2 = await run(['--proc', 'my project/train\\.py --epochs', '--every', '100ms', '--timeout', '600ms'], { env });
+  assert.match(first(r2), /\(pid 300\)$/);
+});
+
+test('darwin --proc: done once only the excluded rows (self, callers, ps itself, a zombie) match', async () => {
+  const { dir, env } = platEnv('darwin');
+  writeOut(dir, 'ps.out.1', `  302     1 S    /opt/tool/bin/worker --name ${MARK}\n`);
+  writeOut(dir, 'ps.out.2', `  302     1 S    /opt/tool/bin/worker --name ${MARK}\n`);
+  writeOut(dir, 'ps.out.3', `  302     1 Z    (worker)\n  303 1 Z+ ${MARK}-defunct\n`);
+  const r = await run(['--proc', MARK, '--every', '100ms', '--timeout', '8s'], { env });
+  assert.equal(r.code, 0, r.stdout);
+  assert.match(first(r), new RegExp(`^done: no process matching /${MARK}/ after`));
+  assert.ok(Number(fs.readFileSync(path.join(dir, 'ps.count'), 'utf8')) >= 3);
+});
+
+test('darwin: --unit is refused before waiting, exit 3, even with other conditions', async () => {
+  for (const plat of ['darwin', 'win32']) {
+    const t0 = Date.now();
+    const r = await run(['--unit', 'x.service', '--timeout', '30s'], { env: { WAITFOR_FAKE_PLATFORM: plat } });
+    assert.equal(r.code, 3, plat);
+    assert.equal(r.stdout, 'error: --unit needs systemd (Linux only)\n');
+    assert.ok(Date.now() - t0 < 3000, 'no waiting');
+    const r2 = await run(['--file', tmp('x'), '--unit', 'a.service', '--state', 'active', '--system'], { env: { WAITFOR_FAKE_PLATFORM: plat } });
+    assert.equal(r2.code, 3);
+    assert.match(first(r2), /^error: --unit needs systemd/);
+  }
+  // other usage mistakes keep exit 64, and --help still works
+  assert.equal((await run(['--unit', 'x', '--system', '--state', 'bad'], { env: { WAITFOR_FAKE_PLATFORM: 'darwin' } })).code, 64);
+  assert.equal((await run(['--unit', 'x', '--help'], { env: { WAITFOR_FAKE_PLATFORM: 'darwin' } })).code, 0);
+});
+
+test('darwin: --until and --slurm run through sh exactly as on Linux', async () => {
+  const { dir, env } = platEnv('darwin', { FAKE_SQUEUE_BUSY: '1' });
+  const f = tmp('mac-until');
+  const p = start(['--until', `test -f ${f}`, '--every', '100ms', '--timeout', '8s'], { env });
+  await delay(400);
+  fs.writeFileSync(f, '');
+  const r = await p.done;
+  assert.equal(r.code, 0);
+  assert.match(first(r), /^done: until 'test -f .*' succeeded/);
+  const r2 = await run(['--slurm', '77', '--every', '100ms', '--timeout', '8s'], { env });
+  assert.equal(r2.code, 0);
+  assert.match(first(r2), /^done: slurm 77 left the queue/);
+  assert.equal(lines(path.join(dir, 'squeue.args'))[0], '-h -j 77 -o %T');
+});
+
+test('win32 --pid: process.kill(pid, 0) decides; a live process keeps waiting, a gone one counts as exited', async () => {
+  const { env } = platEnv('win32');
+  const sl = spawn('sleep', ['1'], { stdio: 'ignore' });
+  const t0 = Date.now();
+  const r = await run(['--pid', `${sl.pid},999999`, '--every', '100ms', '--timeout', '8s'], { env });
+  assert.equal(r.code, 0);
+  assert.match(first(r), new RegExp(`^done: pid ${sl.pid},999999 exited after`));
+  assert.ok(Date.now() - t0 >= 900, 'waited for the live pid');
+});
+
+const CIM_ROWS = (...extra) => '[' + [
+  '{"ProcessId":0,"ParentProcessId":0,"CommandLine":null}',
+  '{"ProcessId":4,"ParentProcessId":0,"CommandLine":null}',
+  `{"ProcessId":@PARENT@,"ParentProcessId":6000,"CommandLine":"bash -c \\"waitfor --proc ${MARK}\\""}`,
+  `{"ProcessId":6000,"ParentProcessId":1,"CommandLine":"C:\\\\Git\\\\usr\\\\bin\\\\bash.exe ${MARK}"}`,
+  `{"ProcessId":@SELF@,"ParentProcessId":@PARENT@,"CommandLine":"node waitfor --proc ${MARK}"}`,
+  `{"ProcessId":@PS@,"ParentProcessId":@SELF@,"CommandLine":"powershell -NoProfile ... Get-CimInstance ${MARK}"}`,
+  ...extra,
+].join(',') + ']';
+
+test('win32 --proc: PowerShell/CIM JSON, null command lines, callers and its own powershell excluded, exact arguments', async () => {
+  const { dir, env } = platEnv('win32');
+  writeOut(dir, 'cim.out', CIM_ROWS(`{"ProcessId":7100,"ParentProcessId":1,"CommandLine":"\\"C:\\\\Python\\\\python.exe\\" train.py --tag ${MARK} run"}`));
+  const r = await run(['--proc', `train\\.py --tag ${MARK}`, '--every', '100ms', '--timeout', '800ms'], { env });
+  assert.equal(r.code, 124);
+  assert.match(first(r), /still running \(pid 7100\)$/);
+  assert.equal(lines(path.join(dir, 'powershell.args'))[0],
+    '-NoProfile -NonInteractive -Command Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress');
+  // only the excluded rows match the marker: nothing is running
+  writeOut(dir, 'cim.out', CIM_ROWS());
+  const r2 = await run(['--proc', MARK, '--every', '100ms', '--timeout', '8s'], { env });
+  assert.equal(r2.code, 0, r2.stdout);
+  assert.match(first(r2), new RegExp(`^done: no process matching /${MARK}/`));
+});
+
+test('win32 --proc: a single process is a bare JSON object, an empty list is null', async () => {
+  const { dir, env } = platEnv('win32');
+  writeOut(dir, 'cim.out.1', '{"ProcessId":7100,"ParentProcessId":1,"CommandLine":"node build.js"}\n');
+  writeOut(dir, 'cim.out.2', 'null\n');
+  const r = await run(['--proc', 'node build\\.js', '--every', '100ms', '--timeout', '8s'], { env });
+  assert.equal(r.code, 0, r.stdout);
+  assert.match(first(r), /^done: no process matching/);
+  assert.equal(Number(fs.readFileSync(path.join(dir, 'powershell.count'), 'utf8')), 2);
+});
+
+test('win32 --proc: no PowerShell is a clear error (exit 3); a failing one is retried, 5 failures stop', async () => {
+  const r = await run(['--proc', 'x', '--every', '50ms', '--timeout', '8s'], { env: { PATH: EMPTY_BIN, WAITFOR_FAKE_PLATFORM: 'win32' } });
+  assert.equal(r.code, 3);
+  assert.equal(first(r), 'error: --proc needs PowerShell on Windows');
+  const { dir, env } = platEnv('win32');
+  writeOut(dir, 'powershell.fail', '');
+  const r2 = await run(['--proc', 'x', '--every', '50ms', '--timeout', '30s'], { env });
+  assert.equal(r2.code, 3);
+  assert.match(first(r2), /^error: --proc: listing processes failed 5 times in a row: powershell: access denied$/);
+  const { dir: d3, env: env3 } = platEnv('win32');
+  writeOut(d3, 'cim.out', 'Get-CimInstance : something went wrong\n');
+  const r3 = await run(['--proc', 'x', '--every', '50ms', '--timeout', '30s'], { env: env3 });
+  assert.match(first(r3), /^error: --proc: listing processes failed 5 times in a row: powershell output is not JSON$/);
+});
+
+test('win32: --until and --slurm need sh; without one the error names Git for Windows (exit 3, before waiting)', async () => {
+  const env = { PATH: EMPTY_BIN, WAITFOR_FAKE_PLATFORM: 'win32' };
+  for (const [args, flag] of [[['--until', 'true'], '--until'], [['--slurm', '5', '--via', 'ssh x'], '--slurm'], [['--until', 'true', '--slurm', '5'], '--until and --slurm']]) {
+    const t0 = Date.now();
+    const r = await run([...args, '--timeout', '30s'], { env });
+    assert.equal(r.code, 3, args.join(' '));
+    assert.match(first(r), new RegExp(`^error: ${flag} needs sh on PATH \\(install Git for Windows`));
+    assert.ok(Date.now() - t0 < 3000);
+  }
+  // with sh on PATH they work
+  const { env: ok } = platEnv('win32');
+  const r = await run(['--until', 'exit 0', '--timeout', '8s'], { env: ok });
+  assert.equal(r.code, 0);
+  assert.match(first(r), /^done: until 'exit 0' succeeded/);
+});
+
+test('win32 `--` form: command runs, exit code passes through, output is captured', async () => {
+  const { env } = platEnv('win32');
+  const out = tmp('win-cmd.out');
+  const r = await run(['--out', out, '--', 'sh', '-c', 'echo hello from win; exit 7'], { env });
+  assert.equal(r.code, 7);
+  assert.match(first(r), /^failed: exit 7 after \ds: sh -c /);
+  assert.match(r.stdout, /hello from win\n$/);
+  assert.match(fs.readFileSync(out, 'utf8'), /hello from win/);
+});
+
+test('win32 `--` form: a script without .exe (.cmd / extensionless) is started through sh', async () => {
+  const { dir, env } = platEnv('win32');
+  const bin = path.join(dir, 'bin');
+  fs.mkdirSync(bin);
+  for (const n of ['mytool', 'other.cmd']) fs.writeFileSync(path.join(bin, n), '#!/bin/sh\necho "ran $0-$1"\n', { mode: 0o755 });
+  const e = { ...env, PATH: `${bin}:${env.PATH}` };
+  const r = await run(['--out', tmp('win-script.out'), '--', 'mytool', 'a'], { env: e });
+  assert.equal(r.code, 0, r.stdout);
+  assert.match(r.stdout, /ran .*mytool-a\n$/);
+  const r2 = await run(['--out', tmp('win-script2.out'), '--', 'other.cmd', 'b'], { env: e });
+  assert.equal(r2.code, 0, r2.stdout);
+  assert.match(r2.stdout, /ran .*other\.cmd-b\n$/);
+  // a program that does not exist at all is still "cannot run ... ENOENT"
+  const r3 = await run(['--out', tmp('win-enoent.out'), '--', 'definitely-not-a-command-xyz'], { env: e });
+  assert.equal(r3.code, 3);
+  assert.match(first(r3), /^error: cannot run 'definitely-not-a-command-xyz': ENOENT$/);
+});
+
+test('win32 `--` form: timeout stops the command with `taskkill /PID <pid> /T /F`; no process group is used', async () => {
+  const { dir, env } = platEnv('win32');
+  const pidf = tmp('win-to.pid');
+  const t0 = Date.now();
+  const r = await run(['--out', tmp('win-to.out'), '--timeout', '1s', '--', 'sh', '-c', `echo $$ > ${pidf}; sleep 30 & wait`], { env });
+  assert.equal(r.code, 124);
+  assert.ok(Date.now() - t0 < 5000, 'stopped promptly');
+  const pid = Number(fs.readFileSync(pidf, 'utf8'));
+  assert.deepEqual(lines(path.join(dir, 'taskkill.args')), [`/PID ${pid} /T /F`]);
+  await delay(200);
+  assert.ok(!alive(pid), 'child is gone');
+});
+
+test('win32 `--` form: --fail and SIGTERM to waitfor also use taskkill', async () => {
+  const { dir, env } = platEnv('win32');
+  const pidf = tmp('win-fail.pid');
+  const r = await run(['--out', tmp('win-fail.out'), '--fail', 'Traceback', '--timeout', '20s', '--',
+    'sh', '-c', `echo $$ > ${pidf}; echo 'Traceback: boom'; sleep 30`], { env });
+  assert.equal(r.code, 2);
+  assert.match(first(r), /^failed: output matched \/Traceback\/ after \ds: Traceback: boom$/);
+  const pid = Number(fs.readFileSync(pidf, 'utf8'));
+  assert.deepEqual(lines(path.join(dir, 'taskkill.args')), [`/PID ${pid} /T /F`]);
+  await delay(200);
+  assert.ok(!alive(pid));
+
+  const { dir: d2, env: env2 } = platEnv('win32');
+  const pidf2 = tmp('win-int.pid');
+  const p = start(['--out', tmp('win-int.out'), '--timeout', '30s', '--', 'sh', '-c', `echo $$ > ${pidf2}; echo started; sleep 30`], { env: env2 });
+  await delay(600);
+  const pid2 = Number(fs.readFileSync(pidf2, 'utf8'));
+  p.child.kill('SIGTERM');
+  const r2 = await p.done;
+  assert.equal(r2.code, 130);
+  assert.deepEqual(lines(path.join(d2, 'taskkill.args')), [`/PID ${pid2} /T /F`]);
+  await delay(200);
+  assert.ok(!alive(pid2));
+});
+
+test('win32 `--` form: without taskkill the child itself is killed instead', async () => {
+  const { env } = platEnv('win32');
+  // a PATH with the basic tools but no taskkill
+  const bin = path.join(TMP, 'notaskkill');
+  fs.mkdirSync(bin, { recursive: true });
+  for (const n of ['sh', 'sleep', 'echo']) {
+    const real = ['/bin', '/usr/bin'].map((d) => path.join(d, n)).find((f) => fs.existsSync(f));
+    if (real) fs.symlinkSync(real, path.join(bin, n));
+  }
+  const pidf = tmp('win-notk.pid');
+  const r = await run(['--out', tmp('win-notk.out'), '--timeout', '1s', '--', 'sh', '-c', `echo $$ > ${pidf}; exec sleep 30`], { env: { ...env, PATH: bin } });
+  assert.equal(r.code, 124);
+  await delay(200);
+  assert.ok(!alive(Number(fs.readFileSync(pidf, 'utf8'))), 'child was killed through child.kill()');
+});
+
+test('--help names the platform limits and stays under 45 lines', async () => {
+  const r = await run(['--help']);
+  const ls = r.stdout.trimEnd().split('\n');
+  assert.ok(ls.length < 45, `${ls.length} lines`);
+  const l = ls.find((x) => x.startsWith('Platforms:'));
+  assert.match(l, /--unit is Linux only/);
+  assert.match(l, /Git for Windows/);
+  assert.match(l, /PowerShell/);
+});
+
+test('pid (Linux /proc): a zombie that nobody has reaped counts as exited', async () => {
+  // `sleep 0.2` becomes a zombie of the `sleep 4` that sh turns into with exec (it never calls wait)
+  const holder = spawn('sh', ['-c', 'sleep 0.2 & echo $!; exec sleep 4'], { stdio: ['ignore', 'pipe', 'ignore'] });
+  const zpid = await new Promise((resolve) => holder.stdout.once('data', (d) => resolve(Number(String(d).trim()))));
+  await delay(600);
+  assert.match(fs.readFileSync(`/proc/${zpid}/stat`, 'utf8'), /^\d+ \(sleep\) Z /, 'is a zombie');
+  const t0 = Date.now();
+  const r = await run(['--pid', String(zpid), '--every', '100ms', '--timeout', '8s']);
+  holder.kill();
+  assert.equal(r.code, 0);
+  assert.match(first(r), new RegExp(`^done: pid ${zpid} exited after`));
+  assert.ok(Date.now() - t0 < 2500, 'did not wait for the holder to exit');
 });

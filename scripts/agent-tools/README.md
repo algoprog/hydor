@@ -1,9 +1,10 @@
 # Command-line tools for coding agents
 
-Three small programs that save a coding agent round trips: `waitfor`, `edits` and `sym`. They are developer tools kept
-in this repository, for the agents that work on Hydor (or on any other project) from your shell. The app does not hand
-them to agents by itself: you put them on your `PATH` and tell your agents they are there (below). None calls a model,
-and none needs anything installed beyond Node.js 22 (the tree-sitter parser `sym` uses is in `lib/sym/`, with its licence).
+Three small programs that save a coding agent round trips: `waitfor`, `edits` and `sym`. They are part of Hydor: every
+agent session the app starts (Claude Code, Codex, Custom and the other ACP agents) finds them on its `PATH` and is told
+about them, in a checkout, in Docker and in the desktop apps (below). You can also use them from your own shell and
+tell your own agents about them (below). None calls a model, and none needs anything installed beyond Node.js 22 (the
+tree-sitter parser `sym` uses is in `lib/sym/`, with its licence).
 
 | Program | Takes the place of |
 |---|---|
@@ -72,7 +73,26 @@ that has the word has to be parsed. When it cannot be sure where a definition en
 language form it does not know) it says "extent unsure" or "heuristic extent" in the header: look at those lines before
 you edit them.
 
+## How the app gives them to agents
+
+Agents' shells have no Node.js on their `PATH` (the tools start with `#!/usr/bin/env node`), so the app does not link the
+scripts. At each start the server (`server/shelltools/`) writes a small `sh` launcher for each tool into
+`<data folder>/shelltools/bin`, which runs the app's own Node.js (`process.execPath`) on the tool's script in the app's
+own folder (`exec "<node>" "<app>/scripts/agent-tools/bin/<tool>" "$@"`; `sym` also gets `HYDOR_RG`, the ripgrep that
+comes with Codex, when there is one). A launcher is rewritten only when the app's folder or its Node.js changed, which
+is what every new version of a desktop app does (Windows and AppImages run from a copy of the server for each version);
+on Windows each also has a `.cmd`, and Git's bash, in which agents run commands, uses the one without an ending. The
+server then tries each launcher once, in the background, with a `PATH` of the system's folders and no node (`--help` for
+`waitfor` and `edits`; for `sym`, the outline of a three-line TypeScript file, which proves its parser loads), logs one
+line for each that fails, and from then on puts the launchers' folder first on the `PATH` of every session it starts and
+adds a text to its instructions that names only the tools that passed. `HYDOR_SHELL_TOOLS=0` turns all of it off
+([configuration](../../docs/configuration.md)); there is no setting. The desktop apps ship `bin/` and `lib/` (not `test/`
+or `fixtures/`: `desktop/scripts/stage.sh`), and CI fails a packed app whose launchers cannot run the tools
+(`desktop/scripts/smoke.mjs`).
+
 ## Put them on your PATH
+
+For your own shell (the app's agents do not need this):
 
 ```bash
 for t in waitfor edits sym; do ln -s "$PWD/scripts/agent-tools/bin/$t" ~/.local/bin/$t; done   # from the repository's root
@@ -80,6 +100,16 @@ for t in waitfor edits sym; do ln -s "$PWD/scripts/agent-tools/bin/$t" ~/.local/
 
 The links point into your checkout, so a new version of the tools comes with a `git pull`. Check that `~/.local/bin` is
 on your `PATH`.
+
+## Where they run
+
+Linux, macOS and Windows, on Node.js 22. On Windows agents run commands in Git's bash (Git for Windows), which the app finds as it does for every command.
+
+- `waitfor` reads the process table (`--pid`, `--proc`) from `/proc` on Linux, from `ps` where there is no `/proc` (macOS), and from PowerShell on Windows, where `--proc` needs it. `--unit` (systemd) is Linux only and is refused elsewhere with a message that says so. On Windows `--until` and `--slurm` need Git's `sh`, and it says so before it starts waiting. A command started with `--` is stopped with `taskkill` on Windows.
+- `edits` tries its final rename again on Windows when a file is briefly held by another program (five tries), and puts every file back if it still cannot.
+- `sym` finds the files that hold a name with ripgrep first (the file `HYDOR_RG` names, which the app's launcher sets to the ripgrep that comes with Codex; else `rg` on the `PATH`), then `git grep`, then plain `grep`. The three give the same files; ripgrep is the fastest (about 1.0 s against 1.3 s with `git grep` in a large repository). `SYM_BACKEND=rg|git|grep` (for tests) uses one only.
+
+Honestly: the macOS and Windows paths are covered by tests that stand in for `ps`, PowerShell and `taskkill` on Linux (and a hidden `SYM_FAKE_PLATFORM`), and by the desktop builds' smoke check in CI (`desktop/scripts/smoke.mjs`), which runs the tools through their launchers on each system; the three suites themselves have not run in full on a real macOS or Windows machine.
 
 ## Tests
 
@@ -89,26 +119,28 @@ node --test scripts/agent-tools/test/sym.test.mjs # or one of them
 npm run check                                      # runs them when something here changed
 ```
 
-`npm test` runs them too (`server/agent-tools-test.ts`). They work from any folder and clean up after themselves. The
+`npm test` runs them too (`server/agent-tools-test.ts`); the launchers, the `PATH` agents get and the staging list have their
+own test (`server/shelltools/shelltools-test.ts`). They work from any folder and clean up after themselves. The
 `waitfor` suite waits on real timers and takes about a minute; on a machine that is busy with other tests, one of its
 short waits can run late, so run it alone first when it fails.
 
-## Tell your agents
+## Tell your own agents
 
-Add this to your agents' instructions (an `AGENTS.md`, `CLAUDE.md` or a message at the start of a session):
+Agents the app starts are told already. For others (an `AGENTS.md`, `CLAUDE.md` or a message at the start of a session),
+this is the text the app gives its own (`SHELL_TOOLS_TEXT` in `server/shelltools/index.ts`):
 
 ```
-Shell tools on PATH (each has --help):
+Shell commands this app adds to your PATH (each has --help):
 - waitfor: wait for a long job in ONE call instead of sleep/poll loops. Conditions: --pid, --proc, --file,
-  --log FILE --match REGEX, --http URL, --unit, --slurm ID [--via 'ssh host'], --until 'cmd'; add --fail REGEX to
-  stop at the first crash line, --tail FILE:N for the output, --timeout 30m. `waitfor -- cmd args` runs a command and
-  waits for it. Run it as a background command when the wait may exceed a few minutes.
-- edits: apply several exact search/replace edits across files in one atomic call (a script of `=== path` sections
-  with <<<<<<< SEARCH / ======= / >>>>>>> REPLACE blocks on stdin). Nothing is written unless every block matches
-  exactly once; it prints the changed lines with numbers, so no re-read is needed. `--check` then runs the repo's check.
-- sym NAME...: a definition with its full body and exact line range (TypeScript, JavaScript, Python, Rust);
-  `sym --refs NAME` for references, `sym --outline FILE` for a file's declarations. Use grep for text and strings.
-Batch independent lookups into one command where you can.
+  --log FILE --match REGEX, --http URL, --unit, --slurm ID [--via 'ssh host'], --until 'cmd'. Add --fail REGEX to stop
+  at the first crash line, --tail FILE:N to see the output, --timeout 30m. `waitfor -- cmd args` runs a command and
+  waits for it. Run it as a background command when the wait may take more than a few minutes.
+- edits: several exact search/replace edits across files in one atomic call. It reads a script on stdin: `=== path`
+  sections holding <<<<<<< SEARCH / ======= / >>>>>>> REPLACE blocks. Nothing is written unless every block matches
+  exactly once, and it prints the changed lines with their numbers, so there is no need to re-read the files. Use it
+  when changing more than one place.
+- sym NAME...: a definition with its whole body and exact line range (TypeScript, JavaScript, Python, Rust).
+  `sym --refs NAME` lists references, `sym --outline FILE` a file's declarations. Use grep for text and strings.
 ```
 
 ## What is in this folder

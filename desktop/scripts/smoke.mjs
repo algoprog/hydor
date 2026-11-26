@@ -1,5 +1,7 @@
 // Checks a packed desktop app: its Node.js runs its server, which answers, with its native modules and (on macOS and
-// Linux) its tmux working. A Mac app's signature must check out too.
+// Linux) its tmux working. A Mac app's signature must check out too. The server must also have written the launchers of
+// the three command-line tools every agent gets on its PATH (waitfor, edits, sym: server/shelltools), and they must run
+// from a shell with no node on its PATH, as an agent's shell runs them (on Windows, in Git's bash).
 //   node desktop/scripts/smoke.mjs dist/mac-arm64/Hydor.app    (dist/mac/ on Intel)
 //   node desktop/scripts/smoke.mjs dist/win-unpacked
 //   node desktop/scripts/smoke.mjs dist/linux-unpacked          (dist/linux-arm64-unpacked on ARM)
@@ -109,6 +111,59 @@ if (!health) {
   else if (!/listening on/.test(text())) fail("The server's log does not say it listens.");
   else {
     console.log("The app's server starts.");
-    cleanup();
+    try {
+      await shellTools();
+      cleanup();
+    } catch (e) {
+      console.error(text().split('\n').filter((l) => l.includes('[shelltools]')).join('\n'));
+      fail(e.message);
+    }
   }
+}
+
+/**
+ * The agents' tools through the launchers the server wrote in its data folder, in a shell whose PATH has them and the
+ * system's own folders, never node: `--help` of each, then edits changing a file and sym reading a TypeScript file with
+ * its bundled parser.
+ */
+async function shellTools() {
+  const bin = path.join(data, 'shelltools', 'bin');
+  const tools = ['waitfor', 'edits', 'sym'];
+  for (let i = 0; i < 60 && !tools.every((t) => fs.existsSync(path.join(bin, t))); i++) await new Promise((r) => setTimeout(r, 500));
+  for (const t of tools) if (!fs.existsSync(path.join(bin, t))) throw new Error(`The server wrote no launcher for ${t} in ${bin}`);
+  let bash = '/bin/bash';
+  let PATH = `${bin}:/usr/bin:/bin`;
+  if (WIN) {
+    // Git's bash, as the app finds it (server/platform.ts); its commands are in …\Git\usr\bin.
+    const candidates = [process.env.CLAUDE_CODE_GIT_BASH_PATH, ...[process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(Boolean).map((p) => path.join(p, 'Git', 'bin', 'bash.exe'))];
+    bash = candidates.find((c) => c && fs.existsSync(c));
+    if (!bash) throw new Error("Git's bash is not on this computer, so the tools cannot be tried the way agents run them.");
+    PATH = [bin, path.resolve(path.dirname(bash), '..', 'usr', 'bin'), path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')].join(';');
+  }
+  const work = path.join(tmp, 'tools-work');
+  fs.mkdirSync(work);
+  fs.writeFileSync(path.join(work, 'check.ts'), 'export function greet(name: string) {\n  return `hello ${name}`;\n}\n');
+  fs.writeFileSync(path.join(work, 'note.txt'), 'one\ntwo\n');
+  const env = { PATH, HOME: work, TMPDIR: work, TEMP: work, TMP: work, LANG: 'C.UTF-8', ...(WIN ? { SystemRoot: process.env.SystemRoot, windir: process.env.windir, ComSpec: process.env.ComSpec } : {}) };
+  const sh = (line, input) => execFileSync(bash, ['-c', line], { cwd: work, env, input, encoding: 'utf8', timeout: 60_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const expect = (what, line, want, input) => {
+    let out;
+    try {
+      out = sh(line, input);
+    } catch (e) {
+      throw new Error(`${what}: \`${line}\` failed (${e.status ?? e.code}): ${e.stdout ?? ''}${e.stderr ?? ''}${e.message}`);
+    }
+    if (!want.test(out)) throw new Error(`${what}: \`${line}\` printed:\n${out}`);
+    console.log(`${what}: ok`);
+  };
+  if (sh('command -v node || true').trim()) throw new Error('The shell used for the tools has a node on its PATH: it would prove nothing.');
+  expect('waitfor', 'waitfor --help', /waitfor/);
+  expect('edits', 'edits --help', /edits/);
+  expect('sym (its parser)', 'sym --outline check.ts', /\b1-3\b.*\bgreet\b/);
+  expect('edits (changes a file)', 'edits', /note\.txt/, '=== note.txt\n<<<<<<< SEARCH\ntwo\n=======\n2\n>>>>>>> REPLACE\n');
+  if (fs.readFileSync(path.join(work, 'note.txt'), 'utf8').replace(/\r/g, '') !== 'one\n2\n') throw new Error('edits did not change the file.');
+  // The launcher runs the app's own Node.js, wherever the app is.
+  const launcher = fs.readFileSync(path.join(bin, 'sym'), 'utf8');
+  if (!launcher.includes('agent-tools')) throw new Error(`The launcher does not name the tool:\n${launcher}`);
+  console.log('The agents’ command-line tools run through their launchers.');
 }

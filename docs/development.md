@@ -37,10 +37,17 @@ OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA
 
 `scripts/agent-tools/` holds three small command-line tools for coding agents: `waitfor` (wait for a job in one call),
 `edits` (several exact search-and-replace edits in one call) and `sym` (a definition with its whole body, found by a
-parser). They are developer tools kept here: the app does not give them to agents. Put them on your `PATH` and tell your
-agents about them as its README says; their tests (`server/agent-tools-test.ts`) run with `npm test`, and with
-`npm run check` when something in that folder changes. They need nothing installed beyond Node.js; the parser and
-grammars `sym` uses are copied into the folder, with their licences in `NOTICE`.
+parser). They are built into the app: every agent session it starts (Claude Code, Codex, Custom and the other ACP agents)
+finds them on its PATH and is told about them (`server/shelltools/`, `HYDOR_SHELL_TOOLS=0` turns it off). At each start the
+server writes a launcher for each into `<data folder>/shelltools/bin` (the app's own Node.js on the tool's script in the
+app's own folder), tries each once with no node on the PATH, and puts that folder first on the PATH of each session it starts
+and names the tools that worked in its instructions. The desktop apps ship `scripts/agent-tools/bin` and `lib` (the list in
+`desktop/scripts/stage.sh`; Docker and a checkout have the whole folder), and `desktop/scripts/smoke.mjs`, which CI runs on
+every packed app, fails when the launchers the server wrote cannot run the three tools in a shell like an agent's (Git's bash
+on Windows). `server/shelltools/shelltools-test.ts` has the launchers, the PATH each kind of agent gets and the staging list;
+the tools' own tests (`server/agent-tools-test.ts`) run with `npm test`, and with `npm run check` when something in that
+folder changes. They need nothing installed beyond Node.js; the parser and grammars `sym` uses are copied into the folder, with
+their licences in `NOTICE`. To try the tools from a shell of your own, put the folder's `bin/` on your `PATH`.
 
 A scratch copy of the app (its own `DATA_DIR` and `PORT`, to try a change in a browser) shares your computer with the
 app you use. Give it a `HOME`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` of its own under `/tmp` too: its agents keep their
