@@ -4,6 +4,32 @@
 found); the rest is not built. It follows [Apps: a plan for building apps on top of agents](apps-framework.md), which
 is built: agent apps stay as that plan made them.*
 
+## Decided on 26 November 2026: the kit is dropped
+
+The comparison in section 13 built six apps both ways and changed two afterwards. Every app passed every check,
+and building on the kit cost two to three times as much as building from scratch each time. So the kit is not
+continued: apps are built from scratch, in whatever stack suits them, and its repository is removed once what
+Hydor still takes from it has been moved over.
+
+**What stays is the logic that guides someone through making and running an app**, all of it on Hydor's side and
+none of it tied to a framework:
+
+- the stages (brief, design, build, check, launch, run) and their cards, with the conversation doing the work;
+- the contract, one file any app meets (`hydor.json`), and the checker that tries what it claims;
+- running an app inside Hydor: a version being changed and a launched one, each with data of its own, the proxy
+  and Hydor's sign-in, backups and the way back;
+- the keys card (several at once, in tabs, each with how to get it) and keys kept per app and place;
+- the services catalog (at most three for a need, one recommended, none where one is better overall);
+- a model, search vectors and mail through Hydor, with the owner's say and caps;
+- launching to a server with backups and the way back, moved from the kit into Hydor;
+- checks of the pages an app serves (phone layout, contrast, weight, keys in the page), moved the same way;
+- the comparison's judge and descriptions, kept to measure what a build costs as the guide changes.
+
+**What goes**: the kit's core, blocks, starters and commands; the Features stage and the updates card; the choice
+between the kit and from scratch. Sections 3 to 6, and what sections 7 to 10 say about blocks, starters and the
+kit's commands, describe what was built and measured, not what is planned. Phases 6 to 8 (commerce, community,
+portable flows) are not built as blocks: an app that needs them is built from scratch against the contract.
+
 ## In short
 
 - **One kind of app, with two halves.** An *agent app* stays a small tool for one job, run by Hydor's agents and
