@@ -1,0 +1,5 @@
+web-tree-sitter@0.25.10 (MIT, see LICENSE), copied unchanged from the npm package.
+sym loads tree-sitter.js; that module finds tree-sitter.wasm beside itself.
+
+d4fc466df6358055253bc4cdaab23cdf84fe00741fa5a4ff56506c06c533da42  tree-sitter.js
+f38dcc4b43b818f9a0785bc1c6d5611a75ac4cdd428ff3f02757c34ca4e46d7f  tree-sitter.wasm

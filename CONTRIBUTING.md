@@ -39,10 +39,14 @@ To try a change without touching your own Hydor, give the server a data folder o
 ## Testing
 
 ```bash
+npm run check            # the type check and the tests for what you changed; prints only what fails
 npm run typecheck
 npm test                 # every test that needs nothing beyond a checkout, a few at a time
 npm test -- memory/      # only those whose path has these words
 ```
+
+`npm run check` is the quick one while you work (`-- --base main` for the whole branch, `-- --plan` to see what it would
+run); `npm run typecheck` and `npm test` are the full runs before a pull request.
 
 Each test is a script beside the code it checks (`*-test.ts`, `tests.ts`). A change comes with tests for what it
 changes. A change to how a page looks or works comes with pictures of it before and after

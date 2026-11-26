@@ -1,0 +1,837 @@
+#!/usr/bin/env node
+// edits: apply several exact search-and-replace edits across files in one atomic call.
+// Dependency-free, Node >= 22. See usage() for the interface.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_ERRORS = 10;
+const CHECK_TIMEOUT_MS = 15 * 60 * 1000;
+const EXCERPT_MAX_CHANGED = 14;
+const EXCERPT_HEAD = 6;
+const EXCERPT_TAIL = 6;
+const LINE_DISPLAY_MAX = 200;
+
+const USAGE = `usage: edits [--dry-run] [--context N] [--check[=ARGS]] [--max-chars N] [FILE]
+Reads an edit script from FILE (or stdin, or "-") and applies all edits atomically.
+
+  === path/to/file
+  <<<<<<< SEARCH            (or "SEARCH all" / "SEARCH 3")
+  exact old text
+  =======
+  new text
+  >>>>>>> REPLACE
+  === new/file (new)        (single block, empty SEARCH; also "(overwrite)")
+
+Or JSON: [{"file","old","new","count"}, {"file","create"}, {"file","overwrite"}].
+Search text must occur exactly once unless "all"/N is given. Nothing is written
+if any block fails. Exit codes: 0 ok, 1 edit/format/write/check failure, 2 usage.
+
+Notes:
+  - Matching is an exact substring and must be unique: include a neighbouring
+    line when the text is short.
+  - An empty replacement removes the following newline too (when the match starts
+    a line and does not itself end with a newline). To leave a blank line, include
+    a neighbouring line in the block and put the blank line in the replacement.
+  - (new)/(overwrite) content in the text format gets a trailing newline if it
+    lacks one; JSON create/overwrite content is written byte-for-byte.
+  - A literal "=======" line in a search needs the JSON format.
+`;
+
+class FormatError extends Error {}
+
+// ---------------------------------------------------------------- arguments
+function parseArgs(argv) {
+  const o = { dryRun: false, context: 2, maxChars: 2500, check: null, file: null };
+  const num = (name, v, min) => {
+    if (v === undefined || !/^\d+$/.test(v) || Number(v) < min) usageError(`${name} needs an integer >= ${min}`);
+    return Number(v);
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--') { if (argv[i + 1] !== undefined) o.file = argv[i + 1]; break; }
+    else if (a === '-h' || a === '--help') { process.stdout.write(USAGE); process.exit(0); }
+    else if (a === '--dry-run') o.dryRun = true;
+    else if (a === '--context') o.context = num('--context', argv[++i], 0);
+    else if (a.startsWith('--context=')) o.context = num('--context', a.slice(10), 0);
+    else if (a === '--max-chars') o.maxChars = num('--max-chars', argv[++i], 1);
+    else if (a.startsWith('--max-chars=')) o.maxChars = num('--max-chars', a.slice(12), 1);
+    else if (a === '--check') o.check = '';
+    else if (a.startsWith('--check=')) o.check = a.slice(8);
+    else if (a === '-') o.file = '-';
+    else if (a.startsWith('-')) usageError(`unknown option ${a}`);
+    else if (o.file !== null) usageError('more than one FILE given');
+    else o.file = a;
+  }
+  return o;
+}
+
+function usageError(msg) {
+  process.stderr.write(`edits: ${msg}\n${USAGE}`);
+  process.exit(2);
+}
+
+async function readInput(file) {
+  if (file === null || file === '-') {
+    if (file === null && process.stdin.isTTY) usageError('no FILE given and stdin is a terminal');
+    const chunks = [];
+    for await (const c of process.stdin) chunks.push(c);
+    return Buffer.concat(chunks);
+  }
+  try { return fs.readFileSync(file); }
+  catch (e) { process.stderr.write(`edits: cannot read script ${file}: ${e.code || e.message}\n`); process.exit(2); }
+}
+
+// ------------------------------------------------------------------ parsing
+const SEARCH_RE = /^<<<<<<< SEARCH(?: (.*))?$/;
+
+function parseCount(mod, lineNo) {
+  if (mod === undefined) return 1;
+  if (mod === 'all') return 'all';
+  if (/^[1-9][0-9]*$/.test(mod) && Number.isSafeInteger(Number(mod))) return Number(mod);
+  throw new FormatError(`script line ${lineNo}: bad SEARCH modifier "${mod}" (use "SEARCH", "SEARCH all" or "SEARCH N" with N >= 1)`);
+}
+
+function parseText(src) {
+  const lines = src.split('\n');
+  if (lines[lines.length - 1] === '') lines.pop();
+  const entries = [];
+  let sec = null; // current file section
+  let state = 'top'; // top | file | search | replace
+  let blk = null;
+  let buf = [];
+  const fe = (n, m) => new FormatError(`script line ${n}: ${m}`);
+  const closeSection = (endLine) => {
+    if (!sec) return;
+    if (sec.blocks === 0) throw fe(sec.line, `no SEARCH/REPLACE block for ${sec.file}`);
+    sec = null;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i];
+    const no = i + 1;
+    if (state === 'search') {
+      if (ln === '=======') { blk.search = buf.join('\n'); buf = []; state = 'replace'; }
+      else if (ln === '>>>>>>> REPLACE') throw fe(no, `">>>>>>> REPLACE" before "=======" (block started at line ${blk.line})`);
+      else if (SEARCH_RE.test(ln)) throw fe(no, `"<<<<<<< SEARCH" inside the block started at line ${blk.line} (missing "=======" or ">>>>>>> REPLACE"?)`);
+      else buf.push(ln);
+      continue;
+    }
+    if (state === 'replace') {
+      if (ln === '>>>>>>> REPLACE') {
+        blk.replace = buf.join('\n'); buf = [];
+        entries.push(blk); sec.blocks++; blk = null; state = 'file';
+      } else if (SEARCH_RE.test(ln)) throw fe(no, `"<<<<<<< SEARCH" inside the block started at line ${blk.line} (missing ">>>>>>> REPLACE"?)`);
+      else buf.push(ln);
+      continue;
+    }
+    if (ln.trim() === '') continue;
+    if (ln.startsWith('=== ')) {
+      closeSection(no);
+      let rest = ln.slice(4).replace(/\s+$/, '');
+      let kind = 'edit';
+      const m = /^(.*?) \((new|overwrite)\)$/.exec(rest);
+      if (m) { rest = m[1].replace(/\s+$/, ''); kind = m[2]; }
+      if (rest === '') throw fe(no, 'empty path after "==="');
+      sec = { file: rest, kind, blocks: 0, line: no };
+      state = 'file';
+      continue;
+    }
+    if (state === 'top') throw fe(no, 'text before the first "=== PATH" line');
+    const m = SEARCH_RE.exec(ln);
+    if (!m) throw fe(no, `unexpected text outside a block: ${JSON.stringify(ln.length > 60 ? ln.slice(0, 60) + '…' : ln)}`);
+    if (sec.kind !== 'edit' && sec.blocks >= 1) throw fe(no, `"(${sec.kind})" file ${sec.file} takes exactly one block`);
+    const count = parseCount(m[1], no);
+    if (sec.kind !== 'edit' && count !== 1) throw fe(no, `"(${sec.kind})" block cannot have a SEARCH count`);
+    blk = { file: sec.file, kind: sec.kind, count, line: no, search: '', replace: '' };
+    state = 'search';
+  }
+  if (state === 'search') throw fe(blk.line, 'block has no "=======" separator before end of script');
+  if (state === 'replace') throw fe(blk.line, 'block has no ">>>>>>> REPLACE" before end of script');
+  closeSection(lines.length);
+  for (const e of entries) {
+    if (e.kind !== 'edit' && e.search !== '') throw fe(e.line, `"(${e.kind})" block must have an empty SEARCH section`);
+    if (e.kind !== 'edit' && e.replace !== '' && !e.replace.endsWith('\n')) e.replace += '\n';
+  }
+  return entries;
+}
+
+function parseJson(src) {
+  let data;
+  try { data = JSON.parse(src); } catch (e) { throw new FormatError(`JSON: ${e.message}`); }
+  let arr = data;
+  if (!Array.isArray(data)) {
+    if (data && typeof data === 'object' && Array.isArray(data.edits) && Object.keys(data).length === 1) arr = data.edits;
+    else throw new FormatError('JSON: expected an array or {"edits": [...]}');
+  }
+  const entries = [];
+  arr.forEach((it, idx) => {
+    const fe = (m) => new FormatError(`JSON entry ${idx + 1}: ${m}`);
+    if (!it || typeof it !== 'object' || Array.isArray(it)) throw fe('not an object');
+    if (typeof it.file !== 'string' || it.file === '') throw fe('"file" must be a non-empty string');
+    const keys = Object.keys(it);
+    const allowed = new Set(['file', 'old', 'new', 'count', 'create', 'overwrite']);
+    for (const k of keys) if (!allowed.has(k)) throw fe(`unknown key "${k}"`);
+    if ('create' in it || 'overwrite' in it) {
+      const kind = 'create' in it ? 'new' : 'overwrite';
+      const content = it.create ?? it.overwrite;
+      if (('create' in it) && ('overwrite' in it)) throw fe('both "create" and "overwrite"');
+      if (typeof content !== 'string') throw fe(`"${'create' in it ? 'create' : 'overwrite'}" must be a string`);
+      if ('old' in it || 'new' in it || 'count' in it) throw fe('"create"/"overwrite" cannot be combined with old/new/count');
+      entries.push({ file: it.file, kind, count: 1, line: idx + 1, search: '', replace: content });
+      return;
+    }
+    if (typeof it.old !== 'string') throw fe('"old" must be a string');
+    if (typeof it.new !== 'string') throw fe('"new" must be a string');
+    let count = 1;
+    if ('count' in it) {
+      if (it.count === 'all') count = 'all';
+      else if (Number.isSafeInteger(it.count) && it.count >= 1) count = it.count;
+      else throw fe('"count" must be a positive integer or "all"');
+    }
+    entries.push({ file: it.file, kind: 'edit', count, line: idx + 1, search: it.old, replace: it.new });
+  });
+  if (entries.length === 0) throw new FormatError('JSON: no edits');
+  return entries;
+}
+
+function parseScript(buf) {
+  let src;
+  try { src = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buf); }
+  catch { throw new FormatError('script is not valid UTF-8'); }
+  if (src.charCodeAt(0) === 0xFEFF) src = src.slice(1);
+  // A script saved with CRLF on every line is treated as LF.
+  const nl = (src.match(/\n/g) || []).length;
+  if (nl > 0 && (src.match(/\r\n/g) || []).length === nl) src = src.replace(/\r\n/g, '\n');
+  const first = /\S/.exec(src);
+  if (first && (src[first.index] === '[' || src[first.index] === '{')) return parseJson(src);
+  const entries = parseText(src);
+  if (entries.length === 0) throw new FormatError('script contains no edits');
+  return entries;
+}
+
+// ------------------------------------------------------------ path helpers
+function resolvePath(p) {
+  if (p === '~' || p.startsWith('~/')) p = path.join(os.homedir(), p.slice(1));
+  return path.resolve(p);
+}
+
+// realpath of the deepest existing ancestor + the remaining names (works for missing files).
+function canonical(abs) {
+  try { return fs.realpathSync(abs); } catch { /* fall through */ }
+  const rest = [];
+  let dir = abs;
+  for (;;) {
+    rest.unshift(path.basename(dir));
+    const parent = path.dirname(dir);
+    if (parent === dir) return abs;
+    dir = parent;
+    try { return path.join(fs.realpathSync(dir), ...rest); } catch { /* keep walking */ }
+  }
+}
+
+function lstatOrNull(p) {
+  try { return fs.lstatSync(p); } catch (e) { if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return null; throw e; }
+}
+
+// Returns an error string when the nearest existing ancestor of abs is not a directory.
+function ancestorProblem(abs) {
+  let dir = path.dirname(abs);
+  for (;;) {
+    let st = null;
+    try { st = fs.statSync(dir); } catch (e) { if (e.code !== 'ENOENT' && e.code !== 'ENOTDIR') return `${dir}: ${e.code || e.message}`; }
+    if (st) return st.isDirectory() ? null : `${dir} is not a directory`;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+// ------------------------------------------------------------- file reading
+const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+
+// Returns { err } or { buf, text, bom, st }.
+function readText(abs) {
+  let st;
+  try { st = fs.statSync(abs); }
+  catch (e) {
+    if (e.code === 'ENOENT') {
+      const l = lstatOrNull(abs);
+      return { missing: true, err: l ? 'is a broken symlink' : 'file not found' };
+    }
+    return { err: `cannot stat: ${e.code || e.message}` };
+  }
+  if (st.isDirectory()) return { err: 'is a directory, not a file' };
+  if (!st.isFile()) return { err: 'is not a regular file' };
+  if (st.size > MAX_FILE_BYTES) return { err: `too large (${(st.size / 1048576).toFixed(1)} MB > 20 MB)` };
+  let buf;
+  try { buf = fs.readFileSync(abs); } catch (e) { return { err: `cannot read: ${e.code || e.message}` }; }
+  if (buf.length > MAX_FILE_BYTES) return { err: 'too large (> 20 MB)' };
+  if (buf.includes(0)) return { err: 'is binary (contains NUL bytes): refused' };
+  let text;
+  try { text = utf8.decode(buf); } catch { return { err: 'is not valid UTF-8: refused' }; }
+  let bom = false;
+  if (text.charCodeAt(0) === 0xFEFF) { bom = true; text = text.slice(1); }
+  return { buf, text, bom, st };
+}
+
+function detectCrlf(text) {
+  let total = 0, crlf = 0;
+  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) {
+    total++;
+    if (i > 0 && text.charCodeAt(i - 1) === 13) crlf++;
+  }
+  return total > 0 && crlf * 2 > total;
+}
+
+const toCrlf = (s) => s.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
+
+// ------------------------------------------------------------- line helpers
+function lineStarts(text) {
+  const starts = [0];
+  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) starts.push(i + 1);
+  return starts;
+}
+
+// 1-based line number containing offset pos (an offset equal to text length after a final newline maps to nLines+1).
+function lineAt(starts, pos) {
+  let lo = 0, hi = starts.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (starts[mid] <= pos) lo = mid; else hi = mid - 1;
+  }
+  return lo + 1;
+}
+
+function countLines(text) {
+  if (text === '') return 0;
+  const n = (text.match(/\n/g) || []).length;
+  return text.endsWith('\n') ? n : n + 1;
+}
+
+// --------------------------------------------------------- block application
+function findAll(text, search) {
+  const out = [];
+  for (let i = text.indexOf(search); i !== -1; i = text.indexOf(search, i + search.length)) out.push(i);
+  return out;
+}
+
+function fmtLines(starts, positions) {
+  const ls = positions.map((p) => lineAt(starts, p));
+  const shown = ls.slice(0, 5).join(', ');
+  return ls.length > 5 ? `${shown}, …` : shown;
+}
+
+const normWs = (s) => s.split('\n').map((l) => l.replace(/[ \t\r]+/g, ' ').trim()).join('\n');
+
+function zeroMatchMessage(disp, k, text, search, hasEarlier) {
+  let msg = `${disp}: block ${k}: 0 matches`;
+  const sl = search.split(/\r?\n/);
+  const first = sl.find((l) => l.trim() !== '');
+  if (first !== undefined) {
+    const fileLines = text.split('\n');
+    const find = (needle) => {
+      const hits = [];
+      fileLines.forEach((l, i) => { if (l.includes(needle)) hits.push(i + 1); });
+      return hits;
+    };
+    let hits = find(first);
+    if (hits.length === 0) hits = find(first.trim());
+    if (hits.length) {
+      const shown = hits.slice(0, 5).join(', ') + (hits.length > 5 ? ', …' : '');
+      msg += ` (first search line occurs at line${hits.length > 1 ? 's' : ''} ${shown})`;
+    } else msg += ' (first search line does not occur in the file)';
+    if (hasEarlier) msg += ' [line numbers are after the earlier blocks of this script]';
+    const nSearch = normWs(search);
+    if (nSearch.trim() !== '') {
+      const nText = normWs(text);
+      const hs = [];
+      for (let i = nText.indexOf(nSearch); i !== -1 && hs.length < 3; i = nText.indexOf(nSearch, i + 1)) {
+        let ln = 1;
+        for (let j = nText.indexOf('\n'); j !== -1 && j < i; j = nText.indexOf('\n', j + 1)) ln++;
+        hs.push(ln);
+      }
+      if (hs.length) msg += `\n  matches at line${hs.length > 1 ? 's' : ''} ${hs.join(', ')} if whitespace is ignored: check indentation/trailing spaces`;
+    }
+  } else msg += ' (search text is only whitespace)';
+  return msg;
+}
+
+// Apply a replacement at every position. Returns { text, segs }.
+function applyAt(text, search, rep, positions) {
+  const parts = [];
+  const segs = [];
+  let cur = 0, outLen = 0;
+  for (let k = 0; k < positions.length; k++) {
+    const idx = positions[k];
+    let end = idx + search.length;
+    let extra = 0;
+    if (rep === '' && !search.endsWith('\n') && (idx === 0 || text[idx - 1] === '\n')) {
+      if (text[end] === '\n') extra = 1;
+      else if (text[end] === '\r' && text[end + 1] === '\n') extra = 2;
+      if (extra && k + 1 < positions.length && positions[k + 1] < end + extra) extra = 0;
+    }
+    end += extra;
+    const pre = text.slice(cur, idx);
+    parts.push(pre, rep);
+    outLen += pre.length;
+    let removed = 0;
+    if (rep === '' && end > idx && (idx === 0 || text[idx - 1] === '\n')) {
+      const gone = text.slice(idx, end);
+      if (gone.endsWith('\n') || end === text.length) {
+        removed = (gone.match(/\n/g) || []).length + (gone.endsWith('\n') ? 0 : 1);
+      }
+    }
+    segs.push({ os: idx, oe: end, ns: outLen, nl: rep.length, removed });
+    outLen += rep.length;
+    cur = end;
+  }
+  parts.push(text.slice(cur));
+  return { text: parts.join(''), segs };
+}
+
+// Map an offset of the old text to the new text. isEnd selects behaviour for offsets inside a replaced span.
+function mapPos(segs, p, isEnd) {
+  let lo = 0, hi = segs.length - 1, i = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (segs[mid].os < p) { i = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  if (i < 0) return p;
+  const s = segs[i];
+  if (p >= s.oe) return p + (s.ns + s.nl - s.oe);
+  return isEnd ? s.ns + s.nl : s.ns;
+}
+
+// ------------------------------------------------------------------ phase 1
+// groups: Map canonicalPath -> group
+function buildGroups(entries) {
+  const groups = new Map();
+  for (const e of entries) {
+    const abs = resolvePath(e.file);
+    const key = canonical(abs);
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, abs, display: e.file, entries: [], kinds: new Set() };
+      groups.set(key, g);
+    }
+    g.entries.push(e);
+    g.kinds.add(e.kind);
+  }
+  return [...groups.values()];
+}
+
+function processGroup(g, errors) {
+  const disp = g.display;
+  const err = (m) => errors.push(m);
+  g.target = g.key;
+  if (g.kinds.size > 1 || (!g.kinds.has('edit') && g.entries.length > 1)) {
+    err(`${disp}: "(new)"/"(overwrite)"/create/overwrite must be the only block for a file${g.entries.length > 1 ? ` (it appears in ${g.entries.length} blocks, possibly via different paths)` : ''}`);
+    return;
+  }
+  const kind = [...g.kinds][0];
+  g.kind = kind;
+  if (kind === 'new' || kind === 'overwrite') {
+    const e = g.entries[0];
+    if (kind === 'new') {
+      let l = null;
+      try { l = lstatOrNull(g.abs); } catch (x) { err(`${disp}: cannot stat: ${x.code || x.message}`); return; }
+      if (l) { err(`${disp}: already exists ((new) refuses to overwrite): use "(overwrite)" to replace it or edit it with SEARCH blocks`); return; }
+      g.orig = null;
+    } else {
+      const r = readText(g.abs);
+      if (r.err && !r.missing) { err(`${disp}: ${r.err}`); return; }
+      if (r.missing && r.err === 'is a broken symlink') { err(`${disp}: ${r.err}`); return; }
+      g.orig = r.missing ? null : r;
+    }
+    if (!g.orig) {
+      const p = ancestorProblem(g.abs);
+      if (p) { err(`${disp}: cannot create: ${p}`); return; }
+    }
+    g.finalText = e.replace;
+    g.finalBom = false;
+    g.changed = g.orig ? (g.orig.bom ? '﻿' : '') + g.orig.text !== e.replace : true;
+    g.nEdits = 1;
+    g.created = true;
+    g.blockRegions = [];
+    return;
+  }
+  // kind === 'edit'
+  const r = readText(g.abs);
+  if (r.err) {
+    if (r.missing && r.err === 'file not found') err(`${disp}: file not found: to create it use "=== ${disp} (new)" with an empty SEARCH`);
+    else err(`${disp}: ${r.err}`);
+    return;
+  }
+  g.orig = r;
+  const crlf = detectCrlf(r.text);
+  let text = r.text;
+  let failedBefore = false;
+  const blockRegions = []; // per successful block: regions in current-text coordinates
+  g.entries.forEach((e, idx) => {
+    const k = idx + 1;
+    if (e.search === '') { err(`${disp}: block ${k}: empty search text in an existing file (to create a file use "(new)"; to replace it use "(overwrite)")`); failedBefore = true; blockRegions.push(null); return; }
+    const search = crlf ? toCrlf(e.search) : e.search;
+    const rep = crlf ? toCrlf(e.replace) : e.replace;
+    const positions = findAll(text, search);
+    const n = positions.length;
+    const want = e.count;
+    let bad = null;
+    if (n === 0) bad = zeroMatchMessage(disp, k, text, search, idx > 0);
+    else if (want !== 'all' && n !== want) {
+      const lines = fmtLines(lineStarts(text), positions);
+      bad = want === 1
+        ? `${disp}: block ${k}: ${n} matches (lines ${lines}), expected 1: add surrounding lines or use "SEARCH all"/"SEARCH ${n}"`
+        : `${disp}: block ${k}: ${n} matches (lines ${lines}), expected ${want}: use "SEARCH ${n}"/"SEARCH all" or add surrounding lines`;
+    }
+    if (bad) {
+      if (failedBefore) bad += ' [an earlier block of this file also failed; this check ran without it]';
+      err(bad);
+      failedBefore = true;
+      blockRegions.push(null);
+      return;
+    }
+    const { text: nt, segs } = applyAt(text, search, rep, positions);
+    for (const regs of blockRegions) {
+      if (!regs) continue;
+      for (const rg of regs) {
+        const s = mapPos(segs, rg.s, false);
+        const en = Math.max(s, mapPos(segs, rg.e, true));
+        if (en > s) rg.removed = 0;
+        rg.s = s; rg.e = en;
+      }
+    }
+    blockRegions.push(segs.map((s) => ({ s: s.ns, e: s.ns + s.nl, removed: s.nl === 0 ? s.removed : 0 })));
+    text = nt;
+  });
+  g.blockRegions = blockRegions.filter(Boolean);
+  g.nEdits = g.entries.length;
+  g.finalText = text;
+  g.finalBom = r.bom;
+  g.changed = text !== r.text;
+}
+
+// ------------------------------------------------------------------ phase 2
+function writeAtomic(target, data, mode, uid, gid) {
+  const dir = path.dirname(target);
+  const tmp = path.join(dir, `.edits-${process.pid}-${randomBytes(5).toString('hex')}.tmp`);
+  let fd;
+  try {
+    fd = fs.openSync(tmp, 'wx', mode == null ? 0o666 : 0o600);
+    fs.writeFileSync(fd, data);
+    if (uid != null) { try { fs.fchownSync(fd, uid, gid); } catch { /* best effort */ } }
+    if (mode != null) fs.fchmodSync(fd, mode & 0o7777);
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    fs.renameSync(tmp, target);
+  } catch (e) {
+    if (fd !== undefined) { try { fs.closeSync(fd); } catch { /* ignore */ } }
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+    throw e;
+  }
+}
+
+function mkdirsTracked(dir, created) {
+  if (fs.existsSync(dir)) return;
+  mkdirsTracked(path.dirname(dir), created);
+  fs.mkdirSync(dir);
+  created.push(dir);
+}
+
+function applyWrites(groups) {
+  const done = [];
+  for (const g of groups) {
+    if (!g.changed) continue;
+    g.createdDirs = [];
+    try {
+      if (!g.orig) mkdirsTracked(path.dirname(g.target), g.createdDirs);
+      const data = Buffer.from((g.finalBom ? '﻿' : '') + g.finalText, 'utf8');
+      const st = g.orig ? g.orig.st : null;
+      writeAtomic(g.target, data, st ? st.mode : null, st ? st.uid : null, st ? st.gid : null);
+      done.push(g);
+    } catch (e) {
+      for (const d of g.createdDirs.reverse()) { try { fs.rmdirSync(d); } catch { /* ignore */ } }
+      return { failed: g, error: e, done };
+    }
+  }
+  return { done };
+}
+
+function rollback(done) {
+  const problems = [];
+  for (const g of done.slice().reverse()) {
+    try {
+      if (g.orig) writeAtomic(g.target, g.orig.buf, g.orig.st.mode, g.orig.st.uid, g.orig.st.gid);
+      else {
+        fs.unlinkSync(g.target);
+        for (const d of g.createdDirs.slice().reverse()) { try { fs.rmdirSync(d); } catch { /* ignore */ } }
+      }
+    } catch (e) { problems.push(`${g.display}: ${e.code || e.message}`); }
+  }
+  return problems;
+}
+
+// ------------------------------------------------------------------- output
+const cut = (s) => {
+  s = s.replace(/\r$/, '');
+  return s.length > LINE_DISPLAY_MAX ? s.slice(0, LINE_DISPLAY_MAX) + '…' : s;
+};
+
+// Build the structural excerpt for one edit. fin = { text, starts, nLines }.
+function buildExcerpt(fin, regions, ctx) {
+  const chg = new Set();
+  const dels = new Map(); // after-line -> removed count
+  for (const r of regions) {
+    if (r.e > r.s) {
+      const a = lineAt(fin.starts, r.s);
+      const b = Math.min(lineAt(fin.starts, r.e - 1), fin.nLines);
+      for (let l = a; l <= b; l++) chg.add(l);
+    } else if (r.removed > 0) {
+      const after = lineAt(fin.starts, r.s) - 1;
+      dels.set(after, (dels.get(after) || 0) + r.removed);
+    } else {
+      const l = Math.min(lineAt(fin.starts, r.s), fin.nLines);
+      if (l >= 1) chg.add(l);
+    }
+  }
+  let anchors = [];
+  for (const l of chg) anchors.push({ pos: l, kind: 'chg', line: l });
+  for (const [after, n] of dels) anchors.push({ pos: after + 0.5, kind: 'del', after, n });
+  anchors.sort((x, y) => x.pos - y.pos);
+  const lo = anchors.length ? anchors[0] : null;
+  const hi = anchors.length ? anchors[anchors.length - 1] : null;
+  const summary = !lo ? '' : (() => {
+    const A = lo.kind === 'chg' ? lo.line : Math.max(lo.after, 1);
+    const B = hi.kind === 'chg' ? hi.line : Math.min(hi.after + 1, Math.max(fin.nLines, 1));
+    if (anchors.every((a) => a.kind === 'del')) {
+      const total = anchors.reduce((s, a) => s + a.n, 0);
+      return `${total} line${total === 1 ? '' : 's'} removed after line ${lo.after}`;
+    }
+    return `lines ${A}-${Math.max(A, B)} changed`;
+  })();
+  let kept = anchors, omitted = [];
+  if (anchors.length > EXCERPT_MAX_CHANGED) {
+    kept = [...anchors.slice(0, EXCERPT_HEAD), ...anchors.slice(anchors.length - EXCERPT_TAIL)];
+    omitted = anchors.slice(EXCERPT_HEAD, anchors.length - EXCERPT_TAIL);
+  }
+  const omitLines = new Set(omitted.filter((a) => a.kind === 'chg').map((a) => a.line));
+  const lines = new Map(); // line -> 'chg' | 'ctx'
+  const markers = new Map();
+  const addCtx = (l) => {
+    if (l >= 1 && l <= fin.nLines && !lines.has(l) && !omitLines.has(l)) lines.set(l, 'ctx');
+  };
+  for (const a of kept) {
+    if (a.kind === 'chg') {
+      lines.set(a.line, 'chg');
+      for (let d = 1; d <= ctx; d++) { addCtx(a.line - d); addCtx(a.line + d); }
+    } else {
+      markers.set(a.after, a.n);
+      for (let d = 0; d < ctx; d++) { addCtx(a.after - d); addCtx(a.after + 1 + d); }
+    }
+  }
+  const events = [];
+  for (const [l, k] of lines) events.push({ pos: l, line: l, kind: k });
+  for (const [after, n] of markers) events.push({ pos: after + 0.5, kind: 'del', n, after });
+  events.sort((x, y) => x.pos - y.pos);
+  const rows = [];
+  let prevPos = null, prevLine = null, oi = 0, moreDone = false;
+  for (const ev of events) {
+    if (prevPos !== null) {
+      while (oi < omitted.length && omitted[oi].pos <= prevPos) oi++;
+      if (!moreDone && omitted.length && oi < omitted.length && omitted[oi].pos < ev.pos) {
+        rows.push({ t: 'more', n: omitted.length });
+        moreDone = true;
+      } else if (ev.kind !== 'del' && prevLine !== null && ev.line > prevLine + 1) rows.push({ t: 'gap' });
+    }
+    if (ev.kind === 'del') rows.push({ t: 'del', n: ev.n, after: ev.after });
+    else { rows.push({ t: ev.kind, line: ev.line }); prevLine = ev.line; }
+    prevPos = ev.pos;
+  }
+  return { rows, summary, maxLine: rows.reduce((m, r) => (r.line > m ? r.line : m), 0) };
+}
+
+function formatRows(rows, fin, width) {
+  const out = [];
+  for (const r of rows) {
+    if (r.t === 'gap') out.push('  …');
+    else if (r.t === 'more') out.push(`  … ${r.n} more changed lines …`);
+    else if (r.t === 'del') out.push(`- (${r.n} line${r.n === 1 ? '' : 's'} removed after line ${r.after})`);
+    else {
+      const text = fin.text.slice(fin.starts[r.line - 1], r.line < fin.starts.length ? fin.starts[r.line] - 1 : fin.text.length);
+      out.push(`${r.t === 'chg' ? '+' : ' '} ${String(r.line).padStart(width)}  ${cut(text)}`);
+    }
+  }
+  return out;
+}
+
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+function renderReport(groups, opts, header) {
+  const lines = [header];
+  let used = header.length + 1;
+  let collapsed = false;
+  // one-line summaries are still printed after the cap, up to a hard limit that keeps huge scripts bounded
+  const hardLimit = 2 * opts.maxChars + 500;
+  let hidden = 0, hiddenFiles = 0;
+  for (const g of groups) {
+    let fileLine;
+    if (!g.changed) fileLine = `${g.display}: unchanged`;
+    else if (g.created) fileLine = g.orig ? `${g.display}: overwritten (${plural(countLines(g.finalText), 'line')})` : `${g.display}: created (${plural(countLines(g.finalText), 'line')})`;
+    else fileLine = `${g.display}: ${plural(g.nEdits, 'edit')}`;
+    if (g.created && g.changed && !g.finalText.endsWith('\n') && g.finalText !== '') fileLine += ' [no trailing newline]';
+    if (collapsed && used >= hardLimit) { hiddenFiles++; hidden += g.changed && !g.created ? g.nEdits : 0; continue; }
+    lines.push(fileLine);
+    used += fileLine.length + 1;
+    if (!g.changed || g.created) continue;
+    const fin = { text: g.finalText, starts: lineStarts(g.finalText) };
+    fin.nLines = countLines(g.finalText);
+    const ex = g.blockRegions.map((regs) => buildExcerpt(fin, regs, opts.context));
+    const width = String(Math.max(1, ...ex.map((e) => e.maxLine))).length;
+    let shownInFile = 0;
+    ex.forEach((e, i) => {
+      if (collapsed && used >= hardLimit) { hidden++; return; }
+      const sep = shownInFile > 0 ? ['  --'] : [];
+      const body = [...sep, ...formatRows(e.rows, fin, width)];
+      const len = body.reduce((s, l) => s + l.length + 1, 0);
+      if (!e.rows.length) return;
+      if (!collapsed && used + len <= opts.maxChars) {
+        lines.push(...body); used += len; shownInFile++;
+      } else {
+        collapsed = true;
+        const one = `${g.display}: ${e.summary || `block ${i + 1} changed`}`;
+        lines.push(one); used += one.length + 1;
+      }
+    });
+  }
+  if (hidden || hiddenFiles) lines.push(`… ${plural(hidden, 'more edit')}${hiddenFiles ? ` in ${plural(hiddenFiles, 'more file')}` : ''} not shown (--max-chars ${opts.maxChars})`);
+  return lines;
+}
+
+// ------------------------------------------------------------------- check
+function splitArgs(s) {
+  const out = [];
+  let cur = '', q = null, has = false;
+  for (const ch of s) {
+    if (q) { if (ch === q) q = null; else cur += ch; }
+    else if (ch === '"' || ch === "'") { q = ch; has = true; }
+    else if (/\s/.test(ch)) { if (cur !== '' || has) out.push(cur); cur = ''; has = false; }
+    else cur += ch;
+  }
+  if (cur !== '' || has) out.push(cur);
+  return out;
+}
+
+function gitTop(dir) {
+  const r = spawnSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  return r.status === 0 && r.stdout.trim() ? r.stdout.trim() : null;
+}
+
+function runCheck(groups, argString, maxChars) {
+  const first = groups[0];
+  let dir = path.dirname(first.target);
+  while (!fs.existsSync(dir) && path.dirname(dir) !== dir) dir = path.dirname(dir);
+  const root = gitTop(dir) || gitTop(process.cwd()) || process.cwd();
+  const script = path.join(root, 'scripts', 'check');
+  let cmd = null;
+  try {
+    if (fs.statSync(script).isFile()) { fs.accessSync(script, fs.constants.X_OK); cmd = [script]; }
+  } catch { /* none */ }
+  if (!cmd) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+      if (pkg && pkg.scripts && typeof pkg.scripts.check === 'string') cmd = ['npm', 'run', 'check', '--silent', '--'];
+    } catch { /* none */ }
+  }
+  if (!cmd) return { text: `no check command found in ${root}`, status: 0, none: true };
+  const args = argString !== ''
+    ? splitArgs(argString)
+    : groups.filter((g) => g.changed || groups.every((x) => !x.changed)).map((g) => {
+      const rel = path.relative(root, g.target);
+      return rel.startsWith('..') || path.isAbsolute(rel) ? g.target : rel;
+    });
+  const r = spawnSync('sh', ['-c', 'exec "$@" 2>&1', 'sh', ...cmd, ...args], {
+    cwd: root, env: process.env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: CHECK_TIMEOUT_MS, maxBuffer: 256 * 1024 * 1024,
+  });
+  let out = (r.stdout || '').replace(/\n$/, '');
+  const limit = Math.max(maxChars, 500);
+  if (out.length > limit) {
+    const h = Math.floor(limit * 0.4), t = limit - h;
+    out = `${out.slice(0, h)}\n… ${out.length - limit} chars omitted …\n${out.slice(out.length - t)}`;
+  }
+  let status = r.status;
+  if (r.error && r.error.code === 'ETIMEDOUT') { out += '\ncheck timed out after 15 minutes'; status = 124; }
+  else if (status === null) { out += `\ncheck killed by signal ${r.signal}`; status = 1; }
+  return { text: out, status, none: false, root };
+}
+
+// --------------------------------------------------------------------- main
+function fail(lines, code = 1) {
+  process.stderr.write(lines.join('\n') + '\n');
+  process.exitCode = code;
+}
+
+async function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  const raw = await readInput(opts.file);
+  let entries;
+  try { entries = parseScript(raw); }
+  catch (e) {
+    if (e instanceof FormatError) return fail([`edits: format error, nothing written`, e.message]);
+    throw e;
+  }
+  const groups = buildGroups(entries);
+  const errors = [];
+  for (const g of groups) processGroup(g, errors);
+  if (errors.length) {
+    const shown = errors.slice(0, MAX_ERRORS);
+    const lines = [`edits: ${plural(errors.length, 'problem')}, nothing written`, ...shown];
+    if (errors.length > MAX_ERRORS) lines.push(`… and ${errors.length - MAX_ERRORS} more`);
+    return fail(lines);
+  }
+  const changedGroups = groups.filter((g) => g.changed);
+  const nEdits = changedGroups.reduce((s, g) => s + g.nEdits, 0);
+  const nUnchanged = groups.length - changedGroups.length;
+  let summary = `${plural(nEdits, 'edit')} in ${plural(changedGroups.length, 'file')}`;
+  if (nUnchanged) summary += ` (${nUnchanged} unchanged)`;
+
+  if (opts.dryRun) {
+    const lines = renderReport(groups, opts, `dry run: would apply ${summary}`);
+    if (opts.check !== null) lines.push('(check skipped: dry run)');
+    process.stdout.write(lines.join('\n') + '\n');
+    return;
+  }
+
+  const res = applyWrites(groups);
+  if (res.failed) {
+    const problems = rollback(res.done);
+    const lines = [`edits: write failed for ${res.failed.display}: ${res.error.code || ''} ${res.error.message}`.replace(/\s+/g, ' ')];
+    if (problems.length) {
+      lines.push(`ROLLBACK INCOMPLETE, these files may be modified:`, ...problems.map((p) => `  ${p}`));
+    } else {
+      lines.push(res.done.length ? `restored ${plural(res.done.length, 'file')} already written; nothing changed` : 'nothing changed');
+    }
+    return fail(lines);
+  }
+
+  let check = null;
+  if (opts.check !== null) check = runCheck(groups, opts.check, opts.maxChars);
+  const failed = check && !check.none && check.status !== 0;
+  const header = `applied ${summary}${failed ? ' (kept); check failed' : ''}`;
+  const lines = renderReport(groups, opts, header);
+  if (check) {
+    lines.push('--- check');
+    lines.push(check.text === '' ? '(no output)' : check.text);
+    if (failed) lines.push(`check exit code ${check.status}`);
+  }
+  process.stdout.write(lines.join('\n') + '\n');
+  if (failed) process.exitCode = check.status;
+}
+
+main().catch((e) => {
+  process.stderr.write(`edits: internal error: ${e && e.stack || e}\n`);
+  process.exitCode = 1;
+});

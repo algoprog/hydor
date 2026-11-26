@@ -1,7 +1,9 @@
 // Runs the app's tests: each `*-test.ts`, `tests.ts` and `selftest.ts` is a script of its own (docs/development.md),
 // built here on its own and run with a scratch data folder, a few at a time. `npm test` runs every one that needs
 // nothing beyond a checkout (no display, other system, network or real installs: those are listed in NEEDS, run with
-// --all); name some to run just those: `npm test -- memory guide/`.
+// --all); name some to run just those: `npm test -- memory guide/` (a name that is a test's whole path picks only
+// that test). `--list` prints the tests and the NEEDS list as JSON, `--tail=N` shows N lines of each failure's output
+// instead of 25: both are for scripts/check.mjs.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,6 +14,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const all = args.includes('--all');
 const names = args.filter((a) => !a.startsWith('--'));
+const tail = Number(args.find((a) => a.startsWith('--tail='))?.slice(7)) || 25;
 const jobs = Number(args.find((a) => a.startsWith('--jobs='))?.slice(7)) || Math.max(1, Math.min(6, Math.floor(os.cpus().length / 2)));
 const LIMIT_MS = 15 * 60_000;
 
@@ -38,7 +41,12 @@ const walk = (dir) => {
 for (const d of ['server', 'shared', 'web/src']) if (fs.existsSync(path.join(root, d))) walk(d);
 found.sort();
 
-const chosen = found.filter((f) => (names.length ? names.some((n) => f.includes(n)) : all || !NEEDS[f]));
+if (args.includes('--list')) {
+  console.log(JSON.stringify({ tests: found, needs: NEEDS }));
+  process.exit(0);
+}
+const matches = (f, n) => (found.includes(n) ? f === n : f.includes(n));
+const chosen = found.filter((f) => (names.length ? names.some((n) => matches(f, n)) : all || !NEEDS[f]));
 const skipped = names.length || all ? [] : found.filter((f) => NEEDS[f]);
 if (!chosen.length) {
   console.error(`No tests match ${names.join(', ')}`);
@@ -50,7 +58,7 @@ const run = (cmd, argv, env, ms) =>
   new Promise((resolve) => {
     const p = spawn(cmd, argv, { cwd: root, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
-    const keep = (b) => (out = (out + b).slice(-6000));
+    const keep = (b) => (out = (out + b).slice(-Math.max(6000, tail * 400)));
     p.stdout.on('data', keep);
     p.stderr.on('data', keep);
     const t = setTimeout(() => p.kill('SIGKILL'), ms);
@@ -87,7 +95,7 @@ const worker = async () => {
 await Promise.all(Array.from({ length: Math.min(jobs, chosen.length) }, worker));
 
 const failed = results.filter((r) => !r.ok);
-for (const f of failed) console.log(`\n---- ${f.file}\n${f.out.trim().split('\n').slice(-25).join('\n')}`);
+for (const f of failed) console.log(`\n---- ${f.file}\n${f.out.trim().split('\n').slice(-tail).join('\n')}`);
 console.log(
   `\n${results.length - failed.length} of ${results.length} passed${skipped.length ? `; not run here (--all runs them): ${skipped.map((f) => `${path.basename(f)} (${NEEDS[f]})`).join(', ')}` : ''}`,
 );

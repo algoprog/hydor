@@ -1,0 +1,867 @@
+#!/usr/bin/env node
+// waitfor: block until a long-running job reaches a state, then print ONE compact result.
+// Single file, no dependencies. See --help.
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
+
+const HELP = `waitfor - block until a job reaches a state, then print ONE compact result.
+
+Usage:
+  waitfor [conditions] [options]
+  waitfor [options] -- COMMAND [ARGS...]     run COMMAND itself and wait for it
+
+Conditions (repeatable; wait ends when ANY holds, --all: when ALL hold):
+  --pid N[,N...]        process(es) have exited
+  --proc REGEX          no running process cmdline matches REGEX (cmdlines containing "waitfor" ignored)
+  --file P | --file-nonempty P | --gone P    file exists / exists and size>0 / no longer exists
+  --log FILE --match REGEX    a line matching REGEX is appended to FILE (new content only
+                        unless --from-start; FILE may not exist yet). A --log without --match
+                        is only watched for --fail / --progress.
+  --http URL [--status CODE] [--body REGEX] [--json a.b.0=VALUE]   2xx (or CODE), body/json checks
+  --unit NAME [--state inactive|active|failed] [--system]   systemd unit state (default: --user)
+  --slurm JOBID [--via 'PREFIX']   job left the queue (squeue run as: PREFIX 'squeue ...')
+  --until 'SHELL CMD'   command exits 0 (sh -c, 30 s per try)
+Failure / progress:
+  --fail REGEX          new line in a watched log (or command output) matching -> stop, exit 2
+  --progress REGEX      remember last matching line; printed on timeout/failure
+Options:
+  --timeout DUR         90, 90s, 15m, 2h, 1h30m. Default 10m; none with '--'. exit 124 on timeout
+  --every DUR           poll interval (default 2s; http 5s; slurm 15s; logs at most 1s)
+  --tail FILE[:N]       after the wait print the last N (15) lines of FILE (repeatable)
+  --grep REGEX          keep only matching lines in the tails (before taking last N)
+  --max-chars N         cap total output (default 2000); lines cut at 300 chars
+  --out FILE            with '--': file for command stdout+stderr (default $TMPDIR/waitfor-PID.log)
+  --from-start          count existing log content too
+  --all  --quiet  --help
+Any REGEX may be written /pattern/flags (flags i, m, s, u); otherwise it is used as given.
+Limits: a log that is truncated and regrown past its old size between two polls is not noticed.
+Exit: 0 done, 2 failed, 124 timeout, 3 runtime error, 64 usage, 130 interrupted.
+      '--' form: the command's own exit code (128+signal if killed).
+
+Examples:
+  waitfor --pid 4312 --tail train.log:20
+  waitfor --log build.log --match 'DONE|BUILD OK' --fail 'Traceback|FATAL' --timeout 30m
+  waitfor --http http://localhost:8000/health --json status=ok --every 3s
+  waitfor --slurm 123456 --via 'ssh login.example.org' --timeout 4h --tail slurm-123456.out
+  waitfor --timeout 20m --progress 'epoch \\d+' -- python train.py --epochs 50
+`;
+
+class UsageError extends Error {}
+class RuntimeErr extends Error {}
+
+const T0 = performance.now();
+const elapsed = () => performance.now() - T0;
+
+// ---------- formatting helpers ----------
+function fmtDur(ms) {
+  const s = Math.round(ms / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const p2 = (n) => String(n).padStart(2, '0');
+  if (h) return `${h}h${p2(m)}m`;
+  if (m) return sec ? `${m}m${p2(sec)}s` : `${m}m`;
+  return `${sec}s`;
+}
+const cut = (l, n = 300) => (l.length > n ? l.slice(0, n - 1) + '…' : l);
+const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
+function cleanLine(raw) {
+  const segs = raw.replace(ANSI, '').split('\r');
+  let last = segs[segs.length - 1];
+  for (let i = segs.length - 1; i >= 0; i--) if (segs[i].trim()) { last = segs[i]; break; }
+  return last.trimEnd();
+}
+const shq = (a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, `'\\''`)}'`);
+const errMsg = (e) => String(e?.cause?.code || e?.cause?.message || e?.message || e).split('\n')[0];
+
+function parseDur(v, flag) {
+  const s = String(v).trim();
+  const mult = { ms: 1, s: 1000, m: 60000, h: 3600000 };
+  let ms = null, m;
+  if ((m = /^(\d+(?:\.\d+)?|\.\d+)(ms|s|m|h)?$/.exec(s))) ms = parseFloat(m[1]) * mult[m[2] || 's'];
+  else if (s && (m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(s))) {
+    ms = ((+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0)) * 1000;
+  }
+  if (ms === null || !(ms > 0)) {
+    throw new UsageError(`bad duration for ${flag}: '${v}' (use 90, 90s, 15m, 2h, 1h30m)`);
+  }
+  return ms;
+}
+// REGEX arguments are JS regexes; `/pattern/flags` (flags i, m, s, u) is also accepted.
+function mkRx(src, flag) {
+  const m = /^\/(.+)\/([imsu]*)$/s.exec(src);
+  try {
+    return { re: m ? new RegExp(m[1], m[2]) : new RegExp(src), src: m ? src : `/${src}/` };
+  } catch (e) {
+    throw new UsageError(`invalid regex for ${flag}: ${src} (${String(e.message).replace(/^Invalid regular expression: /, '')})`);
+  }
+}
+
+// ---------- argument parsing ----------
+const BOOL_OPTS = new Set(['all', 'from-start', 'system', 'quiet', 'help']);
+const VALUE_OPTS = new Set(['pid', 'proc', 'file', 'file-nonempty', 'gone', 'log', 'match', 'http', 'status',
+  'body', 'json', 'unit', 'state', 'slurm', 'via', 'until', 'fail', 'timeout', 'every', 'tail', 'grep',
+  'progress', 'max-chars', 'out']);
+
+function parseArgs(argv) {
+  const o = { conds: [], fails: [], tails: [], logPaths: [], timeoutMs: null, every: null, maxChars: 2000,
+    all: false, fromStart: false, system: false, quiet: false, grep: null, progress: null, out: null, cmd: null, help: false };
+  let lastLog = null, lastHttp = null, lastUnit = null, lastSlurm = null;
+  const need = (cond, flag, what) => { if (!cond) throw new UsageError(`${flag} needs a preceding ${what}`); };
+  for (let i = 0; i < argv.length; i++) {
+    let tok = argv[i];
+    if (tok === '--') { o.cmd = argv.slice(i + 1); break; }
+    if (tok === '-h') tok = '--help';
+    if (!tok.startsWith('--')) throw new UsageError(`unexpected argument '${tok}'`);
+    let name = tok.slice(2), val;
+    const eq = name.indexOf('=');
+    if (eq > 0) { val = name.slice(eq + 1); name = name.slice(0, eq); }
+    if (BOOL_OPTS.has(name)) {
+      if (val !== undefined) throw new UsageError(`--${name} takes no value`);
+      if (name === 'all') o.all = true;
+      else if (name === 'from-start') o.fromStart = true;
+      else if (name === 'system') o.system = true;
+      else if (name === 'quiet') o.quiet = true;
+      else if (name === 'help') { o.help = true; return o; }
+      continue;
+    }
+    if (!VALUE_OPTS.has(name)) throw new UsageError(`unknown option '--${name}'`);
+    if (val === undefined) {
+      if (i + 1 >= argv.length) throw new UsageError(`--${name} needs a value`);
+      val = argv[++i];
+    }
+    const flag = `--${name}`;
+    switch (name) {
+      case 'pid': {
+        const pids = val.split(',').map((x) => x.trim());
+        if (!pids.length || pids.some((x) => !/^\d+$/.test(x) || +x < 1)) throw new UsageError(`bad pid list for --pid: '${val}'`);
+        o.conds.push({ kind: 'pid', pids: pids.map(Number) });
+        break;
+      }
+      case 'proc': o.conds.push({ kind: 'proc', ...mkRx(val, flag) }); break;
+      case 'file': o.conds.push({ kind: 'file', mode: 'exists', path: val }); break;
+      case 'file-nonempty': o.conds.push({ kind: 'file', mode: 'nonempty', path: val }); break;
+      case 'gone': o.conds.push({ kind: 'file', mode: 'gone', path: val }); break;
+      case 'log': lastLog = val; o.logPaths.push(val); break;
+      case 'match':
+        need(lastLog !== null, flag, '--log');
+        o.conds.push({ kind: 'log', path: lastLog, ...mkRx(val, flag) });
+        break;
+      case 'http': {
+        try { new URL(val); } catch { throw new UsageError(`bad URL for --http: '${val}'`); }
+        lastHttp = { kind: 'http', url: val, status: null, bodySrc: null, bodyRe: null, json: [] };
+        o.conds.push(lastHttp);
+        break;
+      }
+      case 'status':
+        need(lastHttp, flag, '--http');
+        if (!/^\d{3}$/.test(val)) throw new UsageError(`bad status code for --status: '${val}'`);
+        lastHttp.status = +val;
+        break;
+      case 'body': need(lastHttp, flag, '--http'); { const x = mkRx(val, flag); lastHttp.bodySrc = x.src; lastHttp.bodyRe = x.re; } break;
+      case 'json': {
+        need(lastHttp, flag, '--http');
+        const k = val.indexOf('=');
+        if (k < 1) throw new UsageError(`--json needs PATH=VALUE, got '${val}'`);
+        lastHttp.json.push({ path: val.slice(0, k), value: val.slice(k + 1) });
+        break;
+      }
+      case 'unit':
+        lastUnit = { kind: 'unit', name: val, state: 'inactive' };
+        o.conds.push(lastUnit);
+        break;
+      case 'state':
+        need(lastUnit, flag, '--unit');
+        if (!['inactive', 'active', 'failed'].includes(val)) throw new UsageError(`--state must be inactive, active or failed, got '${val}'`);
+        lastUnit.state = val;
+        break;
+      case 'slurm':
+        if (!/^[\w.\[\],-]+$/.test(val)) throw new UsageError(`bad job id for --slurm: '${val}'`);
+        lastSlurm = { kind: 'slurm', job: val, via: null };
+        o.conds.push(lastSlurm);
+        break;
+      case 'via': need(lastSlurm, flag, '--slurm'); lastSlurm.via = val; break;
+      case 'until': o.conds.push({ kind: 'until', cmd: val }); break;
+      case 'fail': o.fails.push(mkRx(val, flag)); break;
+      case 'timeout': o.timeoutMs = parseDur(val, flag); break;
+      case 'every': o.every = parseDur(val, flag); break;
+      case 'tail': {
+        const m = /^(.*):(\d+)$/.exec(val);
+        const n = m ? +m[2] : 15;
+        if (!(n >= 1) || !(m ? m[1] : val)) throw new UsageError(`bad --tail '${val}' (use FILE or FILE:N, N>=1)`);
+        o.tails.push({ file: m ? m[1] : val, n });
+        break;
+      }
+      case 'grep': o.grep = mkRx(val, flag); break;
+      case 'progress': o.progress = mkRx(val, flag); break;
+      case 'max-chars':
+        if (!/^\d+$/.test(val) || +val < 1) throw new UsageError(`bad number for --max-chars: '${val}'`);
+        o.maxChars = +val;
+        break;
+      case 'out': o.out = val; break;
+    }
+  }
+  // cross-validation
+  if (o.system && !o.conds.some((c) => c.kind === 'unit')) throw new UsageError('--system needs a --unit');
+  if (o.cmd !== null) {
+    if (!o.cmd.length) throw new UsageError('no command given after --');
+    if (o.conds.length || o.logPaths.length) throw new UsageError("conditions cannot be combined with '-- COMMAND'");
+    if (o.all) throw new UsageError("--all needs conditions, not '-- COMMAND'");
+    if (o.fromStart) throw new UsageError('--from-start only applies to --log');
+  } else {
+    if (!o.conds.length) {
+      throw new UsageError(o.logPaths.length ? '--log needs a --match to be a condition' : 'no condition given');
+    }
+    if (o.out) throw new UsageError("--out only applies to '-- COMMAND'");
+    if (o.fromStart && !o.logPaths.length) throw new UsageError('--from-start needs a --log');
+    if ((o.fails.length || o.progress) && !o.logPaths.length) {
+      throw new UsageError(`${o.fails.length ? '--fail' : '--progress'} needs a --log (or the '-- COMMAND' form)`);
+    }
+  }
+  o.timeoutGiven = o.timeoutMs !== null;
+  if (!o.timeoutGiven && o.cmd === null) {
+    o.timeoutMs = process.env.WAITFOR_DEFAULT_TIMEOUT ? parseDur(process.env.WAITFOR_DEFAULT_TIMEOUT, 'WAITFOR_DEFAULT_TIMEOUT') : 600000; // test hook
+  }
+  return o;
+}
+
+// ---------- runtime state ----------
+const S = { finished: false, resolveDone: null, progress: null, cmd: null, sigCount: 0, children: new Set() };
+const donePromise = new Promise((r) => { S.resolveDone = r; });
+function finish(outcome) {
+  if (S.finished) return;
+  S.finished = true;
+  S.resolveDone(outcome);
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function killGroup(child, sig) {
+  if (!child || !child.pid) return;
+  try { process.kill(-child.pid, sig); } catch { try { child.kill(sig); } catch { /* gone */ } }
+}
+
+// Resolves when the child has exited and its stdio closed (or 300 ms after exit if a grandchild holds the pipes).
+function childDone(child, onSpawnError) {
+  return new Promise((resolve) => {
+    let settled = false, exitInfo = null;
+    const settle = (v) => { if (!settled) { settled = true; resolve(v); } };
+    child.on('error', (e) => { onSpawnError?.(e); settle({ code: null, signal: null, error: e }); });
+    child.on('exit', (code, signal) => {
+      exitInfo = { code, signal };
+      setTimeout(() => settle(exitInfo), 300).unref?.();
+    });
+    child.on('close', (code, signal) => settle({ code, signal }));
+  });
+}
+
+// Run a command with captured output and a hard timeout (process group is killed).
+function runCmd(file, args, ms) {
+  return new Promise((resolve) => {
+    const child = spawn(file, args, { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    S.children.add(child);
+    let out = '', err = '', timedOut = false;
+    const cap = (s, d) => (s.length < 1e6 ? s + d : s);
+    child.stdout.on('data', (d) => { out = cap(out, d); });
+    child.stderr.on('data', (d) => { err = cap(err, d); });
+    const timer = setTimeout(() => { timedOut = true; killGroup(child, 'SIGKILL'); }, ms);
+    childDone(child).then((r) => {
+      clearTimeout(timer);
+      S.children.delete(child);
+      resolve({ code: r.code, signal: r.signal, spawnError: r.error, out: String(out), err: String(err), timedOut });
+    });
+  });
+}
+const runSh = (cmd, ms = 30000) => runCmd('sh', ['-c', cmd], ms);
+function firstLine(...ss) { for (const s of ss) { const l = String(s || '').split('\n').map((x) => x.trim()).find(Boolean); if (l) return cut(l, 160); } return ''; }
+
+// ---------- line splitting (shared by log watchers and command output) ----------
+class LineSplitter {
+  constructor(onLine) { this.onLine = onLine; this.dec = new StringDecoder('utf8'); this.partial = ''; }
+  write(buf) {
+    const text = this.partial + this.dec.write(buf);
+    const parts = text.split(/\r\n|\n|\r/);
+    this.partial = parts.pop();
+    for (const p of parts) { if (S.finished) return; if (p) this.onLine(p); }
+    if (this.partial.length > 1e6) { const p = this.partial; this.partial = ''; if (!S.finished) this.onLine(p); }
+  }
+  flushPartial() {
+    const p = this.partial;
+    this.partial = '';
+    if (p && !S.finished) this.onLine(p);
+  }
+  end() {
+    const rest = this.partial + this.dec.end();
+    this.partial = '';
+    if (rest && !S.finished) this.onLine(rest);
+  }
+}
+
+// ---------- conditions ----------
+const UNIT_RESULTS = new Set(['success', 'exit-code', 'signal', 'core-dump', 'timeout', 'watchdog', 'start-limit-hit',
+  'resources', 'protocol', 'oom-kill', 'skip-condition', 'done', 'merge']);
+const UNIT_ACTIVE = new Set(['active', 'inactive', 'failed', 'activating', 'deactivating', 'reloading', 'maintenance', 'refreshing']);
+const UNIT_LOAD = new Set(['loaded', 'not-found', 'bad-setting', 'error', 'masked', 'stub', 'merged']);
+function parseUnitOut(out) {
+  let lines = out.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.some((l) => /^(ActiveState|SubState|Result|LoadState)=/.test(l))) {
+    const kv = Object.fromEntries(lines.filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+    return { active: kv.ActiveState || '', sub: kv.SubState || '', result: kv.Result || '', load: kv.LoadState || '' };
+  }
+  const li = lines.findIndex((l) => UNIT_LOAD.has(l));
+  const load = li >= 0 ? lines[li] : '';
+  if (li >= 0) lines = lines.filter((_, i) => i !== li);
+  return { ...parseUnitValues(lines), load };
+}
+function parseUnitValues(lines) {
+  // `show --value` prints values in the unit's own property order (real systemd: Result, ActiveState,
+  // SubState); the spec order is ActiveState, SubState, Result. Tell them apart by vocabulary.
+  if (lines.length >= 3) {
+    if (UNIT_RESULTS.has(lines[0]) && UNIT_ACTIVE.has(lines[1])) return { result: lines[0], active: lines[1], sub: lines[2] };
+    if (UNIT_ACTIVE.has(lines[0])) return { active: lines[0], sub: lines[1], result: lines[2] };
+    return { result: lines[0], active: lines[1], sub: lines[2] };
+  }
+  return { active: lines[0] || '', sub: lines[1] || '', result: '' };
+}
+
+function jsonPick(obj, p) {
+  let cur = obj;
+  for (const k of p.split('.')) {
+    if (cur === null || cur === undefined || typeof cur !== 'object') return undefined;
+    cur = cur[k];
+  }
+  return cur;
+}
+
+function buildCondition(spec, o) {
+  const every = (def) => o.every ?? def;
+  const c = { spec, met: false, metAt: null, result: null, interval: every(2000) };
+  switch (spec.kind) {
+    case 'pid': {
+      c.alive = spec.pids.slice();
+      c.pending = () => `pid ${c.alive.join(',')} running`;
+      c.check = async () => {
+        c.alive = spec.pids.filter(pidAlive);
+        return c.alive.length ? null : { what: `pid ${spec.pids.join(',')} exited`, suffix: '' };
+      };
+      break;
+    }
+    case 'proc': {
+      c.hit = null;
+      c.pending = () => `proc ${spec.src} still running${c.hit ? ` (pid ${c.hit})` : ''}`;
+      c.check = async () => {
+        c.hit = findProc(spec.re);
+        return c.hit ? null : { what: `no process matching ${spec.src}`, suffix: '' };
+      };
+      break;
+    }
+    case 'file': {
+      c.state = '';
+      const label = { exists: `file ${spec.path}`, nonempty: `file ${spec.path} non-empty`, gone: `${spec.path} gone` }[spec.mode];
+      c.pending = () => `${label}${c.state ? ` (${c.state})` : ''}`;
+      c.check = async () => {
+        let st = null;
+        try { st = await fsp.stat(spec.path); } catch { st = null; }
+        if (spec.mode === 'gone') {
+          if (!st) return { what: `${spec.path} is gone`, suffix: '' };
+          c.state = 'still exists'; return null;
+        }
+        if (!st) { c.state = 'missing'; return null; }
+        if (spec.mode === 'nonempty' && !(st.size > 0)) { c.state = 'empty'; return null; }
+        return { what: spec.mode === 'nonempty' ? `file ${spec.path} is non-empty` : `file ${spec.path} exists`, suffix: '' };
+      };
+      break;
+    }
+    case 'log': {
+      c.pending = () => `log ${spec.path} ${spec.src}${c.watcher && !c.watcher.exists ? ' (file missing)' : ''}`;
+      c.check = null; // driven by the watcher
+      break;
+    }
+    case 'http': {
+      c.last = 'no response yet';
+      c.interval = every(5000);
+      const lab = `http ${spec.url}`;
+      c.pending = () => `${lab} (last: ${c.last})`;
+      c.check = async () => {
+        let res;
+        try { res = await fetch(spec.url, { signal: AbortSignal.timeout(10000) }); } catch (e) { c.last = errMsg(e); return null; }
+        const status = res.status;
+        let body = '';
+        try {
+          if (spec.bodyRe || spec.json.length) body = await res.text(); else await res.body?.cancel();
+        } catch (e) { c.last = `HTTP ${status}, ${errMsg(e)}`; return null; }
+        const statusOk = spec.status !== null ? status === spec.status : status >= 200 && status < 300;
+        if (!statusOk) { c.last = `HTTP ${status}`; return null; }
+        if (spec.bodyRe && !spec.bodyRe.test(body)) { c.last = `HTTP ${status}, body does not match`; return null; }
+        if (spec.json.length) {
+          let data;
+          try { data = JSON.parse(body); } catch { c.last = `HTTP ${status}, body is not JSON`; return null; }
+          for (const j of spec.json) {
+            const v = jsonPick(data, j.path);
+            const s = v === undefined ? undefined : typeof v === 'object' ? JSON.stringify(v) : String(v);
+            if (s !== j.value) { c.last = `HTTP ${status}, ${j.path}=${s === undefined ? '(missing)' : cut(s, 40)}`; return null; }
+          }
+        }
+        let what = `${lab} ${status}`;
+        if (spec.bodyRe) what += ` body ${spec.bodySrc}`;
+        if (spec.json.length) what += ` json ${spec.json.map((j) => `${j.path}=${j.value}`).join(' ')}`;
+        return { what, suffix: '' };
+      };
+      break;
+    }
+    case 'unit': {
+      c.last = '?';
+      c.fails = 0;
+      c.pending = () => `unit ${spec.name} (${c.last}, want ${spec.state})`;
+      c.check = async () => {
+        const args = [...(o.system ? [] : ['--user']), 'show', spec.name, '-p', 'ActiveState,SubState,Result,LoadState', '--value'];
+        const r = await runCmd('systemctl', args, 30000);
+        if (r.spawnError?.code === 'ENOENT') throw new RuntimeErr('systemctl not found');
+        if (r.code !== 0 || r.timedOut) {
+          if (++c.fails >= 5) throw new RuntimeErr(`unit ${spec.name}: systemctl failed ${c.fails} times in a row: ${r.timedOut ? 'timed out' : firstLine(r.err, r.out) || `exit ${r.code}`}`);
+          return null;
+        }
+        c.fails = 0;
+        const u = parseUnitOut(r.out);
+        if (u.load === 'not-found') {
+          if (!c.seenLoaded) throw new RuntimeErr(`unit ${spec.name} not found`);
+          // a transient unit that was loaded earlier and has been garbage-collected has finished
+          if (spec.state === 'inactive') return { what: `unit ${spec.name} inactive (no longer loaded)`, suffix: '' };
+          throw new RuntimeErr(`unit ${spec.name} not found (it disappeared while waiting)`);
+        }
+        if (u.load) c.seenLoaded = true;
+        c.last = u.active ? `${u.active}${u.sub ? '/' + u.sub : ''}` : '?';
+        const res = u.result ? ` (Result=${u.result})` : '';
+        if (spec.state === 'active' && u.active === 'active') return { what: `unit ${spec.name} active${u.sub ? ` (${u.sub})` : ''}`, suffix: '' };
+        if (spec.state === 'failed' && u.active === 'failed') return { what: `unit ${spec.name} failed${res}`, suffix: '' };
+        if (spec.state === 'inactive') {
+          if (u.active === 'inactive') return { what: `unit ${spec.name} inactive${res}`, suffix: '' };
+          if (u.active === 'failed') return { what: `unit ${spec.name} failed${res}`, suffix: '', failed: true };
+        }
+        return null;
+      };
+      break;
+    }
+    case 'slurm': {
+      c.interval = every(15000);
+      c.last = 'queued/running';
+      c.fails = 0;
+      const wrap = (cmd) => (spec.via ? `${spec.via} '${cmd}'` : cmd);
+      c.pending = () => `slurm ${spec.job} (${c.last})`;
+      c.check = async () => {
+        const r = await runSh(wrap(`squeue -h -j ${spec.job} -o %T`));
+        const all = `${r.out}\n${r.err}`;
+        let finished = false;
+        if (/Invalid job id/i.test(all)) finished = true;
+        else if (r.code === 0 && !r.timedOut) {
+          c.fails = 0;
+          const txt = r.out.trim();
+          if (!txt) finished = true; else { c.last = [...new Set(txt.split('\n').map((x) => x.trim()))].join(','); return null; }
+        } else {
+          c.fails++;
+          c.last = `squeue failing: ${r.timedOut ? 'timed out' : firstLine(r.err, r.out) || `exit ${r.code}`}`;
+          if (c.fails >= 5) throw new RuntimeErr(`slurm ${spec.job}: squeue failed ${c.fails} times in a row: ${c.last.replace(/^squeue failing: /, '')}`);
+          return null;
+        }
+        if (!finished) return null;
+        const sa = await runSh(wrap(`sacct -n -X -j ${spec.job} -o State,ExitCode,Elapsed`));
+        const ls = sa.code === 0 && !sa.timedOut ? sa.out.split('\n').map((x) => x.trim().replace(/\s+/g, ' ')).filter(Boolean) : [];
+        if (!ls.length) {
+          return { what: `slurm ${spec.job} left the queue`, suffix: ` (final state unknown: ${sa.code === 0 && !sa.timedOut ? 'sacct returned nothing' : 'sacct failed'})` };
+        }
+        // lines look like "COMPLETED 0:0 00:58:12" or "CANCELLED by 1000 0:0 00:01:02"; "CANCELLED+" is a truncated state
+        const parsed = ls.map((l) => {
+          const m = /^(\S+?)\+?(?: by \S+)?(?: (\S+))?(?: (\S+))?$/.exec(l);
+          return m ? { state: m[1].toUpperCase(), exit: m[2] || '?', elapsed: m[3] || '?', line: l } : { state: l.split(' ')[0].toUpperCase(), exit: '?', elapsed: '?', line: l };
+        });
+        const NONFINAL = new Set(['PENDING', 'RUNNING', 'COMPLETING', 'REQUEUED', 'RESIZING', 'SUSPENDED', 'CONFIGURING', 'REQUEUE_HOLD', 'REQUEUE_FED', 'RESV_DEL_HOLD', 'SIGNALING', 'STAGE_OUT', 'STOPPED']);
+        const live = parsed.find((x) => NONFINAL.has(x.state));
+        if (live) { c.last = `left squeue, sacct says ${live.state}`; return null; }
+        const bad = parsed.find((x) => x.state !== 'COMPLETED');
+        if (bad) return { what: `slurm ${spec.job} ended ${bad.state} (${bad.exit}, ${bad.elapsed})`, suffix: '', failed: true };
+        return { what: `slurm ${spec.job} left the queue`, suffix: ` (${ls.slice(0, 3).join('; ')}${ls.length > 3 ? '; ...' : ''})` };
+      };
+      break;
+    }
+    case 'until': {
+      c.last = '';
+      c.pending = () => `until '${cut(spec.cmd, 50)}'${c.last ? ` (${c.last})` : ''}`;
+      c.check = async () => {
+        const r = await runSh(spec.cmd);
+        if (r.code === 0 && !r.timedOut) return { what: `until '${cut(spec.cmd, 80)}' succeeded`, suffix: '' };
+        c.last = r.timedOut ? 'timed out' : `exit ${r.code}`;
+        return null;
+      };
+      break;
+    }
+  }
+  return c;
+}
+
+function pidAlive(pid) {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const st = stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3);
+    return st !== 'Z' && st !== 'X';
+  } catch (e) {
+    if (e.code === 'ENOENT' || e.code === 'ESRCH') {
+      if (fs.existsSync('/proc/self')) return false; // /proc available: no entry means gone
+    }
+    try { process.kill(pid, 0); return true; } catch (e2) { return e2.code === 'EPERM'; }
+  }
+}
+
+// waitfor itself and its ancestors (the calling shell, whose cmdline contains the regex) are never matched.
+function selfAndAncestors() {
+  const set = new Set([process.pid, 1]);
+  let p = process.ppid;
+  while (p > 1 && !set.has(p)) {
+    set.add(p);
+    try { p = +/^PPid:\s*(\d+)/m.exec(fs.readFileSync(`/proc/${p}/status`, 'utf8'))[1]; } catch { break; }
+  }
+  return set;
+}
+
+function findProc(re) {
+  const skip = selfAndAncestors();
+  let ents;
+  try { ents = fs.readdirSync('/proc'); } catch { throw new RuntimeErr('cannot read /proc (--proc needs Linux)'); }
+  for (const e of ents) {
+    if (!/^\d+$/.test(e) || skip.has(+e)) continue;
+    let cmd;
+    try { cmd = fs.readFileSync(`/proc/${e}/cmdline`, 'latin1'); } catch { continue; }
+    if (!cmd) continue;
+    cmd = cmd.replace(/\0/g, ' ').trim();
+    // cmdline was read as latin1 for speed; decode properly only when matching
+    const text = /[\x80-\xff]/.test(cmd) ? Buffer.from(cmd, 'latin1').toString('utf8') : cmd;
+    if (re.test(text)) return +e;
+  }
+  return null;
+}
+
+// ---------- log watcher ----------
+class Watcher {
+  constructor(file, fromStart, onLine) {
+    this.file = file; this.fromStart = fromStart; this.onLine = onLine;
+    this.offset = 0; this.ino = null; this.exists = false; this.sp = new LineSplitter(onLine); this.conds = [];
+    this.lastGrow = performance.now();
+  }
+  initSync() {
+    try {
+      const st = fs.statSync(this.file);
+      this.ino = st.ino; this.exists = true;
+      this.offset = this.fromStart ? 0 : st.size;
+    } catch { this.offset = 0; this.ino = null; this.exists = false; }
+  }
+  reset() { this.offset = 0; this.sp = new LineSplitter(this.onLine); }
+  // An unterminated last line that has not grown for 2 s is treated as complete.
+  checkPartial() {
+    if (this.sp.partial && performance.now() - this.lastGrow >= 2000) this.sp.flushPartial();
+  }
+  async poll() {
+    await this.pollOnce();
+    if (!S.finished) this.checkPartial();
+  }
+  async pollOnce() {
+    let st;
+    try { st = await fsp.stat(this.file); } catch {
+      if (this.exists) { this.reset(); this.ino = null; }
+      this.exists = false;
+      return;
+    }
+    this.exists = true;
+    if (this.ino !== null && st.ino !== this.ino) this.reset(); // replaced (rotation)
+    else if (st.size < this.offset) this.reset(); // truncated
+    this.ino = st.ino;
+    if (st.size <= this.offset) return;
+    let fh;
+    try { fh = await fsp.open(this.file, 'r'); } catch { return; }
+    try {
+      const buf = Buffer.allocUnsafe(256 * 1024);
+      while (!S.finished && this.offset < st.size) {
+        const { bytesRead } = await fh.read(buf, 0, Math.min(buf.length, st.size - this.offset), this.offset);
+        if (!bytesRead) break;
+        this.offset += bytesRead;
+        this.lastGrow = performance.now();
+        this.sp.write(buf.subarray(0, bytesRead));
+      }
+    } finally { await fh.close().catch(() => {}); }
+  }
+}
+
+// ---------- tails ----------
+function readTailLines(file, n, grepRe) {
+  let fd;
+  try { fd = fs.openSync(file, 'r'); } catch { return null; }
+  try {
+    const size = fs.fstatSync(fd).size;
+    const limit = 32 * 1024 * 1024;
+    let want = grepRe ? Math.min(size, limit) : Math.min(size, 64 * 1024);
+    for (;;) {
+      const start = size - want;
+      const buf = Buffer.alloc(want);
+      let got = 0;
+      while (got < want) { const r = fs.readSync(fd, buf, got, want - got, start + got); if (!r) break; got += r; }
+      let lines = buf.subarray(0, got).toString('utf8').split('\n');
+      if (start > 0) lines.shift(); // possibly partial first line
+      while (lines.length && lines[lines.length - 1] === '') lines.pop();
+      lines = lines.map(cleanLine);
+      if (grepRe) lines = lines.filter((l) => grepRe.test(l));
+      if (grepRe || start === 0 || lines.length > n || want >= limit) return lines.slice(-n);
+      want = Math.min(size, limit, want * 4);
+    }
+  } finally { fs.closeSync(fd); }
+}
+
+function buildTails(o, defaults) {
+  const specs = o.tails.length ? o.tails : defaults;
+  return specs.map(({ file, n }) => {
+    const lines = readTailLines(file, n, o.grep?.re);
+    if (lines === null) return { heading: `--- ${file} (missing)`, lines: [], total: 0 };
+    const kept = lines.map((l) => cut(l));
+    const heading = !kept.length ? `--- ${file} (${o.grep ? 'no lines match --grep' : 'empty'})` : `--- ${file} (last ${kept.length} lines)`;
+    return { heading, lines: kept, file, total: kept.length };
+  });
+}
+
+function assemble(head, tails, cap) {
+  head = head.map((l) => cut(l));
+  const parts = [...head];
+  let budget = cap - head.reduce((a, l) => a + l.length + 1, 0);
+  const cost = (t) => t.heading.length + 1 + t.lines.reduce((a, l) => a + l.length + 1, 0);
+  const order = tails.map((t, i) => ({ t, i })).sort((a, b) => cost(a.t) - cost(b.t));
+  const shown = new Array(tails.length);
+  let left = order.length;
+  for (const { t, i } of order) {
+    const share = Math.floor(budget / left--);
+    if (cost(t) <= share) { shown[i] = t; budget -= cost(t); continue; }
+    // keep the END of the tail, say how many lines were dropped
+    const headingFor = (k) => `--- ${t.file} (last ${k} of ${t.total} lines; ${t.total - k} dropped for --max-chars)`;
+    let used = 0;
+    const kept = [];
+    for (let j = t.lines.length - 1; j >= 0; j--) {
+      const l = t.lines[j];
+      if (headingFor(t.total).length + 1 + used + l.length + 1 > share) break;
+      used += l.length + 1; kept.unshift(l);
+    }
+    const heading = headingFor(kept.length);
+    shown[i] = { heading, lines: kept };
+    budget -= heading.length + 1 + used;
+  }
+  for (const t of shown) { parts.push(t.heading, ...t.lines); }
+  return parts.join('\n') + '\n';
+}
+
+// ---------- main ----------
+function printUsageError(msg) {
+  process.stderr.write(`error: ${msg}\nhint: run 'waitfor --help' for usage and examples\n`);
+  process.exit(64);
+}
+
+async function main() {
+  // undocumented helpers used by the test-suite: --_dur 90s 1h30m  /  --_fmt 751000
+  if (process.argv[2] === '--_dur' || process.argv[2] === '--_fmt') {
+    const lines = process.argv.slice(3).map((a) => {
+      try { return process.argv[2] === '--_dur' ? String(parseDur(a, '--_dur')) : fmtDur(Number(a)); } catch (e) { return `ERR ${e.message}`; }
+    });
+    process.stdout.write(lines.join('\n') + '\n');
+    process.exit(0);
+  }
+  let o;
+  try { o = parseArgs(process.argv.slice(2)); } catch (e) {
+    if (e instanceof UsageError) printUsageError(e.message);
+    throw e;
+  }
+  if (o.help) { process.stdout.write(HELP); process.exit(0); }
+  process.stdout.on('error', () => {});
+
+  const timers = [];
+  const outcome = {};
+  let conds = [];
+  const cmdForm = o.cmd !== null;
+  const cmdText = cmdForm ? cut(o.cmd.map(shq).join(' '), 120) : '';
+  let outPath = null;
+  const watcherList = [];
+
+  // signals
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.on(sig, () => {
+      S.sigCount++;
+      if (S.sigCount > 1 && S.cmd) killGroup(S.cmd.child, 'SIGKILL');
+      finish({ kind: 'interrupted', header: `interrupted after ${fmtDur(elapsed())}`, code: 130, signal: sig });
+    });
+  }
+
+  const onLine = (label) => (raw) => {
+    if (S.finished) return;
+    for (const f of o.fails) {
+      if (f.re.test(raw)) {
+        finish({ kind: 'failed', code: 2, header: `failed: ${label} matched ${f.src} after ${fmtDur(elapsed())}: ${cleanLine(raw)}` });
+        return;
+      }
+    }
+    if (o.progress && o.progress.re.test(raw)) S.progress = cleanLine(raw);
+  };
+
+  const onCondMet = (c) => {
+    if (S.finished) return;
+    const r = c.result;
+    if (r.failed) {
+      finish({ kind: 'failed', code: 2, header: `failed: ${r.what} after ${fmtDur(c.metAt)}${r.suffix}` });
+    } else if (!o.all) {
+      finish({ kind: 'done', code: 0, header: `done: ${r.what} after ${fmtDur(c.metAt)}${r.suffix}` });
+    } else if (conds.every((x) => x.met)) {
+      finish({ kind: 'done', code: 0, header: `done: all ${conds.length} conditions met after ${fmtDur(c.metAt)}` });
+    }
+  };
+
+  if (!cmdForm) {
+    const watchers = new Map();
+    const fromStart = o.fromStart;
+    const getWatcher = (p) => {
+      const key = path.resolve(p);
+      if (!watchers.has(key)) watchers.set(key, new Watcher(p, fromStart, null));
+      return watchers.get(key);
+    };
+    for (const p of o.logPaths) getWatcher(p);
+    for (const spec of o.conds) {
+      const c = buildCondition(spec, o);
+      conds.push(c);
+      if (spec.kind === 'log') { const w = getWatcher(spec.path); w.conds.push(c); c.watcher = w; }
+    }
+    for (const w of watchers.values()) {
+      const base = onLine(w.file);
+      w.onLine = (raw) => {
+        base(raw);
+        if (S.finished) return;
+        for (const c of w.conds) {
+          if (!c.met && c.spec.re.test(raw)) {
+            c.met = true; c.metAt = elapsed();
+            c.result = { what: `${w.file} matched ${c.spec.src}`, suffix: `: ${cleanLine(raw)}` };
+            onCondMet(c);
+            if (S.finished) return;
+          }
+        }
+      };
+      w.sp = new LineSplitter(w.onLine);
+      w.initSync();
+    }
+    watcherList.push(...watchers.values());
+    // start loops
+    const logInterval = Math.min(o.every ?? 2000, 1000);
+    for (const w of watchers.values()) {
+      (async () => {
+        while (!S.finished) {
+          try { await w.poll(); } catch { /* transient fs error: try again */ }
+          await sleep(logInterval);
+        }
+      })();
+    }
+    for (const c of conds) {
+      if (!c.check) continue;
+      (async () => {
+        while (!S.finished && !c.met) {
+          let r;
+          try { r = await c.check(); } catch (e) {
+            finish({ kind: 'error', code: 3, header: `error: ${e.message}` });
+            return;
+          }
+          if (S.finished) return;
+          if (r) { c.met = true; c.metAt = elapsed(); c.result = r; onCondMet(c); return; }
+          await sleep(c.interval);
+        }
+      })();
+    }
+    // a waiting loop with only log conditions and no other work is fine: timers keep the process alive
+  } else {
+    outPath = o.out || path.join(os.tmpdir(), `waitfor-${process.pid}.log`);
+    let fd;
+    try { fd = fs.openSync(outPath, 'w'); } catch (e) {
+      process.stdout.write(`error: cannot open output file ${outPath}: ${e.message}\n`);
+      process.exit(3);
+    }
+    const child = spawn(o.cmd[0], o.cmd.slice(1), { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const exited = childDone(child, (e) => {
+      finish({ kind: 'error', code: 3, header: `error: cannot run '${o.cmd[0]}': ${e.code || e.message}` });
+    });
+    S.cmd = { child, exited, done: false };
+    const lineCb = onLine('output');
+    const sps = [new LineSplitter(lineCb), new LineSplitter(lineCb)];
+    [child.stdout, child.stderr].forEach((s, i) => {
+      s.on('data', (d) => {
+        try { fs.writeSync(fd, d); } catch { /* disk full etc: keep going */ }
+        sps[i].write(d);
+      });
+    });
+    exited.then((r) => {
+      S.cmd.done = true;
+      const t = fmtDur(elapsed());
+      if (r.error) return;
+      for (const sp of sps) sp.end();
+      if (S.finished) return;
+      let code = r.code;
+      let how = `exit ${code}`;
+      if (code === null || code === undefined) {
+        code = 128 + (os.constants.signals[r.signal] || 0);
+        how = `killed by ${r.signal} (exit ${code})`;
+      }
+      finish({ kind: code === 0 ? 'done' : 'failed', code, exitCmd: true,
+        header: `${code === 0 ? 'done' : 'failed'}: ${how} after ${t}: ${cmdText}` });
+    });
+  }
+
+  // timeout
+  const deadline = o.timeoutMs;
+  const armTimeout = async () => {
+    if (S.finished) return;
+    const rem = deadline - elapsed();
+    if (rem <= 0) {
+      // about to give up: a pending unterminated log line counts as a complete line now
+      for (const w of watcherList) {
+        try { await w.poll(); } catch { /* ignore */ }
+        w.sp.flushPartial();
+        if (S.finished) return;
+      }
+      const unmet = cmdForm ? [`command to exit: ${cmdText}`] : conds.filter((c) => !c.met).map((c) => c.pending());
+      finish({ kind: 'timeout', code: 124, header: `timeout after ${fmtDur(elapsed())}: still waiting for ${unmet.join(', ')}${!o.timeoutGiven && !cmdForm ? ' (--timeout to wait longer)' : ''}` });
+      return;
+    }
+    const t = setTimeout(armTimeout, Math.min(rem, 2 ** 31 - 1));
+    timers.push(t);
+  };
+  if (deadline !== null) armTimeout();
+
+  const out = await donePromise;
+  for (const t of timers) clearTimeout(t);
+  for (const ch of S.children) killGroup(ch, 'SIGKILL');
+
+  // stop a still-running command (timeout, --fail, interrupt)
+  if (cmdForm && !S.cmd.done && S.cmd.child.pid) {
+    const sig = out.signal || 'SIGTERM';
+    killGroup(S.cmd.child, sig);
+    const raced = await Promise.race([S.cmd.exited.then(() => 'x'), sleep(5000).then(() => 'late')]);
+    if (raced === 'late') {
+      killGroup(S.cmd.child, 'SIGKILL');
+      await Promise.race([S.cmd.exited, sleep(2000)]);
+    }
+  }
+
+  // ---- report ----
+  const head = [out.header];
+  if (!o.quiet) {
+    if (o.all && !cmdForm) {
+      for (const c of conds) head.push(c.met ? `  met at ${fmtDur(c.metAt)}: ${c.result.what}${c.result.suffix}` : `  unmet: ${c.pending()}`);
+    }
+    const showProgress = S.progress && (out.kind === 'timeout' || out.kind === 'interrupted' || out.kind === 'error' || (out.kind === 'failed'));
+    if (showProgress) head.push(`last progress: ${S.progress}`);
+    if (cmdForm) head.push(`output: ${outPath}`);
+  }
+  let tails = [];
+  if (!o.quiet) tails = buildTails(o, cmdForm ? [{ file: outPath, n: 15 }] : []);
+  process.stdout.write(assemble(head, tails, o.maxChars), () => process.exit(out.code));
+}
+
+main().catch((e) => {
+  process.stdout.write(`error: ${e?.message || e}\n`, () => process.exit(3));
+});

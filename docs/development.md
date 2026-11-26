@@ -21,11 +21,26 @@ The app's capabilities (search, the browser, memory, the guide…) each live in 
 scratch data folder. `npm test` runs every one that needs nothing beyond a checkout, a few at a time (pull requests run
 it on GitHub too); `npm test -- memory guide/` runs those whose path has those words, and `npm test -- --all` those
 that need a display, another system or the network as well (email's `server/mail/live-test.ts` needs a throwaway test
-mail server, GreenMail in Docker: its first lines say how to start one). One by hand:
+mail server, GreenMail in Docker: its first lines say how to start one). `npm run check` (`scripts/check.mjs`) runs the type
+check and just the tests that belong to what changed: those beside a changed file (in its folder, else the nearest folder
+above that has any) and the ones named in its table of rules at the top (the guide's, the search box's, the release
+notes', the dictionaries'). It prints one line when all passes and otherwise only the errors and each failed test's
+message, with the full output in a log under the temporary folder (`hydor-check/`); `-- --base main` takes what changed
+since the branch left `main`, `-- --plan` says what would run and why, `-- pages` names tests as `npm test` does, and
+`node scripts/check.mjs --selftest` (also run by `server/check-test.ts`) checks the script itself. It runs tsc and the
+tests under `systemd-run --user --scope` with a memory cap (`CHECK_MEMORY_MAX`, 6G unless set) and `nice` where it can.
+One by hand:
 
 ```bash
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
 ```
+
+`scripts/agent-tools/` holds three small command-line tools for coding agents: `waitfor` (wait for a job in one call),
+`edits` (several exact search-and-replace edits in one call) and `sym` (a definition with its whole body, found by a
+parser). They are developer tools kept here: the app does not give them to agents. Put them on your `PATH` and tell your
+agents about them as its README says; their tests (`server/agent-tools-test.ts`) run with `npm test`, and with
+`npm run check` when something in that folder changes. They need nothing installed beyond Node.js; the parser and
+grammars `sym` uses are copied into the folder, with their licences in `NOTICE`.
 
 A scratch copy of the app (its own `DATA_DIR` and `PORT`, to try a change in a browser) shares your computer with the
 app you use. Give it a `HOME`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` of its own under `/tmp` too: its agents keep their
