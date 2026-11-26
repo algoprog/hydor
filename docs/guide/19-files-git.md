@@ -732,6 +732,7 @@ When your browser can't reach the preview port (you reach the app through a tunn
 
 To have the page itself in your browser rather than streamed:
 
+- behind Cloudflare (a Cloudflare Tunnel, or a name Cloudflare proxies to Hydor over https), nothing needs setting up: Preview shows the page itself at your Hydor name on port 8443, which Cloudflare carries to Hydor too. `PREVIEW_CF_PORT` picks another of the ports Cloudflare carries (2053, 2083, 2087 and 2096), and `0` turns this off.
 - on the same network, or over a VPN such as Tailscale or WireGuard, open the app at this computer's own address: the port works directly;
 - behind a tunnel or a proxy, give the preview port a hostname of its own (preview.example.com → localhost:8791) and start the app with `PREVIEW_ORIGIN` set to it.
 

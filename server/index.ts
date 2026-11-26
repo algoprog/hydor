@@ -59,7 +59,7 @@ import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAc
 import { buildCsp } from './csp.ts';
 import { webapps, webappsOptionsFromEnv } from './webapps/index.ts';
 import { carryPathWay } from './webapps/proxy.ts';
-import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
+import { carryPreviewPort, devServerShot, listDevServers, livePreview, PREVIEW_CF_PORT, PREVIEW_ORIGIN, PREVIEW_PORT, previewOriginFor, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import { moveFileComments } from './pages/filecomments.ts';
 import { keepPicture, markdownDoc } from './pages/index.ts';
@@ -2056,12 +2056,13 @@ app.register(async (scope) => {
 
 // ---- static web app ------------------------------------------------------------------------
 
-const CSP = buildCsp({ previewPort: PREVIEW_PORT, previewOrigin: PREVIEW_ORIGIN, apps: webappsOptionsFromEnv() });
+const CSP = buildCsp({ previewPort: PREVIEW_PORT, previewOrigin: PREVIEW_ORIGIN, previewCfPort: PREVIEW_PORT ? PREVIEW_CF_PORT : 0, apps: webappsOptionsFromEnv() });
 
 // ---- dev-server previews (server/preview.ts) -------------------------------------------------------
 
-startPreviewServer();
-app.get('/api/preview', async () => ({ servers: await listDevServers(), port: PREVIEW_PORT || null, origin: PREVIEW_ORIGIN || null }));
+// Behind Cloudflare, previews come on Hydor's own name at PREVIEW_CF_PORT: handed to the preview server.
+carryPreviewPort(app.server, startPreviewServer());
+app.get('/api/preview', async (req) => ({ servers: await listDevServers(), port: PREVIEW_PORT || null, origin: previewOriginFor(req.headers) }));
 app.post('/api/preview/link', async (req) => {
   const port = Number((req.body as any)?.port);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new HttpError(400, 'Pick a port');

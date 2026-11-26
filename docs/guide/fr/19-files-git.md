@@ -732,6 +732,7 @@ Quand votre navigateur ne peut pas atteindre le port d’aperçu (vous accédez 
 
 Pour avoir la page elle-même dans votre navigateur plutôt que diffusée :
 
+- derrière Cloudflare (un tunnel Cloudflare, ou un nom que Cloudflare relaie vers Hydor en https), rien n’est à configurer : Aperçu affiche la page elle-même à votre nom Hydor, sur le port 8443, que Cloudflare transmet aussi à Hydor. `PREVIEW_CF_PORT` choisit un autre des ports que Cloudflare transmet (2053, 2083, 2087 et 2096), et `0` désactive cela ;
 - sur le même réseau, ou via un VPN comme Tailscale ou WireGuard, ouvrez l’app à l’adresse propre de cet ordinateur : le port fonctionne directement ;
 - derrière un tunnel ou un proxy, donnez au port d’aperçu son propre nom d’hôte (preview.example.com → localhost:8791) et démarrez l’app avec `PREVIEW_ORIGIN` défini sur ce nom.
 

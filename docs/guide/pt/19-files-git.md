@@ -732,6 +732,7 @@ Quando o seu navegador não consegue alcançar a porta de prévia (por exemplo, 
 
 Para ter a própria página no seu navegador em vez de transmitida:
 
+- atrás do Cloudflare (um túnel do Cloudflare ou um nome que o Cloudflare encaminha para o Hydor por https), não há nada a configurar: a Prévia mostra a própria página no seu nome do Hydor, na porta 8443, que o Cloudflare também encaminha para o Hydor. `PREVIEW_CF_PORT` escolhe outra das portas que o Cloudflare encaminha (2053, 2083, 2087 e 2096), e `0` desativa isso.
 - na mesma rede, ou por uma VPN como Tailscale ou WireGuard, abra o app no endereço deste computador: a porta funciona diretamente;
 - atrás de um túnel ou de um proxy, dê à porta de prévia um hostname próprio (preview.example.com → localhost:8791) e inicie o app com `PREVIEW_ORIGIN` definido com ele.
 

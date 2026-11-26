@@ -9,13 +9,15 @@ export interface CspOptions {
   previewPort: number;
   /** Where browsers reach the preview port when it is not this host on that port, or "". */
   previewOrigin: string;
+  /** Behind Cloudflare, previews are at Hydor's own name on this port (0: not used). */
+  previewCfPort?: number;
   /** The apps' own server (web apps). */
   apps: FrameOptions;
 }
 
 export function buildCsp(o: CspOptions): string {
   const preview = o.previewPort ? ` http://*:${o.previewPort} https://*:${o.previewPort}` : "";
-  const previewOrigin = o.previewOrigin ? ` ${o.previewOrigin}` : "";
+  const previewOrigin = `${o.previewOrigin ? ` ${o.previewOrigin}` : ""}${o.previewCfPort ? ` https://*:${o.previewCfPort}` : ""}`;
   const apps = appFrameSources(o.apps)
     .map((s) => ` ${s}`)
     .join("");

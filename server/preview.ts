@@ -9,6 +9,10 @@
 // reach the preview port (the app behind a tunnel with one hostname), the page opens in the app's own
 // browser here instead and streams to Preview, which the user drives (livePreview); pictures of the screen
 // are taken here too (devServerShot), to save or hand to an agent.
+//
+// Behind Cloudflare (a tunnel, or a name it proxies), there is nothing to set up: Cloudflare carries Hydor's
+// own name on a few more HTTPS ports to the same place, so the preview is at that name on PREVIEW_CF_PORT
+// (8443), an origin of its own, and Hydor's server hands what comes on it to the preview server.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -23,6 +27,44 @@ import { readLink, signLink } from './links.ts';
 export const PREVIEW_PORT = Number(process.env.PREVIEW_PORT ?? 8791);
 /** Where browsers reach the preview port, when it is not the app's host on PREVIEW_PORT (a tunnel hostname, say). */
 export const PREVIEW_ORIGIN = (process.env.PREVIEW_ORIGIN ?? '').replace(/\/+$/, '');
+/**
+ * The port of Hydor's own name that previews use behind Cloudflare, which carries 8443 (and 2053, 2083, 2087, 2096) to the same
+ * tunnel or server as 443; 0: not used.
+ */
+export const PREVIEW_CF_PORT = ((n) => (Number.isInteger(n) && n >= 0 && n <= 65535 ? n : 8443))(Number(process.env.PREVIEW_CF_PORT ?? 8443));
+
+/** Cloudflare adds these to every request it passes on. */
+const viaCloudflare = (h: http.IncomingHttpHeaders) => typeof h['cf-ray'] === 'string' || typeof h['cf-visitor'] === 'string';
+
+/**
+ * Where a page reaches previews: PREVIEW_ORIGIN when it is set; for a page that reached Hydor through Cloudflare over https, Hydor's
+ * own name on PREVIEW_CF_PORT; else none (the page's own host on the preview port).
+ */
+export function previewOriginFor(h: http.IncomingHttpHeaders, o = { origin: PREVIEW_ORIGIN, port: PREVIEW_PORT, cfPort: PREVIEW_CF_PORT }): string | null {
+  if (o.origin) return o.origin;
+  if (!o.port || !o.cfPort || !viaCloudflare(h)) return null;
+  if (h['x-forwarded-proto'] !== 'https' && !String(h['cf-visitor'] ?? '').includes('https')) return null;
+  let name = '';
+  try {
+    name = new URL(`https://${String(h.host ?? '')}`).hostname;
+  } catch {}
+  if (!name || name === 'localhost' || name.endsWith('.localhost') || name.startsWith('[') || net.isIP(name)) return null;
+  return `https://${name}:${o.cfPort}`;
+}
+
+/**
+ * Hydor's server hands what Cloudflare brings on PREVIEW_CF_PORT (Host `<name>:8443`) to the preview server, requests and sockets as
+ * they come, before anything of its own sees them. Only what came through Cloudflare: nothing else names that port.
+ */
+export function carryPreviewPort(server: http.Server, preview: http.Server | null, cfPort = PREVIEW_CF_PORT): void {
+  if (!preview || !cfPort) return;
+  const on = (req: http.IncomingMessage) => viaCloudflare(req.headers) && String(req.headers.host ?? '').endsWith(`:${cfPort}`);
+  const emit = server.emit.bind(server) as (event: string | symbol, ...args: unknown[]) => boolean;
+  server.emit = ((event: string | symbol, ...args: unknown[]) => {
+    if ((event === 'request' || event === 'upgrade') && on(args[0] as http.IncomingMessage)) return preview.emit(event, ...args);
+    return emit(event, ...args);
+  }) as typeof server.emit;
+}
 
 const COOKIE = 'ac_preview';
 const SESSION_MS = 12 * 3600_000;

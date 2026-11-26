@@ -732,6 +732,7 @@ Cuando tu navegador no puede llegar al puerto de vista previa (por ejemplo, si a
 
 Para tener la propia página en tu navegador en lugar de transmitida:
 
+- detrás de Cloudflare (un túnel de Cloudflare o un nombre que Cloudflare redirige a Hydor por https), no hay nada que configurar: la vista previa muestra la página en sí en tu nombre de Hydor, en el puerto 8443, que Cloudflare también lleva a Hydor. `PREVIEW_CF_PORT` elige otro de los puertos que Cloudflare lleva (2053, 2083, 2087 y 2096), y `0` lo desactiva.
 - en la misma red, o mediante una VPN como Tailscale o WireGuard, abre la app en la dirección propia de esta computadora: el puerto funciona directamente;
 - detrás de un túnel o un proxy, dale al puerto de vista previa un nombre de host propio (preview.example.com → localhost:8791) e inicia la app con `PREVIEW_ORIGIN` configurado con él.
 

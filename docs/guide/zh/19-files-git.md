@@ -732,6 +732,7 @@ git 尚未跟踪的新文件，如果是小的文本文件就会显示出来。�
 
 如果想让页面本身在你的浏览器中打开，而不是传过来的画面：
 
+- 在 Cloudflare 后面（Cloudflare 隧道，或 Cloudflare 转发的名称）时无需任何设置：预览会在你的 Hydor 名称的 8443 端口上直接显示页面本身，Cloudflare 也会把这个端口转发到 Hydor。`PREVIEW_CF_PORT` 可以选择 Cloudflare 转发的其他端口（2053、2083、2087、2096），设为 `0` 则关闭此功能；
 - 在同一个网络中，或通过 Tailscale、WireGuard 之类的 VPN，用这台电脑自己的地址打开应用：这个端口可以直接使用；
 - 在隧道或代理后面时，给预览端口单独分配一个主机名（preview.example.com → localhost:8791），并在启动应用时把 `PREVIEW_ORIGIN` 设为它。
 

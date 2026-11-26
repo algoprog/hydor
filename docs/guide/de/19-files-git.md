@@ -732,6 +732,7 @@ Wenn dein Browser den Vorschau-Port nicht erreichen kann (du erreichst die App e
 
 Um die Seite selbst in deinem Browser zu haben statt gestreamt:
 
+- Hinter Cloudflare (einem Cloudflare-Tunnel oder einem Namen, den Cloudflare weiterleitet, über https) musst du nichts einrichten: Die Vorschau zeigt die Seite selbst unter deinem Hydor-Namen auf Port 8443, den Cloudflare auch zu Hydor weiterleitet. `PREVIEW_CF_PORT` wählt einen anderen der Ports, die Cloudflare weiterleitet (2053, 2083, 2087 und 2096), und `0` schaltet das aus.
 - Öffne Hydor im selben Netzwerk oder über Tailscale beziehungsweise WireGuard an der Computeradresse. Der Vorschauport ist dann direkt erreichbar.
 - Gib hinter Tunnel oder Proxy dem Vorschauport einen eigenen Hostnamen, etwa preview.example.com → localhost:8791, und starte Hydor mit entsprechendem `PREVIEW_ORIGIN`.
 
