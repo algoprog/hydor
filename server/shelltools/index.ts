@@ -1,7 +1,7 @@
-// Shell commands the app adds to every agent's PATH: waitfor (wait for a job in one call), edits (several exact edits in
-// one call), sym (a definition with its whole body) and leancheck (whether a Lean file's proofs hold: server/lean).
-// They are the programs in scripts/agent-tools/ (its README says
-// what each does). The app writes a small launcher for each into <data folder>/shelltools/bin at every start, which runs
+// Shell commands the app adds to every agent's PATH: waitfor (wait for a job in one call), job (long work the Jobs section
+// shows, after other jobs or in a queue: server/jobs), edits (several exact edits in one call), sym (a definition with its
+// whole body) and leancheck (whether a Lean file's proofs hold: server/lean). They are the programs in
+// scripts/agent-tools/ (its README says what each does). The app writes a small launcher for each into <data folder>/shelltools/bin at every start, which runs
 // the app's own Node.js on the tool (agents' shells have no node on their PATH: the tools start with
 // `#!/usr/bin/env node`), tries each launcher once, in the background, the way an agent's shell would run it, and
 // from then on puts that folder first on the PATH of every session it starts and tells it about the tools that worked.
@@ -15,7 +15,7 @@ import { agentBaseEnv } from '../env.ts';
 import type { Feature } from '../features/types.ts';
 import { bashCommand, bashPath, WIN } from '../platform.ts';
 
-export const TOOLS = ['waitfor', 'edits', 'sym', 'leancheck'] as const;
+export const TOOLS = ['waitfor', 'job', 'edits', 'sym', 'leancheck'] as const;
 export type Tool = (typeof TOOLS)[number];
 
 /** What each session is told, one bullet for each tool that works (the same text every time, so the provider's cache of it holds). */
@@ -23,6 +23,7 @@ export const SHELL_TOOLS_HEAD = 'Shell commands this app adds to your PATH (each
 export const SHELL_TOOLS_TEXT: Record<Tool, string> = {
   waitfor:
     '- waitfor: wait for a long job in ONE call instead of sleep/poll loops. Conditions: --pid, --proc, --file, --log FILE --match REGEX, --http URL, --unit, --slurm ID [--via \'ssh host\'], --until \'cmd\'. Add --fail REGEX to stop at the first crash line, --tail FILE:N to see the output, --timeout 30m. `--log FILE --match` sees only lines written after it starts, unless `--from-start`. `waitfor -- cmd args` runs a command and waits for it. Run it as a background command when the wait may take more than a few minutes.',
+  job: '- job: run long work (anything over ~10 minutes) so the user sees it in Hydor\'s Jobs section with its progress and time left: `job run --name \'what it is\' [--eta 2h] [--after ID|NAME] [--queue NAME] -- cmd args`, as a background command. It waits first for the jobs named in --after to finish and for its turn in its --queue (one job at a time per queue), then runs the command and ends with its exit code. Print progress as "step 120/500" or "42%" so the time left can be estimated. `job list`, `job wait ID`, `job stop ID`. `job adopt --pid PID --name \'…\' --log FILE` shows long work started earlier without restarting it.',
   edits:
     '- edits: several exact search/replace edits across files in one atomic call. It reads a script on stdin: `=== path` sections holding <<<<<<< SEARCH / ======= / >>>>>>> REPLACE blocks. Nothing is written unless every block matches exactly once, and it prints the changed lines with their numbers, so there is no need to re-read the files. Use it when changing more than one place.',
   sym: '- sym NAME...: a definition with its whole body and exact line range (TypeScript, JavaScript, Python, Rust). `sym --refs NAME` lists references, `sym --outline FILE` a file\'s declarations. Use grep for text and strings.',

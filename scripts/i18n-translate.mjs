@@ -375,6 +375,7 @@ const PARTS = {
   board: 'the board editor',
   browser: 'the web browser',
   agents: 'the Agents page',
+  jobs: 'the Jobs page: long computing work running in the background, such as builds and training runs, never employment',
 };
 const PART_RE = /^([a-z]+)::/;
 

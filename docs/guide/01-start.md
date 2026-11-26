@@ -20,7 +20,7 @@ The rail is a column of icons; point at one, or move to it with Tab, and a toolt
 
 - **Sessions**: shows your sessions in the sidebar. While you are on the start page or in a session, it hides or shows the sidebar (the same as Ctrl+B). From any other page it shows the sidebar and takes you back to the session you had open last in this window, or to the start page when there was none. While the sidebar is hidden, a small dot on this tile says something happened on another machine (see [Switch between machines](/guide/devices#switch-between-machines)).
 
-Then the sections of the app (the desktop app has seven; the web app and a phone have six, with no **Browser**):
+Then the sections of the app (the desktop app has eight; the web app and a phone have seven, with no **Browser**):
 
 - **Browser**: a browser of your own, only in the desktop app, with tabs, private tabs, a smart address bar, page translation, reader view, bookmarks, history, an ad blocker and Chrome extensions, from which you can hand a page to an agent. See [Your own browser](/guide/web#your-own-browser).
 - **Projects**: every project as a card, with what it holds and when it was last at work; a click on a card opens the project's details. See [Find all your projects](/guide/projects#find-all-your-projects).
@@ -29,6 +29,7 @@ Then the sections of the app (the desktop app has seven; the web app and a phone
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
 - **Git**: your repositories, their changes, branches and history, with a short tour the first time you open it. See [See your repositories on the Git page](/guide/files-git#see-your-repositories-on-the-git-page).
 - **Experiments**: training and evaluation jobs that wait for a free GPU, run on their own and are kept as records, with a short tour the first time you open it. See [Experiments](/guide/experiments).
+- **Jobs**: the long work your sessions run in the background, with how long it has left and what waits for what. A number on it says how many jobs are running. See [Jobs](/guide/jobs).
 
 Right under them, always in this place:
 
@@ -42,7 +43,7 @@ Then, after some space, the tools:
 - **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
 - **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
 
-The sections come in the order Browser, Projects, Files, Agents, Apps, Git, Experiments, then Inbox and Search, and the tools below them in the order Usage, System, Settings, Help: that is their usual order. To change it, drag a tile to another place among its own group (the sections, or the tools at the bottom); Inbox and Search stay right under the sections. A tile that a newer version brings takes its usual place in the order you set (Files right before Agents, say), not the end of the list. The tiles keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tile and choose **Back to the usual order** to put them all back. In a window too short for every tile, the rail scrolls.
+The sections come in the order Browser, Projects, Files, Agents, Apps, Git, Experiments, Jobs, then Inbox and Search, and the tools below them in the order Usage, System, Settings, Help: that is their usual order. To change it, drag a tile to another place among its own group (the sections, or the tools at the bottom); Inbox and Search stay right under the sections. A tile that a newer version brings takes its usual place in the order you set (Files right before Agents, say), not the end of the list. The tiles keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tile and choose **Back to the usual order** to put them all back. In a window too short for every tile, the rail scrolls.
 
 The sidebar with your sessions shows only on the start page, in a session and in its review. The **Apps**, **Agents**, **Help** and **Settings** have a column of the same kind, with the logo, their own list (the places of the Apps page and the Agents page, the guide's topics, Settings' sections) and **Hide sidebar**; the **Browser** page shows its tabs in a column of its own, and the other pages (Projects, Inbox, Usage, System…) use the whole width. **Ctrl+B** hides or shows the column of the page you are on, and every column has the same width. A column that holds more than fits shows its scroll bar, and its foot fades while there is more below. While the page reconnects to the app, a crossed-out Wi-Fi icon shows beside the logo at the top of the column, or at the top of the rail when no column is showing (it is hidden, or the page has none).
 
@@ -197,7 +198,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 
 ### What it finds
 
-- **Go to**: Hydor's pages, such as New session, Inbox, Files, Search in files, Git, Experiments, Terminal, Apps, New app, Projects, Shared knowledge, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
+- **Go to**: Hydor's pages, such as New session, Inbox, Files, Search in files, Git, Experiments, Jobs, Terminal, Apps, New app, Projects, Shared knowledge, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
 - **Actions**: Take the tour, What Hydor can do, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or project, Show or hide the terminal panel.
 - **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
 - **Themes**: the built-in themes and your own. Opening one switches to it.

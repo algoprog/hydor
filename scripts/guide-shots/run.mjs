@@ -139,7 +139,7 @@ function apiFor(cookie) {
  * rail shows the Browser, as in the app on a computer. */
 const DESKTOP = `window.hydorDesktop = { browser: new Proxy({}, { get: (_, k) => (typeof k !== 'string' || k === 'then' ? undefined : k.startsWith('on') ? () => () => {} : async () => null) }) };`;
 
-const pageScript = (theme, live) => `
+const pageScript = (theme, live, jobs) => `
 (() => {
   try {
     const k = 'wa.ui.v1';
@@ -161,7 +161,7 @@ const pageScript = (theme, live) => `
       desc.set.call(this, (ev) => {
         let e;
         try { e = JSON.parse(ev.data); } catch { return fn.call(this, ev); }
-        if (e.t === 'usage' || e.t === 'models') return;
+        if (e.t === 'usage' || e.t === 'models' || (e.t === 'jobs' && ${jobs})) return;
         if (e.t === 'live' && LIVE[e.key]) return;
         if (e.t === 'sessions' && e.upsert) {
           e.upsert = e.upsert.map((x) => (LIVE[x.key] ? { ...x, live: LIVE[x.key].live, ...(LIVE[x.key].goal ? { goal: LIVE[x.key].goal } : {}) } : x));
@@ -231,8 +231,8 @@ async function main() {
       await p.timezone('America/New_York');
       await p.cookie('wa_session', cookie, base);
       // Made afresh for each picture, so a card has waited seconds, not the minutes the run takes.
-      const fake = overrides(sessions, Date.now(), shot.goal);
-      await p.initScript(pageScript(theme, fake.live));
+      const fake = overrides(sessions, Date.now(), shot.goal, shot.jobs);
+      await p.initScript(pageScript(theme, fake.live, !!fake.jobs));
       if (LIST?.desktop && !shot.phone) await p.initScript(DESKTOP);
       await route(p, api, fake);
       const file = path.join(o.out, `${shot.id}${theme === 'light' ? '-light' : ''}.webp`);
@@ -249,11 +249,18 @@ async function main() {
 }
 
 /** The faked parts: sessions waiting on a card, Claude Code's models, the plans' usage, the inbox (and what waits on you
- * in While you were away), Settings → Models and the models it suggests, and Experiments' GPUs. */
+ * in While you were away), Settings → Models and the models it suggests, Experiments' GPUs, and the jobs in the
+ * background of a shot that asks for them. */
 async function route(p, api, fake) {
-  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|goals\/[^/?]+|usage|inbox|away(\?|$)|catalog\/claude|models(\?|$)|models\/picks|experiments\/queue)/, async (req) => {
+  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|goals\/[^/?]+|usage|inbox|away(\?|$)|catalog\/claude|models(\?|$)|models\/picks|experiments\/queue|jobs(\?|\/[^/?]+\/log|$))/, async (req) => {
     if (req.method !== 'GET') return null;
     const u = new URL(req.url);
+    // The Jobs page's list (the rail counts what runs in it) and a job's output.
+    if (u.pathname === '/api/jobs') return fake.jobs ? { json: { ...fake.jobs.list, at: Date.now() } } : null;
+    if (u.pathname.startsWith('/api/jobs/')) {
+      const text = fake.jobs?.logs[decodeURIComponent(u.pathname.slice('/api/jobs/'.length, -'/log'.length))];
+      return text ? { json: { text, size: text.length, updatedAt: Date.now() } } : null;
+    }
     // A goal at work (the Goals picture): the session's goal, as the loop would give it.
     if (u.pathname.startsWith('/api/goals/')) return fake.goal && decodeURIComponent(u.pathname.slice('/api/goals/'.length)) === fake.goal.key ? { json: { goal: fake.goal.state } } : null;
     if (u.pathname === '/api/models') return { json: fake.models(await api('GET', u.pathname)) };

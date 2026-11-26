@@ -1,5 +1,5 @@
-// The tools on the rail at the left edge (Browser, Projects, Files, Agents, Apps, Git, Experiments, then Inbox and
-// Search, and Usage, System…)
+// The tools on the rail at the left edge (Browser, Projects, Files, Agents, Apps, Git, Experiments, Jobs, then Inbox
+// and Search, and Usage, System…)
 // and the order you drag them into, which the server keeps for every device (server/sidebar). An order names the tools
 // first to last; any it leaves out (one a newer version brings) take their usual place: right before the next tool
 // that comes after them in the usual order, else last. The groups of projects and folders among the sessions
@@ -7,23 +7,24 @@
 import type { Agent } from './types.ts';
 
 /**
- * Every tool, in its usual order: Browser, Projects, Files, Agents, Apps, Git and Experiments (the sections, on the rail's
- * upper part, with the Inbox and Search right under them, which stay where they are), then Usage, System, Settings and
+ * Every tool, in its usual order: Browser, Projects, Files, Agents, Apps, Git, Experiments and Jobs (the sections, on the
+ * rail's upper part, with the Inbox and Search right under them, which stay where they are), then Usage, System, Settings and
  * Help (its lower part); a phone's drawer shows them all in one grid, six to a row. Each group keeps its own order on
  * the rail. Files and Git were tools of their own before 0.19.0, then tabs of System with Terminal, Preview and the
  * computer's monitor, and Experiments a tab of System since it came; all three are sections of their own again: Files
- * beside Projects, whose files it shows, Git and Experiments after Apps. Usage was a tab of System from 0.37.0 to 0.82.0
- * and is a tool of its own again. A capability's tool (Projects, Agents, Apps, Browser, Experiments) gives its name with
+ * beside Projects, whose files it shows, Git and Experiments after Apps. Jobs (the work running in the background)
+ * came as a section after Experiments. Usage was a tab of System from 0.37.0 to 0.82.0
+ * and is a tool of its own again. A capability's tool (Projects, Agents, Apps, Browser, Experiments, Jobs) gives its name with
  * its entry (WebFeature.nav). Orders kept on the server name them, so a name stays when its tool's page or label
  * changes. Projects had a tool until 0.92 and is one again (its page lists every project; a project's details open in
  * a window over it, or over any page). The Library is gone: what agents keep is a file of its project, in the
  * project's Files.
  */
-export const SIDEBAR_TOOLS = ['browser', 'spaces', 'files', 'agents', 'apps', 'git', 'experiments', 'search', 'usage', 'system', 'settings', 'help'] as const;
+export const SIDEBAR_TOOLS = ['browser', 'spaces', 'files', 'agents', 'apps', 'git', 'experiments', 'jobs', 'search', 'usage', 'system', 'settings', 'help'] as const;
 export type SidebarTool = (typeof SIDEBAR_TOOLS)[number];
 
 /** The tools that are sections of the app, on the rail's upper part; the rest are its lower part (Search sits under the sections, not among them). */
-export const SECTION_TOOLS: readonly SidebarTool[] = ['browser', 'spaces', 'files', 'agents', 'apps', 'git', 'experiments'];
+export const SECTION_TOOLS: readonly SidebarTool[] = ['browser', 'spaces', 'files', 'agents', 'apps', 'git', 'experiments', 'jobs'];
 
 /** Tools that moved into System, or went away (Terminal, Preview and the Library, 'pages'): an order kept from before still names them, and they are passed over. */
 export const RETIRED_TOOLS = ['terminal', 'preview', 'pages'];

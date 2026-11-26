@@ -35,7 +35,8 @@ One by hand:
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
 ```
 
-`scripts/agent-tools/` holds four small command-line tools for coding agents: `waitfor` (wait for a job in one call),
+`scripts/agent-tools/` holds five small command-line tools for coding agents: `waitfor` (wait for a job in one call),
+`job` (run long work that the Jobs section shows, after other jobs or in a queue: `server/jobs/` is its other half),
 `edits` (several exact search-and-replace edits in one call), `sym` (a definition with its whole body, found by a
 parser) and `leancheck` (whether a Lean file's proofs hold: `lib/lean/` is also what the server's Lean tools run,
 `server/lean/`). They are built into the app: every agent session it starts (Claude Code, Codex, Custom and the other ACP agents)
@@ -44,7 +45,7 @@ server writes a launcher for each into `<data folder>/shelltools/bin` (the app's
 app's own folder), tries each once with no node on the PATH, and puts that folder first on the PATH of each session it starts
 and names the tools that worked in its instructions. The desktop apps ship `scripts/agent-tools/bin` and `lib` (the list in
 `desktop/scripts/stage.sh`; Docker and a checkout have the whole folder), and `desktop/scripts/smoke.mjs`, which CI runs on
-every packed app, fails when the launchers the server wrote cannot run the three tools in a shell like an agent's (Git's bash
+every packed app, fails when the launchers the server wrote cannot run the tools in a shell like an agent's (Git's bash
 on Windows). `server/shelltools/shelltools-test.ts` has the launchers, the PATH each kind of agent gets and the staging list;
 the tools' own tests (`server/agent-tools-test.ts`) run with `npm test`, and with `npm run check` when something in that
 folder changes. They need nothing installed beyond Node.js; the parser and grammars `sym` uses are copied into the folder, with

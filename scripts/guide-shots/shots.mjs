@@ -327,6 +327,20 @@ export const SHOTS = [
       return p.shot(ctx.file, { clip: await main(p) });
     },
   },
+  {
+    // Jobs: what runs in the background and how long it has left, what waits (and for what), and a server left running;
+    // what finished lately is below the cut. The demo runs nothing, so the page is answered with made-up jobs (`jobs`:
+    // demo.mjs, run.mjs).
+    id: 'jobs',
+    jobs: true,
+    height: 1300,
+    async take(p, ctx) {
+      await ctx.go('/jobs', { settle: 1800 });
+      await p.park();
+      const servers = `js:[...document.querySelectorAll('main section')].find((s) => s.querySelector('h2')?.textContent === 'Servers')`;
+      return p.shot(ctx.file, { clip: await main(p, await bottomOf(p, servers, 14)) });
+    },
+  },
   settingsShot('custom', 'models', { height: 1101 }),
   settingsShot('app', 'general', { until: button('Import') }),
 ];

@@ -1064,6 +1064,8 @@ export type ServerEvent =
   | { t: 'notify'; n: NotifyEvent }
   | { t: 'machines' }
   | { t: 'tasks' }
+  /** How many background jobs run and wait now (shared/jobs.ts JobCounts), when that changes. */
+  | { t: 'jobs'; running: number; queued: number }
   | { t: 'themes'; themes: AppTheme[] };
 
 /** `device`: the settings this page's browser keeps (theme, language, sound…), sent when it connects and when one changes (shared/device.ts). */

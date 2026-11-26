@@ -74,7 +74,7 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   for search. When the indexer reads a new or changed document, the helper model adds a few notes and updates the
   wiki, a little at a time (a project with more documents than its limit has the pinned, most used and newest read into the wiki; agents search all of them); about once a day it also adds what a project's recent conversations and commits settled to that
   project's wiki. Agents are given a few lines from the wiki, with the notes, when they bear on a request, and read and write the wiki only through tools that keep it inside its folder. Notes and articles that name a project's files are checked against the code as it changes. [How memory works](memory.md) says what agents are given and when and how it stays true, and [Memory internals](memory-internals.md) how it is built.
-- **Four commands in every agent's shell.** `waitfor`, `edits`, `sym` and `leancheck` (the programs in `scripts/agent-tools/`) are
+- **Five commands in every agent's shell.** `waitfor`, `job`, `edits`, `sym` and `leancheck` (the programs in `scripts/agent-tools/`) are
   built in. (The folder is also last on the PATH a goal's check commands run with, so `leancheck` works there.) At each start the server writes a small launcher for each into `shelltools/bin` in its data folder (the app's
   own Node.js on the app's own copy of the tool, whatever the app's version or folder: agents' shells have no Node.js on
   their PATH), tries each once in the way an agent's shell runs it, and from then on puts that folder first on the PATH
@@ -83,6 +83,11 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   also given, in the app's own code (`server/steps/`; no setting and no switch), three lines on taking fewer, fuller
   steps, since each separate tool step re-reads the whole conversation: send independent lookups together, put several
   lookups in one command, and check on a long job at intervals that fit how long it should take.
+- **Jobs gathers the background work.** It reads sessions' background tasks, `job` jobs, runs of Experiments and Hydor
+  subagents (`server/jobs/`), reads each one's progress from the end of its output (`shared/job-progress.ts`) and keeps
+  what ended for a week. The `job` command registers its work with the app, with an address and a token every session's
+  environment holds, waits while the jobs it depends on and its queue say so, then runs the command itself; without the
+  app it just runs it.
 - **Proofs are checked by Lean.** When you agree, the app sets up Lean in `lean/` in its data folder (or uses your own,
   from your PATH), and Mathlib as one shared project there. Agents' tools and `leancheck` share one checker
   (`scripts/agent-tools/lib/lean/`). Its verdict does not trust what the checked file can change: the file is compiled,

@@ -1,5 +1,6 @@
-// The tools of the app's navigation (Browser, Projects, Files, Agents, Apps, Git, Experiments, Search, Usage, System,
-// Settings, Help): what each shows and where it goes, with the Usage bar and the Inbox count. The rail (Rail.tsx) shows
+// The tools of the app's navigation (Browser, Projects, Files, Agents, Apps, Git, Experiments, Jobs, Search, Usage, System,
+// Settings, Help): what each shows and where it goes, with the Usage bar, a capability's own mark (Jobs' count) and the
+// Inbox count. The rail (Rail.tsx) shows
 // them in two groups down the left edge; a phone's drawer (Sidebar.tsx) in one grid.
 import { useEffect, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
@@ -88,7 +89,7 @@ export function useTools(nav: (path: string) => void, searching: () => void, com
   const [loc] = useLocation();
   const updates = useApp((s) => (s.boot?.update?.behind ?? 0) > 0);
   return [
-    ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path), tour: n.id === 'apps' ? 'nav-apps' : undefined }))),
+    ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path), tour: n.id === 'apps' ? 'nav-apps' : undefined, extra: n.Extra ? <n.Extra compact={compact} /> : undefined }))),
     // The files on this computer, opened where you left them (a folder, a place, a file).
     { id: 'files', label: 'Files', icon: <Folder size={17} />, match: loc === '/files' || loc === '/file' || loc === '/search', go: () => nav(filesPlace()) },
     // The Git repositories your sessions work in.

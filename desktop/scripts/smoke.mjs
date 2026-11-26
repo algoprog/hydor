@@ -1,6 +1,6 @@
 // Checks a packed desktop app: its Node.js runs its server, which answers, with its native modules and (on macOS and
 // Linux) its tmux working. A Mac app's signature must check out too. The server must also have written the launchers of
-// the command-line tools every agent gets on its PATH (waitfor, edits, sym, leancheck: server/shelltools), and they must run
+// the command-line tools every agent gets on its PATH (waitfor, job, edits, sym, leancheck: server/shelltools), and they must run
 // from a shell with no node on its PATH, as an agent's shell runs them (on Windows, in Git's bash).
 //   node desktop/scripts/smoke.mjs dist/mac-arm64/Hydor.app    (dist/mac/ on Intel)
 //   node desktop/scripts/smoke.mjs dist/win-unpacked
@@ -128,7 +128,7 @@ if (!health) {
  */
 async function shellTools() {
   const bin = path.join(data, 'shelltools', 'bin');
-  const tools = ['waitfor', 'edits', 'sym', 'leancheck'];
+  const tools = ['waitfor', 'job', 'edits', 'sym', 'leancheck'];
   for (let i = 0; i < 60 && !tools.every((t) => fs.existsSync(path.join(bin, t))); i++) await new Promise((r) => setTimeout(r, 500));
   for (const t of tools) if (!fs.existsSync(path.join(bin, t))) throw new Error(`The server wrote no launcher for ${t} in ${bin}`);
   let bash = '/bin/bash';
@@ -158,6 +158,7 @@ async function shellTools() {
   };
   if (sh('command -v node || true').trim()) throw new Error('The shell used for the tools has a node on its PATH: it would prove nothing.');
   expect('waitfor', 'waitfor --help', /waitfor/);
+  expect('job', 'job --help', /job run/);
   expect('edits', 'edits --help', /edits/);
   expect('leancheck', 'leancheck --help', /leancheck/);
   expect('sym (its parser)', 'sym --outline check.ts', /\b1-3\b.*\bgreet\b/);

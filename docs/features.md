@@ -240,9 +240,10 @@ agents that speak ACP and take MCP servers.
   Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a project, and
   one session (the start page's Options, or the session's menu); the more specific wins. A changed session's
   agent follows the new ones from the next message. CLAUDE.md and AGENTS.md still work, and can be edited there too.
-- **Commands in every agent's shell** (`leancheck`, which says whether a Lean file's proofs hold, is a fourth: For researchers, below): `waitfor` (wait for a long job in one call: a program, a file, a line in a
+- **Commands in every agent's shell** (`leancheck`, which says whether a Lean file's proofs hold, is a fifth: For researchers, below): `waitfor` (wait for a long job in one call: a program, a file, a line in a
   log, a web address, a Slurm job, a systemd unit (Linux only) or a command, stopping at the first crash line, with the end of the log
-  shown), `edits` (several exact search-and-replace edits across files in one atomic call, printing the changed lines)
+  shown), `job` (long work that shows in Jobs with its progress and time left, after other jobs or in a queue, and
+  `job adopt` for work already running), `edits` (several exact search-and-replace edits across files in one atomic call, printing the changed lines)
   and `sym` (a definition with its whole body and exact line range, its references, or a file's declarations, in
   TypeScript, JavaScript, Python and Rust). Claude Code, Codex, Custom and the other agents find them on their PATH and
   are told what they do, in the desktop apps for Mac, Windows and Linux, in Docker and in a copy run from the
@@ -2088,6 +2089,18 @@ programs shows each program's version and what is out, with Check now, Update no
   sessions. The pictures are copied into the app and kept with the session (they go when it is deleted, the oldest first
   past 500 MB in all), so they stay after the agent cleans up its own files.
 - Every file a turn changed, with its diff, and the commits it made, each opening to its message and diff. Screenshots you attach show in the conversation and open full size.
+- **Jobs** (**Jobs** on the rail, `/jobs`, with a count of what runs; [guide](guide/31-jobs.md)): the long work running
+  in the background, all in one place: sessions' background commands, monitors and subagents (those of sessions in VS
+  Code or a terminal too), jobs run with the `job` command, runs of Experiments and Hydor subagents. Each running one
+  shows how long it has run, its progress and last line of output, and the time left, from what the job prints, how
+  fast its progress moves, the agent's estimate or how long the same command took before ("over its estimate" once
+  past it). Servers a session left running (a dev or API server, a notebook, a model server) are listed apart under
+  **Servers**, with no time left and outside the count. Queued ones say what they wait for (other jobs, their turn in a queue that runs one at a time, a free GPU)
+  and when they should start. **Finished** keeps the last 7 days (Done, Failed with the exit code, Stopped, Never
+  started, Ended when nobody saw how). A **Timeline** view draws them along the clock with their dependencies;
+  **Output** shows the end of a job's log, and **Stop** ends it after asking. Agents run long work with `job run`
+  (`--after` another job, `--queue`, `--eta`), as you ask in plain words, and `job adopt` shows work that is already
+  running without restarting it (not on Windows).
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - A message you send shows in the conversation at once, with the agent at work under it (or in the queue, when
   it waits there), before the agent has it, and the box is free for the next; one that does not go through comes

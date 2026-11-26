@@ -20,7 +20,7 @@ Die Werkzeugleiste ist eine Spalte aus Symbolen; zeigst du auf eines oder gehst 
 
 - **Sitzungen**: zeigt deine Sitzungen in der Seitenleiste. Auf der Startseite oder in einer Sitzung blendet die Kachel die Seitenleiste ein oder aus (wie Strg+B). Von jeder anderen Seite zeigt sie die Seitenleiste und bringt dich zur Sitzung, die du zuletzt in diesem Fenster geöffnet hattest, sonst zur Startseite. Solange die Seitenleiste ausgeblendet ist, zeigt ein kleiner Punkt auf dieser Kachel, dass auf einem anderen Computer etwas passiert ist (siehe [Zwischen Computern wechseln](/guide/devices#switch-between-machines)).
 
-Dann die Bereiche der App (die Desktop-App hat sieben; in der Web-App und auf dem Smartphone sind es sechs, ohne **Browser**):
+Dann die Bereiche der App (die Desktop-App hat acht; in der Web-App und auf dem Smartphone sind es sieben, ohne **Browser**):
 
 - **Browser**: ein eigener Browser, nur in der Desktop-App, mit Tabs, privaten Tabs, einer intelligenten Adressleiste, Seitenübersetzung, Leseansicht, Lesezeichen, Verlauf, einem Werbeblocker und Chrome-Erweiterungen, aus dem du einem Agenten eine Seite übergeben kannst. Siehe [Dein eigener Browser](/guide/web#your-own-browser).
 - **Projekte**: jedes Projekt als Karte, mit dem, was es enthält, und wann zuletzt darin gearbeitet wurde; ein Klick auf eine Karte öffnet die Details des Projekts. Siehe [Alle Projekte finden](/guide/projects#find-all-your-projects).
@@ -29,6 +29,7 @@ Dann die Bereiche der App (die Desktop-App hat sieben; in der Web-App und auf de
 - **Apps**: wiederkehrende Aufgaben, für die du ein Formular ausfüllst und ein Agent die Arbeit übernimmt. Siehe [Apps](/guide/apps).
 - **Git**: deine Repositorys mit ihren Änderungen, Branches und ihrem Verlauf, mit einem kurzen Rundgang, wenn du die Seite zum ersten Mal öffnest. Siehe [Repositorys auf der Git-Seite](/guide/files-git#see-your-repositories-on-the-git-page).
 - **Experimente**: Trainings- und Evaluationsjobs, die auf eine freie GPU warten, selbstständig laufen und als Aufzeichnungen aufbewahrt werden, mit einem kurzen Rundgang, wenn du die Seite zum ersten Mal öffnest. Siehe [Experimente](/guide/experiments).
+- **Jobs**: die langwierige Arbeit, die deine Sitzungen im Hintergrund ausführen, mit der verbleibenden Zeit und dem, was worauf wartet. Eine Zahl daran zeigt, wie viele Jobs laufen. Siehe [Jobs](/guide/jobs).
 
 Direkt darunter, immer an dieser Stelle:
 
@@ -42,7 +43,7 @@ Dann, nach etwas Abstand, die Werkzeuge:
 - **Einstellungen**: sämtliche App-Einstellungen. Ein Punkt zeigt eine verfügbare neue Version an. Siehe [Alle Einstellungen](/guide/settings).
 - **Hilfe**: öffnet diesen Leitfaden, in dem du auch einen Agenten zur App befragen kannst. Hier startet auch die Willkommenstour.
 
-Die Bereiche stehen in der Reihenfolge Browser, Projekte, Dateien, Agenten, Apps, Git, Experimente, dann Posteingang und Suchen, und die Werkzeuge darunter in der Reihenfolge Nutzung, System, Einstellungen, Hilfe: Das ist die Standardreihenfolge. Zum Ändern ziehst du eine Kachel an eine andere Position innerhalb ihrer Gruppe (der Bereiche oder der Werkzeuge ganz unten); Posteingang und Suchen bleiben direkt unter den Bereichen. Eine Kachel, die eine neuere Version mitbringt, nimmt ihren üblichen Platz in der Reihenfolge ein, die du festgelegt hast (Dateien etwa direkt vor Agenten), nicht das Ende der Liste. Deine Reihenfolge gilt auf allen Geräten und für alle angezeigten Computer. Nach einer Änderung stellt ein Rechtsklick auf eine Kachel und **Standardreihenfolge wiederherstellen** alles zurück. In einem zu niedrigen Fenster lässt sich die Werkzeugleiste scrollen.
+Die Bereiche stehen in der Reihenfolge Browser, Projekte, Dateien, Agenten, Apps, Git, Experimente, Jobs, dann Posteingang und Suchen, und die Werkzeuge darunter in der Reihenfolge Nutzung, System, Einstellungen, Hilfe: Das ist die Standardreihenfolge. Zum Ändern ziehst du eine Kachel an eine andere Position innerhalb ihrer Gruppe (der Bereiche oder der Werkzeuge ganz unten); Posteingang und Suchen bleiben direkt unter den Bereichen. Eine Kachel, die eine neuere Version mitbringt, nimmt ihren üblichen Platz in der Reihenfolge ein, die du festgelegt hast (Dateien etwa direkt vor Agenten), nicht das Ende der Liste. Deine Reihenfolge gilt auf allen Geräten und für alle angezeigten Computer. Nach einer Änderung stellt ein Rechtsklick auf eine Kachel und **Standardreihenfolge wiederherstellen** alles zurück. In einem zu niedrigen Fenster lässt sich die Werkzeugleiste scrollen.
 
 Die Seitenleiste mit deinen Sitzungen gibt es nur auf der Startseite, in einer Sitzung und in deren Review. **Apps**, **Agenten**, die **Hilfe** und die **Einstellungen** haben eine Spalte derselben Art, mit dem Logo, ihrer eigenen Liste (die Bereiche der Apps-Seite und der Agenten-Seite, die Themen der Hilfe, die Bereiche der Einstellungen) und **Seitenleiste ausblenden**; die Seite **Browser** zeigt ihre Tabs in einer eigenen Spalte, und die übrigen Seiten (Projekte, Posteingang, Nutzung, System …) nutzen die ganze Breite. **Strg+B** blendet die Spalte der Seite ein oder aus, auf der du bist, und alle Spalten sind gleich breit. Eine Spalte, die mehr enthält, als hineinpasst, zeigt ihre Bildlaufleiste, und ihr unteres Ende blendet aus, solange darunter noch mehr kommt. Während die Seite sich erneut mit der App verbindet, erscheint ein durchgestrichenes WLAN-Symbol neben dem Logo oben in der Spalte oder oben in der Werkzeugleiste, wenn keine Spalte zu sehen ist (sie ist ausgeblendet, oder die Seite hat keine).
 
@@ -197,7 +198,7 @@ Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight
 
 ### Was die Suche findet
 
-- **Gehe zu**: App-Seiten wie Neue Sitzung, Posteingang, Dateien, In Dateien suchen, Git, Experimente, Terminal, Apps, Neue App, Projekte, Gemeinsames Wissen, Veröffentlicht, Vorschau, Nutzung und Limits, Modell-Arena, Aktivität, System und Einstellungen.
+- **Gehe zu**: App-Seiten wie Neue Sitzung, Posteingang, Dateien, In Dateien suchen, Git, Experimente, Jobs, Terminal, Apps, Neue App, Projekte, Gemeinsames Wissen, Veröffentlicht, Vorschau, Nutzung und Limits, Modell-Arena, Aktivität, System und Einstellungen.
 - **Aktionen**: Tour starten, Was Hydor alles kann, Freihändig sprechen, Versionshinweise, Zwischen Hell und Dunkel wechseln, Seitenleiste ein- oder ausblenden, Sitzungen nach Ordner oder Projekt gruppieren, Terminalfenster ein- oder ausblenden.
 - **Einstellungen**: alle Einstellungsbereiche und ihre Optionen. Ein Treffer öffnet den Bereich und hebt die Option hervor.
 - **Designs**: integrierte und eigene Designs. Die Auswahl aktiviert das Design.

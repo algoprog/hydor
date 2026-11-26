@@ -1319,10 +1319,148 @@ function goalDemo(c, now) {
   return { state, summary };
 }
 
+// ---- jobs in the background (the Jobs picture) ---------------------------------------------------------
+
+/**
+ * What the Jobs page reads (shared/jobs.ts): nothing in the demo runs in the background, so the page is answered with
+ * Alex's research on the shop's search, all in times from `now`: four jobs running, three waiting (after another, and in
+ * the queue gpu), a dev server left running, and four that ended, each in another way. `logs` is each job's output, by id.
+ */
+function jobsDemo(s, now) {
+  const session = (name, title, project) => ({ key: s[name].key, title, ...(project ? { project } : {}) });
+  const search = session('search', 'Faster product search', { id: 'demo-shop', name: 'Shop website' });
+  const shop = session('applepay', 'Apple Pay at checkout', { id: 'demo-shop', name: 'Shop website' });
+  const thesis = session('thesis', 'Outline chapter 3', { id: 'demo-thesis', name: 'Thesis' });
+  const href = (x) => `/s/${encodeURIComponent(x.key)}`;
+  /** A little over the whole minutes, so a picture taken a few seconds later still says the same. */
+  const ahead = (min) => now + min * MIN + 20_000;
+  /** A background task of a session, or one run with the `job` command. */
+  const task = (id, name, x, o) => ({ id: `task:${x.key}:${id}`, name, session: x, cwd: s.search.cwd, output: { kind: 'task', sessionKey: x.key, taskId: id }, href: href(x), ...o });
+  const job = (id, name, x, o) => ({ id: `job:${id}`, kind: 'job', name, session: x, cwd: s.search.cwd, output: { kind: 'job' }, href: href(x), ...o });
+
+  const running = [
+    {
+      id: 'run:r-demo-reranker',
+      kind: 'experiment',
+      state: 'running',
+      name: 'Fine-tune the reranker',
+      command: 'python train.py --config configs/reranker.yaml --seed 1',
+      session: search,
+      startedAt: now - 114 * MIN,
+      progress: { fraction: 0.62, text: 'step 6,200/10,000', at: now - 5000 },
+      estimate: { endsAt: ahead(70), source: 'progress', confidence: 'high' },
+      lastLine: 'step=6200 train_loss=0.2184 dev_ndcg@10=0.5312 lr=7.60e-06',
+      output: { kind: 'run', runId: 'r-demo-reranker' },
+      href: '/experiments/r-demo-reranker',
+      stoppable: true,
+    },
+    job('j-index', 'Build the search index', search, {
+      state: 'running',
+      command: 'python build_index.py --passages data/passages.jsonl --out index/',
+      queue: 'gpu',
+      startedAt: now - 18 * MIN,
+      progress: { fraction: 0.42, text: 'step 8,400/20,000', at: now - 3000 },
+      estimate: { endsAt: ahead(25), source: 'progress', confidence: 'high' },
+      lastLine: 'step 8,400/20,000 · 3,725,000 passages indexed · 3,460 passages/s',
+      stoppable: true,
+    }),
+    task('b-download', 'Download the passages', search, {
+      kind: 'command',
+      state: 'running',
+      command: 'python scripts/download.py --set passages --to data/',
+      startedAt: now - 17 * MIN,
+      progress: { fraction: 0.81, text: '81%', at: now - 2000 },
+      estimate: { endsAt: ahead(4), source: 'output', confidence: 'high' },
+      lastLine: 'Fetching part 17 of 21: passages-017.jsonl.gz',
+      stoppable: true,
+    }),
+    task('a-review', 'Review the evaluation script', search, {
+      kind: 'subagent',
+      state: 'running',
+      startedAt: now - 6 * MIN,
+      lastLine: 'Checking how eval/ndcg.py counts passages with no judgment',
+      stoppable: true,
+    }),
+  ];
+
+  const queued = [
+    job('j-trec', 'Evaluate on TREC DL 2023', search, {
+      state: 'queued',
+      command: 'python eval.py --index index/ --topics trec-dl-2023',
+      queuedAt: now - 15 * MIN,
+      after: ['job:j-index'],
+      waitingFor: 'Build the search index',
+      startsAt: ahead(25),
+      estimate: { endsAt: ahead(37), source: 'history', confidence: 'low' },
+      output: undefined,
+      stoppable: true,
+    }),
+    job('j-lr', 'Sweep: learning rates', search, {
+      state: 'queued',
+      command: 'python sweep.py --over lr',
+      queuedAt: now - 12 * MIN,
+      queue: 'gpu',
+      position: 1,
+      waitingFor: 'its turn in queue gpu',
+      startsAt: ahead(25),
+      estimate: { endsAt: ahead(75), source: 'agent', confidence: 'low' },
+      output: undefined,
+      stoppable: true,
+    }),
+    job('j-batch', 'Sweep: batch sizes', search, {
+      state: 'queued',
+      command: 'python sweep.py --over batch',
+      queuedAt: now - 11 * MIN,
+      queue: 'gpu',
+      position: 2,
+      waitingFor: 'its turn in queue gpu',
+      startsAt: ahead(75),
+      estimate: { endsAt: ahead(130), source: 'agent', confidence: 'low' },
+      output: undefined,
+      stoppable: true,
+    }),
+  ];
+
+  const servers = [
+    task('b-dev', 'Dev server for the website', shop, {
+      kind: 'server',
+      state: 'running',
+      command: 'npm run dev',
+      startedAt: now - 3 * HOUR - 20 * MIN,
+      lastLine: 'Shop API listening on http://localhost:3000',
+      stoppable: true,
+    }),
+  ];
+
+  const ended = [
+    job('j-clean', 'Clean the crawl', search, { state: 'done', command: 'python clean.py data/crawl', startedAt: now - 43 * MIN, endedAt: now - 25 * MIN, exitCode: 0 }),
+    job('j-convert', 'Convert the PDFs', thesis, { state: 'failed', command: 'python convert.py sources/*.pdf', startedAt: now - 55 * MIN, endedAt: now - 52 * MIN, exitCode: 1, reason: 'Exit code 1', lastLine: 'ValueError: no text on page 4 of survey-scan-12.pdf' }),
+    job('j-plot', 'Plot the results', thesis, { state: 'cancelled', command: 'python plot.py results/', queuedAt: now - 54 * MIN, endedAt: now - 52 * MIN, after: ['job:j-convert'], reason: 'Waited for Convert the PDFs, which failed', output: undefined }),
+    job('j-negatives', 'Mine hard negatives', search, { state: 'done', command: 'python mine_negatives.py --top 100', startedAt: now - 5 * HOUR, endedAt: now - 2 * HOUR - 6 * MIN, exitUnknown: true }),
+  ];
+
+  const logs = {
+    'job:j-index': [
+      '$ python build_index.py --passages data/passages.jsonl --out index/',
+      'Loading the encoder: models/reranker-base (768 dimensions)',
+      'Passages: 8,841,823 in 20,000 steps of 443',
+      '',
+      ...[1200, 2400, 3600, 4800, 6000, 7200].map((n) => `step ${n.toLocaleString('en-US')}/20,000 · ${(n * 443).toLocaleString('en-US')} passages indexed · ${(3380 + ((n / 1200) % 4) * 35).toLocaleString('en-US')} passages/s`),
+      'Wrote index/shard-000.faiss (3.1 GB)',
+      'step 7,800/20,000 · 3,455,400 passages indexed · 3,440 passages/s',
+      'step 8,400/20,000 · 3,725,000 passages indexed · 3,460 passages/s',
+      '',
+    ].join('\n'),
+  };
+
+  return { list: { running, queued, servers, ended, allDoneAt: ahead(130), at: now }, logs };
+}
+
 // ---- answered to the page ---------------------------------------------------------------------------
 
-/** What the server can't show without a real agent or account: live states, cards, plan limits, the inbox. */
-export function overrides(s, now, goal) {
+/** What the server can't show without a real agent or account: live states, cards, plan limits, the inbox, and for a shot
+ * that asks (`jobs`), the work running in the background. */
+export function overrides(s, now, goal, jobs) {
   const commandCard = {
     id: 'demo-tests',
     itemId: s.checkout.waitingOn,
@@ -1509,7 +1647,7 @@ export function overrides(s, now, goal) {
     live[s.checkout.key] = { live: { status: 'working', startedAt: now - 41 * MIN, turnStartedAt: now - 3 * MIN, pendingApprovals: 0, model: 'opus', effort: 'high', mode: 'default', contextTokens: 88_400, contextWindow: 200_000 }, overlay: { items: [], patches: {}, approvals: [] }, goal: g.summary };
     return { live, usage, inbox, models, picks, gpus, away, goal: { key: s.checkout.key, state: g.state, summary: g.summary } };
   }
-  return { live, usage, inbox, models, picks, gpus, away };
+  return { live, usage, inbox, models, picks, gpus, away, ...(jobs ? { jobs: jobsDemo(s, now) } : {}) };
 }
 
 /** The models Claude Code offers, as its own program lists them (the stand-in program lists none). */

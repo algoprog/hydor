@@ -1,0 +1,631 @@
+#!/usr/bin/env node
+// job: run long work so Hydor's Jobs section shows it with its progress and time left, after other jobs or in a queue.
+// Talks to the app over HTTP (shared/jobs.ts has the contract); without the app it just runs the command.
+// Single file, no dependencies. See --help.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import tty from 'node:tty';
+import { spawn, spawnSync } from 'node:child_process';
+
+const HELP = `job - run long work that Hydor shows in its Jobs section with its progress and time left.
+
+Usage:
+  job run [options] -- COMMAND [ARGS...]     run COMMAND as a job; ends with its exit code
+  job adopt --pid PID [options]              show work that already runs as a job, without restarting it
+  job list [--all]                           the jobs running and queued (--all: and the last ended ones)
+  job status ID [--json]                     one job
+  job wait ID... [--timeout DUR]             block until the jobs end
+  job stop ID                                stop a job, or cancel one that waits
+
+Options of run:
+  --name TEXT           what it is, in a few words (default: the command, cut to 60 characters)
+  --eta DUR             how long you expect it to take: 45 (minutes), 90s, 45m, 2h, 1h30m
+  --after ID|NAME       start only when that job is done (repeatable; a name means the newest job with it).
+                        If it fails or is stopped, this job never starts.
+  --queue NAME          one job at a time per queue name, in the order they came
+  --progress REGEX      which lines say how far it is (capture groups: done and total, or a percent).
+                        Lines like "step 120/500" or "42%" are understood without it.
+
+Options of adopt: --pid PID, --name TEXT, --eta DUR, --progress REGEX as above, and
+  --log FILE            the file that process writes to, read for its progress and last line
+It prints "job <id> adopted: <name>" and returns at once (--after and --queue are only run's). The job ends when
+the process is gone, with its exit code unknown (for --after that counts as done). job stop sends that one process
+SIGTERM, then SIGKILL after 10 s.
+
+COMMAND is run as given; a single argument with spaces or shell syntax ('make && make test') is run with sh -c.
+Its output comes out as it is, and is also kept for the Jobs section. Run job as a background command.
+If Hydor cannot be reached or does not accept the session's sign-in, the command runs anyway (it is just not shown).
+--timeout DUR (of wait): 90 (seconds), 90s, 15m, 2h, 1h30m. Default: none.
+Limits: kill -9 of job alone leaves the command running (Hydor then shows the job as failed).
+Exit: run: the command's own (128+signal if killed), 2 not accepted (e.g. no such --after), 3 never started,
+      127/126 cannot run it. wait: 0 all done, 1 any failed, stopped or cancelled, 124 timeout.
+      adopt: 0 adopted, 2 refused or no such process, 1 Hydor not reachable or sign-in not accepted.
+      list, status, stop: 0, 2 refused, 3 Hydor not reachable. 64 usage.
+
+Examples:
+  job run --name 'Build the search index' --eta 2h -- python build_index.py --shards 8
+  job run --name 'Evaluate' --after 'Build the search index' --queue gpu -- 'make eval && make report'
+  job adopt --pid 4312 --name 'Crawl the archive' --log crawl.log
+  job list
+  job wait j-1a2b --timeout 1h
+`;
+
+class UsageError extends Error {}
+
+// JOB_FAKE_PLATFORM (the tests'): takes the macOS way to look at a process on Linux.
+const PLATFORM = process.env.JOB_FAKE_PLATFORM || process.platform;
+const IS_WIN = PLATFORM === 'win32';
+// JOB_TEST_SPEEDUP (the tests') divides every pause: between retries, between looks, and before SIGKILL.
+const SPEEDUP = Number(process.env.JOB_TEST_SPEEDUP) > 0 ? Number(process.env.JOB_TEST_SPEEDUP) : 1;
+const ms = (n) => Math.max(1, Math.round(n / SPEEDUP));
+const sleep = (n) => new Promise((r) => setTimeout(r, n));
+const cut = (l, n) => (l.length > n ? l.slice(0, n - 1) + '…' : l);
+const oneLine = (s) => String(s ?? '').replace(/[\x00-\x1f\x7f]+/g, ' ').trim();
+const shq = (a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, `'\\''`)}'`);
+const note = (s) => process.stderr.write(`${s}\n`);
+const out = (s) => process.stdout.write(`${s}\n`);
+const errMsg = (e) => String(e?.cause?.code || e?.cause?.message || e?.message || e).split('\n')[0];
+
+function fmtDur(n) {
+  const s = Math.max(0, Math.round(n / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const p2 = (x) => String(x).padStart(2, '0');
+  if (h) return `${h}h${p2(m)}m`;
+  if (m) return sec ? `${m}m${p2(sec)}s` : `${m}m`;
+  return `${sec}s`;
+}
+
+// waitfor's durations; a plain number counts in `plain` (seconds for --timeout, minutes for --eta).
+function parseDur(v, flag, plain = 's') {
+  const s = String(v).trim();
+  const mult = { ms: 1, s: 1000, m: 60000, h: 3600000 };
+  let n = null, m;
+  if ((m = /^(\d+(?:\.\d+)?|\.\d+)(ms|s|m|h)?$/.exec(s))) n = parseFloat(m[1]) * mult[m[2] || plain];
+  else if (s && (m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(s))) {
+    n = ((+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0)) * 1000;
+  }
+  if (n === null || !(n > 0)) {
+    throw new UsageError(`bad duration for ${flag}: '${v}' (use 90${plain === 'm' ? ' (minutes)' : ''}, 90s, 15m, 2h, 1h30m)`);
+  }
+  return Math.round(n);
+}
+
+// ---------- arguments ----------
+const VALUE_OPTS = { run: ['name', 'eta', 'after', 'queue', 'progress'], adopt: ['pid', 'name', 'log', 'eta', 'progress'], list: [], status: [], wait: ['timeout'], stop: [] };
+const BOOL_OPTS = { run: [], adopt: [], list: ['all'], status: ['json'], wait: [], stop: [] };
+
+function parseArgs(argv) {
+  const sub = argv[0];
+  if (sub === undefined || sub === '--help' || sub === '-h' || sub === 'help') return { help: true };
+  if (!Object.hasOwn(VALUE_OPTS, sub)) throw new UsageError(`unknown command '${sub}'`);
+  const o = { sub, ids: [], after: [], cmd: null, all: false, json: false };
+  for (let i = 1; i < argv.length; i++) {
+    let tok = argv[i];
+    if (tok === '--' && sub === 'run') { o.cmd = argv.slice(i + 1); break; }
+    if (tok === '-h' || tok === '--help') return { help: true };
+    if (!tok.startsWith('--')) {
+      if (sub === 'run') throw new UsageError(`unexpected argument '${tok}' (the command goes after --)`);
+      o.ids.push(tok);
+      continue;
+    }
+    let name = tok.slice(2), val;
+    const eq = name.indexOf('=');
+    if (eq > 0) { val = name.slice(eq + 1); name = name.slice(0, eq); }
+    if (BOOL_OPTS[sub].includes(name)) {
+      if (val !== undefined) throw new UsageError(`--${name} takes no value`);
+      o[name] = true;
+      continue;
+    }
+    if (!VALUE_OPTS[sub].includes(name)) throw new UsageError(`unknown option '--${name}' for job ${sub}`);
+    if (val === undefined) {
+      if (i + 1 >= argv.length || argv[i + 1] === '--') throw new UsageError(`--${name} needs a value`);
+      val = argv[++i];
+    }
+    if (!val.trim()) throw new UsageError(`--${name} needs a value`);
+    if (name === 'after') o.after.push(val);
+    else if (name === 'eta') o.etaMs = parseDur(val, '--eta', 'm');
+    else if (name === 'timeout') o.timeoutMs = parseDur(val, '--timeout');
+    else if (name === 'pid') {
+      if (!/^\d+$/.test(val) || +val < 2) throw new UsageError(`bad process id for --pid: '${val}'`);
+      o.pid = +val;
+    }
+    else if (name === 'progress') {
+      // The server reads the lines; a pattern that is no regular expression is said here, before anything waits.
+      try { new RegExp(val); } catch (e) { throw new UsageError(`invalid regex for --progress: ${val} (${String(e.message).replace(/^Invalid regular expression: /, '')})`); }
+      o.progress = val;
+    } else o[name] = val;
+  }
+  if (sub === 'run') {
+    if (o.cmd === null) throw new UsageError("job run needs '-- COMMAND'");
+    if (!o.cmd.length || !o.cmd[0]) throw new UsageError('no command given after --');
+  } else if (sub === 'list' || sub === 'adopt') {
+    if (o.ids.length) throw new UsageError(`unexpected argument '${o.ids[0]}'`);
+    if (sub === 'adopt' && !o.pid) throw new UsageError('job adopt needs --pid');
+  } else if (sub === 'wait') {
+    if (!o.ids.length) throw new UsageError('job wait needs a job id');
+  } else if (o.ids.length !== 1) throw new UsageError(`job ${sub} needs one job id`);
+  return o;
+}
+
+// ---------- the app ----------
+function appEnv() {
+  const url = process.env.HYDOR_JOBS_URL, token = process.env.HYDOR_JOBS_TOKEN;
+  return url && token ? { url: url.replace(/\/+$/, ''), token } : null;
+}
+
+/** One request: { status, data } (data: the JSON answered, or null); throws when nothing answers. */
+async function call(app, method, tail = '', body, { timeout = 10_000, signal } = {}) {
+  const limit = AbortSignal.timeout(timeout);
+  const res = await fetch(app.url + tail, {
+    method,
+    headers: { authorization: `Bearer ${app.token}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: signal ? AbortSignal.any([signal, limit]) : limit,
+  });
+  let data = null;
+  try { data = JSON.parse(await res.text()); } catch { /* not JSON */ }
+  return { status: res.status, data };
+}
+const okStatus = (s) => s >= 200 && s < 300;
+const errorWords = (r) => oneLine(typeof r.data?.error === 'string' && r.data.error ? r.data.error : `Hydor answered ${r.status}`);
+
+// ---------- running a command ----------
+function isFile(p) { try { return fs.statSync(p).isFile(); } catch { return false; } }
+const onPath = (env = process.env) => String(env.PATH ?? env.Path ?? '').split(path.delimiter).filter(Boolean);
+// `sh` on PATH (Git for Windows puts one there).
+function findSh(env = process.env) {
+  for (const d of onPath(env)) for (const n of ['sh.exe', 'sh']) if (isFile(path.join(d, n))) return path.join(d, n);
+  return null;
+}
+
+// How to start the command (waitfor's way). Windows cannot start .cmd/.bat/extensionless scripts directly (Node refuses
+// without a shell), so when the command resolves to one of those and sh is there, sh starts it.
+function spawnPlan(cmd, env = process.env, exists = isFile) {
+  const direct = { file: cmd[0], args: cmd.slice(1) };
+  if (!IS_WIN) return direct;
+  const name = cmd[0];
+  const hasDir = /[\\/]/.test(name);
+  const dirs = hasDir ? [''] : ['.', ...onPath(env)];
+  const hasExt = /\.[^\\/.]+$/.test(name);
+  const order = hasExt ? [''] : ['.exe', '.com', '.cmd', '.bat', ''];
+  for (const d of dirs) {
+    for (const e of order) {
+      const f = path.join(d, name + e);
+      if (!exists(f)) continue;
+      if (/\.(exe|com)$/i.test(f)) return direct;
+      const sh = findSh(env);
+      return sh ? { file: sh, args: ['-c', 'exec "$@"', 'sh', ...cmd] } : direct;
+    }
+  }
+  return direct;
+}
+
+// One argument that is a line of shell ('a && b'), not the path of a program that happens to have a space.
+const isShellLine = (cmd) => cmd.length === 1 && /[\s;&|<>()$`*?'"]/.test(cmd[0]) && !isFile(cmd[0]);
+const commandText = (cmd) => (isShellLine(cmd) || cmd.length === 1 ? cmd[0] : cmd.map(shq).join(' '));
+const planOf = (cmd) => (isShellLine(cmd) ? { file: (IS_WIN && findSh()) || 'sh', args: ['-c', cmd[0]] } : spawnPlan(cmd));
+
+function signalGroup(child, sig) {
+  if (!child?.pid) return;
+  if (IS_WIN) {
+    // no process groups or signals on Windows: taskkill takes the whole tree down
+    let ok = false;
+    try { ok = spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 10000 }).status === 0; } catch { /* fall back */ }
+    if (!ok) { try { child.kill(); } catch { /* gone */ } }
+    return;
+  }
+  try { process.kill(-child.pid, sig); } catch { try { child.kill(sig); } catch { /* gone */ } }
+}
+function groupAlive(pid) {
+  if (IS_WIN) return false;
+  try { process.kill(-pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+}
+
+// Resolves when the child has exited and its output closed (or 300 ms after exit if a grandchild holds the pipes).
+function childDone(child) {
+  return new Promise((resolve) => {
+    let settled = false, exitInfo = null;
+    const settle = (v) => { if (!settled) { settled = true; resolve(v); } };
+    child.on('error', (e) => settle({ code: null, signal: null, error: e }));
+    child.on('exit', (code, signal) => {
+      exitInfo = { code, signal };
+      setTimeout(() => settle(exitInfo), 300).unref?.();
+    });
+    child.on('close', (code, signal) => settle({ code, signal }));
+  });
+}
+
+// ---------- signals ----------
+// One handler from the start: while it waits there is no command to stop, only the wait.
+const S = { signal: null, child: null, killTimer: null, abort: new AbortController() };
+const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+const exitFor = (sig) => 128 + (os.constants.signals[sig] || 0);
+
+function onSignal(sig) {
+  if (S.signal) { if (S.child) signalGroup(S.child, 'SIGKILL'); return; } // asked twice: no more patience
+  S.signal = sig;
+  S.abort.abort();
+  if (!S.child) return;
+  signalGroup(S.child, 'SIGTERM');
+  S.killTimer = setTimeout(() => signalGroup(S.child, 'SIGKILL'), ms(10_000));
+}
+
+/**
+ * Starts the command in a process group of its own, passing its output through (and into `log`), and calls `started`
+ * with it. Resolves { code, signal, error } once it ended, and after a stop once nothing of its group is left.
+ */
+async function runCommand(cmd, { log = null, env = process.env, started } = {}) {
+  let fd = null;
+  if (log) {
+    try {
+      fs.mkdirSync(path.dirname(log), { recursive: true });
+      fd = fs.openSync(log, 'a');
+    } catch (e) {
+      note(`job: cannot write ${log} (${e.code || e.message}): the Jobs section will not show its output`);
+    }
+  }
+  const plan = planOf(cmd);
+  let child;
+  try {
+    child = spawn(plan.file, plan.args, {
+      // A terminal is not handed on: a group in the background that reads it would be stopped by the system.
+      // (Not process.stdin.isTTY: making that stream would turn a shared pipe non-blocking under the command.)
+      stdio: [tty.isatty(0) ? 'ignore' : 'inherit', 'pipe', 'pipe'],
+      detached: !IS_WIN,
+      windowsHide: true,
+      env,
+    });
+  } catch (e) {
+    if (fd !== null) fs.closeSync(fd);
+    return { code: null, signal: null, error: e };
+  }
+  const ended = childDone(child);
+  for (const [from, to] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
+    from?.on('data', (d) => {
+      if (fd !== null) { try { fs.writeSync(fd, d); } catch { /* disk full etc: keep going */ } }
+      // A slow reader holds the command back, as it would without us; a reader that is gone does not.
+      if (!to.destroyed && !to.errored && to.write(d) === false) {
+        from.pause();
+        const resume = () => { to.off('drain', resume); to.off('error', resume); to.off('close', resume); from.resume(); };
+        to.on('drain', resume); to.on('error', resume); to.on('close', resume);
+      }
+    });
+  }
+  if (child.pid) {
+    S.child = child;
+    // A signal that came between the last look and the start.
+    if (S.signal) { signalGroup(child, 'SIGTERM'); S.killTimer = setTimeout(() => signalGroup(child, 'SIGKILL'), ms(10_000)); }
+    started?.(child);
+  }
+  const r = await ended;
+  if (S.signal && child.pid) {
+    // The command may have ended while others of its group still run: they get the rest of the 10 s.
+    const deadline = Date.now() + ms(10_000);
+    while (groupAlive(child.pid) && Date.now() < deadline) await sleep(50);
+    if (groupAlive(child.pid)) signalGroup(child, 'SIGKILL');
+  }
+  clearTimeout(S.killTimer);
+  S.child = null;
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+  if (fd !== null) fs.closeSync(fd);
+  return r;
+}
+
+/** The exit code `job` ends with for how the command ended, saying why when it could not be started. */
+function exitCodeOf(r, cmd) {
+  if (r.error) {
+    note(`job: cannot run '${cmd[0]}': ${r.error.code || r.error.message}`);
+    return r.error.code === 'ENOENT' ? 127 : 126;
+  }
+  return r.code ?? exitFor(r.signal);
+}
+
+// ---------- run ----------
+/** Tells the app how the job is doing: up to 3 more tries over about 10 s, then a note. Never throws. */
+async function report(app, id, body) {
+  let why = '';
+  for (const pause of [0, 1000, 3000, 6000]) {
+    if (pause) await sleep(ms(pause));
+    try {
+      const r = await call(app, 'POST', `/${encodeURIComponent(id)}`, body, { timeout: 5000 });
+      if (okStatus(r.status)) return;
+      why = errorWords(r);
+      if (r.status < 500 && ![401, 408, 429].includes(r.status)) break; // asking again would get the same answer
+    } catch (e) {
+      why = errMsg(e);
+    }
+  }
+  note(`job: could not tell Hydor that job ${id} is ${body.state}: ${why}`);
+}
+
+/**
+ * Registers the job: { job } when taken; { refused } for a 400 (what was asked is wrong, an unknown --after), the one
+ * answer that keeps a command from running; { denied } for a sign-in not accepted; { unreachable } for anything else.
+ */
+async function register(app, body) {
+  try {
+    const r = await call(app, 'POST', '', body);
+    if (okStatus(r.status) && typeof r.data?.id === 'string' && r.data.id) return { job: r.data };
+    if (r.status === 400) return { refused: errorWords(r) };
+    if (r.status === 401 || r.status === 403) return { denied: true };
+    return { unreachable: true };
+  } catch {
+    return { unreachable: true };
+  }
+}
+
+/** Waits for its turn: null to start, else why it never will. Returns early (null) when a signal came. */
+async function waitForGo(app, job) {
+  let said = job.waitingFor ?? '';
+  note(`job ${job.id} waits: ${oneLine(said) || 'its turn'}`);
+  let fails = 0, refusals = 0, saidDown = false;
+  while (!S.signal) {
+    const t0 = Date.now();
+    let go = null;
+    try {
+      const r = await call(app, 'GET', `/${encodeURIComponent(job.id)}/go`, undefined, { timeout: 35_000, signal: S.abort.signal });
+      if (okStatus(r.status) && r.data) { go = r.data; refusals = 0; }
+      // A 4xx can pass (the app just restarted): only one that stays means this job will not be started.
+      else if (r.status >= 400 && r.status < 500 && ++refusals >= 12) return errorWords(r);
+    } catch {
+      refusals = 0;
+    }
+    if (S.signal) break;
+    if (go?.start === true) return null;
+    if (typeof go?.cancel === 'string') return oneLine(go.cancel) || 'it was cancelled';
+    if (go) {
+      fails = 0;
+      if (typeof go.wait === 'string' && go.wait !== said) { said = go.wait; note(`job ${job.id} waits: ${oneLine(said)}`); }
+      // The app holds the request while there is nothing to say; one that answers at once is not asked at once again.
+      if (Date.now() - t0 < ms(1000)) await sleep(ms(1000));
+    } else {
+      if (++fails >= 5 && !saidDown) { saidDown = true; note(`job ${job.id}: Hydor is not answering; still waiting`); }
+      await sleep(ms(Math.min(5000, 500 * 2 ** Math.min(fails - 1, 4))));
+    }
+  }
+  return null;
+}
+
+async function cmdRun(o) {
+  for (const sig of SIGNALS) process.on(sig, () => onSignal(sig));
+  const command = commandText(o.cmd);
+  const name = o.name ?? cut(oneLine(command), 60);
+  const app = appEnv();
+  const reg = app
+    ? await register(app, { name, command, cwd: process.cwd(), pid: process.pid, etaMs: o.etaMs, after: o.after.length ? o.after : undefined, queue: o.queue, progress: o.progress })
+    : { unreachable: true };
+  if (reg.refused) {
+    note(`job: ${reg.refused}`);
+    return 2;
+  }
+  if (reg.unreachable || reg.denied) {
+    note(`job: ${reg.denied ? 'Hydor did not accept this session\'s sign-in' : 'Hydor is not reachable'}; running without registering`);
+    if (S.signal) return exitFor(S.signal);
+    const r = await runCommand(o.cmd);
+    return S.signal ? exitFor(S.signal) : exitCodeOf(r, o.cmd);
+  }
+
+  const job = reg.job;
+  if (job.start !== true && !S.signal) {
+    const never = await waitForGo(app, job);
+    if (never !== null) {
+      note(`job ${job.id} never started: ${never}`);
+      return 3;
+    }
+  }
+  if (S.signal) {
+    await report(app, job.id, { state: 'stopped', signal: S.signal });
+    return exitFor(S.signal);
+  }
+
+  let running = Promise.resolve();
+  const r = await runCommand(o.cmd, {
+    log: typeof job.log === 'string' && job.log ? job.log : null,
+    // Python holds its output back when it goes to a pipe: the progress would be read minutes late.
+    env: { PYTHONUNBUFFERED: '1', ...process.env },
+    started: (child) => {
+      note(`job ${job.id} started: ${oneLine(name)}`);
+      running = report(app, job.id, { state: 'running', pid: child.pid });
+    },
+  });
+  const code = S.signal ? exitFor(S.signal) : exitCodeOf(r, o.cmd);
+  // Stopped: by a signal to us, or the command ended by one of those a stop sends (a crash or the kernel's SIGKILL is a failure).
+  const state = S.signal || SIGNALS.includes(r.signal) ? 'stopped' : code === 0 && !r.error ? 'done' : 'failed';
+  await running; // in order: an end that arrived first would be overwritten
+  await report(app, job.id, { state, exitCode: code, signal: r.signal ?? S.signal ?? undefined });
+  return code;
+}
+
+// ---------- adopt ----------
+/** What a running process is: { command, cwd? }, or null when there is none (or only what is left of an ended one). */
+function lookAt(pid) {
+  if (PLATFORM === 'linux' && fs.existsSync('/proc/self')) {
+    let stat, command = '', cwd;
+    try { stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8'); } catch { return null; }
+    if (/^[ZX]/.test(stat.slice(stat.lastIndexOf(')') + 2))) return null;
+    try { command = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean).join(' '); } catch { /* another user's */ }
+    try { cwd = fs.readlinkSync(`/proc/${pid}/cwd`); } catch { /* another user's */ }
+    return { command: command || stat.slice(stat.indexOf('(') + 1, stat.lastIndexOf(')')), cwd };
+  }
+  // COLUMNS keeps BSD ps from cutting long command lines when its output is a pipe
+  const r = spawnSync('ps', ['-o', 'stat=', '-o', 'command=', '-p', String(pid)], { encoding: 'utf8', env: { ...process.env, COLUMNS: '100000' }, timeout: 30_000 });
+  const m = /^\s*(\S+)\s+(.*\S)/.exec(r.stdout ?? '');
+  return m && !m[1].startsWith('Z') ? { command: m[2] } : null;
+}
+
+// There is no command to run instead, so an app that cannot be reached is a failure here.
+async function cmdAdopt(o) {
+  const fail = (code, why) => { note(`job: ${why}`); return code; };
+  if (IS_WIN) return fail(1, 'job adopt is not available on Windows');
+  const found = lookAt(o.pid);
+  if (!found) return fail(2, `there is no running process with pid ${o.pid}`);
+  const app = appEnv();
+  const log = o.log === undefined ? undefined : path.resolve(o.log);
+  const name = o.name ?? cut(oneLine(found.command), 60);
+  const reg = app
+    ? await register(app, { name, command: found.command, cwd: found.cwd ?? process.cwd(), pid: o.pid, adoptPid: o.pid, logFile: log, etaMs: o.etaMs, progress: o.progress })
+    : { unreachable: true };
+  if (reg.refused) return fail(2, reg.refused);
+  if (reg.denied) return fail(1, `Hydor did not accept this session's sign-in; pid ${o.pid} is not adopted`);
+  if (reg.unreachable) return fail(1, `Hydor is not reachable; pid ${o.pid} is not adopted`);
+  if (log && !isFile(log)) note(`job: ${log} is not there (yet): its progress is read once it is`);
+  out(`job ${reg.job.id} adopted: ${oneLine(name)}`);
+  return 0;
+}
+
+// ---------- list, status, wait, stop ----------
+/** A request of these commands: its data, or the process's end with why not. */
+async function ask(method, tail) {
+  const app = appEnv();
+  if (!app) throw Object.assign(new Error('HYDOR_JOBS_URL and HYDOR_JOBS_TOKEN are not set: this needs a session Hydor started'), { code: 3 });
+  let r;
+  try {
+    r = await call(app, method, tail);
+  } catch (e) {
+    throw Object.assign(new Error(`Hydor is not reachable: ${errMsg(e)}`), { code: 3 });
+  }
+  if (okStatus(r.status) && r.data) return r.data;
+  throw Object.assign(new Error(errorWords(r)), { code: r.status >= 400 && r.status < 500 ? 2 : 3 });
+}
+
+const ENDED = new Set(['done', 'failed', 'stopped', 'cancelled']);
+// An adopted process that is gone is "done" to the app, but nobody saw how it ended.
+const stateWord = (j) => (j.state === 'done' && j.exitUnknown ? 'ended' : oneLine(j.state));
+
+const timing = (j, now) => {
+  if (j.state === 'running') return j.startedAt ? fmtDur(now - j.startedAt) : '';
+  if (j.state === 'queued') return j.queuedAt ? `queued ${fmtDur(now - j.queuedAt)}` : 'queued';
+  return j.startedAt && j.endedAt ? `took ${fmtDur(j.endedAt - j.startedAt)}` : '';
+};
+const left = (j, now) => {
+  if (ENDED.has(j.state)) return j.endedAt ? `${fmtDur(now - j.endedAt)} ago` : '';
+  const parts = [];
+  if (j.state === 'queued' && j.startsAt) parts.push(`starts in ${fmtDur(j.startsAt - now)}`);
+  else if (j.estimate?.endsAt) parts.push(j.estimate.endsAt > now ? `${fmtDur(j.estimate.endsAt - now)} left` : 'over its estimate');
+  return parts.join('');
+};
+const note2 = (j) => {
+  if (j.state === 'queued') return j.waitingFor ? `waits for ${j.waitingFor}` : '';
+  if (ENDED.has(j.state)) return j.reason ?? (j.exitCode ? `exit code ${j.exitCode}` : '');
+  return j.progress?.text ?? (typeof j.progress?.fraction === 'number' ? `${Math.floor(j.progress.fraction * 100)}%` : '');
+};
+
+function table(rows) {
+  const widths = rows[0].map((_, i) => Math.max(...rows.map((r) => r[i].length)));
+  return rows.map((r) => r.map((c, i) => (i === r.length - 1 ? c : c.padEnd(widths[i]))).join('  ').trimEnd()).join('\n');
+}
+
+async function cmdList(o) {
+  const data = await ask('GET', o.all ? '?ended=20' : '');
+  const jobs = [...(data.running ?? []), ...(data.queued ?? []), ...(o.all ? (data.ended ?? []).slice(0, 20) : [])];
+  if (!jobs.length) { out(o.all ? 'no jobs' : 'no jobs running or queued'); return 0; }
+  const now = data.at ?? Date.now();
+  const rows = jobs.map((j) => [
+    oneLine(j.id), stateWord(j), cut(oneLine(j.name), 40), cut(oneLine(j.session?.title ?? '-'), 30), timing(j, now), left(j, now), cut(oneLine(note2(j)), 60),
+  ]);
+  out(table([['ID', 'STATE', 'NAME', 'SESSION', 'TIME', 'LEFT', ''], ...rows]));
+  if (data.allDoneAt && data.allDoneAt > now) out(`all done in about ${fmtDur(data.allDoneAt - now)}`);
+  return 0;
+}
+
+const fetchJob = async (id) => {
+  const data = await ask('GET', `/${encodeURIComponent(id)}`);
+  if (!data.job) throw Object.assign(new Error(`Hydor sent no job for ${id}`), { code: 3 });
+  return data.job;
+};
+
+async function cmdStatus(o) {
+  const j = await fetchJob(o.ids[0]);
+  if (o.json) { out(JSON.stringify(j, null, 2)); return 0; }
+  const now = Date.now();
+  const lines = [`${oneLine(j.id)}  ${stateWord(j)}  ${oneLine(j.name)}`];
+  const add = (label, v) => { if (v !== undefined && v !== null && v !== '') lines.push(`  ${`${label}:`.padEnd(11)}${oneLine(v)}`); };
+  add('command', j.command && cut(j.command, 200));
+  add('folder', j.cwd);
+  add('session', j.session && `${j.session.title}${j.session.project ? ` (project ${j.session.project.name})` : ''}`);
+  add('queue', j.queue && `${j.queue}${j.position ? `, place ${j.position}` : ''}`);
+  add('after', j.after?.join(', '));
+  add('waits for', j.state === 'queued' && j.waitingFor);
+  add('time', timing(j, now));
+  add('progress', j.progress && [typeof j.progress.fraction === 'number' ? `${Math.floor(j.progress.fraction * 100)}%` : '', j.progress.text !== undefined && !/^\d+(\.\d+)?%$/.test(j.progress.text) ? j.progress.text : ''].filter(Boolean).join('  '));
+  if (!ENDED.has(j.state)) add('estimate', [left(j, now), j.estimate && `(from ${j.estimate.source}, ${j.estimate.confidence} confidence)`].filter(Boolean).join(' '));
+  else add('ended', left(j, now));
+  add('exit code', j.exitUnknown ? 'not known' : j.exitCode);
+  add('reason', j.reason);
+  add('last line', j.lastLine && cut(j.lastLine, 300));
+  out(lines.join('\n'));
+  return 0;
+}
+
+async function cmdWait(o) {
+  const deadline = o.timeoutMs ? Date.now() + o.timeoutMs : Infinity;
+  const waiting = new Map(o.ids.map((id) => [id, null]));
+  let bad = false, fails = 0, first = true;
+  for (;;) {
+    for (const id of [...waiting.keys()]) {
+      let j;
+      try {
+        j = await fetchJob(id);
+        fails = 0;
+      } catch (e) {
+        // An unknown id, or an app that is not there at all, is said at once; one that goes away while we wait may come back.
+        if (first || (e.code === 2 && ++fails >= 6) || (e.code !== 2 && ++fails >= 30)) throw e;
+        continue;
+      }
+      waiting.set(id, j);
+      if (!ENDED.has(j.state)) continue;
+      waiting.delete(id);
+      if (j.state !== 'done') bad = true;
+      const took = j.startedAt && j.endedAt ? ` after ${fmtDur(j.endedAt - j.startedAt)}` : '';
+      const why = j.state === 'done' ? '' : j.reason ? `: ${oneLine(j.reason)}` : j.exitCode !== undefined ? `: exit code ${j.exitCode}` : '';
+      out(`${oneLine(j.id)} ${stateWord(j)}${took}: ${oneLine(j.name)}${why}${j.exitUnknown ? ' (exit code not known)' : ''}`);
+    }
+    first = false;
+    if (!waiting.size) return bad ? 1 : 0;
+    const rem = deadline - Date.now();
+    if (rem <= 0) {
+      out(`timeout after ${fmtDur(o.timeoutMs)}: still waiting for ${[...waiting].map(([id, j]) => (j ? `${id} (${j.state}: ${oneLine(j.name)})` : id)).join(', ')}`);
+      return 124;
+    }
+    await sleep(Math.min(ms(10_000), rem));
+  }
+}
+
+async function cmdStop(o) {
+  await ask('POST', `/${encodeURIComponent(o.ids[0])}/stop`);
+  out(`asked to stop ${o.ids[0]}`);
+  return 0;
+}
+
+// ---------- main ----------
+/** Ends once what was written has left: process.exit alone cuts off what is still in a pipe's buffer. */
+function exit(code) {
+  let n = 2;
+  const done = () => { if (--n === 0) process.exit(code); };
+  for (const s of [process.stdout, process.stderr]) {
+    if (s.destroyed || s.errored) done();
+    else s.write('', done);
+  }
+}
+
+async function main() {
+  process.stdout.on('error', () => {});
+  process.stderr.on('error', () => {});
+  let o;
+  try {
+    o = parseArgs(process.argv.slice(2));
+  } catch (e) {
+    if (!(e instanceof UsageError)) throw e;
+    process.stderr.write(`error: ${e.message}\nhint: run 'job --help' for usage and examples\n`);
+    return 64;
+  }
+  if (o.help) { process.stdout.write(HELP); return 0; }
+  return { run: cmdRun, adopt: cmdAdopt, list: cmdList, status: cmdStatus, wait: cmdWait, stop: cmdStop }[o.sub](o);
+}
+
+main().then(exit, (e) => {
+  process.stderr.write(`job: ${e?.message || e}\n`);
+  exit(typeof e?.code === 'number' ? e.code : 3);
+});

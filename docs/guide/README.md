@@ -30,6 +30,7 @@ The guide is also in [German (Deutsch)](de/), [Spanish (Español)](es/), [French
 - [Look, language and updates](21-app.md)
 - [Let agents work the app for you](22-ask-agents.md)
 - [Experiments](24-experiments.md)
+- [Jobs](31-jobs.md)
 - [Research: papers, writing and the lab](25-researchers.md)
 - [Engineering: CI, issues, dependencies and incidents](26-engineering.md)
 - [Hydor in a terminal](27-terminal.md)

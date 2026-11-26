@@ -720,6 +720,10 @@ export function handleEvent(e: ServerEvent) {
     case 'feature':
       emitFeatureEvent(e.id, { key: e.key, data: e.data });
       break;
+    case 'jobs':
+      // The Jobs page and its count on the rail hear it (features/jobs/store).
+      emitFeatureEvent('jobs', { data: { running: e.running, queued: e.queued } });
+      break;
   }
 }
 

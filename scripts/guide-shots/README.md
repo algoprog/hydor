@@ -64,7 +64,8 @@ the real app's).
   database, for the start page's While you were away. What only a running agent or a real account has
   is answered to the page instead (`overrides`): two sessions waiting on a card, Claude Code's model list, the
   plans' usage, the inbox (and what waits on you in While you were away), and Settings → Models with the models it
-  suggests.
+  suggests. A shot with `jobs: true` also gets made-up work running in the background (the Jobs page, its output
+  panel and the rail's count); the other shots keep the demo's empty list.
 - `shots.mjs` lists the shots: the page, what to open on it (a menu, a folded group of steps) and the part to
   keep. Desktop shots are 1280×800 CSS pixels (taller where a page needs it) at twice the resolution, cut to
   that part and at most 1600 pixels wide; `devices` is a 390×844 phone at 780 pixels wide.

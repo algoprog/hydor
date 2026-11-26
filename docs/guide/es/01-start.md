@@ -20,7 +20,7 @@ La barra de iconos es una columna de iconos; apunta a uno, o llega a él con Tab
 
 - **Sesiones**: muestra tus sesiones en la barra lateral. Mientras estás en la página de inicio o dentro de una sesión, oculta o muestra la barra lateral (igual que Ctrl+B). Desde cualquier otra página muestra la barra lateral y te lleva de vuelta a la última sesión que tuviste abierta en esta ventana, o a la página de inicio si no había ninguna. Mientras la barra lateral está oculta, un pequeño punto en este icono indica que ocurrió algo en otra máquina (consulta [Cambiar entre máquinas](/guide/devices#switch-between-machines)).
 
-Luego vienen las secciones de la app (la app de escritorio tiene siete; la app web y un teléfono tienen seis, sin **Navegador**):
+Luego vienen las secciones de la app (la app de escritorio tiene ocho; la app web y un teléfono tienen siete, sin **Navegador**):
 
 - **Navegador**: un navegador propio, solo en la app de escritorio, con pestañas, pestañas privadas, una barra de direcciones inteligente, traducción de páginas, vista de lectura, marcadores, historial, un bloqueador de anuncios y extensiones de Chrome, desde el cual puedes pasarle una página a un agente. Consulta [Tu propio navegador](/guide/web#your-own-browser).
 - **Proyectos**: cada proyecto como una tarjeta, con lo que contiene y cuándo trabajó por última vez; un clic en una tarjeta abre los detalles del proyecto. Consulta [Encontrar todos tus proyectos](/guide/projects#find-all-your-projects).
@@ -29,6 +29,7 @@ Luego vienen las secciones de la app (la app de escritorio tiene siete; la app w
 - **Apps**: tareas que ejecutas una y otra vez: rellenas un formulario y un agente hace el trabajo. Consulta [Apps](/guide/apps).
 - **Git**: tus repositorios, sus cambios, ramas e historial, con un recorrido corto la primera vez que abres la página. Consulta [Ver tus repositorios en la página de Git](/guide/files-git#see-your-repositories-on-the-git-page).
 - **Experimentos**: trabajos de entrenamiento y evaluación que esperan una GPU libre, se ejecutan solos y se guardan como registros, con un recorrido corto la primera vez que abres la página. Consulta [Experimentos](/guide/experiments).
+- **Jobs**: el trabajo largo que tus sesiones ejecutan en segundo plano, con el tiempo que le queda y qué está esperando a qué. Un número sobre él indica cuántos jobs se están ejecutando. Consulta [Jobs](/guide/jobs).
 
 Justo debajo, siempre en el mismo lugar:
 
@@ -42,7 +43,7 @@ Después, tras un espacio, las herramientas:
 - **Configuración**: todo lo que se puede ajustar en la app. Un punto en ella significa que hay una versión más reciente. Consulta [Todos los ajustes](/guide/settings).
 - **Ayuda**: abre esta guía, donde también puedes preguntarle a un agente sobre la app. El recorrido de bienvenida también empieza desde ahí.
 
-Las secciones van en el orden Navegador, Proyectos, Archivos, Agentes, Apps, Git, Experimentos, luego Bandeja de entrada y Búsqueda, y las herramientas de abajo en el orden Uso, Sistema, Configuración, Ayuda: ese es su orden habitual. Para cambiarlo, arrastra un icono a otro lugar dentro de su propio grupo (las secciones, o las herramientas de abajo); Bandeja de entrada y Búsqueda se quedan justo debajo de las secciones. Un icono que trae una versión más reciente ocupa su lugar habitual en el orden que fijaste (Archivos justo antes de Agentes, por ejemplo), no el final de la lista. Los iconos mantienen el orden que fijaste en todos los dispositivos, desde cualquier máquina que mires. Cuando los hayas movido, haz clic derecho en un icono y elige **Volver al orden habitual** para devolverlos todos a su lugar. En una ventana demasiado baja para todos los iconos, la barra de iconos se desplaza.
+Las secciones van en el orden Navegador, Proyectos, Archivos, Agentes, Apps, Git, Experimentos, Jobs, luego Bandeja de entrada y Búsqueda, y las herramientas de abajo en el orden Uso, Sistema, Configuración, Ayuda: ese es su orden habitual. Para cambiarlo, arrastra un icono a otro lugar dentro de su propio grupo (las secciones, o las herramientas de abajo); Bandeja de entrada y Búsqueda se quedan justo debajo de las secciones. Un icono que trae una versión más reciente ocupa su lugar habitual en el orden que fijaste (Archivos justo antes de Agentes, por ejemplo), no el final de la lista. Los iconos mantienen el orden que fijaste en todos los dispositivos, desde cualquier máquina que mires. Cuando los hayas movido, haz clic derecho en un icono y elige **Volver al orden habitual** para devolverlos todos a su lugar. En una ventana demasiado baja para todos los iconos, la barra de iconos se desplaza.
 
 La barra lateral con tus sesiones solo aparece en la página de inicio, dentro de una sesión y en su revisión. **Apps**, **Agentes**, **Ayuda** y **Configuración** tienen una columna del mismo tipo, con el logo, su propia lista (los lugares de la página de Apps y de la página de Agentes, los temas de la guía, las secciones de Configuración) y **Ocultar barra lateral**; la página **Navegador** muestra sus pestañas en una columna propia, y las demás páginas (Proyectos, Bandeja de entrada, Uso, Sistema…) usan todo el ancho. **Ctrl+B** oculta o muestra la columna de la página en la que estás, y todas las columnas tienen el mismo ancho. Una columna que contiene más de lo que cabe muestra su barra de desplazamiento, y su parte inferior se desvanece mientras hay más contenido debajo. Mientras la página se reconecta con la app, un icono de Wi-Fi tachado aparece junto al logo en la parte superior de la columna, o en la parte superior de la barra de iconos cuando no se muestra ninguna columna (está oculta, o la página no tiene).
 
@@ -197,7 +198,7 @@ El cuadro de búsqueda encuentra cualquier cosa de la app mientras escribes, com
 
 ### Qué encuentra
 
-- **Ir a**: las páginas de Hydor, como Nueva sesión, Bandeja de entrada, Archivos, Buscar en archivos, Git, Experimentos, Terminal, Apps, Nueva app, Proyectos, Conocimiento compartido, Publicado, Vista previa, Uso y límites, Arena de modelos, Actividad, Sistema y Configuración.
+- **Ir a**: las páginas de Hydor, como Nueva sesión, Bandeja de entrada, Archivos, Buscar en archivos, Git, Experimentos, Jobs, Terminal, Apps, Nueva app, Proyectos, Conocimiento compartido, Publicado, Vista previa, Uso y límites, Arena de modelos, Actividad, Sistema y Configuración.
 - **Acciones**: Hacer el recorrido, Lo que Hydor puede hacer, Hablar con manos libres, Notas de la versión, Cambiar entre claro y oscuro, Mostrar u ocultar la barra lateral, Agrupar las sesiones por carpeta o proyecto, Mostrar u ocultar el panel de la terminal.
 - **Configuración**: cada sección de Configuración y las opciones que contiene. Al abrir una, se abre su sección y señala la opción.
 - **Temas**: los temas integrados y los tuyos. Al abrir uno, cambias a él.

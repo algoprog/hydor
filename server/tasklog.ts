@@ -48,7 +48,7 @@ export function taskOutputPath(sessionId: string, taskId: string): string | null
   return null;
 }
 
-function readTail(file: string, bytes: number): { text: string; size: number; truncated: boolean } {
+export function readTail(file: string, bytes: number): { text: string; size: number; truncated: boolean } {
   const fd = fs.openSync(file, 'r');
   try {
     const size = fs.fstatSync(fd).size;
@@ -65,7 +65,7 @@ function readTail(file: string, bytes: number): { text: string; size: number; tr
 }
 
 /** Terminal output as plain lines: colours go, and a line redrawn with \r (a progress bar) keeps its last state. */
-function plain(text: string): string {
+export function plain(text: string): string {
   return text
     .replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g, '')
     .split('\n')

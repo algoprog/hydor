@@ -408,6 +408,21 @@ function carried(db: DB, key: string): SessionExtra | undefined {
 /** What the subagent helpers read of a manager (also of the stand-ins that tests make of one). */
 const leadsOf = (m: SessionManager): Leads => ({ db: (m as any).db, lives: (m as any).lives, external: (m as any).external });
 
+/** What a session's agent has in the background: one this app runs, or one open elsewhere (VS Code, a terminal). */
+export interface BackgroundWork {
+  key: string;
+  external: boolean;
+  /** This app's: its live status ('idle' and so on). Elsewhere: working, waiting or idle. */
+  status: string;
+  error?: string;
+  startedAt?: number;
+  turnStartedAt?: number;
+  /** Tasks still running (none once its process has ended or failed). */
+  running: BackgroundTask[];
+  /** The ones that ended lately, in this run of its process (this app's sessions only). */
+  ended: BackgroundTask[];
+}
+
 export class SessionManager extends EventEmitter {
   lives = new Map<string, Live>();
   private timelines = new Map<string, Timeline>();
@@ -3539,6 +3554,49 @@ export class SessionManager extends EventEmitter {
 
   async stopTask(key: string, taskId: string) {
     await this.live(key).adapter.stopTask(taskId);
+  }
+
+  /**
+   * The background work of every session, here and elsewhere, without building each one's whole summary: the Jobs
+   * section reads it every few seconds (server/jobs).
+   */
+  backgroundWork(): BackgroundWork[] {
+    const out: BackgroundWork[] = [];
+    for (const l of this.lives.values()) {
+      this.dateTasks(l);
+      const s = l.adapter.state;
+      const over = l.adapter.exited || s.status === 'exited' || s.status === 'error';
+      out.push({
+        key: l.key,
+        external: false,
+        status: l.adapter.exited ? 'exited' : s.status,
+        error: s.error,
+        startedAt: s.startedAt,
+        turnStartedAt: s.turnStartedAt,
+        running: over ? [] : (s.backgroundTasks ?? []).filter((t) => t.status === 'running'),
+        ended: s.endedTasks ?? [],
+      });
+    }
+    for (const key of this.external.states.keys()) {
+      if (this.lives.has(key)) continue;
+      const r = this.row(key);
+      const e = r ? this.externalState(r) : null;
+      if (e) out.push({ key, external: true, status: e.status, startedAt: e.startedAt, running: (e.backgroundTasks ?? []).filter((t) => t.status === 'running'), ended: [] });
+    }
+    return out;
+  }
+
+  /**
+   * The command a background task was started with, as the transcript read so far tells (a task itself keeps only the
+   * agent's description of it); undefined while the transcript has not been read or does not hold the step.
+   */
+  taskCommand(key: string, toolUseId: string): string | undefined {
+    const items = this.timelines.get(key)?.parser.items;
+    for (let i = (items?.length ?? 0) - 1; i >= 0; i--) {
+      const it = items![i];
+      if (it.kind === 'tool' && it.id === toolUseId) return it.tool.category === 'command' ? it.tool.title : undefined;
+    }
+    return undefined;
   }
 
   /** The title the helper model gave a new session: kept unless it has one by now (renamed meanwhile), and told to its agent. */

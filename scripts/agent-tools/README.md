@@ -1,15 +1,17 @@
 # Command-line tools for coding agents
 
-Small programs for coding agents: `waitfor`, `edits` and `sym`, which save round trips, and `leancheck`, which says
-whether the proofs in a Lean file hold. They are part of Hydor: every
+Small programs for coding agents: `waitfor`, `edits` and `sym`, which save round trips, `job`, which runs long work where
+you can see it, and `leancheck`, which says whether the proofs in a Lean file hold. They are part of Hydor: every
 agent session the app starts (Claude Code, Codex, Custom and the other ACP agents) finds them on its `PATH` and is told
 about them, in a checkout, in Docker and in the desktop apps (below). You can also use them from your own shell and
 tell your own agents about them (below). None calls a model, and none needs anything installed beyond Node.js 22 (the
-tree-sitter parser `sym` uses is in `lib/sym/`, with its licence), but `leancheck`, which needs Lean 4.
+tree-sitter parser `sym` uses is in `lib/sym/`, with its licence), but `leancheck`, which needs Lean 4. `job` shows its jobs
+in Hydor, so it needs the app for that; without it, it runs the command all the same.
 
 | Program | Takes the place of |
 |---|---|
 | `bin/waitfor` | `for i in $(seq ...); do sleep 5; ...; done; tail log` loops that wait for a job |
+| `bin/job` | long commands started in the background that nobody can see the progress or end of, or that must wait for one another |
 | `bin/edits` | a script that does `text.replace(old, new)` on several files, with checks written by hand |
 | `bin/sym` | `grep -n "export function X" -A30`, then `sed -n A,Bp` to read the part you found |
 | `bin/leancheck` | reading `lake build`'s output and hoping a proof holds |
@@ -33,6 +35,41 @@ An agent should run it as a background command when the wait may be longer than 
 
 Limit: a log that is emptied and grows past its old size again between two checks is not noticed (`--every` sets how
 often it looks).
+
+## job
+
+Runs long work so that Hydor shows it in its **Jobs** section with its progress and how long it has left, and can start
+it after other jobs. `job run -- cmd args` registers the command with the app, waits while it must (for the jobs named in
+`--after` to finish, and for its turn in its `--queue`, which runs one job at a time), runs it, passes its output through
+(and keeps a copy for the Jobs section) and ends with its exit code. `--name` says what it is, `--eta 2h` how long you
+expect it to take (a plain number is minutes), and `--progress REGEX` which lines say how far it is, when they are not
+like "step 120/500" or "42%". `job list`, `job status ID`, `job wait ID…` and `job stop ID` look after jobs. A job that
+waits for one that failed or was stopped never starts (exit 3).
+
+Work that is already running (a background command, a `nohup … &`, a service) can be shown without restarting it:
+`job adopt --pid PID [--name 'what it is'] [--log FILE]` registers the process, prints `job <id> adopted: <name>` and
+returns. Progress is read from the `--log` file. The job ends when the process is gone, with its exit code not known, and
+`job stop` stops that one process. For example, a training run started earlier:
+
+```bash
+nohup python train.py > train.log &    # earlier: the shell printed its pid, here 4312 (ps finds it again)
+job adopt --pid 4312 --name 'Train the model' --log train.log
+```
+
+```bash
+job run --name 'Build the search index' --eta 2h -- python build_index.py --shards 8
+job run --name 'Evaluate it' --after 'Build the search index' --queue gpu -- 'make eval && make report'
+```
+
+An agent should run `job run` as a background command. It also sets `PYTHONUNBUFFERED=1` for the command (unless it is
+set already), so that Python's progress lines arrive as they are printed.
+
+Limits: the Jobs section needs Hydor, which tells every session it starts where to reach it (`HYDOR_JOBS_URL` and
+`HYDOR_JOBS_TOKEN`). Without those, or when the app does not answer or does not accept that sign-in as the job is
+started, `job run` says so and just runs the command: it is not shown, and `--after` and `--queue` are not kept. What the
+app finds wrong in what was asked (an unknown `--after`) does not run. A job already waiting for its turn goes on waiting while the app is away. The command runs in a process group of its
+own, which a stop of `job` takes down with it; a `kill -9` of `job` alone leaves the command running. `job adopt` needs the
+app (without it, it says so and exits 1) and is not available on Windows.
 
 ## edits
 
@@ -120,7 +157,7 @@ comes with Codex, when there is one, and `leancheck` gets `HYDOR_LEAN_DIR`, wher
 is what every new version of a desktop app does (Windows and AppImages run from a copy of the server for each version);
 on Windows each also has a `.cmd`, and Git's bash, in which agents run commands, uses the one without an ending. The
 server then tries each launcher once, in the background, with a `PATH` of the system's folders and no node (`--help` for
-`waitfor`, `edits` and `leancheck`; for `sym`, the outline of a three-line TypeScript file, which proves its parser loads), logs one
+`waitfor`, `job`, `edits` and `leancheck`; for `sym`, the outline of a three-line TypeScript file, which proves its parser loads), logs one
 line for each that fails, and from then on puts the launchers' folder first on the `PATH` of every session it starts (and last on the `PATH` a goal's
 checks run with) and
 adds a text to its instructions that names only the tools that passed. `HYDOR_SHELL_TOOLS=0` turns all of it off
@@ -133,7 +170,7 @@ or `fixtures/`: `desktop/scripts/stage.sh`), and CI fails a packed app whose lau
 For your own shell (the app's agents do not need this):
 
 ```bash
-for t in waitfor edits sym leancheck; do ln -s "$PWD/scripts/agent-tools/bin/$t" ~/.local/bin/$t; done   # from the repository's root
+for t in waitfor job edits sym leancheck; do ln -s "$PWD/scripts/agent-tools/bin/$t" ~/.local/bin/$t; done   # from the repository's root
 ```
 
 The links point into your checkout, so a new version of the tools comes with a `git pull`. Check that `~/.local/bin` is
@@ -144,15 +181,16 @@ on your `PATH`.
 Linux, macOS and Windows, on Node.js 22. On Windows agents run commands in Git's bash (Git for Windows), which the app finds as it does for every command.
 
 - `waitfor` reads the process table (`--pid`, `--proc`) from `/proc` on Linux, from `ps` where there is no `/proc` (macOS), and from PowerShell on Windows, where `--proc` needs it. `--unit` (systemd) is Linux only and is refused elsewhere with a message that says so. On Windows `--until` and `--slurm` need Git's `sh`, and it says so before it starts waiting. A command started with `--` is stopped with `taskkill` on Windows.
+- `job` stops its command with `taskkill` on Windows, and a command given as one line needs Git's `sh` there.
 - `edits` tries its final rename again on Windows when a file is briefly held by another program (five tries), and puts every file back if it still cannot.
 - `sym` finds the files that hold a name with ripgrep first (the file `HYDOR_RG` names, which the app's launcher sets to the ripgrep that comes with Codex; else `rg` on the `PATH`), then `git grep`, then plain `grep`. The three give the same files; ripgrep is the fastest (about 1.0 s against 1.3 s with `git grep` in a large repository). `SYM_BACKEND=rg|git|grep` (for tests) uses one only.
 
-Honestly: the macOS and Windows paths are covered by tests that stand in for `ps`, PowerShell and `taskkill` on Linux (and a hidden `SYM_FAKE_PLATFORM`), and by the desktop builds' smoke check in CI (`desktop/scripts/smoke.mjs`), which runs the tools through their launchers on each system; the three suites themselves have not run in full on a real macOS or Windows machine.
+Honestly: the macOS and Windows paths are covered by tests that stand in for `ps`, PowerShell and `taskkill` on Linux (and a hidden `SYM_FAKE_PLATFORM`), and by the desktop builds' smoke check in CI (`desktop/scripts/smoke.mjs`), which runs the tools through their launchers on each system; those suites themselves have not run in full on a real macOS or Windows machine (and `job`'s Windows paths have no test).
 
 ## Tests
 
 ```bash
-node --test "scripts/agent-tools/test/*.test.mjs"  # the four suites, from the repository's root
+node --test "scripts/agent-tools/test/*.test.mjs"  # the five suites, from the repository's root
 node --test scripts/agent-tools/test/sym.test.mjs # or one of them
 npm run check                                      # runs them when something here changed
 ```
@@ -173,6 +211,12 @@ Shell commands this app adds to your PATH (each has --help):
   --log FILE --match REGEX, --http URL, --unit, --slurm ID [--via 'ssh host'], --until 'cmd'. Add --fail REGEX to stop
   at the first crash line, --tail FILE:N to see the output, --timeout 30m. `waitfor -- cmd args` runs a command and
   waits for it. Run it as a background command when the wait may take more than a few minutes.
+- job: run long work (anything over ~10 minutes) so the user sees it in Hydor's Jobs section with its progress and time
+  left: `job run --name 'what it is' [--eta 2h] [--after ID|NAME] [--queue NAME] -- cmd args`, as a background command.
+  It waits first for the jobs named in --after to finish and for its turn in its --queue (one job at a time per queue),
+  then runs the command and ends with its exit code. Print progress as "step 120/500" or "42%" so the time left can be
+  estimated. `job list`, `job wait ID`, `job stop ID`. `job adopt --pid PID --name '…' --log FILE` shows long work
+  started earlier without restarting it.
 - edits: several exact search/replace edits across files in one atomic call. It reads a script on stdin: `=== path`
   sections holding <<<<<<< SEARCH / ======= / >>>>>>> REPLACE blocks. Nothing is written unless every block matches
   exactly once, and it prints the changed lines with their numbers, so there is no need to re-read the files. Use it
@@ -187,7 +231,7 @@ Shell commands this app adds to your PATH (each has --help):
 
 ## What is in this folder
 
-`bin/` has the four programs (`sym` is a short launcher for `lib/sym/`, `leancheck` for `lib/lean/`, which the app's
+`bin/` has the five programs (`sym` is a short launcher for `lib/sym/`, `leancheck` for `lib/lean/`, which the app's
 Lean tools use too). `lib/sym/grammars/` holds the five grammars
 `sym` reads code with, and `lib/sym/vendor/web-tree-sitter/` the parser that runs them: both are copied unchanged from
 npm packages, each with a `SOURCE.txt` of where from and their checksums (the licences are in `NOTICE` at the root of

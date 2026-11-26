@@ -74,7 +74,7 @@ test('sym is offered as the shell tools offer it: only after a passed test run, 
     const f = createShellTools({ dir: () => path.join(root, 'shim'), node: process.execPath, root, rg: undefined, basePath: () => '/usr/bin' });
     f.start!(deps);
     await f.ready();
-    assert.deepEqual(f.passed(), ['waitfor', 'edits', 'sym', 'leancheck']);
+    assert.deepEqual(f.passed(), ['waitfor', 'job', 'edits', 'sym', 'leancheck']);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

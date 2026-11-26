@@ -27,6 +27,7 @@ import { goalFeature } from './goal/feature';
 import { guideFeature } from './guide/feature';
 import { guidelinesFeature } from './guidelines/feature';
 import { imagesFeature } from './images/feature';
+import { jobsFeature } from './jobs/feature';
 import { mediaFeature } from './media/feature';
 import { knowledgeFeature } from './knowledge/feature';
 import { memoryFeature } from './memory/feature';
@@ -107,8 +108,11 @@ export interface WebFeature {
   settings?: FeatureSection[];
   /** Pages of its own. */
   routes?: { match: (path: string) => boolean; Page: ComponentType }[];
-  /** Entries among the sidebar's tools; `id` names one in the order you drag them into (shared/sidebar.ts). */
-  nav?: { id: SidebarTool; path: string; label: string; icon: ReactNode; match?: (path: string) => boolean }[];
+  /**
+   * Entries among the sidebar's tools; `id` names one in the order you drag them into (shared/sidebar.ts). `Extra`: a
+   * mark of its own on the tool (a count), `compact` on the rail's small tiles.
+   */
+  nav?: { id: SidebarTool; path: string; label: string; icon: ReactNode; match?: (path: string) => boolean; Extra?: ComponentType<{ compact?: boolean }> }[];
   /** Items in a session's menu… */
   SessionMenu?: ComponentType<{ s: SessionSummary; close: () => void }>;
   /** …and the part they go in: More unless given, which keeps the main list short. */
@@ -163,6 +167,7 @@ export const features = (): WebFeature[] =>
     connectionsFeature,
     automationsFeature,
     experimentsFeature,
+    jobsFeature,
     voiceFeature,
     suggestFeature,
     assistantsFeature,
