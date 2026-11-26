@@ -3,6 +3,53 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.116.0 · 26 November 2026
+
+Research you can trust when agents do it: one sealed way of keeping score, results tested before they count, proofs
+checked with Lean, and Experiments, Files and Git as sections of their own.
+
+- **Evaluations**: in **Experiments → ⋯ → New evaluation** (or ask an agent to set one up) you give a project one way
+  of keeping score: a command and the number that counts. Hydor seals the scorer's files and data, works every score
+  out itself from its own runs, one for each seed, and gives no score while a sealed file differs: **See what
+  changed**, **Put them back** or **Seal again…**. An evaluation's page shows the **Baseline**, the **Latest score**
+  and how it stands to the baseline in words (better, worse, or the same within the noise), a chart and every score.
+  The baseline and the **Final test** are yours alone: agents can ask for a score and propose an evaluation, nothing
+  more. Every other run in the folder says whether the scorer was as sealed when it started.
+- **Try to break it**: where you compare runs, **Try to break it** has an agent that did none of the work look for
+  other explanations of a gain (lucky seeds, an untuned baseline, a leak, a metric bug), run controls and tell you
+  whether it holds, holds in part or does not hold.
+- **Is this new?**: ask any agent whether an idea or a result has been done before. It searches arXiv, OpenAlex and
+  Semantic Scholar under the other names the idea may go by, and gives the closest papers with what each shares and
+  what differs: already known, partly known, looks new, or not judged. Gap finder and the Research sprint check every
+  idea and hypothesis this way.
+- **Findings**: a project's **Memory** has a **Findings** chip: what was tried and what came of it, dead ends
+  included, each with its verdict and its evidence as links. Agents look at them before they propose an experiment
+  and record one after each result, and the Research sprint records one for each hypothesis.
+- **A score as a goal's check**: a goal can be done when the project's evaluation beats its baseline by what you say,
+  beyond the noise. The score runs only once you press **Start**, and a goal never runs the final test.
+- **Evolve**: from an evaluation's ⋯ menu, **Evolve…** tries many small changes to the files you name, scores each
+  with the evaluation and keeps the best, without touching your own files. Its page shows every try and a chart, and
+  **Take the best** puts the winner on a branch of its own.
+- **Proofs checked with Lean**: **Settings → General → Lean (proof checker)** sets up Lean 4 (about 620 MB; Mathlib,
+  the library most mathematics needs, is a second and larger step), or uses your own. Agents check proofs with it and
+  give a verdict that holds: no errors, no gaps, no added axioms. Before they prove anything they agree the formal
+  statement with you. The LaTeX editor's **Tools** gain **Check a proof…**, which reads a proof written in words step
+  by step, and **Formalise in Lean…**.
+- **The experiments reviewers ask for**: the lists in the Reviewer simulator and the Rebuttal workbench have **Run
+  these…**, which opens a new session with the request written for an agent to run them.
+- **Experiments, Files and Git in the rail**: they are sections of their own now, beside Projects, Agents and Apps;
+  **System** keeps Overview, Terminal, Preview and Monitor, and old links still work. Git and Experiments show a short
+  tour the first time you open them.
+- **A project is a page**: a project opened from **Projects** is its own page with an arrow back to all projects. Its
+  open tab is in the address, so Back and a reload keep your place.
+- **Screenshots as one card**: screenshots an agent took show as one card by screen, with before and after and each
+  size switched in place, and pictures that follow one another in a reply show as a grid.
+- **Subagents are Hydor's**: in the sessions Hydor runs, agents hand work to Hydor subagents, which you can open and
+  steer, and each program's own are switched off. Agents keep what they make on this computer unless you ask
+  otherwise.
+- **Fixed**: a run that started just as another ended could fail to start, and runs started in the same instant
+  could clash.
+
 ## 0.115.0 · 26 November 2026
 
 Folders for your sessions, outside projects or inside one, and a sidebar that reads as a tree.
