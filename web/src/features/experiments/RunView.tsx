@@ -78,6 +78,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 const linkCls = 'text-left text-accent hover:underline';
 
+/** The files the command names that git does not track: what became of them, and their names. */
+function NotInGit({ words, files }: { words: string; files: string[] }) {
+  return (
+    <p className="border-t border-line pt-1.5 text-[12px] break-words text-fg-3">
+      <span>{words}</span>{' '}
+      <span translate="no" className="font-mono text-[11.5px]">
+        {files.join(', ')}
+      </span>
+    </p>
+  );
+}
+
 /** Whether an evaluation's sealed files were as sealed when the run started, one line for each evaluation. */
 function Sealed({ entries, onOpen }: { entries: NonNullable<RunRecord['sealed']>; onOpen: (evaluation: string) => void }) {
   return (
@@ -654,40 +666,46 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                 {!!r.sealed?.length && <Sealed entries={r.sealed} onOpen={(e) => onOpenEvaluation(e)} />}
               </div>
             </Block>
-            {r.commit && (
+            {!!(r.commit || r.kept?.length || r.notKept?.length) && (
               <Block title="Code">
                 <div className={CARD}>
-                  <Row label="Commit">
-                    <span className="flex items-center gap-1">
-                      <span translate="no" className="font-mono text-[12px]">
-                        {r.commit.slice(0, 10)}
-                      </span>
-                      <IconButton label="Copy the commit" size="sm" onClick={() => copyText(r.commit!, 'Copied the commit')}>
-                        <Copy size={13} />
-                      </IconButton>
-                    </span>
-                  </Row>
-                  {r.branch && (
-                    <Row label="Branch">
-                      <span translate="no" className="font-mono text-[12px]">
-                        {r.branch}
-                      </span>
-                    </Row>
+                  {r.commit && (
+                    <>
+                      <Row label="Commit">
+                        <span className="flex items-center gap-1">
+                          <span translate="no" className="font-mono text-[12px]">
+                            {r.commit.slice(0, 10)}
+                          </span>
+                          <IconButton label="Copy the commit" size="sm" onClick={() => copyText(r.commit!, 'Copied the commit')}>
+                            <Copy size={13} />
+                          </IconButton>
+                        </span>
+                      </Row>
+                      {r.branch && (
+                        <Row label="Branch">
+                          <span translate="no" className="font-mono text-[12px]">
+                            {r.branch}
+                          </span>
+                        </Row>
+                      )}
+                      <Row label="Changes">
+                        {r.dirty ? (
+                          r.patchPath ? (
+                            <button type="button" onClick={showPatch} className={linkCls}>
+                              See the changes
+                            </button>
+                          ) : (
+                            <span className="text-fg-3">Not committed</span>
+                          )
+                        ) : (
+                          <span className="text-fg-3">Nothing changed since</span>
+                        )}
+                      </Row>
+                      {r.untracked ? <p className="border-t border-line pt-1.5 text-[12px] text-fg-3">{r.untracked === 1 ? '1 file git does not track' : `${r.untracked} files git does not track`}</p> : null}
+                    </>
                   )}
-                  <Row label="Changes">
-                    {r.dirty ? (
-                      r.patchPath ? (
-                        <button type="button" onClick={showPatch} className={linkCls}>
-                          See the changes
-                        </button>
-                      ) : (
-                        <span className="text-fg-3">Not committed</span>
-                      )
-                    ) : (
-                      <span className="text-fg-3">Nothing changed since</span>
-                    )}
-                  </Row>
-                  {r.untracked ? <p className="border-t border-line pt-1.5 text-[12px] text-fg-3">{`${r.untracked} files git does not track`}</p> : null}
+                  {!!r.kept?.length && <NotInGit words="Not in git, kept with the run:" files={r.kept} />}
+                  {!!r.notKept?.length && <NotInGit words="Not in git and too large to keep:" files={r.notKept} />}
                 </div>
               </Block>
             )}

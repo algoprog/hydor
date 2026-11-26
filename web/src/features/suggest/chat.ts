@@ -2,6 +2,7 @@
 // answered, even while it is still being written) and the person's message before. Read when a request goes out.
 import { childReplyOf } from '@shared/children';
 import { goalMessageOf } from '@shared/goals';
+import { experimentNoticeOf } from '@shared/experiments';
 import type { TimelineItem } from '@shared/types';
 import { useLive, useTimeline } from '../../lib/store';
 
@@ -19,7 +20,7 @@ export function chatContext(key: string): { reply?: string; prev?: string; sessi
   const lists = [useLive.getState().byKey[key]?.overlay.items ?? [], useTimeline.getState().byKey[key]?.items ?? []];
   return {
     reply: lastText(lists, (i) => (i.kind === 'assistant' ? i.text : undefined)),
-    prev: lastText(lists, (i) => (i.kind === 'user' && !i.meta && !i.peer && !childReplyOf(i.text) && !goalMessageOf(i.text) ? i.text : undefined)),
+    prev: lastText(lists, (i) => (i.kind === 'user' && !i.meta && !i.peer && !childReplyOf(i.text) && !goalMessageOf(i.text) && !experimentNoticeOf(i.text) ? i.text : undefined)),
     session: key,
   };
 }

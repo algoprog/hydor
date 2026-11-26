@@ -1729,7 +1729,7 @@ agents that speak ACP and take MCP servers.
 - **Keep up with your field** (ready-made apps under Apps → Research, each on its own page with Update automatically):
   **Paper radar** (each morning, new arXiv and OpenAlex papers in your fields, on your topics and by the people you
   follow, ranked against your projects with the local embedding model, each with why it matters to you; Save, Cite as
-  BibTeX, Dig deeper, Not for me, which steer the next days), **Citation alerts** (who cited your papers, with the citing
+  BibTeX, Dig deeper, Try it on my code, Not for me; saving and Not for me steer the next days), **Citation alerts** (who cited your papers, with the citing
   sentence, and whether it builds on, compares with or disputes your work; it says when the sentences could not be read and
   tries them again at the next update; it finds you by the id in About you), **New-model watch** (new Hugging Face
   models of a task, checked against your limits and run on your own evaluation through Experiments; you hear only of
@@ -1787,7 +1787,11 @@ agents that speak ACP and take MCP servers.
   metric. A run's page has **Overview** (key metrics with their curves, hyperparameters, values, details, code,
   command, environment and what happened), **Charts** and **Log**. **Compare** puts the picked runs' metrics,
   hyperparameters (**Only what differs**) and charts side by side. An agent on call wakes on NaN, out of memory, a
-  stall, a crash or divergence, and tells you or acts within your rules. Sweep hyperparameters (every combination or a
+  stall, a crash or divergence, and tells you or acts within your rules. A session whose agent started runs hears of
+  those that end close together in one message, the numbers that matter most first, shown as one row. The files a
+  run's command names that git does not track are kept with it, so it can be run again. Each run can write its
+  per-example scores to a folder of its own (`$HYDOR_RUN_DIR/scores.jsonl`), as the runs of a sweep do, for paired
+  tests. Sweep hyperparameters (every combination or a
   random sample, losing runs stopped early; a sweep is one experiment, and its notice opens its Hyperparameters tab),
   and make **results tables** (mean ± std over seeds, the best in bold, paired or Welch tests with Holm's correction as
   daggers, a double dagger where worse, and a note instead where the seeds barely change a number) as LaTeX, Markdown
@@ -1848,10 +1852,13 @@ agents that speak ACP and take MCP servers.
   own Lean or sets one up in its own folder when you agree (about 620 MB to download, 3 GB unpacked), with Mathlib as a
   second step (about 600 MB to download, 8 GB unpacked). A Lean project of your own that uses Mathlib is not run until
   its own copy is fetched, so that no check downloads it unasked or builds it from source.
-  Agents check a file or a snippet (lean_check), search the library (lean_search: Loogle and LeanSearch) and
+  Agents check a file or a snippet (lean_check), search the library (lean_search: LeanSearch for ordinary words and
+  Loogle for names and patterns, each result with its documentation page, and the names checked against what is
+  installed here when asked) and
   give a verdict you can rely on (lean_verify, and the `leancheck` command for a goal's check): no errors, no gaps
   marked `sorry`, the standard axioms only, with every declaration replayed through Lean's kernel, so the usual ways
-  of faking a proof are refused. The lean-proofs skill has agents agree the formal statement with you before proving
+  of faking a proof are refused. The verdict also shows what each theorem states, as Lean reads it, with a pin of that
+  statement (`name@pin`), so a statement weakened after you agreed it fails even though it is proved. The lean-proofs skill has agents agree the formal statement with you before proving
   anything (translated back into plain mathematics, with every difference listed), and the proof-check skill reads a
   proof written in words step by step and reports its gaps. Checking a Lean file can run code in it, so it runs in
   the app's sandbox where there is one, and asks you once a session where there is none.
@@ -1859,6 +1866,10 @@ agents that speak ACP and take MCP servers.
   Rebuttal workbench's experiments to run each have **Run these…**, which opens the start page with a request for an
   agent to plan them within your GPU hours, queue them in Experiments, and report each with its numbers in a results
   table.
+- **Try a paper's idea on your own code**: a paper in Paper radar or Living related work has **Try it on my code**,
+  which opens the start page with a request for an agent to read it, check what your project already tried, plan the
+  smallest faithful version and ask which way to go before any run, measure it against your code unchanged, try to
+  explain a gain away, and record what came of it, also when it did not help.
 - New skills for every agent: papers' peer review, reproducing a paper, figures for papers, trying to break a result,
   proofs in Lean, and checking a proof written in words.
 

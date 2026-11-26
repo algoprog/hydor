@@ -18,10 +18,27 @@ import { allowedFolder, ChangedError, check, cleanSpec, createEvaluation, evalua
 import type { Candidate, Evolution } from '../../shared/evolve.ts';
 import { candidateDetail, candidatesOf, checkEvolveSpec, EVOLVE, listEvolutions, mustEvolution, startEvolution } from './evolve.ts';
 import { cleanJob, onCallSession, placesLine, runAgain, stopRun, submit, waitRuns, whereWords } from './queue.ts';
+import { keepUntracked, keptWords, localShell } from './capture.ts';
+import { agentBaseEnv } from '../env.ts';
+import { sawEnded } from './notices.ts';
 import { getRun, getRunWithEvents, isFinalRun, isScoringRun, listInfo, listRuns, saveInfo } from './records.ts';
 import { connectedMachines } from './remote.ts';
 
 const json = (v: unknown): string => JSON.stringify(v, null, 1);
+
+/** The files a run on this computer names that git does not track, in a sentence: as kept, or (not started yet) as they will be. */
+async function notInGit(r: RunRecord): Promise<string> {
+  if (r.remote || (r.where && r.where !== 'local') || isScoringRun(r)) return '';
+  if (r.status !== 'queued' && r.status !== 'waiting') return keptWords(r);
+  return keptWords(await keepUntracked(localShell(r.cwd, { ...agentBaseEnv(), ...r.env }), r.command, r.cwd, null).catch(() => ({ kept: [], notKept: [] })));
+}
+
+/** What experiment_run answers with. */
+async function started(r: RunRecord): Promise<string> {
+  const note = await notInGit(r);
+  return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), name: r.name, page: `/experiments/${r.id}`, ...(note ? { note } : {}) });
+}
+
 const failed = (e: unknown): ToolOutput => ({ text: (e as Error)?.message ?? String(e), isError: true });
 
 /** Sessions whose user allowed starting and stopping runs for the rest of the session (until the app restarts). */
@@ -99,8 +116,8 @@ const JOB_PROPS = (ctx: RunCtx) => {
     params: { type: 'object', description: 'Its settings, kept with the run and compared in tables ({ "lr": 0.0003 }); --name value pairs in the command are read too. {name} placeholders in the command are filled from them.' },
     seed: { type: 'number', description: 'Its seed (fills {seed} in the command; also read from --seed).' },
     tags: { type: 'array', items: { type: 'string' } },
-    metricsFile: { type: 'string', description: 'A file it writes metrics to as JSON lines (relative to cwd). Metrics are also read from its output: key=value pairs and JSON objects on a line.' },
-    scoresFile: { type: 'string', description: 'A file of per-example scores it writes (JSON lines with "id" and a number per metric, or trec_eval -q lines): kept with the run for paired significance tests over examples.' },
+    metricsFile: { type: 'string', description: 'A file it writes metrics to as JSON lines (relative to cwd; {run} is the run’s id, and it may start with $HYDOR_RUN_DIR/, the run’s own folder). Metrics are also read from its output: key=value pairs and JSON objects on a line.' },
+    scoresFile: { type: 'string', description: 'A file of per-example scores it writes (JSON lines with "id" and a number per metric, or trec_eval -q lines): kept with the run for paired significance tests over examples. {run} and {param} placeholders are filled, and it may start with $HYDOR_RUN_DIR/. Not needed for scores written to $HYDOR_RUN_DIR/scores.jsonl.' },
     hours: { type: 'number', description: 'A time limit: it is stopped after this many hours (on SLURM, its --time).' },
     priority: { type: 'number', description: 'Higher goes first in the queue (default 0).' },
     env: { type: 'object', description: 'Environment variables for it.' },
@@ -122,7 +139,7 @@ function runTool(ctx: RunCtx): RunTool {
   return {
     name: 'experiment_run',
     description:
-      'Start a long job (training, an evaluation) in Experiments’ queue instead of running it in the foreground: it waits for free GPUs (or a place among the jobs without one), runs on its own (in tmux, so it outlives this session), and is recorded: the commit and a patch of changes not committed, its settings and seed, the environment, its log and the metrics it prints. Returns at once with the run’s id. Never start runs on the user’s GPUs unless they asked for it. With again: a run’s id, it runs that run again with the changes you give.',
+      'Start a long job (training, an evaluation) in Experiments’ queue instead of running it in the foreground: it waits for free GPUs (or a place among the jobs without one), runs on its own (in tmux, so it outlives this session), and is recorded: the commit and a patch of changes not committed, the files the command names that git does not track, its settings and seed, the environment, its log and the metrics it prints. Each run has $HYDOR_RUN (its id) and $HYDOR_RUN_DIR (its own folder) in its environment: per-example scores written to $HYDOR_RUN_DIR/scores.jsonl are kept with it without being named. Returns at once with the run’s id. Never start runs on the user’s GPUs unless they asked for it. With again: a run’s id, it runs that run again with the changes you give.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -143,7 +160,7 @@ function runTool(ctx: RunCtx): RunTool {
           const no = await mayRun(ctx, `Run “${prev.name ?? prev.id}” again`, [changes.command ?? prev.command, `# in ${changes.cwd ?? prev.cwd} · ${whereWords(db, prev)}`].join('\n'));
           if (no) return failed(no);
           const r = await runAgain(ctx.deps, prev.id, { ...changes, ...(onCall ? { onCall } : {}) }, startedBy(ctx));
-          return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), name: r.name, page: `/experiments/${r.id}` });
+          return started(r);
         }
         const spec = await cleanJob(db, { ...a, ...(onCall ? { onCall } : {}) }, { cwd: ctx.cwd });
         const no = await mayRun(
@@ -153,7 +170,7 @@ function runTool(ctx: RunCtx): RunTool {
         );
         if (no) return failed(no);
         const r = await submit(ctx.deps, spec, { startedBy: startedBy(ctx) });
-        return json({ id: r.id, status: r.status, ...(r.why ? { why: r.why } : {}), name: r.name, page: `/experiments/${r.id}` });
+        return started(r);
       } catch (e) {
         return failed(e);
       }
@@ -166,7 +183,7 @@ function sweepTool(ctx: RunCtx): RunTool {
   return {
     name: 'experiment_sweep',
     description:
-      'Start a sweep: one command with a {name} placeholder for each setting, and values for each, expanded into runs of one experiment (every combination, or a random sample with mode "random"), queued like experiment_run’s. With earlyStop, a run whose metric at a step is worse than the median of the other runs at that step is stopped. The user hears once, when the whole sweep has ended. Never start runs on the user’s GPUs unless they asked for it.',
+      'Start a sweep: one command with a {name} placeholder for each setting, and values for each, expanded into runs of one experiment (every combination, or a random sample with mode "random"), queued like experiment_run’s. Each run can write its own per-example scores to $HYDOR_RUN_DIR/scores.jsonl, its own folder; tags, name, scoresFile and metricsFile apply to every run. With earlyStop, a run whose metric at a step is worse than the median of the other runs at that step is stopped. The user hears once, when the whole sweep has ended. Never start runs on the user’s GPUs unless they asked for it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -175,6 +192,7 @@ function sweepTool(ctx: RunCtx): RunTool {
         mode: { type: 'string', enum: ['grid', 'random'], description: 'grid (default): every combination; random: a random sample of them, maxRuns at most.' },
         maxRuns: { type: 'number', description: 'At most this many runs (200 at most).' },
         group: { type: 'string', description: 'The experiment’s name: its runs are kept and compared under it.' },
+        name: { type: 'string', description: 'A name for each run, its {param} placeholders filled as the command’s are: "bm25 k1={k1}" (default: the experiment and the settings).' },
         earlyStop: { type: 'object', description: '{ metric, better: "max"|"min", afterSteps? }: stop runs worse than the median of the others at the same step.' },
         cwd: props.cwd,
         where: props.where,
@@ -276,7 +294,10 @@ const GET: RunTool = {
       const kept = getRun(ctx.deps.db, id);
       if (kept && isFinalRun(kept)) return failed(FINAL_RUN);
       const v = await runView(ctx.deps, id, Math.min(Math.max(Number(a.lines) || 100, 0), 2000));
-      return json({ run: { ...v.run, where: whereWords(ctx.deps.db, v.run), ...sealChanged(v.run) }, log: v.log });
+      // It has been read since it ended: the message that would tell this session of it leaves it out.
+      if (!ACTIVE.includes(v.run.status)) sawEnded(ctx.deps, ctx.key, [id]);
+      const note = await notInGit(v.run);
+      return json({ run: { ...v.run, where: whereWords(ctx.deps.db, v.run), ...sealChanged(v.run) }, ...(note ? { note } : {}), log: v.log });
     } catch (e) {
       return failed(e);
     }
@@ -310,7 +331,7 @@ const STOP: RunTool = {
 const TABLE: RunTool = {
   name: 'experiment_table',
   description:
-    'Make a results table from runs of Experiments: a row per experiment (group) or per value of a setting ("param:lr"), the runs of a row averaged over seeds (mean ± std), the best of each column in bold, each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired over seeds when they share seeds, else Welch’s t-test; Holm-corrected), † on cells significantly better than the baseline and ‡ on those significantly worse (each tested cell has verdict: "better", "worse" or "same"). When the seeds barely change a number and there are no per-example scores, it is not tested and the table’s notes say so: give the runs a scoresFile. Returns it as LaTeX (booktabs, with a “% hydor:table <id>” line that lets the numbers be checked again later: keep it), Markdown and CSV.',
+    'Make a results table from runs of Experiments: a row per experiment (group) or per value of a setting ("param:lr"), the runs of a row averaged over seeds (mean ± std), the best of each column in bold, each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired over seeds when they share seeds, else Welch’s t-test; Holm-corrected), † on cells significantly better than the baseline and ‡ on those significantly worse (each tested cell has verdict: "better", "worse" or "same"). When the seeds barely change a number and there are no per-example scores, it is not tested and the table’s notes say so. Runs have per-example scores when they wrote $HYDOR_RUN_DIR/scores.jsonl (each run’s own folder) or named a scoresFile. Returns it as LaTeX (booktabs, with a “% hydor:table <id>” line that lets the numbers be checked again later: keep it), Markdown and CSV.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -362,6 +383,7 @@ const WAIT: RunTool = {
       .digest('hex')
       .slice(0, 16)}`;
     const w = await waitRuns(ctx.deps, { ids, group: a.group ? String(a.group) : undefined, tag: a.tag ? String(a.tag) : undefined }, { hours, key, signal: ctx.signal });
+    sawEnded(ctx.deps, ctx.key, w.runs.filter((r) => !ACTIVE.includes(r.status)).map((r) => r.id));
     return json({ ended: w.ended, ...(w.ended ? {} : { note: `Not all had ended after ${hours} h.` }), runs: w.runs.filter((r) => !isFinalRun(r)).map((r) => ({ ...brief(ctx.deps.db, r), events: getRunWithEvents(ctx.deps.db, r.id)?.events?.slice(-5) })) });
   },
 };

@@ -17,6 +17,7 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { normalizeTex, type TexDoc } from '../../shared/latex.ts';
 import { ARXIV_DEFAULTS, detectVenue, venueById, venueWith, type CheckFinding, type CheckState } from '../../shared/latex-submit.ts';
 import type { ResultsTable, RunRecord } from '../../shared/experiments.ts';
+import { translator } from '../../shared/translate.ts';
 import { arxivPackage, flattenTex, pictureSize, stripComments, usedFiles } from './latex-arxiv.ts';
 import { checkJob, countEnd, finishedCheck, fontsOf, gridOf, infoOf, pagesOf, startCheck, useRecords } from './latex-check.ts';
 import { differences, entryFrom, Lookup, sameVenue, type PaperRecord } from './latex-lookup.ts';
@@ -387,6 +388,14 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
   ok(!(await says(ad, marked)), 'a table from before the worse mark is not stale for lacking it');
   ok(/its significance mark is no longer earned/.test((await says(md, aTable))?.detail ?? ''), 'a worse mark its runs no longer give');
   ok(/not the one its runs give now/.test((await says(md, marked.replace('1.2$^\\ddagger$', '1.2$^\\dagger$')))?.detail ?? ''), 'worse in the paper, better now');
+  // Every sentence of it is whole or a template with values, so the pages translate it (shared/translate.ts).
+  const german = translator({
+    '“{0}”, {1}: its significance mark is no longer earned.': '„{0}“, {1}: Zeichen nicht mehr verdient.',
+    'Experiments worked it out again from its runs (table {0}).': 'Neu berechnet (Tabelle {0}).',
+  });
+  const unearned = (await says(md, aTable))!.detail!;
+  const turned = german(unearned);
+  ok(!!turned && !/significance|Experiments worked/.test(turned) && /Neu berechnet \(Tabelle tmq3x9b2c4\)\./.test(turned), `the finding translates sentence by sentence (${unearned} -> ${turned})`);
   useRecords({ recomputeTable: () => null, listRuns: () => [] });
   const st2 = await check(d, 'other');
   ok(has(st2, 'numbers:gone:tmq3x9a1f2')?.level === 'info' && has(st2, 'numbers:noruns')?.level === 'info', 'no runs: said as information, never as an error');

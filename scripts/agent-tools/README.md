@@ -83,20 +83,32 @@ lemma of the file) depends only on the standard axioms (`propext`, `Classical.ch
 `leanchecker` accepts every declaration of the file and of the project's own files it imports.
 
 ```bash
-leancheck Proofs/Main.lean                    # a goal's command check can be exactly this
-leancheck Proofs/Main.lean --theorem main     # just that theorem
-leancheck Proofs/Main.lean --allow-sorry      # a skeleton: gaps pass, everything else still fails
+leancheck Proofs/Main.lean                                 # every theorem of the file
+leancheck Proofs/Main.lean --theorem main                  # just that theorem
+leancheck Proofs/Main.lean --theorem main@3fa2c1d9ab12     # and it still states what it did: a goal's check
+leancheck Proofs/Main.lean --allow-sorry                   # a skeleton: gaps pass, everything else still fails
 ```
+
+Each theorem is printed as `name@pin`, then what it states, as Lean reads it, and the definitions of your own that
+the statement rests on. The pin is 12 hexadecimal digits of a hash of the elaborated type, written down term by term,
+with those definitions' content: names of variables and of your own definitions, binder brackets, spacing, comments
+and proofs do not change it; any other term, type, number, universe, instance or library name does, and so does what
+one of those definitions says. Another version of Lean or Mathlib may read the same text otherwise and give another
+pin. With `--allow-sorry` a theorem that still has a gap is printed as `gap`, not `ok`.
+
+Exit codes: 0 verified; 1 not verified (errors, gaps, axioms that are not standard); 2 the question is wrong or cannot
+be put (no such file, no such theorem, a malformed pin, no Lean); 3 a statement changed from its pin; 64 usage.
 
 It does not trust what the file can change. `#print axioms` can be redefined by the file's own `macro_rules`, and
 `set_option debug.skipKernelTC true` puts in a proof the kernel never saw, reported as using no axioms (both with Lean
 4.36). So the axioms are read by a small program of ours that loads the compiled file without running its syntax
-(`lib/lean/core.mjs`), and `leanchecker` plays the declarations back through the kernel. The verdict cannot say whether
-the statement is the one you meant.
+(`lib/lean/core.mjs`), and `leanchecker` plays the declarations back through the kernel. The statement is printed by
+the same program with Lean's and the downloaded libraries' notation only, never the file's or the project's, so a
+notation of one's own cannot make it read as another. The verdict cannot say whether the statement is the one you
+meant: agree that first, then hold the proof to its pin.
 
 Lean is found as your own `lake` and `lean` on `PATH`, else the one Hydor set up (`HYDOR_LEAN_DIR`, which the app's
-launcher sets). A snippet or loose file that imports Mathlib needs Mathlib added in the app. Exit: 0 verified, 1 not,
-2 it could not be checked, 64 usage.
+launcher sets). A snippet or loose file that imports Mathlib needs Mathlib added in the app.
 
 ## How the app gives them to agents
 
@@ -167,9 +179,10 @@ Shell commands this app adds to your PATH (each has --help):
   when changing more than one place.
 - sym NAME...: a definition with its whole body and exact line range (TypeScript, JavaScript, Python, Rust).
   `sym --refs NAME` lists references, `sym --outline FILE` a file's declarations. Use grep for text and strings.
-- leancheck FILE.lean: whether its proofs hold (it builds, no sorry, standard axioms only, kernel re-check). Exits 0
-  only then, so a goal's command check can be "leancheck Proofs/Main.lean". --theorem NAME, --allow-sorry. Needs Lean
-  set up.
+- leancheck FILE.lean: whether its proofs hold (it builds, no sorry, standard axioms only, kernel re-check), with what
+  each theorem states and a pin of that statement. Exits 0 only then, so a goal's command check can be "leancheck
+  Proofs/Main.lean --theorem NAME@PIN" (with the pin of the agreed statement, so a changed one fails: exit 3).
+  --theorem NAME[@PIN], --allow-sorry. Needs Lean set up.
 ```
 
 ## What is in this folder

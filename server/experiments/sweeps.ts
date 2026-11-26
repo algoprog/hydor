@@ -28,6 +28,15 @@ export function fillCommand(command: string, values: Record<string, Value>, quot
 }
 
 /**
+ * A metrics or scores file as a run writes it: {name} placeholders filled as the command's, {run} the run's id, and a
+ * leading $HYDOR_RUN_DIR its own folder (`own`). A relative path stays relative to its cwd.
+ */
+export function runFile(r: { id: string; params?: Record<string, Value>; seed?: number }, file: string, own: string): string {
+  const values = { ...r.params, ...(r.seed !== undefined ? { seed: r.seed } : {}), run: r.id };
+  return fillCommand(file, values, false).replace(/^\$(?:HYDOR_RUN_DIR|\{HYDOR_RUN_DIR\})(?=[/\\]|$)/, () => own);
+}
+
+/**
  * Every combination of the settings' values (grid), or a random sample of them without repeats (random), at most
  * `maxRuns`. A grid larger than maxRuns is refused, in words, rather than cut where it happens to.
  */

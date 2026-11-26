@@ -103,7 +103,7 @@ The new run opens, so you can watch it start. To add a run to an experiment you 
 
 ## What a run records
 
-- **Its code**: when it starts, the commit and branch of its folder's Git repository and whether there were changes not committed; if there were, a patch of them (binary files left out, at most 2 MB), and how many files Git does not track.
+- **Its code**: when it starts, the commit and branch of its folder's Git repository and whether there were changes not committed; if there were, a patch of them (binary files left out, at most 2 MB), and how many files Git does not track. On this computer, the files its command names that Git does not track or ignores (a script you have not committed, a small settings file) are copied into its folder, under `untracked/`, so you can run it again later: at most 1 MB a file and 5 MB in all, never one that looks like it holds a key or a password. Its record says "Not in git, kept with the run", and which were too large to keep.
 - **Its environment**: the computer; the Python the command runs with and the versions of PyTorch, Transformers, JAX, TensorFlow and NumPy in it (read from the packages, nothing is imported); with GPUs, the CUDA and driver versions and the GPUs' names.
 - **Its hyperparameters and seed**, its **log**, its **exit code**, and its own folder in the app's data (its log, patch, exit code and metrics).
 - **Its metrics**, read from its output as it grows: `key=value` pairs (`loss=0.42`, as Lightning's progress bars print them), a JSON object on a line (`{"step": 100, "loss": 0.42}`), Python's printed dicts (as Hugging Face's Trainer prints them), Keras' "loss: 0.41 - accuracy: 0.87", and the metrics file. The step comes from `step`, `global_step`, `iter` or `epoch`. For each metric it keeps the last value, the best (lower is better for losses, errors, perplexity and the like by their names, higher for the others) and a series for the charts. A metric it prints again and again is a curve; a number it prints once is a value (its hyperparameters at the start, its results at the end). It keeps up to 100 metrics: when a run prints more, its curves are kept before numbers it printed once.
@@ -124,7 +124,7 @@ Click a run (in a table, on a card, or a GPU's meter). On a computer it opens in
 - **Hyperparameters**: the ones it was given or that were read from its command (a box finds one when there are many).
 - **Values**: the numbers it printed once, by name: its hyperparameters at the start, its results at the end. **All N** shows more than twelve, with a box to find one.
 - **Details**: its experiment (a link to it), status, when it started and ended, how long it took, where it runs, GPUs, seed, priority, the session that started it and the run it is a new run of.
-- **Code**: the commit and branch, **See the changes** for the patch (or "Nothing changed since"), and how many files Git does not track.
+- **Code**: the commit and branch, **See the changes** for the patch (or "Nothing changed since"), how many files Git does not track, and the names of those the command uses that were kept with the run or were too large to keep.
 - **Command**: the command and the folder, with **Its folder in Files**. **Environment**: the computer, Python, packages and GPUs.
 - **What happened**: its events, with their times: when it waited, started and ended, and what the agent on call saw and did, with **Open its session**.
 
@@ -148,7 +148,7 @@ Left empty, the rules are: "Read the log and the code. If a fix is clear and saf
 
 You hear when a run is done or fails (unless you untick them), when a metric crosses the value you set, and from the agent on call. A notification opens the run's page. A sweep tells you once, when all its runs have ended, with its best run; its notice opens the sweep's experiment on its **Hyperparameters** tab. At most eight notices about runs come in ten minutes; past that, one tells you how many more there were.
 
-A run an agent started with "tell me when it ends" (report) also sends that session a message when it ends, so its agent can go on from there.
+A run an agent started with "tell me when it ends" (report) also sends that session a message when it ends, so its agent can go on from there. Runs of one session that end close together, or while its agent is at work, are told in one message, a line each with the numbers that matter most, and a run the agent has read since it ended is left out; in the conversation it shows as one row, **Experiments · Runs ended**, which opens on a click.
 
 ## Titles, descriptions and categories
 
@@ -283,7 +283,7 @@ Then:
 
 A table is kept when you copy it or put it in a document. Its LaTeX carries a line `% hydor:table <id>` just above its tabular: keep it there, so the check before you submit can work the numbers out again from the runs and say which changed. **Results tables**, in the menu (⋯) at the top of the page, lists the tables kept: open one to copy or place it again, or **Work it out again** from its runs as they are now.
 
-For paired tests over examples (queries in retrieval, sentences in translation), a run writes a file of per-example scores and gives it under **Per-example scores**: JSON lines with an `id` (or `qid`, `query`, `example`) and a number per metric, such as `{"id": "q12", "ndcg@10": 0.53}`, or trec_eval -q's lines. It may have `{name}` placeholders, as the command; the file is kept with the run when it ends.
+For paired tests over examples (queries in retrieval, sentences in translation), a run writes a file of per-example scores and gives it under **Per-example scores**: JSON lines with an `id` (or `qid`, `query`, `example`) and a number per metric, such as `{"id": "q12", "ndcg@10": 0.53}`, or trec_eval -q's lines. It may have `{name}` placeholders, as the command (`{run}` is the run's id), and may start with `$HYDOR_RUN_DIR/`, the run's own folder; the file is kept with the run when it ends. A run that writes `scores.jsonl` into `$HYDOR_RUN_DIR` need not name it at all, so the runs of a sweep each keep their own.
 
 ## Sweeps
 

@@ -1,11 +1,14 @@
 // What a run records when it starts, wherever it runs (this computer, or a cluster over SSH): the commit, the
-// branch and whether there were changes not committed (then a patch of them, binary files left out, cut at 2 MB),
+// branch and whether there were changes not committed (then a patch of them, binary files left out, cut at 2 MB), on
+// this computer the files its command names that git does not track (copied into the run's folder),
 // and the environment as found: the host, the Python and the versions of PyTorch and its kin from the run's own
 // Python (by their packages' metadata: nothing is imported), the CUDA and the driver nvidia-smi names.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { isSecret, UPLOADS } from '../agent/permissions.ts';
+import { secretIn } from '../memory/secrets.ts';
 import { shellWords } from './sweeps.ts';
 
 /** Runs a shell script in a folder (here, or on a cluster); its output and exit code. */
@@ -72,6 +75,151 @@ export async function captureGit(sh: Shell): Promise<GitRecord> {
     }
   }
   return rec;
+}
+
+/** The most of one file not in git that is kept with a run, and of all of them. */
+export const KEEP_FILE = 1024 * 1024;
+export const KEEP_ALL = 5 * 1024 * 1024;
+
+/**
+ * The words of a whole command, as a shell splits them (quotes, backslashes), whatever joins its parts. What it only
+ * writes to (after > or >>) and its comments are left out.
+ */
+export function commandWords(command: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let has = false;
+  let quote: string | null = null;
+  let target = false;
+  const end = () => {
+    if (!has) return;
+    if (!target) out.push(cur);
+    target = false;
+    cur = '';
+    has = false;
+  };
+  for (let i = 0; i < command.length; i++) {
+    const c = command[i];
+    if (quote) {
+      if (c === quote) quote = null;
+      else if (c === '\\' && quote === '"' && i + 1 < command.length) cur += command[++i];
+      else cur += c;
+    } else if (c === "'" || c === '"') {
+      quote = c;
+      has = true;
+    } else if (c === '\\' && i + 1 < command.length) {
+      const next = command[++i];
+      if (next !== '\n') {
+        cur += next;
+        has = true;
+      }
+    } else if (c === '#' && !has) {
+      while (i + 1 < command.length && command[i + 1] !== '\n') i++;
+    } else if (c === '>') {
+      end();
+      target = true;
+    } else if (/[\s;|&()<]/.test(c)) end();
+    else {
+      cur += c;
+      has = true;
+    }
+  }
+  end();
+  return out;
+}
+
+const inside = (p: string, dir: string) => {
+  const rel = path.relative(dir, p);
+  return !!rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+};
+
+const real = (p: string) => {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return p;
+  }
+};
+
+/** Files named for what they hold, wherever they are (isSecret knows keys, .env and the like). */
+const SECRET_NAME = /^(secrets?|tokens?|credentials?|auth)(\.(json|ya?ml|toml|ini|txt|cfg|conf|env))?$/i;
+const SETTINGS_FILE = /\.(env|ini|ya?ml|toml|cfg|conf|json|properties)$/i;
+/** What secretIn only guesses at, from the words around it or how random it looks: code is full of such lines. */
+const GUESSED = new Set(['a password or key', 'a key or token', 'a card number']);
+
+/** Whether a file looks like it holds a key or a password (by its names, as written and where a link leads, or its text): never kept. */
+function secretFile(root: string, rel: string, at: string, text: string): boolean {
+  const appData = real(path.dirname(UPLOADS));
+  // In a folder the app made to work in (a worktree, a project's), being under the app's data says nothing: its name does.
+  const own = inside(root, appData);
+  for (const name of [rel, path.relative(root, at)]) {
+    if (isSecret(own ? `/${name}` : path.join(root, name)) || SECRET_NAME.test(path.basename(name))) return true;
+  }
+  const what = secretIn(text);
+  // A settings file with a password in it counts too; a long number or a random-looking id alone does not.
+  return !!what && (!GUESSED.has(what) || (what === 'a password or key' && SETTINGS_FILE.test(rel)));
+}
+
+/**
+ * The files a command names (its words that are files under the folder it runs in) that git does not track, or ignores:
+ * copied under `into` at the same relative paths, so the run can be reproduced (with `into` null, only listed). Those
+ * over the limits are listed in `notKept`. A file that looks like it holds a secret is left alone, as is a link that
+ * leads out of the folder. Nothing outside a git repository.
+ */
+export async function keepUntracked(sh: Shell, command: string, cwd: string, into: string | null): Promise<{ kept: string[]; notKept: string[] }> {
+  const none = { kept: [], notKept: [] };
+  const repo = await sh('git rev-parse --is-inside-work-tree 2>/dev/null', { timeoutMs: 10_000 });
+  if (repo.out.trim() !== 'true') return none;
+  const here = path.resolve(cwd);
+  const root = real(here);
+  const found = new Map<string, string>();
+  for (const word of commandWords(command)) {
+    for (const w of word.includes('=') ? [word, word.slice(word.indexOf('=') + 1)] : [word]) {
+      if (!w || w.length > 1000 || found.size >= 200) continue;
+      const abs = path.resolve(here, w);
+      const rel = path.relative(here, abs);
+      if (!inside(abs, here) || rel.split(path.sep).includes('.git')) continue;
+      try {
+        const at = fs.realpathSync(abs);
+        if (inside(at, root) && fs.statSync(at).isFile()) found.set(rel.split(path.sep).join('/'), at);
+      } catch {}
+    }
+  }
+  if (!found.size) return none;
+  const ls = await sh(`git --literal-pathspecs ls-files -z -- ${[...found.keys()].map(q).join(' ')}`, { timeoutMs: 20_000 });
+  if (ls.code !== 0) return none;
+  const tracked = new Set(ls.out.split('\0'));
+  const kept: string[] = [];
+  const notKept: string[] = [];
+  let total = 0;
+  for (const [rel, at] of found) {
+    if (tracked.has(rel)) continue;
+    try {
+      const size = fs.statSync(at).size;
+      // Its name first: a large file that is a secret by its name is not even listed.
+      if (secretFile(root, rel, at, '')) continue;
+      if (size > KEEP_FILE || total + size > KEEP_ALL) {
+        notKept.push(rel);
+        continue;
+      }
+      const data = fs.readFileSync(at);
+      if (!data.includes(0) && secretFile(root, rel, at, data.toString('utf8'))) continue;
+      if (into) {
+        const to = path.join(into, rel);
+        fs.mkdirSync(path.dirname(to), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(to, data, { mode: 0o600 });
+      }
+      kept.push(rel);
+      total += size;
+    } catch {}
+  }
+  return { kept, notKept };
+}
+
+/** In a sentence for agents, what became of the files a command names that git does not track. */
+export function keptWords(r: { kept?: string[]; notKept?: string[] }): string {
+  const list = (files: string[]) => `${files.slice(0, 20).join(', ')}${files.length > 20 ? ` and ${files.length - 20} more` : ''}`;
+  return [r.kept?.length ? `Not in git, kept with the run: ${list(r.kept)}` : '', r.notKept?.length ? `Not in git and too large to keep: ${list(r.notKept)}` : ''].filter(Boolean).join('. ');
 }
 
 /**

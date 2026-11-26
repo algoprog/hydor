@@ -28,8 +28,9 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx, ToolOutput } from '../features/types.ts';
 import { setCheckSandbox } from '../goals/driver.ts';
 import { lean as leanFeature } from './index.ts';
-import { looksFormal, searchLean, setSearchFetchForTests } from './search.ts';
-import { leanDir, leanState, removeLean, setLeanForTests, setupLean, type LeanWorld } from './setup.ts';
+import { confirmHere, NO_MATHLIB } from './confirm.ts';
+import { forLoogle, searchLean, setSearchFetchForTests } from './search.ts';
+import { lean as theLean, leanDir, leanState, mathlib as theMathlib, removeLean, setLeanForTests, setupLean, type LeanWorld } from './setup.ts';
 import { leanTools, NOT_SET_UP, setLeanSandboxForTests } from './tools.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -469,7 +470,8 @@ test('lean_verify: ok with each theorem’s axioms; a sorry, an axiom of one’s
   const good = await verdict('V.lean', 'namespace N\ntheorem a : True := trivial\ntheorem b : True := Classical.byContradiction id\nend N\n');
   assert.equal(good.ok, true, JSON.stringify(good));
   assert.equal(good.why, undefined);
-  assert.deepEqual(good.theorems, [{ name: 'N.a', axioms: [], ok: true }, { name: 'N.b', axioms: ['Classical.choice', 'Quot.sound', 'propext'], ok: true }]);
+  const briefly = (v: any) => v.theorems.map((t: any) => ({ name: t.name, axioms: t.axioms, ok: t.ok }));
+  assert.deepEqual(briefly(good), [{ name: 'N.a', axioms: [], ok: true }, { name: 'N.b', axioms: ['Classical.choice', 'Quot.sound', 'propext'], ok: true }]);
   const gaps = await verdict('G.lean', 'theorem a : True := by\n  sorry\ntheorem b : True := by\n  sorry\n');
   assert.equal(gaps.ok, false);
   assert.equal(gaps.why, 'it still has 2 gaps marked sorry');
@@ -486,7 +488,9 @@ test('lean_verify: ok with each theorem’s axioms; a sorry, an axiom of one’s
   const missing = await verdict('M.lean', 'theorem here : True := trivial\n', ['here', 'gone']);
   assert.equal(missing.ok, false);
   assert.equal(missing.why, 'there is no theorem gone in this file');
-  assert.deepEqual(missing.theorems, [{ name: 'here', axioms: [], ok: true }, { name: 'gone', axioms: [], ok: false }]);
+  assert.deepEqual(briefly(missing), [{ name: 'here', axioms: [], ok: true }, { name: 'gone', axioms: [], ok: false }]);
+  assert.deepEqual(missing.missing, ['gone']);
+  assert.deepEqual(Object.keys(missing.theorems[1]), ['name', 'axioms', 'ok'], 'nothing is stated by a theorem that is not there');
   const empty = await verdict('E.lean', 'def x := 1\n');
   assert.equal(empty.why, 'there is no theorem or lemma in it to check');
   const broken = await verdict('B.lean', 'theorem bad : 2 + 2 = 5 := by decide\n');
@@ -498,6 +502,38 @@ test('lean_verify: ok with each theorem’s axioms; a sorry, an axiom of one’s
   put('p2/.lake/build/lib/lean/Proofs/Other.olean', 'set_option debug.skipKernelTC true in\ntheorem skipped : 1 = 2 := by decide\n');
   const proj = await call('lean_verify', { file: 'p2/Main.lean' });
   assert.match(proj.data.why, /Lean's kernel does not accept the file Proofs\.Other it imports/);
+});
+
+test('lean_verify: what each theorem states and its pin, even while it is sorry; name@pin holds a proof to it', async () => {
+  world('pins', { path: ownPath() });
+  const verify = async (text: string, theorems?: string[]) => {
+    put('Pin.lean', text);
+    return call('lean_verify', { file: 'Pin.lean', ...(theorems ? { theorems } : {}) });
+  };
+  const def = 'def twice (k : Nat) : Nat := k * 2\n';
+  const open = (await verify(`${def}theorem bound (n : Nat) (h : 0 < n) : twice n < n * 3 := by\n  sorry\n`)).data;
+  assert.equal(open.ok, false);
+  assert.equal(open.why, 'it still has 1 gap marked sorry');
+  const { statement, pin, definitions } = open.theorems[0];
+  assert.deepEqual([statement, definitions], ['∀ (n : Nat), (0 : Nat) < n → twice n < n * (3 : Nat)', ['twice']]);
+  assert.match(pin, /^[0-9a-f]{12}$/);
+  // Proved, laid out otherwise and with another name for the variable: the same pin.
+  const proved = (await verify(`${def}-- proved now\ntheorem bound\n    (m : Nat) (pos : 0 < m) : twice m < m * 3 := by\n  unfold twice; omega\n`, [`bound@${pin}`])).data;
+  assert.equal(proved.ok, true, JSON.stringify(proved));
+  assert.equal(proved.theorems[0].pin, pin);
+  assert.equal(proved.changed, undefined);
+  const weaker = (await verify(`${def}theorem bound (n : Nat) (h : 0 < n) (few : n < 5) : twice n < n * 3 := by\n  unfold twice; omega\n`, [`bound@${pin}`])).data;
+  assert.equal(weaker.ok, false);
+  assert.deepEqual([weaker.changed, weaker.theorems[0].ok], [['bound'], false]);
+  const now = weaker.theorems[0].pin;
+  assert.notEqual(now, pin);
+  assert.equal(weaker.why, `bound no longer says what was agreed: its statement changed (it was pinned as ${pin}, it is now ${now}) (the pin covers the definitions of its own that it rests on too: twice). It now says: ∀ (n : Nat), (0 : Nat) < n → n < (5 : Nat) → twice n < n * (3 : Nat)`);
+  // A malformed pin is the question's fault; a pin for a theorem that is not there is no such theorem.
+  const bad = await verify(`${def}theorem bound : True := trivial\n`, ['bound@abc']);
+  assert.equal(bad.error, true);
+  assert.equal(bad.text, '"bound@abc" is not a theorem with its pin: write it as name@pin, where the pin is the 12 characters (0-9, a-f) a verdict gave for it.');
+  const gone = (await verify('theorem here : True := trivial\n', [`gone@${pin}`])).data;
+  assert.deepEqual([gone.why, gone.missing, gone.changed], ['there is no theorem gone in this file', ['gone'], undefined]);
 });
 
 test('lean_verify works with the app’s own Lean too, and leaves nothing behind', async () => {
@@ -551,37 +587,98 @@ test('checking runs code, so it is as free as the session’s commands: sandboxe
 const loogleAnswer = { count: 1, hits: [{ doc: null, module: 'Init.Data.Nat.Basic', name: 'Nat.add_comm', type: ' (n m : ℕ) : n + m = m + n' }] };
 const leansearchAnswer = [[{ result: { module_name: ['Mathlib', 'NumberTheory', 'Real', 'Irrational'], kind: 'theorem', name: ['irrational_sqrt_two'], signature: ': Irrational (√2)', type: 'Irrational √2', docstring: null, informal_name: 'Irrationality', informal_description: 'The square root of 2 is irrational.' }, distance: 0.15 }]];
 
-test('lean_search: both services, the better suited first; one down; both down, said plainly', async () => {
+test('lean_search: Loogle is asked only what can be one of its queries', () => {
+  for (const q of ['Nat.add_comm', 'add_comm', 'Nat', '_ + _ = _ + _', 'Real.sqrt (_ ^ 2)', 'Real.sqrt ?a * Real.sqrt ?a', '"differ"', '|- tsum _ = _ * tsum _', '⊢ _ < _', '(?a -> ?b) -> List ?a -> List ?b', 'List ℕ → ℕ', 'Real.sin, Real.cos', 'Real.sin, "two", _ * _', 'Real.sqrt 2', '2 * x * y ≤ x ^ 2 + y ^ 2', 'List.map f', '∀ n, 0 ≤ n'])
+    assert.equal(forLoogle(q), true, q);
+  for (const q of ['square root of two is irrational', 'addition is commutative', 'sum of the first n odd numbers', 'is sqrt 2 irrational?', 'Cauchy-Schwarz inequality', 'Bezout’s identity', 'Pythagorean theorem (inner product spaces)', 'what does Nat.succ do', 'continuous functions on compact sets, bounded', ''])
+    assert.equal(forLoogle(q), false, q);
+});
+
+test('lean_search: routed by the query; from lists the services whose hits are there; each hit its service and page; failures said plainly', async () => {
   world('search', { path: ownPath() });
   const asked: string[] = [];
-  let down: string[] = [];
+  let down: Record<string, 'error' | 'unreachable' | 'garbled' | undefined> = {};
   setSearchFetchForTests(async (url, init) => {
     asked.push(`${init?.method ?? 'GET'} ${url} ${init?.body ?? ''}`);
     const who = url.includes('loogle') ? 'loogle' : 'leansearch';
-    if (down.includes(who)) return new Response('bad gateway', { status: 502 });
-    return Response.json(who === 'loogle' ? (url.includes('sqrt') ? { error: 'Unknown identifier `sqrt`', suggestions: [] } : loogleAnswer) : leansearchAnswer);
+    if (down[who] === 'error') return new Response('bad gateway', { status: 502 });
+    if (down[who] === 'unreachable') throw new TypeError('fetch failed');
+    if (down[who] === 'garbled') return new Response('<html>', { status: 200 });
+    return Response.json(who === 'loogle' ? (url.includes('irrational') ? { error: "unknown identifier 'irrational'", suggestions: [] } : loogleAnswer) : leansearchAnswer);
   });
+  const loogled = () => asked.filter((a) => a.includes('loogle')).length;
   try {
     const both = await call('lean_search', { query: 'Nat.add_comm' });
     assert.deepEqual(both.data.from, ['Loogle', 'LeanSearch']);
-    assert.deepEqual(both.data.hits.map((h: any) => h.name), ['Nat.add_comm', 'irrational_sqrt_two']);
-    assert.deepEqual(both.data.hits[1], { name: 'irrational_sqrt_two', type: 'Irrational √2', module: 'Mathlib.NumberTheory.Real.Irrational', doc: 'The square root of 2 is irrational.' });
+    assert.deepEqual(both.data.hits, [
+      { name: 'Nat.add_comm', type: '(n m : ℕ) : n + m = m + n', module: 'Init.Data.Nat.Basic', from: 'Loogle', url: 'https://leanprover-community.github.io/mathlib4_docs/Init/Data/Nat/Basic.html#Nat.add_comm' },
+      { name: 'irrational_sqrt_two', type: 'Irrational √2', module: 'Mathlib.NumberTheory.Real.Irrational', doc: 'The square root of 2 is irrational.', from: 'LeanSearch', url: 'https://leanprover-community.github.io/mathlib4_docs/Mathlib/NumberTheory/Real/Irrational.html#irrational_sqrt_two' },
+    ]);
     assert.ok(asked.some((a) => a.startsWith('GET https://loogle.lean-lang.org/json?q=Nat.add_comm')));
     assert.ok(asked.some((a) => a === 'POST https://leansearch.net/search {"query":["Nat.add_comm"],"num_results":10}'));
-    const words = await call('lean_search', { query: 'sqrt two is irrational' });
-    assert.deepEqual(words.data.hits.map((h: any) => h.name), ['irrational_sqrt_two']);
-    assert.match(words.data.note, /Loogle could not read the query \(Unknown identifier `sqrt`\)/);
-    down = ['leansearch'];
+    assert.equal(both.data.note, undefined);
+    assert.ok(both.data.hits.every((h: any) => !('here' in h)), 'nothing is checked unless asked');
+    const pattern = await call('lean_search', { query: '_ + _ = _ + _' });
+    assert.deepEqual([loogled(), pattern.data.from], [2, ['Loogle', 'LeanSearch']], 'a pattern goes to both');
+    // Plain words are not sent to Loogle, and it is not said to have answered.
+    const words = await call('lean_search', { query: 'square root of two is irrational' });
+    assert.equal(loogled(), 2);
+    assert.deepEqual([words.data.from, words.data.hits.map((h: any) => h.from), words.data.note], [['LeanSearch'], ['LeanSearch'], undefined]);
+    // A name Loogle does not know: its hits are not there, so it is not in from.
+    const unknown = await call('lean_search', { query: 'irrational' });
+    assert.deepEqual([unknown.data.from, unknown.data.note], [['LeanSearch'], 'Loogle knows nothing called irrational.']);
+    down = { leansearch: 'error' };
     const one = await call('lean_search', { query: 'Nat.add_comm' });
-    assert.deepEqual(one.data.from, ['Loogle']);
-    assert.match(one.data.note, /Did not answer: LeanSearch: it answered 502\./);
-    down = ['leansearch', 'loogle'];
+    assert.deepEqual([one.data.from, one.data.note], [['Loogle'], 'Did not answer: LeanSearch: it answered with an error (502).']);
+    down = { loogle: 'unreachable' };
+    assert.equal((await call('lean_search', { query: 'Nat.add_comm' })).data.note, 'Did not answer: Loogle: it could not be reached.');
+    down = { leansearch: 'garbled' };
+    const words2 = await call('lean_search', { query: 'two is irrational' });
+    assert.equal(words2.error, true, 'the only service asked did not answer');
+    assert.equal(words2.text, 'No Lean search service answered (LeanSearch: its answer could not be read). Try again later, or search with exact? and apply? inside Lean.');
+    down = { leansearch: 'error', loogle: 'error' };
     const none = await call('lean_search', { query: 'add' });
     assert.equal(none.error, true);
-    assert.equal(none.text, 'No Lean search service answered (Loogle: it answered 502; LeanSearch: it answered 502). Try again later, or search with exact? and apply? inside Lean.');
-    assert.equal(looksFormal('_ + _ = _ + _'), true);
-    assert.equal(looksFormal('addition is commutative'), false);
+    assert.equal(none.text, 'No Lean search service answered (Loogle: it answered with an error (502); LeanSearch: it answered with an error (502)). Try again later, or search with exact? and apply? inside Lean.');
+    // A hit with no module has no page.
+    down = {};
+    setSearchFetchForTests(async (url) => Response.json(url.includes('loogle') ? { hits: [{ name: 'Lost.lemma', type: 'True', module: null }] } : [[]]));
+    const lost = await call('lean_search', { query: 'Lost.lemma' });
+    assert.deepEqual(lost.data.hits, [{ name: 'Lost.lemma', type: 'True', module: '', from: 'Loogle' }]);
+    assert.deepEqual(lost.data.from, ['Loogle']);
   } finally {
+    setSearchFetchForTests(null);
+  }
+});
+
+test('lean_search with confirm: the names are checked against what is installed here, or it says why not', async () => {
+  const { dir } = world('confirm', { path: ownPath() });
+  const found = [{ name: 'Nat.add_comm', type: 't', module: 'Init.Data.Nat.Basic' }, { name: 'Nat.gone_since', type: 't', module: 'Mathlib.Data.Nat.Basic' }, { name: 'bad name\n#eval 1', type: 't', module: 'Mathlib.X' }, { name: 'List.map', type: 't', module: 'Init.Prelude' }];
+  setSearchFetchForTests(async (url) => Response.json(url.includes('loogle') ? { hits: found } : [[]]));
+  boxed.length = 0;
+  try {
+    const without = await call('lean_search', { query: 'Nat.add_comm', confirm: true });
+    assert.equal(without.error, false, without.text);
+    assert.equal(without.data.note, NO_MATHLIB);
+    assert.match(NO_MATHLIB, /^The names were not checked against what is installed here: Mathlib is not set up \(add it in Settings → General → Lean \(proof checker\) → Add Mathlib/);
+    assert.ok(without.data.hits.every((h: any) => !('here' in h)));
+    // Mathlib added (the stand-in's).
+    const p = appPaths(dir);
+    fs.mkdirSync(path.join(p.mathlib, '.lake', 'packages', 'mathlib'), { recursive: true });
+    fs.writeFileSync(path.join(p.mathlib, '.lake', 'packages', 'mathlib', 'built'), '');
+    fs.writeFileSync(p.mathlibMarker, 'leanprover/lean4:v4.36.0\n');
+    const mine = () => fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith('hydor-lean-names-'));
+    const with_ = await call('lean_search', { query: 'Nat.add_comm', confirm: true });
+    assert.equal(with_.data.note, undefined, with_.text);
+    assert.deepEqual(with_.data.hits.map((h: any) => [h.name, h.here]), [['Nat.add_comm', true], ['Nat.gone_since', false], ['bad name\n#eval 1', undefined], ['List.map', true]], 'what is not a name is never written into the file');
+    assert.deepEqual(mine(), [], 'the scratch folder goes');
+    const off = await call('lean_search', { query: 'Nat.add_comm' });
+    assert.ok(off.data.hits.every((h: any) => !('here' in h)));
+    // In Plan mode too: nothing of the person's is run.
+    session.mode = 'plan';
+    assert.equal((await call('lean_search', { query: 'Nat.add_comm', confirm: true })).data.hits[0].here, true);
+  } finally {
+    session.mode = 'default';
     setSearchFetchForTests(null);
   }
 });
@@ -653,7 +750,7 @@ test('the routes: state, set-up (and Mathlib), removing; the tools, the guide no
   const add = (await leanFeature.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: {} }, deps))!;
   assert.deepEqual(Object.keys(add.env!), ['HYDOR_LEAN_DIR']);
   assert.ok(add.env!.HYDOR_LEAN_DIR.endsWith(path.join('spawn', 'lean')) && dir);
-  assert.equal(add.guides![0].text, 'Lean checks proofs: lean_check a file or a snippet, lean_search before proving something the library may have, lean_verify for the verdict (no errors, no sorry, standard axioms only). Before proving anything for someone, load the lean-proofs skill: the statement is agreed with them first.');
+  assert.equal(add.guides![0].text, 'Lean checks proofs: lean_check a file or a snippet, lean_search before proving something the library may have, lean_verify for the verdict (no errors, no sorry, standard axioms only; it names what each theorem states, with a pin of it, and name@pin holds a proof to the agreed statement). Before proving anything for someone, load the lean-proofs skill: the statement is agreed with them first.');
   assert.equal(await leanFeature.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { browserOnly: true } }, deps), undefined);
 });
 
@@ -666,6 +763,8 @@ test('leancheck exits 0 only for a verified file, 1 otherwise, 2 without Lean', 
   assert.equal(cli(['D.lean']).status, 1);
   assert.equal(cli(['D.lean', '--allow-sorry']).status, 0);
   assert.equal(cli(['C.lean'], '/usr/bin:/bin').status, 2);
+  assert.equal(cli(['C.lean', '--theorem', 'nothing']).status, 2);
+  assert.equal(cli(['C.lean', '--theorem', 'c@0123456789ab']).status, 3);
 });
 
 // ---- the real Lean ------------------------------------------------------------------------------------------------
@@ -720,6 +819,100 @@ if (LIVE) {
     assert.deepEqual(via.theorems.map((t: any) => t.axioms), [['sorryAx'], ['sorryAx']]);
   });
 
+  const lc = (args: string[], cwd = work) => spawnSync(process.execPath, [path.join(APP_ROOT, 'scripts/agent-tools/bin/leancheck'), ...args], { cwd, encoding: 'utf8', env: { PATH: livePath, HOME: home, ELAN_HOME: elan } });
+  /** The theorem of a file, as lean_verify states it (the file need not be proved). */
+  const stated = async (name: string, text: string, theorem?: string) => {
+    put(name, text);
+    const r = await call('lean_verify', { file: name, ...(theorem ? { theorems: [theorem] } : {}) });
+    assert.equal(r.error, false, r.text);
+    const t = r.data.theorems.at(-1);
+    assert.ok(t?.pin, r.text);
+    show(name, `${t.pin}  ${t.statement}${t.definitions ? `   {${t.definitions.join(', ')}}` : ''}`);
+    return t as { name: string; statement: string; pin: string; definitions?: string[] };
+  };
+  const BOUND = 'theorem bound (n : Nat) (h : 0 < n) : n < n + 1 := by\n  omega\n';
+
+  test('LIVE: pins: the same through reformatting, renaming and the proof; another for a hypothesis, a constant, a conclusion', async () => {
+    liveWorld('live-pins');
+    const agreed = await stated('pins/Agreed.lean', 'theorem bound (n : Nat) (h : 0 < n) : n < n + 1 := by\n  sorry\n');
+    assert.equal(agreed.statement, '∀ (n : Nat), (0 : Nat) < n → n < n + (1 : Nat)');
+    for (const [file, text] of [
+      ['Proved.lean', BOUND],
+      ['Renamed.lean', '-- other names, laid out otherwise, another proof, more in the file\ndef other := 1\n\n/-- doc -/\ntheorem bound\n    (m : Nat)\n    (pos : 0 < m) :\n    m < m + 1 := Nat.lt_succ_self _\n'],
+      ['Written.lean', 'theorem bound : ∀ {k : Nat}, 0 < k → k < k + 1 := by\n  intro k _; omega\n'],
+    ]) assert.equal((await stated(`pins/${file}`, text)).pin, agreed.pin, file);
+    for (const [file, text] of [
+      ['Hypothesis.lean', 'theorem bound (n : Nat) (h : 0 < n) (few : n < 10) : n < n + 1 := by\n  omega\n'],
+      ['Constant.lean', 'theorem bound (n : Nat) (h : 0 < n) : n < n + 2 := by\n  omega\n'],
+      ['Conclusion.lean', 'theorem bound (n : Nat) (h : 0 < n) : n ≤ n + 1 := by\n  omega\n'],
+      ['Type.lean', 'theorem bound (n : Int) (h : 0 < n) : n < n + 1 := by\n  omega\n'],
+    ]) assert.notEqual((await stated(`pins/${file}`, text)).pin, agreed.pin, file);
+    // Universe names do not count.
+    const u = await stated('pins/U1.lean', 'universe u v\ntheorem p {α : Sort u} {β : Sort v} (a : α) (b : β) : a = a ∧ b = b := ⟨rfl, rfl⟩\n');
+    assert.equal((await stated('pins/U2.lean', 'theorem p {x : Sort w} {y : Sort z} (c : x) (d : y) : c = c ∧ d = d := ⟨rfl, rfl⟩\n')).pin, u.pin);
+  });
+
+  test('LIVE: pins cover one’s own definitions, not their names; a project and a loose file agree', async () => {
+    const of = (name: string, factor: number, extra = '') => `def ${name} (k : Nat) : Nat := k * ${factor}\n${extra}theorem t (n : Nat) (h : 0 < n) : ${name} n < ${name} n + 1 := Nat.lt_succ_self _\n`;
+    const twice = await stated('defs/A.lean', of('f', 2));
+    assert.deepEqual(twice.definitions, ['f']);
+    assert.equal((await stated('defs/Zeta.lean', of('twice', 2, 'def unused := 7\n'))).pin, twice.pin, 'a renamed definition, another file name');
+    const thrice = await stated('defs/Thrice.lean', of('f', 3));
+    assert.equal(thrice.statement, twice.statement, 'it reads the same');
+    assert.notEqual(thrice.pin, twice.pin, 'and says something else');
+    // A match, a structure, an instance, a private definition, a recursive one: the same twice over.
+    const rich = 'structure P where\n  x : Int\ninstance : Add P := ⟨fun a b => ⟨a.x + b.x⟩⟩\nprivate def secret (n : Nat) : Prop := n = 0\ndef len : List Nat → Nat\n  | [] => 0\n  | _ :: t => len t + 1\ntheorem r (p q : P) (n : Nat) (hs : secret n) : (p + q).x = p.x + q.x ∧ (match n with | 0 => 1 | _ => 2) ≤ len [n] := by\n  sorry\n';
+    const first = await stated('defs/Rich.lean', rich);
+    assert.equal((await stated('defs/RichAgain.lean', `-- again\n${rich}`)).pin, first.pin);
+    // (the hypothesis that depends on n is matched with it, as Lean reads it)
+    assert.match(first.statement, /\(match n, hs with \| \(0 : Nat\), hs => /);
+    assert.deepEqual(first.definitions, ['P', 'secret', 'instAddP', 'len']);
+    // A definition left as sorry does not make the pin depend on where it is written.
+    const gap = await stated('defs/Gap.lean', 'def g (n : Nat) : Nat := sorry\ntheorem t : g 1 = 1 := sorry\n');
+    assert.equal((await stated('defs/GapMoved.lean', '\n\n-- lower down\ndef g (n : Nat) : Nat :=\n      sorry\ntheorem t : g 1 = 1 := sorry\n')).pin, gap.pin);
+    put('pinproj/lakefile.toml', 'name = "pinproj"\n\n[leanOptions]\nautoImplicit = false\n\n[[lean_lib]]\nname = "Proofs"\n');
+    put('pinproj/lean-toolchain', 'leanprover/lean4:v4.36.0\n');
+    put('pinproj/Proofs/Basic.lean', 'def f (k : Nat) : Nat := k * 2\nnotation "TWICE" => f\n');
+    const proj = await stated('pinproj/Proofs/Main.lean', 'import Proofs.Basic\n\ntheorem t (n : Nat) (h : 0 < n) : TWICE n < TWICE n + 1 := Nat.lt_succ_self _\n');
+    assert.equal(proj.pin, twice.pin);
+    assert.deepEqual(proj.definitions, ['f'], 'the project’s own, and its notation is not used to show it');
+    assert.doesNotMatch(proj.statement, /TWICE/);
+  });
+
+  test('LIVE: a file’s own notation, printers and initializers do not change what is shown', async () => {
+    const spoof = 'import Lean\nopen Lean PrettyPrinter\nmacro_rules | `(binrel% LT.lt $_ $_) => `(True)\n@[app_unexpander True] def u : Unexpander := fun _ => `(False)\nset_option pp.all true\ninitialize IO.println "an initializer of the file ran"\n';
+    const made = await stated('spoof/Made.lean', `${spoof}theorem c : 5 < 3 := trivial\n`);
+    assert.equal(made.statement, 'True', 'what it really states');
+    const own = await stated('spoof/Instance.lean', 'instance (priority := high) low : LT Nat := ⟨fun _ _ => True⟩\ntheorem c : (5 : Nat) < 3 := trivial\n');
+    const real = await stated('spoof/Real.lean', 'theorem c : (5 : Nat) < 3 := by\n  sorry\n');
+    assert.equal(own.statement, real.statement, 'it reads the same');
+    assert.notEqual(own.pin, real.pin);
+    assert.deepEqual(own.definitions, ['low']);
+    const out = lc(['spoof/Made.lean']);
+    assert.doesNotMatch(out.stdout, /initializer of the file ran/);
+  });
+
+  test('LIVE: name@pin and leancheck: verified, changed (3), no such theorem and a malformed pin (2), a gap', async () => {
+    const { pin } = await stated('at/Main.lean', 'theorem sum_up (n : Nat) : n ≤ n + n := by\n  sorry\n');
+    const run = (args: string[]) => {
+      const r = lc(args);
+      console.log(`     $ leancheck ${args.join(' ')}\n${`${r.stdout}${r.stderr}`.trimEnd().replace(/^/gm, '     | ')}\n     | exit ${r.status}`);
+      return r.status;
+    };
+    assert.equal(run(['at/Main.lean', '--theorem', `sum_up@${pin}`]), 1, 'not proved yet');
+    assert.equal(run(['at/Main.lean', '--theorem', `sum_up@${pin}`, '--allow-sorry']), 0);
+    put('at/Main.lean', 'theorem sum_up (n : Nat) : n ≤ n + n := Nat.le_add_right n n\n');
+    assert.equal(run(['at/Main.lean', '--theorem', `sum_up@${pin}`]), 0);
+    const v = await verdict('at/Main.lean', 'theorem sum_up (n : Nat) : n ≤ n + n + 1 := by omega\n', [`sum_up@${pin}`]);
+    assert.equal(v.ok, false);
+    assert.deepEqual(v.changed, ['sum_up']);
+    show('why', v.why);
+    assert.equal(run(['at/Main.lean', '--theorem', `sum_up@${pin}`]), 3);
+    assert.equal(run(['at/Main.lean', '--theorem', `other@${pin}`]), 2);
+    assert.equal(run(['at/Main.lean', '--theorem', 'sum_up@12']), 2);
+    assert.equal(run(['at/Missing.lean', '--theorem', `sum_up@${pin}`]), 2);
+  });
+
   test('LIVE: lean_check on a snippet (unsolved goals, positions) and a Lake project (imports built first)', async () => {
     const r = await call('lean_check', { code: 'theorem u (a b : Nat) (h : 0 < a) : a + b = b + a ∧ a < a + b := by\n  constructor\n  · exact Nat.add_comm a b\n  · skip\n\n#check Nat.add_comm\n' });
     show('snippet', r.data);
@@ -769,12 +962,17 @@ if (LIVE) {
     assert.match(r.data.errors[0].message, /^Lean was stopped after 3 s/);
   });
 
-  test('LIVE: lean_search answers from the live services', async () => {
+  test('LIVE: lean_search answers from the live services, and its documentation pages are there', async () => {
     for (const q of ['_ * (_ + _) = _ * _ + _ * _', 'square root of two is irrational']) {
       const r = await searchLean(q);
-      show(`search “${q}”`, { from: r.from, hits: r.hits.slice(0, 3).map((h) => `${h.name} [${h.module}]`), count: r.hits.length, note: r.note });
+      show(`search “${q}”`, { from: r.from, hits: r.hits.slice(0, 3).map((h) => `${h.name} [${h.from}] ${h.url}`), count: r.hits.length, note: r.note });
       assert.ok(r.from.length >= 1, r.note);
       assert.ok(r.hits.length >= 1);
+      if (q.startsWith('square')) assert.deepEqual([r.from, r.note], [['LeanSearch'], undefined]);
+      const [url, anchor] = r.hits[0].url!.split('#');
+      const page = await fetch(url);
+      assert.equal(page.status, 200, url);
+      assert.ok((await page.text()).includes(`id="${decodeURI(anchor)}"`), r.hits[0].url);
     }
   });
 
@@ -803,6 +1001,11 @@ if (LIVE) {
     assert.equal(r.data.ok, true, r.text);
     const v = await verdict('Uses.lean', 'import Mathlib.Tactic\n\ntheorem uses : (2 : ℕ) + 2 = 4 := by norm_num\n');
     assert.equal(v.ok, true, v.why);
+    // The names a search found, asked of the real Lean: there, not there, and with an apostrophe.
+    const named = ['Stand.in_lemma', 'Nat.add_comm', 'Stand.renamed_since', "Nat.add_comm'", 'List.map'].map((name) => ({ name, type: '', module: 'Mathlib.Tactic', from: 'Loogle' as const }));
+    const sure = await confirmHere(theLean()!, named, { mathlib: theMathlib(), timeoutMs: 120_000 });
+    show('confirm', { hits: sure.hits.map((h) => `${h.name}: ${h.here}`), note: sure.note });
+    assert.deepEqual(sure.hits.map((h) => h.here), [true, true, false, false, true]);
     // Checking against Mathlib writes nothing in the app's folder, so it works where that is read-only (the sandbox).
     if (sandboxAvailable()?.kind === 'bwrap') {
       const dir = leanDir();

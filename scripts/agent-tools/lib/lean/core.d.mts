@@ -30,11 +30,21 @@ export interface Theorem {
   name: string;
   axioms: string[];
   ok: boolean;
+  /** What it states, as Lean reads it; not there for a theorem the file does not have. */
+  statement?: string;
+  /** A hash of that statement: `name@pin` asks that it is still this one. */
+  pin?: string;
+  /** The definitions of its own (the file's, the project's) that the statement rests on. */
+  definitions?: string[];
 }
 export interface Verdict {
   ok: boolean;
   why?: string;
   theorems: Theorem[];
+  /** Theorems whose statement is not the one pinned. */
+  changed?: string[];
+  /** Theorems asked for that the file does not have, or has more than once. */
+  missing?: string[];
   sorries: Spot[];
   errors?: Message[];
   note?: string;
@@ -56,6 +66,8 @@ export interface RunOptions {
   signal?: AbortSignal;
   shell?: Shell;
   onLine?: (line: string) => void;
+  /** At most this much output is kept. */
+  maxOut?: number;
 }
 export interface CheckOptions {
   timeoutMs?: number;
@@ -68,6 +80,8 @@ export interface CheckOptions {
 }
 
 export const STANDARD_AXIOMS: string[];
+export const PIN_LENGTH: number;
+export function readTheorem(spec: string): { name: string; pin?: string };
 export const DEFAULT_TIMEOUT_MS: number;
 export const NEEDS_MATHLIB: string;
 export const AUDIT: string;
@@ -87,7 +101,7 @@ export function unfetchedMathlib(root: string, imports: string[]): string | null
 export function readMessages(stdout: string, stderr?: string): { errors: Message[]; warnings: Message[]; info: Message[]; sorryWarnings: Spot[]; count: number };
 export class LeanProblem extends Error {
   constructor(message: string, kind: string);
-  kind: 'file' | 'mathlib' | 'lake';
+  kind: 'file' | 'mathlib' | 'lake' | 'pin';
 }
 export function checkFile(lean: Lean, file: string, o?: CheckOptions): Promise<Checked>;
 export function verifyFile(lean: Lean, file: string, o?: CheckOptions & { theorems?: string[]; allowSorry?: boolean }): Promise<Verdict>;

@@ -22,12 +22,12 @@ export type Tool = (typeof TOOLS)[number];
 export const SHELL_TOOLS_HEAD = 'Shell commands this app adds to your PATH (each has --help):';
 export const SHELL_TOOLS_TEXT: Record<Tool, string> = {
   waitfor:
-    '- waitfor: wait for a long job in ONE call instead of sleep/poll loops. Conditions: --pid, --proc, --file, --log FILE --match REGEX, --http URL, --unit, --slurm ID [--via \'ssh host\'], --until \'cmd\'. Add --fail REGEX to stop at the first crash line, --tail FILE:N to see the output, --timeout 30m. `waitfor -- cmd args` runs a command and waits for it. Run it as a background command when the wait may take more than a few minutes.',
+    '- waitfor: wait for a long job in ONE call instead of sleep/poll loops. Conditions: --pid, --proc, --file, --log FILE --match REGEX, --http URL, --unit, --slurm ID [--via \'ssh host\'], --until \'cmd\'. Add --fail REGEX to stop at the first crash line, --tail FILE:N to see the output, --timeout 30m. `--log FILE --match` sees only lines written after it starts, unless `--from-start`. `waitfor -- cmd args` runs a command and waits for it. Run it as a background command when the wait may take more than a few minutes.',
   edits:
     '- edits: several exact search/replace edits across files in one atomic call. It reads a script on stdin: `=== path` sections holding <<<<<<< SEARCH / ======= / >>>>>>> REPLACE blocks. Nothing is written unless every block matches exactly once, and it prints the changed lines with their numbers, so there is no need to re-read the files. Use it when changing more than one place.',
   sym: '- sym NAME...: a definition with its whole body and exact line range (TypeScript, JavaScript, Python, Rust). `sym --refs NAME` lists references, `sym --outline FILE` a file\'s declarations. Use grep for text and strings.',
   leancheck:
-    '- leancheck FILE.lean: whether its proofs hold (it builds, no sorry, standard axioms only, kernel re-check). Exits 0 only then, so a goal\'s command check can be "leancheck Proofs/Main.lean". --theorem NAME, --allow-sorry. Needs Lean set up.',
+    '- leancheck FILE.lean: whether its proofs hold (it builds, no sorry, standard axioms only, kernel re-check), with what each theorem states and a pin of that statement. Exits 0 only then, so a goal\'s command check can be "leancheck Proofs/Main.lean --theorem NAME@PIN" (with the pin of the agreed statement, so a changed one fails: exit 3). --theorem NAME[@PIN], --allow-sorry. Needs Lean set up.',
 };
 
 export const shellToolsText = (tools: readonly Tool[]): string => [SHELL_TOOLS_HEAD, ...TOOLS.filter((t) => tools.includes(t)).map((t) => SHELL_TOOLS_TEXT[t])].join('\n');

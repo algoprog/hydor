@@ -371,6 +371,7 @@ const PAPER_FIELDS: Record<string, AnswerType> = {
   where: 'text',
   url: 'text',
   tldr: 'text',
+  why: 'text',
   abstract: 'text',
   bibtex: 'text',
   group: 'text',

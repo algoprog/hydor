@@ -9,6 +9,7 @@ import type { DB } from '../db.ts';
 import { files } from './local.ts';
 import { MAX_METRICS, parseLine, readFrom, Tracker } from './metrics.ts';
 import { offsetsOf, runFolder, saveSeries, seriesOf, updateRun } from './records.ts';
+import { runFile } from './sweeps.ts';
 
 /**
  * Logs larger than this are not read again: a run's own, while the page waits for it (when the queue first looks at
@@ -73,7 +74,7 @@ function* repairing(db: DB, r: RunRecord, local: boolean, maxLog: number): Gener
       const off = offsetsOf(db, r.id);
       const t = new Tracker(r.better);
       yield* feed(t, log, Math.min(off.log, size), at);
-      if (r.metricsFile) yield* feed(t, path.resolve(r.cwd, r.metricsFile), off.file, at);
+      if (r.metricsFile) yield* feed(t, path.resolve(r.cwd, runFile(r, r.metricsFile, folder)), off.file, at);
       // What the reading found is for the record, not for the agent on call to be told of.
       t.nan = [];
       t.diverged = [];

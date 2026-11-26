@@ -150,8 +150,10 @@ export async function startSweep(d: Deps, b: Record<string, any>, o: { cwd?: str
   // Every run checked before any is made, so a mistake starts none.
   const specs = [];
   for (const c of combos) {
-    const { params: _p, mode: _m, maxRuns: _x, earlyStop: _e, ...rest } = b;
-    specs.push(await cleanJob(d.db, { ...rest, command: fillCommand(command, c), params: c, group, name: `${group} · ${settingsLine(c)}`.slice(0, 120), sweep: id }, { cwd: o.cwd }));
+    const { params: _p, mode: _m, maxRuns: _x, earlyStop: _e, name: given, ...rest } = b;
+    // A name given is a template, its {name} placeholders filled as the command's are.
+    const name = typeof given === 'string' && given.trim() ? fillCommand(given.trim(), { ...(b.seed !== undefined ? { seed: b.seed } : {}), ...c }, false) : `${group} · ${settingsLine(c)}`;
+    specs.push(await cleanJob(d.db, { ...rest, command: fillCommand(command, c), params: c, group, name: name.slice(0, 120), sweep: id }, { cwd: o.cwd }));
   }
   saveSweep(d.db, sweep);
   const runs: RunRecord[] = [];

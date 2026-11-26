@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, KeyboardSensor, MouseSensor, useSensor, useSensors, type DragEndEvent, type Modifier } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { CornerDownLeft, FileText, GripVertical, Paperclip, Pencil, Play, Target, Trash2, X } from 'lucide-react';
+import { CornerDownLeft, FileText, FlaskConical, GripVertical, Paperclip, Pencil, Play, Target, Trash2, X } from 'lucide-react';
 import { childReplyOf } from '@shared/children';
 import { goalMessageOf } from '@shared/goals';
+import { experimentNoticeOf } from '@shared/experiments';
+import { ExperimentNoticeLabel } from '../experiments/Notice';
 import type { QueuedAttachment, QueuedMessage, SessionSummary } from '@shared/types';
 import { enc, post } from '../../lib/api';
 import { attachmentPayload, dropSentPictures, queuedPicturesOf, readAttachments, releaseAttachments, useSentPictures, type Attachment, type SentPictures } from '../../lib/attachments';
@@ -70,6 +72,8 @@ function QueueRow({ s, m, n, sent, onEdit }: { s: SessionSummary; m: QueuedMessa
   const reply = childReplyOf(m.text);
   // A message of the app's goal loop waiting its turn: one line, and nothing to edit.
   const goal = goalMessageOf(m.text);
+  // As is a notice that runs ended, which Experiments adds to while it waits.
+  const notice = experimentNoticeOf(m.text);
   return (
     <div
       ref={setNodeRef}
@@ -101,6 +105,13 @@ function QueueRow({ s, m, n, sent, onEdit }: { s: SessionSummary; m: QueuedMessa
                   {goal.head && <span> · {goal.head}</span>}
                 </span>
               </span>
+            ) : notice ? (
+              <span className="inline-flex items-center gap-1.5">
+                <FlaskConical size={13} className="shrink-0 text-accent" />
+                <span>
+                  <ExperimentNoticeLabel />
+                </span>
+              </span>
             ) : reply ? (
               <ChildReplyLabel reply={reply} />
             ) : (
@@ -120,7 +131,7 @@ function QueueRow({ s, m, n, sent, onEdit }: { s: SessionSummary; m: QueuedMessa
         <button title="Send now, into the running turn" onClick={() => call('/send')} className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg">
           <CornerDownLeft size={13} />
         </button>
-        {!goal && (
+        {!goal && !notice && (
           <button title="Edit the text and attachments" onClick={onEdit} className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg">
             <Pencil size={13} />
           </button>

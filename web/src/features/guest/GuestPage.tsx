@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, FilePen, Globe, ListChecks, MessageSquareText, Search, Terminal, Wrench } from 'lucide-react';
 import { splitRunMessage } from '@shared/automations';
 import { goalMessageOf } from '@shared/goals';
+import { experimentNoticeOf } from '@shared/experiments';
 import type { Agent, ToolItem, TimelineItem } from '@shared/types';
 import { applyTheme } from '../../lib/theme';
 import { duration } from '../../lib/format';
@@ -13,6 +14,7 @@ import { Logo } from '../../components/Logo';
 import { Markdown } from '../../components/Markdown';
 import { cx, Throbber } from '../../components/ui';
 import { HtmlPage, isPageTool } from '../session/HtmlPage';
+import { ExperimentNoticeLabel } from '../experiments/Notice';
 import { mu } from '../../lib/machine';
 
 interface GuestView {
@@ -124,6 +126,7 @@ export function GuestItem({ it }: { it: TimelineItem }) {
       if (it.meta === 'command-output') return <div className="px-1 font-mono text-[12px] text-fg-3">{it.text}</div>;
       const goal = goalMessageOf(it.text);
       if (goal) return <div data-i18n="goal" className="px-1 text-[12.5px] text-fg-3">Goal{goal.head && <span className="text-fg-2"> · {goal.head}</span>}</div>;
+      if (experimentNoticeOf(it.text)) return <div className="px-1 text-[12.5px] text-fg-3"><ExperimentNoticeLabel /></div>;
       const run = splitRunMessage(it.text);
       if (run) return <div className="px-1 text-[12.5px] text-fg-3">Scheduled task <span className="text-fg-2">{run.task}</span> · {run.when}</div>;
       return (

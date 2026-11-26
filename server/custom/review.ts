@@ -6,6 +6,7 @@ import type { DB } from '../db.ts';
 import { helperJson } from '../helper.ts';
 import type { SessionManager } from '../sessions.ts';
 import { goalObjective } from '../goals/store.ts';
+import { experimentNoticeOf } from '../../shared/experiments.ts';
 import { goalMessageOf } from '../../shared/goals.ts';
 
 export interface StepInfo {
@@ -34,7 +35,8 @@ export async function asked(sessions: Pick<SessionManager, 'timeline'>, key: str
   const tl = await sessions.timeline(key);
   // The goal loop's messages (server/goals) are not the user's: they carry what the agent itself wrote (its notes, its ways
   // to go, its commands' output), which would let the agent argue for its own steps. The goal itself comes on its own.
-  const mine = tl.parser.items.flatMap((i) => (i.kind === 'user' && !i.meta && !i.peer && i.text.trim() && !goalMessageOf(i.text.trim()) ? [i.text.trim()] : []));
+  // Nor is a notice from Experiments that runs ended.
+  const mine = tl.parser.items.flatMap((i) => (i.kind === 'user' && !i.meta && !i.peer && i.text.trim() && !goalMessageOf(i.text.trim()) && !experimentNoticeOf(i.text.trim()) ? [i.text.trim()] : []));
   const picked = mine.length > 11 ? [mine[0], ...mine.slice(-10)] : mine;
   const out: string[] = [];
   let room = 9000;

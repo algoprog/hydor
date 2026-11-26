@@ -4,6 +4,7 @@ import type { Agent, SessionSummary } from '@shared/types';
 import { childReplyOf } from '@shared/children';
 import { isConfidential } from '@shared/confidential';
 import { goalMessageOf } from '@shared/goals';
+import { experimentNoticeOf } from '@shared/experiments';
 import { accountAgentOf } from '@shared/account-agents';
 import { enc, lostOnTheWay, post } from '../../lib/api';
 import { warmMemory } from '../../lib/starting';
@@ -261,7 +262,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   // Up in an empty box walks back through this session's prompts; -1 is the draft.
   const [recall, setRecall] = useState(-1);
   const prompts = useTimeline((x) => x.byKey[key]?.items)
-    ?.filter((i) => i.kind === 'user' && !i.meta && !i.peer && !childReplyOf(i.text) && !goalMessageOf(i.text))
+    ?.filter((i) => i.kind === 'user' && !i.meta && !i.peer && !childReplyOf(i.text) && !goalMessageOf(i.text) && !experimentNoticeOf(i.text))
     .map((i) => (i as { text: string }).text)
     .reverse();
 

@@ -51,7 +51,7 @@ export interface JobSpec {
   tags?: string[];
   /** Higher goes first. */
   priority?: number;
-  /** Metrics: read from its log (key=value and JSON lines) and from a file it writes (metrics.jsonl, relative to cwd). */
+  /** Metrics: read from its log (key=value and JSON lines) and from a file it writes (metrics.jsonl, relative to cwd; {name}, {run} and $HYDOR_RUN_DIR as for scoresFile). */
   metricsFile?: string;
   onCall?: OnCallSpec;
   notify?: NotifySpec;
@@ -63,12 +63,22 @@ export interface JobSpec {
   better?: Record<string, 'max' | 'min'>;
   /**
    * Scores per example that the run writes (JSON lines, each with an "id" and a number per metric, or TREC's
-   * "metric query value" lines), relative to cwd, with {name} placeholders as the command: kept with the run when
-   * it ends, for paired tests over examples (queries, sentences) in results tables.
+   * "metric query value" lines), relative to cwd, with {name} placeholders as the command ({run}: the run's id; or a
+   * path under $HYDOR_RUN_DIR, the run's own folder): kept with the run when it ends, for paired tests over examples
+   * (queries, sentences) in results tables. A scores.jsonl a run writes into $HYDOR_RUN_DIR needs no naming.
    */
   scoresFile?: string;
   /** When it ends, the session that started it hears how it went (its agent goes on from there). */
   report?: boolean;
+}
+
+/**
+ * A notice Experiments sends a session when runs it started have ended (server/experiments/notices.ts): it starts with
+ * this line, and the conversation draws it as one quiet row. Null for any other message.
+ */
+export function experimentNoticeOf(text: string): { body: string } | null {
+  const m = /^\[Experiments · runs ended\][ \t]*\n/.exec(text);
+  return m ? { body: text.slice(m[0].length) } : null;
 }
 
 export interface RunEvent {
@@ -104,6 +114,10 @@ export interface RunRecord extends JobSpec {
   folder?: string;
   /** Files in its folder that git does not track, when it started. */
   untracked?: number;
+  /** The files its command names that git does not track (or ignores), copied into the run's folder under untracked/. */
+  kept?: string[];
+  /** Those that were too large to keep. */
+  notKept?: string[];
   /** Who started it. */
   startedBy?: { session?: string; app?: string; page?: boolean };
   /** The run this one is a new run of (Run again). */

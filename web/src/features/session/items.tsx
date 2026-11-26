@@ -31,6 +31,7 @@ import {
 import { RUN_WHY, splitRunMessage, type RunMessage } from '@shared/automations';
 import { childReplyOf } from '@shared/children';
 import { goalMessageOf } from '@shared/goals';
+import { experimentNoticeOf } from '@shared/experiments';
 import type { FileChange, HandoffInfo, Question, TimelineItem, ToolInfo, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { confirmResume, takeoverDialog } from '../../lib/activity';
@@ -55,6 +56,7 @@ import { DoThisAgain } from '../apps/DoThisAgain';
 import { TriggerIcon } from '../automations/parts';
 import { ChildReplyRow } from '../children/ChildReply';
 import { GoalMessage } from '../goal/GoalMessage';
+import { ExperimentNotice } from '../experiments/Notice';
 import { tr } from '../../i18n/runtime';
 import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
@@ -853,7 +855,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
   const parsed = useMemo(() => {
     const { text, files } = splitAttachedFiles(item.text);
     const ide = splitIdeContext(text);
-    return { text: ide ? ide.request : text, files, context: ide?.context, run: splitRunMessage(item.text), child: childReplyOf(item.text), goal: goalMessageOf(item.text) };
+    return { text: ide ? ide.request : text, files, context: ide?.context, run: splitRunMessage(item.text), child: childReplyOf(item.text), goal: goalMessageOf(item.text), notice: experimentNoticeOf(item.text) };
   }, [item.text]);
   // A long message shows its first lines, the rest a click away; it folds again after.
   const long = useRunsPast(body, FOLD_PAST, parsed.text);
@@ -867,6 +869,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
   if (item.peer) return <PeerMessage item={item} />;
   if (parsed.run) return <RunMessageRow item={item} run={parsed.run} />;
   if (parsed.goal) return <GoalMessage ts={item.ts} message={parsed.goal} />;
+  if (parsed.notice) return <ExperimentNotice ts={item.ts} body={parsed.notice.body} />;
   if (parsed.child) return <ChildReplyRow ts={item.ts} reply={parsed.child} />;
   if (item.meta === 'slash') {
     return (

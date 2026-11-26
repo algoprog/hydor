@@ -18,6 +18,8 @@ import cookie from '@fastify/cookie';
 import { allSteps, type CodeStep, type Step } from '../../shared/app-manifest.ts';
 import { fromField, startFrom, type AboutMe } from '../../shared/app-me.ts';
 import { isActive } from '../../shared/apps.ts';
+import { checkUi, localUi, uiEngine, uiTexts } from '../../shared/app-ui.ts';
+import { askedRunsFrom, askedRunsRequest } from '../../shared/asked-runs.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT } from '../config.ts';
 import { openDb } from '../db.ts';
@@ -33,7 +35,7 @@ import type { SessionManager } from '../sessions.ts';
 import { runCode } from './code.ts';
 import { priorWorkTool, setPriorDepsForTests } from '../research/prior-work.ts';
 import { changeAboutMe } from './me.ts';
-import { findRecords, removeRecords } from './data.ts';
+import { addRecord, findRecords, removeRecords } from './data.ts';
 import { apps } from './index.ts';
 import { startRun, startRuns, waitFor } from './runs.ts';
 import { forgetAll } from './sturdy.ts';
@@ -281,6 +283,51 @@ test('Paper radar: the best for you, the people you follow first, under the proj
     [['2026-11-05', ['c', 'a']]],
   );
   assert.equal(ctx.data.get('marks')!.length, 150, 'the oldest marks forgotten (the latest found first)');
+});
+
+test('Paper radar and Living related work: Try it on my code on each paper, in the radar, the saved list and a topic, writes the request for that paper', () => {
+  const E = uiEngine();
+  const scope = (root: Record<string, unknown>) => ({ root, stack: [], lang: 'en-US' });
+  const draw = (app: string, element: string, root: Record<string, unknown>) => E.render(templateById(app)!.ui!.elements![element].html, scope(root));
+  const unescape = (s: string) => s.replace(/&(amp|lt|gt|quot|#39);/g, (_m, x: string) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[x]!);
+  // A click as the view's kit reads it: the button's data-… as {{event.…}}.
+  const click = (html: string, event: string) => {
+    const tag = new RegExp(`<button[^>]*data-event="${event}"[^>]*>`).exec(html)?.[0];
+    assert.ok(tag, `a ${event} button`);
+    return Object.fromEntries([...tag.matchAll(/ data-([a-z]+)="([^"]*)"/g)].map((m) => [m[1], unescape(m[2])]));
+  };
+  const asks = (app: string, html: string) => {
+    const [action, ...rest] = templateById(app)!.ui!.events!.try_code;
+    assert.deepEqual([action.do, rest.length, action.confirm], ['experiments', 0, undefined], 'it only writes the request: nothing to confirm');
+    return askedRunsFrom(E.valueOf(action.inputs, scope({ event: click(html, 'try_code') })) as Record<string, unknown>);
+  };
+  const paper = { key: 'ax1', title: 'Re-ranking "long" documents & more', url: 'https://arxiv.org/abs/2611.01234', why: 'For Hydor: its re-ranker’s <input>.', relation: 'Extends ColBERT.', group: 'dense retrieval', n: 1 };
+  const wanted = { source: 'paper', paper: paper.url, items: [{ what: paper.title, why: paper.why }] };
+
+  const radar = draw('paper-radar', 'radar', { groups: [{ group: paper.group, n: 1 }], papers: [paper], data: { marks: [] }, state: {} });
+  assert.match(radar, />Dig deeper<\/button>\s*<button type="button" class="b" data-event="try_code"[^>]*>Try it on my code<\/button>/, 'beside Dig deeper');
+  assert.deepEqual(asks('paper-radar', radar), wanted);
+  assert.match(askedRunsRequest(asks('paper-radar', radar)), /\nTitle: Re-ranking "long" documents & more\nLink: https:\/\/arxiv\.org\/abs\/2611\.01234\nWhat it may mean for me: For Hydor: its re-ranker’s <input>\.$/);
+  // Saving a paper keeps why it is for you, so its saved card asks with it too; one saved before has none.
+  const [, keep] = templateById('paper-radar')!.ui!.events!.save;
+  const record = E.valueOf(keep.record, scope({ event: click(radar, 'save') })) as Record<string, unknown>;
+  assert.equal(record.why, paper.why);
+  // As the page's click adds it: the saved list takes every field the button sends (one it does not have is refused).
+  const data = templateById('paper-radar')!.data;
+  assert.equal(addRecord(db, 'tpl:paper-radar', data, 'saved', record).why, paper.why);
+  removeRecords(db, 'tpl:paper-radar', data, 'saved', { id: 'ax1' });
+  assert.deepEqual(asks('paper-radar', draw('paper-radar', 'saved-paper', { ...paper, id: 'ax1' })), wanted);
+  assert.deepEqual(asks('paper-radar', draw('paper-radar', 'saved-paper', { id: 'ax1', title: 'Old one', url: null })), { source: 'paper', items: [{ what: 'Old one' }] });
+  // Living related work: a paper's row of actions, the note being how it relates.
+  const kept = { ...paper, id: 'p1', topic: 'dense retrieval', theme: 'Training', citekey: 'k1', added: '2026-11-05' };
+  const topics = draw('living-related-work', 'lrw-topics', { last: { result: { updated: '2026-11-05', topics: [{ topic: 'dense retrieval', count: 1 }] } }, item: [kept], state: {} });
+  for (const html of [topics, draw('living-related-work', 'lrw-new', kept)]) assert.deepEqual(asks('living-related-work', html), { ...wanted, items: [{ what: paper.title, why: 'Extends ColBERT.' }] });
+  for (const id of ['paper-radar', 'living-related-work']) {
+    const t = templateById(id)!;
+    assert.deepEqual(checkUi(t).errors, [], id);
+    assert.ok(uiTexts(t.ui).includes('Try it on my code'), `${id}: to translate`);
+    assert.equal(localUi(t.ui)?.events?.try_code, undefined, `${id}: a public page starts nothing`);
+  }
 });
 
 // ---- Semantic Scholar: Citation alerts' programs ------------------------------------------------------------------

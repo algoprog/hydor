@@ -1,10 +1,11 @@
 // The views of the ready-made apps for keeping up with a research field (templates-research.ts). The first five open
 // on their own page (pages with on: "app", filled with their latest update, `last.result`), and the same elements show
-// an earlier update on its run's page (filled with `result`). Paper radar's cards save a paper, cite it, dig into it or
-// put it aside, kept in its records (a ready-made app's own page reads and changes what it keeps); Living related
-// work's topics are its records, grouped by theme, with a section drafted on a click. Colours are the page kit's, so
-// they look like part of the app in both themes, and they fit a phone; their words are translated as the app's are.
-import type { AppUi } from '../../shared/app-ui.ts';
+// an earlier update on its run's page (filled with `result`). Paper radar's cards save a paper, cite it, dig into it,
+// try it on your code or put it aside, kept in its records (a ready-made app's own page reads and changes what it
+// keeps); Living related work's topics are its records, grouped by theme, with a section drafted on a click. Colours
+// are the page kit's, so they look like part of the app in both themes, and they fit a phone; their words are
+// translated as the app's are.
+import type { AppUi, UiAction } from '../../shared/app-ui.ts';
 import { CHIPS_CSS, HERO_CSS, STATS_CSS } from './views.ts';
 
 // ---- what several share -----------------------------------------------------------------------------------------
@@ -70,10 +71,11 @@ const RADAR = String.raw`<header class="hero">
       {{#tldr}}<p class="tldr">{{tldr}}</p>{{/tldr}}
       {{#why}}<p class="why">{{why}}</p>{{/why}}
       <p class="acts">
-        {{#data.marks|where:id=$key|where:mark=saved}}<button type="button" class="b on" data-event="unsave" data-key="{{key}}" title="Saved: click to take it out">★ Saved</button>{{/data.marks}}{{^data.marks|where:id=$key|where:mark=saved}}<button type="button" class="b" data-event="save" data-key="{{key}}" data-title="{{title}}" data-authors="{{authors}}" data-date="{{date}}" data-where="{{where}}" data-url="{{url}}" data-tldr="{{tldr}}" data-abstract="{{abstract}}" data-bib="{{bibtex}}" data-group="{{group}}">☆ Save</button>{{/data.marks}}
+        {{#data.marks|where:id=$key|where:mark=saved}}<button type="button" class="b on" data-event="unsave" data-key="{{key}}" title="Saved: click to take it out">★ Saved</button>{{/data.marks}}{{^data.marks|where:id=$key|where:mark=saved}}<button type="button" class="b" data-event="save" data-key="{{key}}" data-title="{{title}}" data-authors="{{authors}}" data-date="{{date}}" data-where="{{where}}" data-url="{{url}}" data-tldr="{{tldr}}" data-why="{{why}}" data-abstract="{{abstract}}" data-bib="{{bibtex}}" data-group="{{group}}">☆ Save</button>{{/data.marks}}
         <button type="button" class="b" data-event="cite" data-bib="{{bibtex}}" title="Copy its BibTeX">Cite</button>
         {{#pdf}}<a class="b" href="{{pdf}}" target="_blank" rel="noopener noreferrer">PDF</a>{{/pdf}}
         <button type="button" class="b" data-event="dig" data-title="{{title}}" data-url="{{url}}" data-group="{{group}}">Dig deeper</button>
+        <button type="button" class="b" data-event="try_code" data-title="{{title}}" data-url="{{url}}" data-why="{{why}}">Try it on my code</button>
         <button type="button" class="b quiet" data-event="nope" data-key="{{key}}" data-title="{{title}}" data-abstract="{{abstract}}">Not for me</button>
       </p>
     </article>{{/data.marks}}
@@ -108,6 +110,9 @@ const RADAR_CSS =
 }
 `;
 
+/** Try it on my code: a request on the start page, not sent, to try the paper's idea on your code and measure it (shared/asked-runs.ts). */
+const TRY_CODE: UiAction = { do: 'experiments', inputs: { source: 'paper', paper: '{{event.url}}', items: [{ what: '{{event.title}}', why: '{{event.why}}' }] } };
+
 const PAPER_RADAR_UI: AppUi = {
   pages: [
     { id: 'today', title: 'Today', on: 'app', blocks: [{ element: 'radar', data: 'last.result' }] },
@@ -130,7 +135,7 @@ const PAPER_RADAR_UI: AppUi = {
       css: String.raw`.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; color: var(--n-muted); font-size: 13.5px; }`,
     },
     'saved-paper': {
-      description: 'A saved paper: where and when, its title, why it was picked, and buttons to cite it, add it to the Reading list, dig into it or take it out',
+      description: 'A saved paper: where and when, its title, why it was picked, and buttons to cite it, add it to the Reading list, dig into it, try it on your code or take it out',
       html: String.raw`<article class="pp">
   <p class="meta">{{#group}}<span>{{group}}</span>{{/group}}{{#where}}<span>{{where}}</span>{{/where}}{{#date}}<span>{{date|shortdate}}</span>{{/date}}<span>saved {{createdAt|ago}}</span></p>
   <h3><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{title}}</a></h3>
@@ -140,6 +145,7 @@ const PAPER_RADAR_UI: AppUi = {
     <button type="button" class="b" data-event="cite" data-bib="{{bibtex}}" title="Copy its BibTeX">Cite</button>
     <button type="button" class="b" data-event="reading" data-title="{{title}}" data-url="{{url}}">Add to Reading list</button>
     <button type="button" class="b" data-event="dig" data-title="{{title}}" data-url="{{url}}" data-group="{{group}}">Dig deeper</button>
+    <button type="button" class="b" data-event="try_code" data-title="{{title}}" data-url="{{url}}" data-why="{{why}}">Try it on my code</button>
     <button type="button" class="b quiet" data-event="remove" data-key="{{id}}" data-title="{{title}}">Take it out</button>
   </p>
 </article>`,
@@ -154,7 +160,7 @@ const PAPER_RADAR_UI: AppUi = {
         do: 'data',
         op: 'add',
         collection: 'saved',
-        record: { id: '{{event.key}}', key: '{{event.key}}', title: '{{event.title}}', authors: '{{event.authors}}', date: '{{event.date}}', where: '{{event.where}}', url: '{{event.url}}', tldr: '{{event.tldr}}', abstract: '{{event.abstract}}', bibtex: '{{event.bib}}', group: '{{event.group}}' },
+        record: { id: '{{event.key}}', key: '{{event.key}}', title: '{{event.title}}', authors: '{{event.authors}}', date: '{{event.date}}', where: '{{event.where}}', url: '{{event.url}}', tldr: '{{event.tldr}}', why: '{{event.why}}', abstract: '{{event.abstract}}', bibtex: '{{event.bib}}', group: '{{event.group}}' },
       },
     ],
     unsave: [
@@ -174,6 +180,7 @@ const PAPER_RADAR_UI: AppUi = {
       },
     ],
     reading: [{ do: 'start', confirm: 'Add “{{event.title}}” to your Reading list?', app: 'tpl:reading-list', inputs: { paper: '{{event.url}}' } }],
+    try_code: [TRY_CODE],
     remove: [
       { do: 'data', op: 'remove', collection: 'saved', id: '{{event.key}}', confirm: 'Take “{{event.title}}” out of your saved papers?' },
       { do: 'data', op: 'remove', collection: 'marks', id: '{{event.key}}' },
@@ -509,7 +516,7 @@ const lrwPaper = (latest: string) => String.raw`<article class="pp">
     <p class="by">{{authors}}</p>
     {{#summary}}<p class="sum">{{summary}}</p>{{/summary}}
     {{#relation}}<p class="rel">{{relation}}</p>{{/relation}}
-    <p class="acts"><code class="key">{{citekey}}</code><button type="button" class="b" data-event="cite_one" data-bib="{{bibtex}}">BibTeX</button><button type="button" class="b quiet" data-event="hide" data-id="{{id}}" data-title="{{title}}">Not related</button></p>
+    <p class="acts"><code class="key">{{citekey}}</code><button type="button" class="b" data-event="cite_one" data-bib="{{bibtex}}">BibTeX</button><button type="button" class="b" data-event="try_code" data-title="{{title}}" data-url="{{url}}" data-why="{{relation}}">Try it on my code</button><button type="button" class="b quiet" data-event="hide" data-id="{{id}}" data-title="{{title}}">Not related</button></p>
   </article>`;
 
 const LRW_TOPICS = String.raw`{{#last.result.topics|count|over:1}}<nav class="chips" aria-label="Topics">
@@ -583,7 +590,7 @@ const LIVING_RELATED_WORK_UI: AppUi = {
   ],
   elements: {
     'lrw-head': { description: 'When it was updated, what is new in a line, and the topics in numbers', html: LRW_HEAD, css: HERO_CSS + STATS_CSS + String.raw`.note { margin: 10px 0 0; color: var(--n-muted); font-size: 12.5px; }` },
-    'lrw-topics': { description: 'Each topic: its papers by theme, the new ones marked, and buttons to draft its related work and export its BibTeX', html: LRW_TOPICS, css: LRW_CSS },
+    'lrw-topics': { description: 'Each topic: its papers by theme, the new ones marked, each to cite or try on your code, and buttons to draft its related work and export its BibTeX', html: LRW_TOPICS, css: LRW_CSS },
     'lrw-new': {
       description: 'A paper an update added, with its topic',
       html: String.raw`<div class="nw"><p class="tp">{{topic}} · {{theme}}</p>${lrwPaper('added')}</div>`,
@@ -604,6 +611,7 @@ const LIVING_RELATED_WORK_UI: AppUi = {
     copy_draft_bib: [{ do: 'copy', text: '{{state.draft.result.bib}}' }],
     copy_bib: [{ do: 'copy', text: '{{state.bib.result.bib}}' }],
     cite_one: [{ do: 'copy', text: '{{event.bib}}' }],
+    try_code: [TRY_CODE],
     hide: [{ do: 'data', op: 'update', collection: 'papers', id: '{{event.id}}', record: { hidden: true }, confirm: 'Take “{{event.title}}” out of this topic? It will not come back.' }],
   },
 };

@@ -126,7 +126,8 @@ export interface UiAction {
   text?: string;
   /** run: one of its flows ("run" is the main one). */
   flow?: string;
-  /** run, again, start: the answers (again: only those that change); experiments: { items, source?, paper?, venue? }. */
+  /** run, again, start: the answers (again: only those that change); experiments: { items, source?, paper?, venue? }
+   *  (source: "reviewers", "rebuttal" or "paper", as shared/asked-runs.ts reads it). */
   inputs?: Record<string, unknown>;
   /** run: the name the run goes by in the view's state ({{state.<as>.result}}, {{state.<as>.working}}). */
   as?: string;

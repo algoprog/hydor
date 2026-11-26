@@ -1063,7 +1063,12 @@ interface ScoreInfo {
   starting?: boolean;
 }
 
-const infoOf = (r: ScoreRow) => JSON.parse(r.info) as ScoreInfo;
+const infoOf = (r: ScoreRow) => {
+  const info = JSON.parse(r.info) as ScoreInfo;
+  // A score kept before equal values had a spread of 0 holds the rounding of their mean (1.4e-16): worked out again.
+  if (info.std !== undefined && info.values?.length) info.std = std(info.values);
+  return info;
+};
 const isOpen = (s: ScoreStatus) => s === 'waiting' || s === 'running';
 const scoreRow = (db: DB, id: string): ScoreRow | undefined => {
   tables(db);

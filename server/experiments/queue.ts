@@ -18,17 +18,19 @@ import { agentBaseEnv } from '../env.ts';
 import type { Deps } from '../features/types.ts';
 import { pathDirs } from '../platform.ts';
 import { startSettings } from '../startSettings.ts';
-import { captureEnvironment, captureGit, localShell, q, type Shell } from './capture.ts';
+import { captureEnvironment, captureGit, keepUntracked, localShell, q, type Shell } from './capture.ts';
 import { endOfSlurm, getCluster, listClusters, parseSacct, parseSbatch, parseSqueue, reasonWords, remoteDir, rq, runSsh, sbatchScript, slurmEnded, sshWhy } from './clusters.ts';
 import { describeAfterSubmit } from './describe.ts';
 import { stampRun } from './evaluations.ts';
 import { chooseGpus, gpuList, gpusVia, readGpus, type GpuReading } from './gpus.ts';
 import { aliveLocal, exitOf, files, startLocal, stopLocal, wrapperScript } from './local.ts';
 import { nanText, oomText, parseLine, readFrom, tailLines, Tracker } from './metrics.ts';
-import { addEvent, eventsOf, eventsSince, getRun, getSweep, insertRun, isScoringRun, listRuns, newId, offsetsOf, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
+import { addEvent, eventsOf, eventsSince, getRun, getSweep, insertRun, isScoringRun, listRuns, listSweeps, listTables, newId, offsetsOf, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
 import { repairRecord, repairRecordSoon } from './repair.ts';
 import { remoteMachine, type RemoteRun } from './remote.ts';
-import { earlyStop, fillCommand, paramsOf, settingsLine, type Value } from './sweeps.ts';
+import { tellEnded } from './notices.ts';
+import { earlyStop, fillCommand, paramsOf, runFile, settingsLine, type Value } from './sweeps.ts';
+import { keyNumbers } from '../../shared/metric-rank.ts';
 
 const TICK_MS = 3000;
 /** Clusters are asked about their runs at most this often, other machines too (the tests make them short). */
@@ -81,12 +83,12 @@ export function placeOf(where: string | undefined): Place {
   return { kind: 'local' };
 }
 
-/** Where a run is, in words: "this computer, GPU 0", "Unity (SLURM)", "Lab box". */
+/** Where a run is, in words for agents: "local (this computer: box), GPU 0" ("local" as the tools call this computer), "Unity", "Lab box". */
 export function whereWords(db: DB, r: RunRecord): string {
   const p = placeOf(r.where);
   if (p.kind === 'cluster') return getCluster(db, p.id)?.name ?? p.id;
   if (p.kind === 'machine') return r.machine?.name ?? remoteMachine(p.id)?.name ?? p.id;
-  return `${r.host ?? os.hostname()}${r.gpuIds?.length ? `, ${gpuList(r.gpuIds)}` : ''}`;
+  return `local (this computer: ${r.host ?? os.hostname()})${r.gpuIds?.length ? `, ${gpuList(r.gpuIds)}` : ''}`;
 }
 
 // ---- a new job -------------------------------------------------------------------------------------------------
@@ -406,6 +408,9 @@ function consume(L: Live, text: string, which: 'log' | 'file') {
   L.outputAt = Date.now();
 }
 
+/** The most of a run's per-example scores kept. */
+const MAX_SCORES = 50 * 1024 * 1024;
+
 /** New output of a local run: its log and its metrics file. */
 function readLocal(r: RunRecord, L: Live, all = false) {
   const folder = r.folder ?? runFolder(r.id);
@@ -416,7 +421,7 @@ function readLocal(r: RunRecord, L: Live, all = false) {
     consume(L, text, 'log');
   }
   if (r.metricsFile) {
-    const file = path.resolve(r.cwd, r.metricsFile);
+    const file = path.resolve(r.cwd, runFile(r, r.metricsFile, folder));
     for (let i = 0; i < (all ? 50 : 1); i++) {
       const { text, next } = readFrom(file, L.file);
       if (!text) break;
@@ -687,11 +692,29 @@ const took = (r: RunRecord) => {
   return m < 1 ? 'under a minute' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`;
 };
 
-/** The run's key numbers in a line: the job's metrics' last values, the best where it differs. */
-export function metricsLine(r: RunRecord, n = 4): string {
+/** The metrics a run, or its experiment, names as the ones that count: `better`, what it watches for, an early stop's, an earlier results table's. */
+function namedMetrics(db: DB, r: RunRecord): string[] {
+  const out = Object.keys(r.better ?? {});
+  if (r.notify?.when) out.push(r.notify.when.metric);
+  const stop = r.sweep ? getSweep(db, r.sweep)?.earlyStop?.metric : undefined;
+  if (stop) out.push(stop);
+  if (r.group) {
+    for (const s of listSweeps(db, 50)) if (s.group === r.group && s.earlyStop) out.push(s.earlyStop.metric);
+    for (const t of listTables(db, 30)) {
+      const ofIt = t.spec.group === r.group || (!t.spec.rows?.startsWith('param:') && t.rows.some((x) => x.key === r.group));
+      if (ofIt) out.push(...t.spec.columns.map((c) => c.metric));
+    }
+  }
+  return out;
+}
+
+/** The names of a run's numbers, the ones that matter most first, `n` at most (shared/metric-rank.ts keyNumbers). */
+const numbersOf = (db: DB, r: RunRecord, n?: number) => keyNumbers(Object.keys(r.metrics?.last ?? {}), { named: namedMetrics(db, r), repeated: r.metrics?.repeated, settings: Object.keys(r.params ?? {}), n });
+
+/** The run's key numbers in a line: their last values, the best where it differs. */
+export function metricsLine(db: DB, r: RunRecord, n = 6): string {
   const last = r.metrics?.last ?? {};
-  return Object.keys(last)
-    .slice(0, n)
+  return numbersOf(db, r, n)
     .map((k) => {
       const b = r.metrics?.best?.[k];
       return `${k} ${fmt(last[k])}${b !== undefined && b !== last[k] ? ` (best ${fmt(b)})` : ''}`;
@@ -700,8 +723,8 @@ export function metricsLine(r: RunRecord, n = 4): string {
 }
 
 /** How a run ended, in a line. */
-export function endLine(r: RunRecord): string {
-  const m = metricsLine(r);
+export function endLine(db: DB, r: RunRecord): string {
+  const m = metricsLine(db, r);
   if (r.status === 'done') return `Done in ${took(r)}${m ? `: ${m}` : ''}`;
   if (r.status === 'stopped') return `${r.why ?? 'Stopped'}${m ? `. ${m}` : ''}`;
   return `${r.why ?? 'Failed'}${took(r) ? ` (after ${took(r)})` : ''}`;
@@ -711,13 +734,8 @@ export function endLine(r: RunRecord): string {
 async function ending(d: Deps, r: RunRecord, toldAlready: boolean) {
   if (r.sweep) return sweepEnding(d, r.sweep);
   const want = r.status === 'done' ? r.notify?.done !== false : r.status === 'failed' || r.status === 'lost' ? r.notify?.failed !== false : false;
-  if (want && !toldAlready && !r.remote) notice(d, r, r.status === 'done' ? 'done' : 'failed', endLine(r));
-  if (r.report && r.startedBy?.session) await report(d, r.startedBy.session, `[Experiments] The run “${r.name ?? r.id}” (${r.id}) ended. ${endLine(r)}. experiment_get reads its record and the end of its log.`);
-}
-
-async function report(d: Deps, key: string, text: string) {
-  if (!d.sessions.summary(key)) return;
-  await d.sessions.deliverOrQueue(key, text).catch(() => {});
+  if (want && !toldAlready && !r.remote) notice(d, r, r.status === 'done' ? 'done' : 'failed', endLine(d.db, r));
+  if (r.report && r.startedBy?.session) tellEnded(d, r.startedBy.session, { runs: [r.id], line: `“${r.name ?? r.id}” (${r.id}) ended. ${endLine(d.db, r)}`, at: r.endedAt ?? Date.now() });
 }
 
 /** A sweep's run ended: when it was the last, one notice for the sweep, with its best run. */
@@ -730,7 +748,8 @@ async function sweepEnding(d: Deps, sweep: string) {
   const parts = [`${count('done')} done`, count('failed') + count('lost') ? `${count('failed') + count('lost')} failed` : '', early ? `${early} stopped early` : '', count('stopped') - early ? `${count('stopped') - early} stopped` : ''].filter(
     Boolean,
   );
-  const metric = sw?.earlyStop?.metric ?? Object.keys(runs.find((x) => x.status === 'done')?.metrics?.last ?? {})[0];
+  const done = runs.find((x) => x.status === 'done');
+  const metric = sw?.earlyStop?.metric ?? (done ? numbersOf(d.db, done, 1)[0] : undefined);
   let best = '';
   if (metric) {
     const way = sw?.earlyStop?.better ?? betterOf(metric, runs[0].better);
@@ -743,7 +762,11 @@ async function sweepEnding(d: Deps, sweep: string) {
   if (first.notify?.done !== false || (count('failed') && first.notify?.failed !== false))
     notice(d, first, count('done') ? 'done' : 'failed', line, { title: `Sweep ${sw?.group ?? first.group ?? ''}`.trim(), url: `/experiments?sweep=${sweep}` });
   if (first.report && first.startedBy?.session)
-    await report(d, first.startedBy.session, `[Experiments] The sweep ${sw?.group ?? sweep} (${sweep}) ended: ${line} experiment_list with group "${sw?.group ?? first.group}" lists its runs; experiment_table compares them.`);
+    tellEnded(d, first.startedBy.session, {
+      runs: runs.map((x) => x.id),
+      line: `The sweep ${sw?.group ?? sweep} (${sweep}) ended: ${line} experiment_list with group "${sw?.group ?? first.group}" lists its runs; experiment_table compares them.`,
+      at: Date.now(),
+    });
 }
 
 // ---- the end of a run ----------------------------------------------------------------------------------------------
@@ -773,14 +796,23 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
   const folder = cur.folder ?? runFolder(r.id);
   // What it leaves in its folder: its metrics, and the per-example scores it wrote.
   let scores = false;
-  if (cur.scoresFile && placeOf(r.where).kind === 'local') {
-    const from = path.resolve(cur.cwd, fillCommand(cur.scoresFile, { ...(cur.params ?? {}), ...(cur.seed !== undefined ? { seed: cur.seed } : {}) }, false));
-    try {
-      if (fs.statSync(from).size <= 50 * 1024 * 1024) {
-        fs.copyFileSync(from, path.join(folder, 'scores.jsonl'));
-        scores = true;
-      }
-    } catch {}
+  if (placeOf(r.where).kind === 'local') {
+    const own = path.join(folder, 'scores.jsonl');
+    if (cur.scoresFile) {
+      const from = path.resolve(cur.cwd, runFile(cur, cur.scoresFile, folder));
+      try {
+        if (fs.statSync(from).size <= MAX_SCORES) {
+          if (from !== own) fs.copyFileSync(from, own);
+          scores = true;
+        }
+      } catch {}
+    }
+    // A run that writes scores.jsonl into its own folder ($HYDOR_RUN_DIR) need not name it.
+    if (!scores)
+      try {
+        const st = fs.statSync(own);
+        scores = st.isFile() && st.size > 0 && st.size <= MAX_SCORES;
+      } catch {}
   }
   updateRun(d.db, r.id, {
     status,
@@ -896,6 +928,12 @@ async function begin(d: Deps, r: RunRecord, gpuIds: number[], reading?: GpuReadi
     if (git.patch) {
       fs.writeFileSync(files(folder).patch, git.cut ? `${git.patch}\n# Hydor: the patch was cut at 2 MB.\n` : git.patch, { mode: 0o600 });
       info.patchPath = files(folder).patch;
+    }
+    // What the command names that git does not have is kept before it runs (a score's files are sealed with its evaluation).
+    if (!isScoringRun(r)) {
+      const named = await keepUntracked(sh, r.command, r.cwd, path.join(folder, 'untracked')).catch(() => null);
+      if (named?.kept.length) info.kept = named.kept;
+      if (named?.notKept.length) info.notKept = named.notKept;
     }
     updateRun(d.db, r.id, { info });
     // The evaluations of this folder: a scoring run does not start on changed files, any other is marked.
@@ -1100,7 +1138,7 @@ async function followCluster(d: Deps, r: RunRecord) {
     if (state.status === 'running') await watch(d, getRun(d.db, r.id)!, L);
     return save(d, r, L);
   }
-  if (r.scoresFile && state.code === 0) await fetchScores(c.host, r);
+  if (state.code === 0) await fetchScores(c.host, r);
   if (state.slurm && state.code === null) {
     const s = state.slurm;
     if (s.status === 'stopped' && !getRun(d.db, r.id)?.stopping) updateRun(d.db, r.id, { info: { stopping: s.why ?? 'Cancelled' } });
@@ -1109,10 +1147,12 @@ async function followCluster(d: Deps, r: RunRecord) {
   return finish(d, getRun(d.db, r.id)!, L, state.code, state.code === null ? { missing: `It is no longer in ${c.name}’s queue and left no exit code` } : {});
 }
 
-/** A cluster run's per-example scores, copied into its folder here when it ends (50 MB at most). */
+/** A cluster run's per-example scores (the file it named, else scores.jsonl in its folder there), copied here when it ends. */
 async function fetchScores(host: string, r: RunRecord) {
-  const file = fillCommand(r.scoresFile!, { ...(r.params ?? {}), ...(r.seed !== undefined ? { seed: r.seed } : {}) }, false);
-  const got = await runSsh(host, `cd ${rq(r.cwd || r.remoteDir || '~')} && head -c 52428800 ${rq(file)}`, { timeoutMs: 120_000 });
+  const dir = r.remoteDir!;
+  const own = rq(`${dir}/scores.jsonl`);
+  const pick = r.scoresFile ? `f=${rq(runFile(r, r.scoresFile, dir))}; [ -f "$f" ] || f=${own}` : `f=${own}`;
+  const got = await runSsh(host, `cd ${rq(r.cwd || dir)} && { ${pick}; [ -f "$f" ] && head -c ${MAX_SCORES} "$f"; }`, { timeoutMs: 120_000 });
   if (got.code !== 0 || !got.out.trim()) return;
   try {
     fs.writeFileSync(path.join(r.folder ?? runFolder(r.id), 'scores.jsonl'), got.out);
@@ -1131,7 +1171,7 @@ function setWhy(d: Deps, r: RunRecord, why: string) {
 /** Copies what another machine says of a run it keeps into the copy here; tells you of its end the way the job asked. */
 function copyRemote(d: Deps, r: RunRecord, there: RemoteRun) {
   const info: Partial<RunInfo> = {};
-  for (const k of ['host', 'gpuIds', 'exitCode', 'commit', 'branch', 'dirty', 'untracked', 'environment', 'outputAt', 'scores', 'stopping'] as const) (info as Record<string, unknown>)[k] = there[k];
+  for (const k of ['host', 'gpuIds', 'exitCode', 'commit', 'branch', 'dirty', 'untracked', 'kept', 'notKept', 'environment', 'outputAt', 'scores', 'stopping'] as const) (info as Record<string, unknown>)[k] = there[k];
   updateRun(d.db, r.id, { status: there.status, why: there.why ?? null, ...(there.startedAt ? { startedAt: there.startedAt } : {}), ...(there.endedAt ? { endedAt: there.endedAt } : {}), info, ...(there.metrics ? { metrics: there.metrics } : {}) });
   if (there.status !== r.status) {
     tellRuns(d, [r.id]);

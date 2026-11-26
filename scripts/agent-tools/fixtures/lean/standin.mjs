@@ -7,6 +7,9 @@
 //   Classical        the standard ones      skipKernelTC     leanchecker refuses
 //   -- slow          never ends             import Broken    the build of an import fails
 //   import Mathlib   fails unless Mathlib's search path is there
+//   #check @…gone    an unknown identifier (as of a name that is not in the library)
+//   -- no notation   the audit cannot load the libraries' notation, only read without it
+// What a theorem states is worked out from its text, for the simple shapes the tests use, as Lean 4.36 printed them.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,7 +58,9 @@ function lean(argv, cwd = process.cwd()) {
     if (bare.includes('2 + 2 = 5')) said.push(msg(file, 'error', '[anonymous]', at, bare.indexOf('decide'), 'Tactic `decide` proved that the proposition\n  2 + 2 = 5\nis false'));
     if (/-- unsolved/.test(l)) said.push(msg(file, 'error', 'Tactic.unsolvedGoals', at, 2, 'unsolved goals\ncase right\na b : Nat\nh : 0 < a\n⊢ a < a + b'));
     if (/\bsorry\b/.test(bare)) said.push(msg(file, 'warning', 'hasSorry', lines.slice(0, at).findLastIndex((x) => /^(theorem|lemma|example|def)/.test(x)) + 1 || at, 8, 'declaration uses `sorry`'));
-    if (bare.startsWith('#check')) said.push(msg(file, 'information', '[anonymous]', at, 0, 'Nat.add_comm (n m : Nat) : n + m = m + n'));
+    const gone = /^#check @(\S*gone\S*)/.exec(bare);
+    if (gone) said.push(msg(file, 'error', 'lean.unknownIdentifier', at, 8, `Unknown identifier \`${gone[1]}\``));
+    else if (bare.startsWith('#check')) said.push(msg(file, 'information', '[anonymous]', at, 0, 'Nat.add_comm (n m : Nat) : n + m = m + n'));
   });
   for (const s of said) console.log(s);
   const failed = said.some((s) => s.includes('"severity":"error"'));
@@ -72,8 +77,44 @@ function compiled(mod) {
   return null;
 }
 
-function audit([mark, mod, ...names]) {
+/**
+ * What a theorem states, for `theorem name (x : T) … : P := proof` and the like: as the real audit prints it (numbers
+ * with their types, a hypothesis nothing names as an arrow), its form with the names of variables left out and each
+ * definition of the file's own written as what it says, and those definitions' names.
+ */
+function stated(d, all) {
+  let rest = d.text.split(':=')[0].replace(/^.*?\b(?:theorem|lemma|axiom|def|example)\b\s*[^\s({:]*/, '').replace(/\s+/g, ' ').trim();
+  const binders = [];
+  while (rest.startsWith('(')) {
+    let depth = 0;
+    let end = 0;
+    for (; end < rest.length; end++) {
+      if (rest[end] === '(') depth++;
+      else if (rest[end] === ')' && --depth === 0) break;
+    }
+    const [names, ...type] = rest.slice(1, end).split(':');
+    for (const name of names.trim().split(' ')) binders.push({ name, type: type.join(':').trim() });
+    rest = rest.slice(end + 1).trim();
+  }
+  const numbers = (s) => s.replace(/(?<![\p{L}\p{N}_.])(\d+)(?![\p{L}\p{N}_.])/gu, '($1 : Nat)');
+  const word = (name) => new RegExp(`(?<![\\p{L}\\p{N}_.])${name}(?![\\p{L}\\p{N}_.])`, 'gu');
+  let statement = numbers(rest.replace(/^:/, '').trim());
+  let form = statement;
+  [...binders].reverse().forEach(({ name, type }, i) => {
+    const used = word(name).test(statement);
+    statement = used ? `∀ (${name} : ${type}), ${statement}` : `${numbers(type)} → ${statement}`;
+    form = `∀ ${numbers(type)}, ${used ? form.replace(word(name), `#${i}`) : form}`;
+  });
+  const rests = all.filter((x) => x.kind === 'def' && x.name && word(x.name).test(statement));
+  rests.forEach((x, i) => {
+    form = `${form.replace(word(x.name), `o${i}`)} ; o${i} = ${x.text.slice(x.text.indexOf(x.name) + x.name.length).replace(/\s+/g, ' ').trim()}`;
+  });
+  return { statement, form, rests: rests.map((x) => x.name) };
+}
+
+function audit([mark, notation, mod, ...names]) {
   const text = compiled(mod);
+  if (notation === 'notation' && text?.includes('-- no notation')) return console.error('uncaught exception: (interpreter) unknown declaration'), 1;
   if (text == null) return console.error(`uncaught exception: unknown module ${mod}`), 1;
   const all = decls(code(text).join('\n'));
   const say = (x) => console.log(mark + JSON.stringify(x));
@@ -92,7 +133,7 @@ function audit([mark, mod, ...names]) {
       ...(t.includes('native_decide') ? ['native._native.native_decide.ax_1_1'] : []),
       ...(t.includes('Classical') ? ['propext', 'Classical.choice', 'Quot.sound'] : []),
     ];
-    say({ name, full: found[0].name, axioms });
+    say({ name, full: found[0].name, axioms, ...stated(found[0], all) });
   }
   say({ module: mod });
   for (const m of text.matchAll(/^import (Proofs\.\S+)/gm)) say({ module: m[1] });

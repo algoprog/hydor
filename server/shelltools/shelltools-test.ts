@@ -213,6 +213,7 @@ test('the text names every tool when all pass, and is built from the four parts'
   assert.equal(all.split('\n').length, 5);
   assert.equal(all.split('\n')[0], SHELL_TOOLS_HEAD);
   assert.deepEqual(all.split('\n').slice(1).map((l) => l.split(':')[0]), ['- waitfor', '- edits', '- sym NAME...', '- leancheck FILE.lean']);
+  assert.match(all, /- waitfor: .*`--log FILE --match` sees only lines written after it starts, unless `--from-start`\./);
   assert.ok(all.length < 1700, `${all.length} characters`);
 });
 

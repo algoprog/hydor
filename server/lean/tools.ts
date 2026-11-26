@@ -20,6 +20,7 @@ import { modeFamily, neverAsks } from '../children/modes.ts';
 import type { RunCtx, RunTool, ToolOutput } from '../features/types.ts';
 import { checkRunner } from '../goals/driver.ts';
 import { confirmChange, modeOf } from '../guide/api.ts';
+import { confirmHere } from './confirm.ts';
 import { searchLean } from './search.ts';
 import { lean, leanState, mathlib, setupLean } from './setup.ts';
 
@@ -30,7 +31,7 @@ const PLAN = 'This session only reads (Plan mode, or read-only), and checking a 
 const DEFAULT_MS = 570_000;
 
 export const LEAN_GUIDE =
-  'Lean checks proofs: lean_check a file or a snippet, lean_search before proving something the library may have, lean_verify for the verdict (no errors, no sorry, standard axioms only). Before proving anything for someone, load the lean-proofs skill: the statement is agreed with them first.';
+  'Lean checks proofs: lean_check a file or a snippet, lean_search before proving something the library may have, lean_verify for the verdict (no errors, no sorry, standard axioms only; it names what each theorem states, with a pin of it, and name@pin holds a proof to the agreed statement). Before proving anything for someone, load the lean-proofs skill: the statement is agreed with them first.';
 
 const failed = (text: string): ToolOutput => ({ text, isError: true });
 const json = (x: unknown): string => JSON.stringify(x, null, 1);
@@ -141,12 +142,12 @@ const CHECK: RunTool = {
 const VERIFY: RunTool = {
   name: 'lean_verify',
   description:
-    'The verdict on proofs in a Lean 4 file, to report as it is. ok only when the file builds, nothing is left as sorry, each theorem named (all theorems and lemmas of the file when none is named) depends only on the standard axioms (propext, Classical.choice, Quot.sound), and Lean’s kernel accepts every declaration. Returns { ok, why?, theorems: [{ name, axioms, ok }], sorries, note?, seconds }. It does not say whether the statement means what the person meant: agree that with them first (the lean-proofs skill).',
+    'The verdict on proofs in a Lean 4 file, to report as it is. ok only when the file builds, nothing is left as sorry, each theorem named (all theorems and lemmas of the file when none is named) depends only on the standard axioms (propext, Classical.choice, Quot.sound), and Lean’s kernel accepts every declaration. Returns { ok, why?, theorems: [{ name, axioms, ok, statement, pin, definitions? }], changed?, missing?, sorries, note?, seconds }. statement is what the theorem states, as Lean reads it, and pin a short hash of it and of the definitions of the file’s or project’s own that it rests on (listed in definitions); both come even while the proof is still sorry. Name a theorem as name@pin to check as well that it still states what it did when it had that pin: a changed statement is not ok, why says so with the statement as it is now, and changed lists it. It does not say whether the statement means what the person meant: agree that with them first (the lean-proofs skill).',
   inputSchema: {
     type: 'object',
     properties: {
       file: { type: 'string', description: 'The .lean file (relative to the session’s folder, or cwd).' },
-      theorems: { type: 'array', items: { type: 'string' }, description: 'Theorem names to check (default: every theorem and lemma in the file).' },
+      theorems: { type: 'array', items: { type: 'string' }, description: 'Theorem names to check (default: every theorem and lemma in the file). name@pin also checks that the statement is the pinned one.' },
       cwd: { type: 'string', description: 'The folder file is relative to (default: the session’s).' },
       minutes: { type: 'number', description: 'Time limit (default about 10).' },
     },
@@ -168,15 +169,28 @@ const VERIFY: RunTool = {
 const SEARCH: RunTool = {
   name: 'lean_search',
   description:
-    'Find theorems Lean’s libraries already have (Mathlib and core), through Loogle (a name such as Nat.add_comm, a pattern such as _ + _ = _ + _, a type) and LeanSearch (ordinary words: "square root of two is irrational"). Both are public services on the web, so the query leaves this computer. Returns up to 10 { name, type, module, doc? } and which services answered.',
-  inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'A name, a pattern, a type or ordinary words.' } }, required: ['query'] },
+    'Find theorems Lean’s libraries already have (Mathlib and core), through Loogle (a name such as Nat.add_comm, a pattern such as _ + _ = _ + _, a type with arrows, a part of a name in quotes) and LeanSearch (ordinary words: "square root of two is irrational"). LeanSearch is asked every query, Loogle only one that can be a name, a pattern or a type. Both are public services on the web, so the query leaves this computer. Returns { from, hits, note? }: up to 10 hits { name, type, module, doc?, from, url? } (url: the lemma’s page in Mathlib’s documentation), from the services those hits came from, and a note when a service failed. The services index a recent Mathlib, so a name may not be in the one here: confirm: true checks the names against the Lean and Mathlib installed here and gives each hit here: true | false. It takes several seconds and needs Mathlib set up: worth it before you build a proof on a lemma, not for looking around.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'A name, a pattern, a type or ordinary words.' },
+      confirm: { type: 'boolean', description: 'Also check the names found against the Lean and Mathlib installed here (several seconds). Off unless asked.' },
+    },
+    required: ['query'],
+  },
   annotations: { readOnlyHint: true, openWorldHint: true },
   async run(a, ctx) {
-    if (!lean()) return failed(NOT_SET_UP);
+    const l = lean();
+    if (!l) return failed(NOT_SET_UP);
     const q = typeof a.query === 'string' ? a.query.trim() : '';
     if (!q) return failed('Say what to look for.');
-    const r = await searchLean(q, ctx.signal);
-    return r.from.length ? json(r) : failed(r.note!);
+    const { unanswered, ...r } = await searchLean(q, ctx.signal);
+    if (unanswered) return failed(r.note!);
+    if (a.confirm !== true || !r.hits.length) return json(r);
+    // The file checked is the app's own, with nothing in it but #check of names: no sandbox or card is needed.
+    const { hits, note } = await confirmHere(l, r.hits, { timeoutMs: DEFAULT_MS, signal: ctx.signal, mathlib: mathlib() });
+    const notes = [r.note, note].filter(Boolean).join(' ');
+    return json({ ...r, hits, ...(notes ? { note: notes } : {}) });
   },
 };
 

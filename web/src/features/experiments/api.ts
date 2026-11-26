@@ -4,10 +4,12 @@
 // come through the app's socket ({ t: 'feature', id: 'experiments' }): the page reloads what changed.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExperimentGroup, ExperimentsSettings, MetricSeries, QueueNow, RunRecord, RunStatus } from '@shared/experiments';
+import { metricScore, rankMetrics } from '@shared/metric-rank';
 import { api, enc } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
 
 export type { RunRecord };
+export { metricScore, rankMetrics };
 
 /** A run's page's tabs, and an experiment's. */
 export type RunTab = 'overview' | 'charts' | 'log';
@@ -124,45 +126,6 @@ export function num(v: number | null | undefined): string {
   if (a !== 0 && (a >= 1e6 || a < 1e-3)) return v.toExponential(2);
   if (Number.isInteger(v)) return String(v);
   return String(Number(v.toPrecision(a >= 100 ? 5 : 4)));
-}
-
-// How much a metric matters, by the words in its name: a quality number (loss, accuracy, F1…) most, a rate or a
-// learning rate less, bookkeeping (sizes, counts, times, steps) least. One that was read many times (a curve) gets more.
-// As arrays of single words: a string of several words would be taken for the page's own text (i18n:extract).
-const WORDS = (list: string[]) => new Set(list);
-const QUALITY = WORDS([
-  'loss', 'acc', 'accuracy', 'f1', 'bleu', 'rouge', 'rouge1', 'rouge2', 'rougel', 'chrf', 'meteor', 'ndcg', 'mrr',
-  'map', 'recall', 'precision', 'prec', 'auc', 'auroc', 'ppl', 'perplexity', 'bpb', 'bpc', 'nll', 'll', 'wer',
-  'cer', 'em', 'exact', 'score', 'reward', 'return', 'win', 'ksr', 'top1', 'top5', 'error', 'err', 'mse', 'mae',
-  'rmse', 'iou', 'dice', 'psnr', 'ssim', 'fid', 'kl', 'agreement', 'correct', 'hit', 'hits', 'success', 'pass',
-]);
-const HELD_OUT = WORDS(['val', 'valid', 'validation', 'dev', 'eval', 'test', 'heldout']);
-const RATE = WORDS(['lr', 'learning', 'grad', 'norm', 'throughput', 'mem', 'memory']);
-const BOOKKEEPING = WORDS([
-  'elapsed', 'time', 'seconds', 'secs', 'sec', 'duration', 'eta', 'epoch', 'n', 'num', 'count', 'total', 'size',
-  'params', 'tokens', 'bytes', 'positions', 'examples', 'words', 'seqs', 'batch', 'accum', 'world', 'rank', 'steps',
-  'step',
-]);
-const PER_SECOND = /per[^a-z]?(s|sec|secs|second|seconds)($|[^a-z])|\/s($|[^a-z])|_s_/;
-
-export function metricScore(name: string, repeated: boolean): number {
-  const low = name.toLowerCase();
-  // Words with their digits (f1, top5, rouge2); "acc@1" and "ksr@0.1" are acc and ksr.
-  const words = low.split(/[^a-z0-9]+/).filter(Boolean);
-  const has = (set: Set<string>) => words.some((w) => set.has(w));
-  let score = repeated ? 2 : 0;
-  if (has(QUALITY)) score += 4 + (has(HELD_OUT) ? 1 : 0);
-  else if (has(RATE) || PER_SECOND.test(low)) score -= 2;
-  else if (has(BOOKKEEPING)) score -= 5;
-  return score;
-}
-
-/** The names, the ones that matter most first (the order they came in otherwise). */
-export function rankMetrics(names: string[], repeated: (k: string) => boolean): string[] {
-  return names
-    .map((k, i) => ({ k, i, s: metricScore(k, repeated(k)) }))
-    .sort((a, b) => b.s - a.s || a.i - b.i)
-    .map((x) => x.k);
 }
 
 /**

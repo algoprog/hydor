@@ -86,8 +86,10 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
 - **Proofs are checked by Lean.** When you agree, the app sets up Lean in `lean/` in its data folder (or uses your own,
   from your PATH), and Mathlib as one shared project there. Agents' tools and `leancheck` share one checker
   (`scripts/agent-tools/lib/lean/`). Its verdict does not trust what the checked file can change: the file is compiled,
-  its theorems' axioms are read by a small program that loads the compiled file without running its syntax, and Lean's
-  `leanchecker` plays every declaration back through the kernel. Checking runs a file's code, so the agents' Lean tools
+  its theorems' axioms and statements are read by a small program that reads the compiled file as data, without running
+  its syntax or code, and Lean's `leanchecker` plays every declaration back through the kernel. A statement is printed
+  with Lean's and the downloaded libraries' notation only, and its pin is a hash of the elaborated type and of the
+  content of the file's or project's own definitions it rests on (not of the text). Checking runs a file's code, so the agents' Lean tools
   are no freer than the session's own commands: in a mode that asks, they run in the app's sandbox (writes kept to the
   session's folder and the temporary one, no network).
 - **Your accounts, your machine.** The app talks to the agents through their official command-line tools and

@@ -1183,7 +1183,7 @@ async function checkMarked(c: Ctx, src: TexSource, t: Tabular) {
     const other = bRows.find((x) => norm(x.label) && norm(x.label) === norm(r.label)) ?? (aRows.length === bRows.length ? bRows[i] : undefined);
     if (!other) {
       count++;
-      changed.push(`the row “${clip(r.label, 30)}” is no longer in it`);
+      changed.push(`The row “${clip(r.label, 30)}” is no longer in it.`);
       return;
     }
     for (const x of r.cells) {
@@ -1195,18 +1195,25 @@ async function checkMarked(c: Ctx, src: TexSource, t: Tabular) {
       const mark = x.n.marked !== y.n.marked ? x.n.marked || !y.n.double : x.n.marked && x.n.double !== y.n.double;
       if (Math.abs(now - x.n.value) > 1e-9) {
         count++;
-        changed.push(`“${clip(r.label, 24)}”, ${head}: ${x.n.value.toFixed(x.n.digits)} in the paper, ${now.toFixed(x.n.digits)} now`);
+        changed.push(`“${clip(r.label, 24)}”, ${head}: ${x.n.value.toFixed(x.n.digits)} in the paper, ${now.toFixed(x.n.digits)} now.`);
       } else if (mark) {
         count++;
-        changed.push(`“${clip(r.label, 24)}”, ${head}: its significance mark is ${!y.n.marked ? 'no longer earned' : x.n.marked ? 'not the one its runs give now' : 'missing'}`);
+        if (!y.n.marked) changed.push(`“${clip(r.label, 24)}”, ${head}: its significance mark is no longer earned.`);
+        else if (x.n.marked) changed.push(`“${clip(r.label, 24)}”, ${head}: its significance mark is not the one its runs give now.`);
+        else changed.push(`“${clip(r.label, 24)}”, ${head}: its significance mark is missing.`);
       }
     }
   });
   if (bRows.length > aRows.length) {
     count++;
-    changed.push(bRows.length - aRows.length === 1 ? 'its runs now give one more row' : `its runs now give ${bRows.length - aRows.length} more rows`);
+    if (bRows.length - aRows.length === 1) changed.push('Its runs now give one more row.');
+    else changed.push(`Its runs now give ${bRows.length - aRows.length} more rows.`);
   }
   if (!count) return;
+  // Each sentence is whole, or a template with its values, so the pages can translate them one by one.
+  const said = changed.slice(0, 5);
+  if (changed.length > 5) said.push('There are more changes than these.');
+  said.push(`Experiments worked it out again from its runs (table ${t.marker}).`);
   const was = src.text.slice(t.from, t.to);
   const next = rt.latex.slice(theirs.from, theirs.to);
   c.add({
@@ -1214,7 +1221,7 @@ async function checkMarked(c: Ctx, src: TexSource, t: Tabular) {
     group: 'numbers',
     level: 'must',
     title: count === 1 ? `A number in the table at line ${t.line} is not what its runs give now` : `${count} numbers in the table at line ${t.line} are not what its runs give now`,
-    detail: `${changed.slice(0, 5).join('; ')}${changed.length > 5 ? '; …' : ''}. Experiments worked it out again from its runs (table ${t.marker}).`,
+    detail: said.join(' '),
     ...place(c.doc, src.name, t.from, t.from + 20),
     fix: { label: 'Update the table', edits: [{ file: src.name, from: t.from, to: t.to, was, text: next }], shows: next },
   });

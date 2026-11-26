@@ -1,7 +1,7 @@
 // An app's view in a page (shared/app-ui.ts): its pages drawn in the sandboxed frame with a run's answer (or, on
 // the app's own page, what it keeps and its latest run), and what its events ask of the app done here: find and
 // change its records (a ready-made app's too), download them, keep a tick, ask the run's agent, run one of its flows, run it again with changed answers,
-// start another app, write a request to run experiments (on the start page, not sent), copy, open an address, say something. Only what `can` allows: a public page's view does
+// start another app, write a request to run experiments or to try a paper's idea (on the start page, not sent), copy, open an address, say something. Only what `can` allows: a public page's view does
 // nothing that reaches the app. A ready-made app's view is put in the app's language first.
 import { useMemo, useState } from 'react';
 import type { AppUi } from '@shared/app-ui';
@@ -183,8 +183,8 @@ export function AppView({
           return null;
         }
         case 'experiments': {
-          // The experiments of a list (reviewers' asks): the start page with the request in its box, not sent, from the
-          // repository or folder the lab apps were last given.
+          // The experiments of a list (reviewers' asks), or a paper's idea to try (source "paper"): the start page with the
+          // request in its box, not sent, from the repository or folder the lab apps were last given.
           need('experiments');
           const asked = askedRunsFrom(a);
           if (!asked.items.length) throw new Error(tr('There are no experiments to run.'));

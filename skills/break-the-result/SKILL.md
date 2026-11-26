@@ -78,6 +78,8 @@ result were not real.
   Give it a title and a description with `experiment_describe`. Each run gets the tag `control`, a name that
   says what it is ("control: shuffled labels · seed 1") and `report: true`. On
   the CPU when it can be: say `gpus: 0`, since leaving it out takes a GPU on a computer that has one.
+- Have each run write its per-example scores to `$HYDOR_RUN_DIR/scores.jsonl` (its own folder, so runs never
+  share a file): they are kept with it, and `experiment_table` then compares the runs example by example.
 - Set `cwd` to your own copy. Check the command for paths it writes to (checkpoints, predictions, logs) and
   point them somewhere new, so a control never overwrites what the claim rests on.
 - More seeds: the same commit, patch, data, settings and environment as the claim's runs, only the seed

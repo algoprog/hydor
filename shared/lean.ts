@@ -42,10 +42,19 @@ export interface LeanSetupAsk {
   mathlib?: boolean;
 }
 
+/** The services lean_search asks. */
+export type LeanService = 'Loogle' | 'LeanSearch';
+
 /** One theorem lean_search found. */
 export interface LeanHit {
   name: string;
   type: string;
   module: string;
   doc?: string;
+  /** The service that gave it. */
+  from: LeanService;
+  /** Its page in Mathlib's documentation. */
+  url?: string;
+  /** Asked with confirm: whether the Lean and Mathlib installed here have the name. */
+  here?: boolean;
 }

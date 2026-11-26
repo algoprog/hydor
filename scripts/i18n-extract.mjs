@@ -501,6 +501,8 @@ const NAMED = ['assistants/builtins', 'apps/templates', 'apps/templates-more', '
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
   for (const m of src.matchAll(/\b(name|label|description|detail|placeholder|help|title|category|note)\s*:\s*((['"`])(?:(?!\3)[^\\]|\\.)*\3)/g)) for (const s of literals(m[2])) add(s, f);
+  // The sentences the paper check puts together into one finding's text, one pushed at a time.
+  if (f === 'server/pages/latex-check.ts') for (const m of src.matchAll(/\b(?:changed|said)\.push\(\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, f);
   // A ready-made app's choices, which its form shows as chips (the answer sent stays the option as written).
   if (/^server\/apps\/(templates(-(more|research|papers|lab))?|explore)\.ts$/.test(f)) for (const m of src.matchAll(/\boptions\s*:\s*\[([^\]]*)\]/g)) for (const o of m[1].matchAll(/'([^'\\]+)'/g)) add(o[1], f, true);
 }

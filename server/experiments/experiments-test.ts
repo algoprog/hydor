@@ -20,25 +20,27 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { betterOf, tableMarks, type RunRecord } from '../../shared/experiments.ts';
+import { betterOf, experimentNoticeOf, tableMarks, type RunRecord } from '../../shared/experiments.ts';
+import { keyNumbers } from '../../shared/metric-rank.ts';
+import { gather, noticeText, sawEnded, tellEnded } from './notices.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { openDb } from '../db.ts';
 import { CONFIDENTIAL_EXTRA } from '../../shared/confidential.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
-import { captureGit, localShell, pythonOf } from './capture.ts';
+import { commandWords, captureGit, KEEP_FILE, keepUntracked, localShell, pythonOf } from './capture.ts';
 import { endOfSlurm, parseSacct, parseSbatch, parseSqueue, reasonWords, saveCluster, sbatchScript, setSsh, type Ssh } from './clusters.ts';
 import { chooseGpus, parseGpus, setGpuReader } from './gpus.ts';
 import { describeGroup, enableExperimentDescriptions, firstObject, redactCommand, redactSetting, timing as describeTiming } from './describe.ts';
 import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
 import { MAX_METRICS, nanText, oomText, parseLine, Tracker } from './metrics.ts';
-import { cleanJob, forgetLive, forgetNotices, onCallBrief, repairEnded, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
+import { cleanJob, endLine, forgetLive, forgetNotices, onCallBrief, repairEnded, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
 import { addEvent, getInfo, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveSeries, saveTable, seriesOf, updateRun, waitStarted, workOut } from './records.ts';
 import { useMachines } from './remote.ts';
 import { holm, lgamma, pairedBootstrap, pairedT, tTwoSided, welch } from './stats.ts';
-import { earlyStop, expandSweep, fillCommand, paramsOf, placeholders, shellWords } from './sweeps.ts';
+import { earlyStop, expandSweep, fillCommand, paramsOf, placeholders, runFile, shellWords } from './sweeps.ts';
 import { insertTable, makeTable, parseScores } from './tables.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { experimentTools } from './tools.ts';
@@ -70,7 +72,8 @@ class Sessions extends EventEmitter {
   answer: string | null = 'accept';
   cards: { title: string; detail?: string }[] = [];
   summary(key: string) {
-    return this.live.has(key) ? ({ key, title: key, live: { status: this.live.get(key) } } as any) : key.startsWith('claude:') ? ({ key, title: key, live: null } as any) : null;
+    const queue = this.queued?.get(key);
+    return this.live.has(key) ? ({ key, title: key, queue, live: { status: this.live.get(key) } } as any) : key.startsWith('claude:') ? ({ key, title: key, queue, live: null } as any) : null;
   }
   async create(o: CreateOpts) {
     this.created.push(o);
@@ -78,8 +81,20 @@ class Sessions extends EventEmitter {
     this.live.set(key, 'working');
     return key;
   }
+  /** What waits for a session at work (one `live` says is working), as the app's queue keeps it. */
+  queued = new Map<string, { id: string; text: string; at: number }[]>();
+  private n = 0;
   async deliverOrQueue(key: string, text: string) {
-    this.delivered.push({ key, text });
+    if (this.live.get(key) === 'working') this.queued.set(key, [...(this.queued.get(key) ?? []), { id: `q${++this.n}`, text, at: Date.now() }]);
+    else this.delivered.push({ key, text });
+  }
+  editQueued(key: string, id: string, o: { text: string }) {
+    const m = this.queued.get(key)?.find((x) => x.id === id);
+    if (!m) throw new HttpError(404, 'That message already went out');
+    m.text = o.text;
+  }
+  dropQueued(key: string, id: string) {
+    this.queued.set(key, (this.queued.get(key) ?? []).filter((x) => x.id !== id));
   }
   adapterByRun(_runId: string) {
     return {
@@ -105,6 +120,7 @@ experiments.routes!(deps);
 useDeps(deps);
 timing.cluster = 300;
 timing.remote = 300;
+gather.ms = 100;
 await http.ready();
 
 /** Steps the queue until `fn` holds (or fails after `ms`). */
@@ -1005,10 +1021,11 @@ test('the tools: JSON answers; a step runs without asking, Plan mode refuses, a 
   assert.equal(getRun(db, again.id)!.seed, 3);
   sessions.answer = 'accept';
   await until(() => ended(ok.id)() && ended(again.id)(), 20_000, 'the session’s runs');
-  assert.ok(
-    sessions.delivered.some((x) => x.key === 'claude:s1' && x.text.includes(`(${ok.id}) ended. Done in`)),
-    'report: the session hears how it went',
-  );
+  const heard = () => sessions.delivered.some((x) => x.key === 'claude:s1' && x.text.includes(`(${ok.id}) ended. Done in`));
+  await until(heard, 5000, 'report: the session to hear how it went');
+  const said = sessions.delivered.find((x) => x.key === 'claude:s1')!.text;
+  assert.ok(experimentNoticeOf(said), said);
+  assert.match(said, /\(This notice is from Experiments, not typed by the user\./);
   const list = JSON.parse((await call('experiment_list', { group: 'tools' }, ctxOf())).text);
   assert.equal(list.runs[0].id, id);
   assert.ok('metrics' in list.runs[0] && 'startedAt' in list.runs[0] && 'endedAt' in list.runs[0]);
@@ -1024,6 +1041,157 @@ test('the tools: JSON answers; a step runs without asking, Plan mode refuses, a 
   const brief = onCallBrief(deps, getRun(db, id)!, 'stall', 'No new output for 31 minutes');
   assert.match(brief, /Never delete files or checkpoints\./);
   assert.match(brief, new RegExp(`experiment_run with again: "${id}"`));
+});
+
+// ---- the message when runs end ---------------------------------------------------------------------------------------
+
+test('the numbers in the line: those named first, then results printed once before curves, never bookkeeping', () => {
+  const run = (more: Partial<RunRecord>, last: Record<string, number>, repeated: string[] = []) => ({ id: 'rline0001', status: 'done', createdAt: 0, command: 'x', cwd: tmp, startedAt: Date.now(), endedAt: Date.now(), metrics: { last, repeated }, ...more }) as RunRecord;
+  const last = { queries: 60, docs: 1000, k1: 1.2, elapsed_s: 3, loss: 0.2, lr: 0.001, 'ndcg@10': 0.41, mrr: 0.33, p_value: 0.5 };
+  assert.deepEqual(keyNumbers(Object.keys(last), { repeated: ['loss', 'lr'], settings: ['k1'] }), ['ndcg@10', 'mrr', 'loss', 'p_value', 'lr']);
+  assert.equal(endLine(db, run({ params: { k1: 1.2 } }, last, ['loss', 'lr'])), 'Done in under a minute: ndcg@10 0.41, mrr 0.33, loss 0.2, p_value 0.5, lr 0.001');
+  assert.match(endLine(db, run({ better: { queries: 'max' } }, last, ['loss'])), /: queries 60, ndcg@10 0\.41,/, 'named as one that counts: first, whatever it is');
+  assert.equal(keyNumbers(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']).length, 6, 'six at most');
+  assert.deepEqual(keyNumbers(['loss', 'depth'], { settings: ['loss', 'depth'] }), ['loss'], 'a loss beside a --loss setting is still its result');
+  // An earlier results table of the experiment says which count.
+  doneRun('tline001a', 'lined', 1, { zeta: 1, acc: 0.5 });
+  saveTable(db, workOut(db, { group: 'lined', columns: [{ metric: 'zeta', better: 'max' }] }, 'tlinetab1'));
+  assert.match(endLine(db, run({ group: 'lined' }, { acc: 0.9, other: 2, zeta: 3 })), /: zeta 3, acc 0\.9, other 2$/);
+});
+
+test('runs that end close together are told in one message; one waiting is added to; a run read since is left out', async () => {
+  const key = 'claude:told';
+  sessions.delivered.length = 0;
+  const mine = () => sessions.delivered.filter((x) => x.key === key);
+  const e = (id: string, at: number) => ({ runs: [id], line: `“${id}” (${id}) ended. Done`, at });
+  // At rest: gathered for a moment.
+  tellEnded(deps, key, e('rb', 2));
+  tellEnded(deps, key, e('ra', 1));
+  assert.equal(mine().length, 0, 'not at once');
+  await sleep(300);
+  assert.equal(mine().length, 1);
+  assert.deepEqual(mine()[0].text.split('\n').filter((l) => l.startsWith('- ')), ['- “ra” (ra) ended. Done', '- “rb” (rb) ended. Done'], 'the latest last');
+  assert.ok(experimentNoticeOf(mine()[0].text));
+  // At work: into the queue at once, and the next ones added to the message that waits.
+  sessions.live.set(key, 'working');
+  tellEnded(deps, key, e('rc', 3));
+  await sleep(50);
+  assert.equal(sessions.queued.get(key)?.length, 1);
+  tellEnded(deps, key, e('rd', 4));
+  await sleep(50);
+  assert.equal(sessions.queued.get(key)!.length, 1, 'one message');
+  assert.match(sessions.queued.get(key)![0].text, /\(rc\)[^]*\(rd\)/);
+  // Read since it ended: gone from the waiting message, and not told at all when it comes after.
+  sawEnded(deps, key, ['rc']);
+  assert.ok(!sessions.queued.get(key)![0].text.includes('(rc)') && sessions.queued.get(key)![0].text.includes('(rd)'));
+  sawEnded(deps, key, ['rd', 're']);
+  assert.equal(sessions.queued.get(key)!.length, 0, 'nothing left to tell: the message is taken off');
+  tellEnded(deps, key, e('re', 5));
+  await sleep(50);
+  assert.equal(sessions.queued.get(key)!.length, 0);
+  // The waiting message went out: the next end starts a new one.
+  tellEnded(deps, key, e('rf', 6));
+  await sleep(50);
+  sessions.queued.set(key, []);
+  tellEnded(deps, key, e('rg', 7));
+  await sleep(50);
+  assert.equal(sessions.queued.get(key)!.length, 1);
+  assert.ok(!sessions.queued.get(key)![0].text.includes('(rf)'));
+  const many = noticeText(Array.from({ length: 23 }, (_, i) => e(`r${i}`, i)));
+  assert.equal(many.split('\n').filter((l) => l.startsWith('- ')).length, 20);
+  assert.match(many, /\nand 3 more \(experiment_list lists them\)\n/);
+  sessions.live.delete(key);
+  sessions.queued.delete(key);
+});
+
+test('a run read with experiment_get before the message goes is not told; the others of the moment are', async () => {
+  const key = 'claude:reads';
+  sessions.delivered.length = 0;
+  const was = gather.ms;
+  gather.ms = 1500;
+  const start = async (name: string) => (await submit(deps, await cleanJob(db, { command: `echo "queries=60"; echo "ndcg@10=0.5"`, cwd: tmp, gpus: 0, name, report: true }), { startedBy: { session: key } })).id;
+  const a = await start('read');
+  const b = await start('unread');
+  await until(() => ended(a)() && ended(b)(), 20_000, 'both');
+  await call('experiment_get', { id: a }, ctxOf({ key }));
+  await until(() => sessions.delivered.some((x) => x.key === key), 5000, 'the message');
+  gather.ms = was;
+  const text = sessions.delivered.filter((x) => x.key === key).map((x) => x.text).join('\n');
+  assert.ok(text.includes(`(${b}) ended. Done in under a minute: ndcg@10 0.5\n`) && !text.includes(`(${a})`), text);
+});
+
+// ---- files git does not track, and files of a run's own ----------------------------------------------------------------
+
+test('the files a command names that git does not track are kept with the run, within limits, never a secret or a link out', async () => {
+  const dir = path.join(tmp, 'untracked-repo');
+  fs.mkdirSync(path.join(dir, 'controls'), { recursive: true });
+  const g = (...a: string[]) => execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=T', ...a], { cwd: dir, stdio: 'pipe' });
+  g('init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(dir, 'tracked.sh'), 'true\n');
+  fs.writeFileSync(path.join(dir, '.gitignore'), 'ignored.cfg\n');
+  g('add', '.');
+  g('commit', '-q', '-m', 'first');
+  fs.writeFileSync(path.join(dir, 'controls/control.sh'), 'echo "token=tokenizer.eos_token"; echo "acc=1"\n');
+  fs.writeFileSync(path.join(dir, 'ignored.cfg'), 'depth: 3\n');
+  fs.writeFileSync(path.join(dir, 'big.bin'), Buffer.alloc(KEEP_FILE + 1));
+  fs.writeFileSync(path.join(dir, '.env'), 'A=1\n');
+  fs.writeFileSync(path.join(dir, 'keys.py'), `KEY = "hf_${'a'.repeat(34)}"\n`);
+  fs.writeFileSync(path.join(dir, 'out.txt'), 'an old output\n');
+  fs.writeFileSync(path.join(tmp, 'outside.txt'), 'outside\n');
+  fs.symlinkSync(path.join(tmp, 'outside.txt'), path.join(dir, 'link.txt'));
+  fs.symlinkSync(path.join(dir, '.env'), path.join(dir, 'settings.txt'));
+  const command = 'sh controls/control.sh --config=ignored.cfg; true tracked.sh big.bin .env keys.py link.txt settings.txt ../outside.txt missing.py > out.txt # notes.txt';
+  assert.deepEqual(commandWords('a "b c" d>e 2>&1 | f <g # h'), ['a', 'b c', 'd', '2', 'f', 'g']);
+  const listed = await keepUntracked(localShell(dir, process.env as Record<string, string>), command, dir, null);
+  assert.deepEqual(listed, { kept: ['controls/control.sh', 'ignored.cfg'], notKept: ['big.bin'] });
+  // Five megabytes in all.
+  const many = Array.from({ length: 7 }, (_, i) => `part${i}.dat`);
+  for (const f of many) fs.writeFileSync(path.join(dir, f), Buffer.alloc(KEEP_FILE));
+  const some = await keepUntracked(localShell(dir, process.env as Record<string, string>), `true ${many.join(' ')}`, dir, null);
+  assert.deepEqual([some.kept.length, some.notKept.length], [5, 2]);
+  assert.deepEqual(await keepUntracked(localShell(tmp, process.env as Record<string, string>), 'sh outside.txt', tmp, null), { kept: [], notKept: [] }, 'outside a repository: nothing');
+  const step = ctxOf({ step: true, runId: 'flow-keep', key: 'acp:flow-keep', agent: 'acp' });
+  const run = JSON.parse((await call('experiment_run', { command, cwd: dir, gpus: 0 }, step)).text);
+  const words = 'Not in git, kept with the run: controls/control.sh, ignored.cfg. Not in git and too large to keep: big.bin';
+  assert.equal(run.note, words);
+  await until(ended(run.id), 20_000, 'the run');
+  const r = getRun(db, run.id)!;
+  assert.deepEqual([r.kept, r.notKept], [['controls/control.sh', 'ignored.cfg'], ['big.bin']]);
+  assert.equal(fs.readFileSync(path.join(runFolder(r.id), 'untracked/controls/control.sh'), 'utf8'), fs.readFileSync(path.join(dir, 'controls/control.sh'), 'utf8'));
+  assert.deepEqual(fs.readdirSync(path.join(runFolder(r.id), 'untracked')).sort(), ['controls', 'ignored.cfg']);
+  const got = JSON.parse((await call('experiment_get', { id: run.id }, step)).text);
+  assert.equal(got.note, words);
+  assert.equal(got.run.where, `local (this computer: ${os.hostname()})`, 'the tools call this computer "local"');
+});
+
+test('scores of a run’s own: scores.jsonl in $HYDOR_RUN_DIR, {run} and $HYDOR_RUN_DIR in the files, and a sweep’s names and tags', async () => {
+  const line = (n: string) => `echo "{\\"id\\": \\"${n}\\", \\"ndcg\\": 0.5}"`;
+  const go = async (more: Record<string, unknown>) => {
+    const r = await submit(deps, await cleanJob(db, { cwd: tmp, gpus: 0, ...more }));
+    await until(ended(r.id), 20_000, 'the run');
+    return getRun(db, r.id)!;
+  };
+  const unnamed = await go({ command: `${line('q1')} > "$HYDOR_RUN_DIR/scores.jsonl"` });
+  assert.equal(unnamed.scores, true, unnamed.why);
+  const none = await go({ command: 'true' });
+  assert.ok(!none.scores);
+  const byRun = await go({ command: `${line('q2')} > per-$HYDOR_RUN.jsonl; echo '{"step": 1, "seen": 7}' > m-$HYDOR_RUN.jsonl`, scoresFile: 'per-{run}.jsonl', metricsFile: 'm-{run}.jsonl' });
+  assert.match(fs.readFileSync(path.join(runFolder(byRun.id), 'scores.jsonl'), 'utf8'), /q2/);
+  assert.equal(byRun.metrics?.last.seen, 7);
+  const own = await go({ command: `${line('q3')} > "$HYDOR_RUN_DIR/mine.jsonl"; echo '{"step": 1, "seen": 8}' > "$HYDOR_RUN_DIR/m.jsonl"`, scoresFile: '$HYDOR_RUN_DIR/mine.jsonl', metricsFile: '${HYDOR_RUN_DIR}/m.jsonl' });
+  assert.match(fs.readFileSync(path.join(runFolder(own.id), 'scores.jsonl'), 'utf8'), /q3/);
+  assert.equal(own.metrics?.last.seen, 8);
+  assert.equal(runFile({ id: 'r1', params: { k: 2 }, seed: 3 }, '$HYDOR_RUN_DIR/{run}-{k}-{seed}.jsonl', '/own'), '/own/r1-2-3.jsonl');
+  assert.equal(runFile({ id: 'r1' }, 'a/$HYDOR_RUN_DIR', '/own'), 'a/$HYDOR_RUN_DIR', 'only at the start');
+  const step = ctxOf({ step: true, runId: 'flow-sw', key: 'acp:flow-sw', agent: 'acp' });
+  const sw = JSON.parse((await call('experiment_sweep', { command: `echo "k={k}" > s-{k}.jsonl`, params: { k: [1, 2] }, group: 'named', cwd: tmp, gpus: 0, name: 'bm25 k={k}', tags: ['control'], scoresFile: 's-{k}.jsonl', metricsFile: 'none-{run}.jsonl' }, step)).text);
+  await until(() => sw.runs.every((id: string) => ended(id)()), 20_000, 'the sweep');
+  const runs = sw.runs.map((id: string) => getRun(db, id)!) as RunRecord[];
+  assert.deepEqual(
+    runs.map((r) => [r.name, r.tags, r.scoresFile, r.metricsFile, r.scores]),
+    [1, 2].map((k) => [`bm25 k=${k}`, ['control'], 's-{k}.jsonl', 'none-{run}.jsonl', true]),
+  );
+  assert.match(fs.readFileSync(path.join(runFolder(runs[1].id), 'scores.jsonl'), 'utf8'), /k=2/);
 });
 
 test('experiment_wait after a restart waits only for what is left of its hours', async () => {

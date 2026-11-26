@@ -103,7 +103,7 @@ Der neue Lauf öffnet sich, damit du seinen Start verfolgen kannst. Um einem Exp
 
 ## Was ein Lauf aufzeichnet
 
-- **Sein Code**: Beim Start werden Commit und Branch des Git-Repositorys seines Ordners erfasst und ob es nicht committete Änderungen gab; falls ja, ein Patch davon (ohne Binärdateien, höchstens 2 MB) sowie die Anzahl der Dateien, die Git nicht verfolgt.
+- **Sein Code**: beim Start der Commit und der Branch des Git-Repositorys seines Ordners und ob es nicht committete Änderungen gab; falls ja, ein Patch davon (ohne Binärdateien, höchstens 2 MB) und wie viele Dateien Git nicht verfolgt. Auf diesem Computer werden die Dateien, die sein Befehl nennt und die Git nicht verfolgt oder ignoriert (ein Skript, das du nicht committet hast, eine kleine Einstellungsdatei), in seinen Ordner unter `untracked/` kopiert, damit du ihn später erneut ausführen kannst: höchstens 1 MB pro Datei und 5 MB insgesamt, nie eine, die so aussieht, als enthielte sie einen Key oder ein Passwort. In seinem Datensatz steht „Nicht in Git, mit dem Lauf aufbewahrt“ und welche Dateien zu groß waren, um sie zu behalten.
 - **Seine Umgebung**: der Computer; das Python, mit dem der Befehl läuft, und die Versionen von PyTorch, Transformers, JAX, TensorFlow und NumPy darin (aus den Paketen gelesen, nichts wird importiert); bei GPUs die CUDA- und Treiberversionen und die Namen der GPUs.
 - **Seine Hyperparameter und sein Seed**, sein **Protokoll**, sein **Exit-Code** und ein eigener Ordner in den App-Daten (sein Protokoll, Patch, Exit-Code und seine Metriken).
 - **Seine Metriken**, aus der wachsenden Ausgabe gelesen: `key=value`-Paare (`loss=0.42`, wie Lightning sie in seinen Fortschrittsbalken ausgibt), ein JSON-Objekt pro Zeile (`{"step": 100, "loss": 0.42}`), ausgegebene Python-Dictionaries (wie der Trainer von Hugging Face sie ausgibt), Keras-Ausgaben wie „loss: 0.41 - accuracy: 0.87“ und die Metrikdatei. Der Schritt wird aus `step`, `global_step`, `iter` oder `epoch` gelesen. Für jede Metrik speichert die App den letzten Wert, den besten (bei Verlust, Fehler, Perplexität und ähnlich benannten Metriken sind kleinere Werte besser, bei anderen größere) und eine Zeitreihe für die Diagramme. Eine Metrik, die er immer wieder ausgibt, ist eine Kurve; eine Zahl, die er nur einmal ausgibt, ist ein Wert (seine Hyperparameter am Anfang, seine Ergebnisse am Ende). Es werden bis zu 100 Metriken gespeichert: Gibt ein Lauf mehr aus, bleiben seine Kurven vor den Zahlen, die er nur einmal ausgegeben hat.
@@ -124,7 +124,7 @@ Klicke auf einen Lauf (in einer Tabelle, auf einer Karte oder auf die Anzeige ei
 - **Hyperparameter**: die, die er erhalten hat oder die aus seinem Befehl gelesen wurden (ein Feld findet einen bestimmten, wenn es viele gibt).
 - **Werte**: die Zahlen, die er nur einmal ausgegeben hat, nach Namen: seine Hyperparameter am Anfang, seine Ergebnisse am Ende. **Alle N** blendet mehr als zwölf ein, mit einem Feld, um einen Wert zu finden.
 - **Details**: sein Experiment (ein Link dorthin), Status, wann er begonnen und geendet hat, wie lange er gedauert hat, wo er läuft, GPUs, Seed, Priorität, die Sitzung, die ihn gestartet hat, und der Lauf, von dem er eine Wiederholung ist.
-- **Code**: der Commit und der Branch, **Änderungen anzeigen** für den Patch (oder „Seitdem nichts geändert“) und die Anzahl der Dateien, die Git nicht verfolgt.
+- **Code**: Commit und Branch, **Änderungen anzeigen** für den Patch (oder „Seitdem hat sich nichts geändert“), wie viele Dateien Git nicht verfolgt, und die Namen derjenigen, die der Befehl verwendet und die mit dem Lauf behalten wurden oder zu groß dafür waren.
 - **Befehl**: der Befehl und der Ordner, mit **Arbeitsordner in Dateien öffnen**. **Umgebung**: der Computer, Python, Pakete und GPUs.
 - **Was ist passiert?**: seine Ereignisse mit Zeitstempeln: wann er gewartet, begonnen und geendet hat und was der zuständige Agent gesehen und getan hat, mit **Sitzung öffnen**.
 
@@ -148,7 +148,7 @@ Ohne eigene Vorgaben gilt sinngemäß: „Lies Protokoll und Code. Ist eine Korr
 
 Du erfährst, wenn ein Lauf fertig ist oder fehlschlägt (solange du es nicht abwählst), wenn eine Metrik den von dir gesetzten Wert überschreitet, und vom zuständigen Agenten. Eine Benachrichtigung öffnet die Seite des Laufs. Ein Sweep meldet sich einmal, wenn alle seine Läufe beendet sind, und nennt seinen besten Lauf; seine Meldung öffnet das Experiment des Sweeps im Tab **Hyperparameter**. Innerhalb von zehn Minuten kommen höchstens acht Meldungen zu Läufen; darüber hinaus sagt eine, wie viele es noch waren.
 
-Startet ein Agent einen Lauf mit der Bitte um Rückmeldung nach Abschluss (report), erhält auch diese Sitzung eine Nachricht, wenn er endet, sodass ihr Agent dort weiterarbeiten kann.
+Ein Lauf, den ein Agent mit „sag mir Bescheid, wenn er endet“ (report) gestartet hat, schickt beim Ende auch dieser Sitzung eine Nachricht, damit ihr Agent von dort aus weitermachen kann. Läufe einer Sitzung, die kurz nacheinander enden oder während ihr Agent arbeitet, werden in einer Nachricht gemeldet, jeweils eine Zeile mit den wichtigsten Zahlen, und ein Lauf, den der Agent seit dessen Ende gelesen hat, wird weggelassen; in der Unterhaltung erscheint das als eine Zeile, **Experimente · Läufe beendet**, die sich per Klick öffnet.
 
 ## Titel, Beschreibungen und Kategorien
 
@@ -283,7 +283,7 @@ Anschließend kannst du:
 
 Eine Tabelle wird gespeichert, wenn du sie kopierst oder in ein Dokument einfügst. Ihr LaTeX trägt unmittelbar vor ihrem tabular die Zeile `% hydor:table <id>`: Behalte sie bei, damit die Prüfung vor einer Einreichung die Zahlen aus den Läufen neu berechnen und sagen kann, welche sich geändert haben. **Ergebnistabellen** im Menü (⋯) oben auf der Seite listet die gespeicherten Tabellen: Öffne eine, um sie erneut zu kopieren oder einzufügen, oder wähle **Neu berechnen**, um sie aus ihren Läufen im jetzigen Stand neu zu berechnen.
 
-Für gepaarte Tests über Beispiele (Suchanfragen beim Retrieval, Sätze bei der Übersetzung) schreibt ein Lauf eine Datei mit Bewertungen pro Beispiel und gibt sie unter **Bewertungen pro Beispiel** an: JSON-Zeilen mit `id` (oder `qid`, `query`, `example`) und einer Zahl je Metrik, etwa `{"id": "q12", "ndcg@10": 0.53}`, oder Zeilen aus trec_eval -q. Sie kann `{name}`-Platzhalter enthalten wie der Befehl; die Datei wird beim Lauf aufbewahrt, wenn er endet.
+Für gepaarte Tests über Beispiele (Anfragen beim Retrieval, Sätze beim Übersetzen) schreibt ein Lauf eine Datei mit Bewertungen pro Beispiel und gibt sie unter **Bewertungen pro Beispiel** an: JSON-Zeilen mit einer `id` (oder `qid`, `query`, `example`) und einer Zahl je Metrik, etwa `{"id": "q12", "ndcg@10": 0.53}`, oder die Zeilen von trec_eval -q. Der Pfad darf Platzhalter wie `{name}` enthalten, genau wie der Befehl (`{run}` ist die ID des Laufs), und darf mit `$HYDOR_RUN_DIR/` beginnen, dem eigenen Ordner des Laufs; die Datei wird beim Ende des Laufs mit ihm aufbewahrt. Ein Lauf, der `scores.jsonl` in `$HYDOR_RUN_DIR` schreibt, muss sie gar nicht angeben, sodass die Läufe eines Sweeps jeweils ihre eigene behalten.
 
 ## Sweeps
 

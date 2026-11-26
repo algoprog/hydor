@@ -12,9 +12,9 @@ Proofs go wrong in two ways, and this method guards against both: proving a stat
 the one the person meant, and "proofs" that lean on `sorry` or an added axiom.
 
 Tools: `lean_check` (a file or a snippet), `lean_search` (what the libraries have), `lean_verify`
-(the verdict). If one says Lean or Mathlib is not set up, ask with `lean_setup` (most real
-mathematics needs Mathlib) and wait; do not write proofs you cannot check and present them as
-checked.
+(the verdict, with what each theorem states and a pin of that statement). If one says Lean or
+Mathlib is not set up, ask with `lean_setup` (most real mathematics needs Mathlib) and wait; do not
+write proofs you cannot check and present them as checked.
 
 ## 1. Agree the statement first
 
@@ -22,9 +22,12 @@ Never start proving before this is done.
 
 1. Write the formal statement, with its definitions, and `sorry` for the proof. Check it with
    `lean_check` until it compiles with no error (the only gap the `sorry`).
-2. **Translate it back into plain mathematics from the Lean text alone**, as if you had never seen
+2. **Try it on small values** where that is possible (`#eval` both sides, `decide` on a few
+   instances, the edge cases such as `0` and the empty set): a false statement compiles as happily
+   as a true one. Over `ℕ`, `(a - b) + b = a` compiles, and `a = 0`, `b = 1` shows it is false.
+3. **Translate it back into plain mathematics from the Lean text alone**, as if you had never seen
    the original. Read each binder, type, hypothesis and operator for what Lean does with it.
-3. List every way your translation differs from what was asked. Look for:
+4. List every way your translation differs from what was asked. Look for:
    - quantifier order (`∀ ε, ∃ δ` against `∃ δ, ∀ ε`) and which variables a constant may depend on;
    - domains and coercions: `ℕ` where `ℤ` or `ℝ` was meant; in `ℕ`, `3 - 5 = 0` and `7 / 2 = 3`;
      division by zero is `0`; where a cast `(n : ℝ)` sits changes the value;
@@ -35,15 +38,22 @@ Never start proving before this is done.
      bound the wrong way, a typo that makes both sides equal, a definition that already says the
      conclusion;
    - what was left out (finiteness, non-emptiness, continuity, measurability) or added.
-4. Show the person the Lean statement, the plain translation and the differences, and ask them to
+5. Show the person the Lean statement, the plain translation and the differences, and ask them to
    confirm it says what they mean, as choices (a choices card, or `ask_form`):
    **"It says what I mean"** and **"Not quite: …"**.
-5. Do not go on without their yes. Never change an agreed statement or definition silently: when
+6. Wait for their yes. But when your brief, or the person, has already given their answer or a
+   criterion for the statement, compare your reading with it and go on, reporting any mismatch,
+   instead of stopping. Either way, never change an agreed statement or definition silently: when
    a proof seems to need a change (a missing hypothesis, a false claim), stop, say why, show the
-   new statement the same way, and ask again.
+   new statement the same way, and ask again. A statement that changes gets a new pin.
+7. Once it is agreed, **pin it**: run `lean_verify` on the file with the proof still `sorry`.
+   The verdict is "not proved yet", and each theorem comes with its `statement` (as Lean reads it)
+   and its `pin`. Check that the `statement` is the one you showed, and that every name in
+   `definitions` (your own definitions it rests on, which the pin covers too) says what was agreed.
+   Write the pin down beside the agreed statement in what you show them: `name@pin`.
 
-A subagent that cannot ask returns the statement and its translation to the session that started
-it, and stops there.
+A subagent that cannot ask, and whose brief gives neither the answer nor a criterion, returns the
+statement and its translation to the session that started it, and stops there.
 
 ## 2. Search before proving
 
@@ -56,7 +66,7 @@ check a snippet and read the "Try this" lines in `info`.
 Write the main steps as lemmas (or `have` steps) with `sorry`, with the final theorem proved from
 them. Check it: if the skeleton does not compile, the plan is wrong, and you learn it before any
 hard work. Then fill one gap at a time and check after each. Test a lemma you doubt on small cases
-(`#eval`, `decide`) before trying to prove it.
+(`#eval`, `decide`) before trying to prove it. A proof of one line needs no skeleton.
 
 ## 4. Read the goal
 
@@ -80,17 +90,27 @@ still open, its statement, what you tried and what Lean answered.
 
 ## 7. The verdict
 
-The verdict is `lean_verify`'s (or `leancheck File.lean` as a goal's command check), not yours.
-Report it as it is: **proved** (ok, with the theorem names and the axioms), or **proved except
-these gaps** (each named, with why it is open). Say again, in one line of plain words, which
+The verdict is `lean_verify`'s (or `leancheck` as a goal's command check), not yours. Ask for it
+with the pin: `lean_verify { file, theorems: ["name@pin"] }`, so that it also fails when the
+statement is no longer the agreed one. When it says the statement changed, do not take the new pin
+for the old one: put the agreed statement back, or go back to the person (step 1).
+Report it as it is: **proved** (ok, with the theorem names, their pins and the axioms), or **proved
+except these gaps** (each named, with why it is open). Say again, in one line of plain words, which
 statement was proved: the agreed one.
 
-For long work set a goal whose check is `leancheck Proofs/Main.lean --theorem <name>`, so it keeps
-going until the proof holds.
+For long work set a goal whose check is `leancheck Proofs/Main.lean --theorem name@pin`, so it
+keeps going until the agreed statement is proved.
+
+When the work belongs to a project that keeps findings (you have the `findings` and
+`finding_record` tools), record what was proved or refuted with `finding_record`: the statement,
+`supported` or `refuted`, and the Lean file as its evidence (`{ kind: "file", ref: its path in the
+project }`).
 
 ## Pitfalls
 
 - "It compiles" is not "it is proved": `sorry` compiles with a warning. Only the verdict counts.
+- A pin comes from the statement you agreed, never from the file after the proof: a pin taken
+  later accepts whatever the file says by then.
 - `ℕ` subtraction and division round down to `0`: state with `ℤ`, `ℚ` or `ℝ`, or add hypotheses.
 - Autobound implicits turn a misspelled name into a new variable, and the statement still
   compiles: put `set_option autoImplicit false` at the top of the file.

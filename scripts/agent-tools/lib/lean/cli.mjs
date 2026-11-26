@@ -6,23 +6,35 @@ import { findLean, mathlibDir, verifyFile, DEFAULT_TIMEOUT_MS } from './core.mjs
 const HELP = `leancheck - whether the proofs in a Lean file really hold.
 
 Usage:
-  leancheck FILE.lean [--theorem NAME]... [--allow-sorry] [--timeout DUR] [--json]
+  leancheck FILE.lean [--theorem NAME[@PIN]]... [--allow-sorry] [--timeout DUR] [--json]
 
 It is ok only when the file builds, nothing is left as \`sorry\`, each theorem named (every theorem and lemma of the
 file when none is named) depends only on the standard axioms (propext, Classical.choice, Quot.sound), and Lean's
 kernel accepts every declaration of the file and of the project's own files it imports.
 
+Each theorem is shown as name@pin, then what it states, as Lean reads it. The pin is a short hash of that statement
+and of the definitions of the file's or project's own that it rests on: it does not change with the proof, spacing,
+comments or the names of variables.
+
 Options:
   --theorem NAME   check this theorem (repeatable), by its full name or its last part
-  --allow-sorry    do not fail for gaps marked sorry (to check a skeleton); anything else still fails
+  --theorem NAME@PIN
+                   check it, and that it still states what it did when it had this pin
+  --allow-sorry    do not fail for gaps marked sorry (to check a skeleton; such a theorem is shown as gap); anything
+                   else still fails
   --timeout DUR    90s, 15m, 1h (default 10m)
   --json           print the verdict as JSON
   --help
 
-Exit: 0 verified, 1 not verified, 2 it could not be checked (no Lean, no such file), 64 usage.
+Exit codes:
+  0   verified
+  1   not verified: errors, gaps, axioms that are not standard
+  2   the question is wrong or cannot be put: no such file, no such theorem, a malformed pin, no Lean
+  3   a statement changed from its pin
+  64  usage
 
 Lean: your own (lake and lean on PATH), else the one Hydor set up (HYDOR_LEAN_DIR names its folder). A goal's command
-check can be: leancheck Proofs/Main.lean`;
+check can be: leancheck Proofs/Main.lean --theorem main_theorem@PIN`;
 
 function duration(s) {
   const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/.exec(s ?? '');
@@ -35,7 +47,13 @@ const NO_LEAN = 'Lean is not set up on this computer: set it up in Hydor’s Set
 /** The short report: each theorem, then the verdict on the last line. */
 export function report(name, v, allowSorry = false) {
   const lines = [`leancheck ${name}`];
-  for (const t of v.theorems) lines.push(`  ${t.ok ? 'ok  ' : 'FAIL'} ${t.name}${t.axioms.length ? `  (axioms: ${t.axioms.join(', ')})` : t.ok ? '  (no axioms)' : ''}`);
+  for (const t of v.theorems) {
+    // A gap that --allow-sorry lets through is not "ok": the theorem is not proved.
+    const mark = !t.ok ? 'FAIL' : t.axioms.includes('sorryAx') ? 'gap ' : 'ok  ';
+    const stated = t.pin ? `@${t.pin} : ${t.statement}` : '';
+    lines.push(`  ${mark} ${t.name}${stated}${t.axioms.length ? `  (axioms: ${t.axioms.join(', ')})` : t.ok ? '  (no axioms)' : ''}`);
+    if (t.definitions) lines.push(`       rests on its own definitions: ${t.definitions.join(', ')}`);
+  }
   for (const e of (v.errors ?? []).slice(0, 10)) lines.push(`  ${e.file ?? name}${e.line ? `:${e.line}:${e.column}` : ''}: ${e.message.split('\n').slice(0, 12).join('\n    ')}`);
   for (const s of v.sorries.slice(0, 20)) lines.push(`  sorry at ${name}:${s.line}:${s.column}`);
   if (v.note) lines.push(`  ${v.note}`);
@@ -94,5 +112,5 @@ export async function main(argv) {
     return 2;
   }
   process.stdout.write(`${json ? JSON.stringify(v, null, 2) : report(file, v, allowSorry)}\n`);
-  return v.ok ? 0 : 1;
+  return v.ok ? 0 : v.changed ? 3 : v.missing ? 2 : 1;
 }

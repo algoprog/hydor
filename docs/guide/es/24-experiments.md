@@ -103,7 +103,7 @@ La nueva ejecución se abre, para que puedas ver cómo empieza. Para añadir una
 
 ## Qué registra una ejecución
 
-- **Su código**: al empezar, el commit y la rama del repositorio Git de su carpeta y si había cambios sin confirmar; si los había, un parche con ellos (sin los archivos binarios, de 2 MB como máximo), y cuántos archivos Git no rastrea.
+- **Su código**: cuando empieza, el commit y la rama del repositorio Git de su carpeta y si había cambios sin confirmar; si los había, un parche con ellos (sin los archivos binarios, de 2 MB como máximo), y cuántos archivos no están bajo el control de Git. En esta computadora, los archivos que nombra su comando y que Git no controla o ignora (un script del que no has hecho commit, un archivo pequeño de ajustes) se copian en su carpeta, dentro de `untracked/`, para que puedas volver a ejecutarlo más adelante: como máximo 1 MB por archivo y 5 MB en total, y nunca uno que parezca contener una clave o una contraseña. Su registro dice “Fuera de git, conservados con la ejecución” y cuáles eran demasiado grandes para conservarlos.
 - **Su entorno**: la computadora; el Python con el que se ejecuta el comando y las versiones de PyTorch, Transformers, JAX, TensorFlow y NumPy que hay en él (se leen de los paquetes, no se importa nada); con GPU, las versiones de CUDA y del controlador y los nombres de las GPU.
 - **Sus hiperparámetros y su semilla**, su **log**, su **código de salida** y su propia carpeta en los datos de la app (su log, parche, código de salida y métricas).
 - **Sus métricas**, leídas de su salida a medida que crece: pares `key=value` (`loss=0.42`, como los imprimen las barras de progreso de Lightning), un objeto JSON en una línea (`{"step": 100, "loss": 0.42}`), los diccionarios de Python impresos (como los imprime el Trainer de Hugging Face), el “loss: 0.41 - accuracy: 0.87” de Keras y el archivo de métricas. El paso se toma de `step`, `global_step`, `iter` o `epoch`. De cada métrica guarda el último valor, el mejor (menor es mejor para las pérdidas, los errores, la perplejidad y similares según sus nombres, mayor para las demás) y una serie para los gráficos. Una métrica que se imprime una y otra vez es una curva; un número que se imprime una sola vez es un valor (sus hiperparámetros al principio, sus resultados al final). Guarda hasta 100 métricas: cuando una ejecución imprime más, se conservan sus curvas antes que los números que imprimió una sola vez.
@@ -124,7 +124,7 @@ Haz clic en una ejecución (en una tabla, en una tarjeta o en el medidor de una 
 - **Hiperparámetros**: los que se le dieron o que se leyeron de su comando (un cuadro permite buscar uno cuando hay muchos).
 - **Valores**: los números que imprimió una sola vez, por nombre: sus hiperparámetros al principio, sus resultados al final. **Todos N** muestra más de doce, con un cuadro para buscar uno.
 - **Detalles**: su experimento (un enlace a él), estado, cuándo empezó y terminó, cuánto tardó, dónde se ejecuta, GPU, semilla, prioridad, la sesión que la inició y la ejecución de la que es una nueva ejecución.
-- **Código**: el commit y la rama, **Ver los cambios** para el parche (o “Nada ha cambiado desde entonces”) y cuántos archivos Git no rastrea.
+- **Código**: el commit y la rama, **Ver los cambios** para el parche (o “No ha cambiado nada desde”), cuántos archivos no están bajo el control de Git y los nombres de los que usa el comando que se conservaron con la ejecución o eran demasiado grandes para conservarlos.
 - **Comando**: el comando y la carpeta, con **Su carpeta en Archivos**. **Entorno**: la computadora, Python, los paquetes y las GPU.
 - **Qué pasó**: sus eventos, con sus horas: cuándo esperó, empezó y terminó, y lo que el agente de guardia vio e hizo, con **Abrir su sesión**.
 
@@ -148,7 +148,7 @@ Si se deja vacío, las reglas son: “Lee el log y el código. Si una solución 
 
 Te enteras cuando una ejecución termina o falla (salvo que desmarques esas opciones), cuando una métrica cruza el valor que fijaste y por el agente de guardia. Una notificación abre la página de la ejecución. Un barrido avisa una sola vez, cuando todas sus ejecuciones han terminado, con su mejor ejecución; su aviso abre el experimento del barrido en su pestaña **Hiperparámetros**. Como máximo entran ocho avisos sobre ejecuciones en diez minutos; pasado eso, uno te dice cuántos más hubo.
 
-Una ejecución que un agente inició con “avísame cuando termine” (report) también envía un mensaje a esa sesión cuando termina, para que su agente pueda continuar desde ahí.
+Una ejecución que un agente inició con “avísame cuando termine” (report) también envía un mensaje a esa sesión cuando termina, para que su agente pueda continuar desde ahí. Las ejecuciones de una misma sesión que terminan con poca diferencia, o mientras su agente está trabajando, se comunican en un solo mensaje, una línea por cada una con los números que más importan, y se omite una ejecución que el agente ya haya leído desde que terminó; en la conversación aparece como una sola fila, **Experimentos · Ejecuciones terminadas**, que se abre con un clic.
 
 ## Títulos, descripciones y categorías
 
@@ -283,7 +283,7 @@ Después:
 
 Una tabla se conserva cuando la copias o la incluyes en un documento. Su LaTeX lleva una línea `% hydor:table <id>` justo encima de su tabular: déjala ahí, para que la comprobación antes de enviar pueda volver a calcular los números a partir de las ejecuciones y decir cuáles cambiaron. **Tablas de resultados**, en el menú (⋯) de la parte superior de la página, enumera las tablas conservadas: abre una para copiarla o colocarla de nuevo, o **Volver a calcular** a partir de sus ejecuciones tal como están ahora.
 
-Para las pruebas pareadas sobre ejemplos (consultas en recuperación, frases en traducción), una ejecución escribe un archivo de puntuaciones por ejemplo y lo indica en **Puntuaciones por ejemplo**: líneas JSON con un `id` (o `qid`, `query`, `example`) y un número por métrica, como `{"id": "q12", "ndcg@10": 0.53}`, o las líneas de trec_eval -q. Puede tener marcadores `{name}`, como el comando; el archivo se conserva con la ejecución cuando esta termina.
+Para pruebas pareadas sobre ejemplos (consultas en recuperación de información, oraciones en traducción), una ejecución escribe un archivo de puntuaciones por ejemplo y lo indica en **Puntuaciones por ejemplo**: líneas JSON con un `id` (o `qid`, `query`, `example`) y un número por métrica, como `{"id": "q12", "ndcg@10": 0.53}`, o las líneas de trec_eval -q. Puede tener marcadores `{name}`, como el comando (`{run}` es el id de la ejecución), y puede empezar por `$HYDOR_RUN_DIR/`, la carpeta propia de la ejecución; el archivo se conserva con la ejecución cuando termina. Una ejecución que escribe `scores.jsonl` en `$HYDOR_RUN_DIR` no necesita nombrarlo en absoluto, así que las ejecuciones de un barrido conservan cada una el suyo.
 
 ## Barridos
 
