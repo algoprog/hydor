@@ -78,8 +78,19 @@ function useDrag(onMove: (dy: number) => void) {
  * page. */
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
-  // A run of Experiments opens beside its list: the same page.
-  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : loc === '/experiments' || loc.startsWith('/experiments/') ? '/experiments' : loc;
+  // A run of Experiments opens beside its list: the same page. So are a project's tabs and folders (/projects/<id>/<tab>).
+  const section =
+    loc === '/file' || loc === '/search'
+      ? '/files'
+      : loc === '/stats' || loc === '/arena'
+        ? '/usage'
+        : loc.startsWith('/guide')
+          ? '/guide'
+          : loc === '/experiments' || loc.startsWith('/experiments/')
+            ? '/experiments'
+            : loc.startsWith('/projects/')
+              ? loc.split('/', 3).join('/')
+              : loc;
   return (
     <div key={section} className="h-full">
       <Page />

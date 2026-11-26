@@ -2,7 +2,7 @@
 
 Os agentes podem responder com uma página em vez de texto simples: um relatório, um gráfico, uma tabela para comparar opções ou uma pequena ferramenta, como um controle de acompanhamento ou uma lista de verificação. Eles também fazem slides, documentos, planilhas, documentos LaTeX, notebooks e diagramas que você edita como no PowerPoint, no Word, no Excel, no Overleaf, no Jupyter ou no draw.io. O que você mantém fica nos arquivos do projeto (os detalhes do projeto → **Arquivos**), junto com as suas imagens, vídeos, sons e páginas da web mantidos. Este tópico trata de acompanhar uma página enquanto ela é escrita, alterá-la e mantê-la, imagens, vídeos e sons, como criar os seus, designs, diagramas, painéis, slides, exportação, como pedir alterações a um agente e publicação.
 
-![A aba Arquivos de um projeto na janela de detalhes: seus documentos, slides e imagens como blocos entre os arquivos da pasta](images/library.webp)
+![A aba Arquivos de um projeto na página dele: seus documentos, slides e imagens como blocos entre os arquivos da pasta](images/library.webp)
 
 ## Páginas na conversa
 
@@ -307,7 +307,7 @@ Tudo o que você mantém pertence a um projeto ou a nenhum (veja [Projetos e con
 - Os arquivos que você solta nos **Arquivos** de um projeto vão para a pasta dele como arquivos (veja [Adicionar arquivos seus](#add-files-of-yours)).
 - Para mover algo, abra o **Mais** (⋯) → **Mover para outro projeto** no bloco dele (**Mover para um projeto** na própria página) e escolha um projeto ou **Nenhum projeto**. “Movido para Thesis” confirma. Mover não muda mais nada: as versões, os dados e os endereços continuam.
 
-Os detalhes de um projeto mostram o que ele contém nas abas **Visão geral** e **Arquivos** (veja [A janela de detalhes de um projeto](/guide/projects#a-projects-details-window)). Excluir um projeto mantém o que ele continha, sem projeto: a caixa de busca o encontra, e a página de cada item pode movê-lo para outro projeto.
+Os detalhes de um projeto mostram o que ele contém nas abas **Visão geral** e **Arquivos** (veja [Detalhes de um projeto](/guide/projects#a-projects-details)). Excluir um projeto mantém o que ele continha, sem projeto: a caixa de busca o encontra, e a página de cada item pode movê-lo para outro projeto.
 
 Para manter sua própria ordem, crie pastas de verdade nos **Arquivos** do projeto (**Nova** → **Nova pasta**) e arraste arquivos para dentro delas: são pastas comuns da pasta do projeto, como em todo o [Trabalhar com arquivos e pastas](/guide/files-git#work-with-files-and-folders). Para trazer uma pasta inteira deste computador, envie-a (**Enviar** → **Enviar uma pasta**) ou solte-a na aba **Arquivos**.
 

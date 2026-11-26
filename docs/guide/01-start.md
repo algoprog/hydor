@@ -204,7 +204,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 - **Sessions**: by title, folder, branch, first message and the agent they started as (General is left out, since most sessions are), archived ones too, marked **Archived** and after the others. Opening one opens it. Its preview lists its **Agent**.
 - **In messages**: messages that hold the words you typed. Opening one opens its session at those words, with the find bar ready.
 - **Memory**: your memory notes. Opening one opens Settings → Memory at that note.
-- **Projects**: your projects, by name and description. Opening one opens the project's details in a window over the page you are on.
+- **Projects**: your projects, by name and description. Opening one opens the project's details: in the **Projects** section its own page, anywhere else a window over the page you are on.
 - **Apps**, **Scheduled tasks**, **Agents**, **Skills**, **Pages**, **Images, videos and audio** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
 - **Files**: up to five files whose names match, in the folder the Files page shows (or the app's default folder).
 - **History**, **Bookmarks** and **Downloads**: in the desktop app, the pages you visited in your own [browser](/guide/web#your-own-browser), your bookmarks and the files it downloaded. They match by their words and, with [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) on, by what they are about, even when the words differ. Opening a page opens it in a new tab of the **Browser** page; opening a download shows the file in its folder. They stay on this computer, agents never get them, and the box does not remember what you typed to find them.

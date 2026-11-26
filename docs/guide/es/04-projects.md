@@ -2,7 +2,7 @@
 
 Un proyecto mantiene reunido un trabajo: sus sesiones, una carpeta para sus archivos (y otras carpetas tuyas con las que trabaja), lo que los agentes recuerdan sobre él (notas, una wiki y documentos propios), las pautas que sigue cada agente en él, habilidades propias, el agente con el que empiezan sus sesiones y agentes propios. El Conocimiento compartido guarda los documentos y las carpetas que añades una sola vez para que todas las sesiones puedan buscar en ellos y citar el archivo y la página que leyeron. Este tema explica la página Proyectos, cómo abrir los detalles de un proyecto, cómo crear y usar proyectos y grupos de proyectos, cómo dar a un proyecto habilidades propias, cómo compartir un proyecto con otras personas, y cómo añadir, buscar y gestionar los documentos en los que buscan los agentes.
 
-![Los detalles de un proyecto en una ventana sobre la página: sus sesiones, sus archivos más recientes y lo que recibe cada sesión, bajo sus pestañas](images/projects.webp)
+![La página propia de un proyecto: sus sesiones, sus archivos más recientes y lo que recibe cada sesión en él, bajo sus pestañas](images/projects.webp)
 
 ## Qué es un proyecto
 
@@ -21,19 +21,22 @@ Un proyecto también puede reunir otros proyectos. Eso es un **grupo**: consulta
 
 ## Abrir los detalles de un proyecto
 
-Los detalles de un proyecto se abren en una ventana sobre la página en la que estás, que queda detrás, atenuada. Hay varias formas de llegar:
+Dónde se muestran los detalles de un proyecto depende de dónde estés. En la sección **Proyectos** (la página Proyectos o la página de un proyecto) son la propia página del proyecto, en lugar de la lista. Desde cualquier otro lugar (una sesión, Configuración…) se abren en una ventana sobre la página en la que estás, que queda detrás, atenuada. Hay varias maneras de entrar:
 
-- **Desde la página Proyectos**: haz clic en la tarjeta de un proyecto (consulta [Encontrar todos tus proyectos](#find-all-your-projects)).
+- **Desde la página Proyectos**: haz clic en la tarjeta de un proyecto (consulta [Encontrar todos tus proyectos](#find-all-your-projects)). Se abre la página del proyecto.
 - **Desde la barra lateral**: en la lista de sesiones, haz clic en el nombre del proyecto en su encabezado (en un teléfono, abre primero la barra lateral, que es un panel deslizante, y toca el nombre; el panel se cierra y los detalles ocupan la pantalla). Su menú ⋯ también tiene **Detalles del proyecto**, como primer elemento. La flecha pequeña junto al nombre pliega o despliega las sesiones del proyecto.
-- **Desde el cuadro de búsqueda**: escribe el nombre del proyecto en el cuadro de búsqueda (Ctrl+K, o ⌘K en Mac) y selecciónalo. Un proyecto sin sesiones todavía no tiene encabezado en la barra lateral, así que este y la página Proyectos son los caminos para llegar a él (un proyecto que acabas de crear abre su ventana por sí solo).
-- **Desde un enlace**: un enlace a un proyecto en una notificación o en la respuesta de un agente también abre la ventana sobre la página en la que estás.
+- **Desde el cuadro de búsqueda**: escribe el nombre del proyecto en el cuadro de búsqueda (Ctrl+K, o ⌘K en una Mac) y elígelo. En la sección Proyectos se abre su página; en otros lugares, la ventana. Un proyecto que todavía no tiene sesiones no tiene encabezado en la barra lateral, así que esta opción y la página Proyectos son las maneras de llegar a él (un proyecto que acabas de crear se abre solo).
+- **Desde un enlace**: un enlace a un proyecto en una notificación o en la respuesta de un agente, seguido desde otra página, también abre la ventana sobre ella.
+- **Por su dirección**: al escribir o recargar `/projects/<id>`, con una pestaña a continuación si quieres, se abre la página del proyecto.
 
-La ventana muestra lo que contiene un proyecto:
+La página y la ventana muestran lo mismo:
 
-- **El encabezado**, en el color del proyecto: su marca y su nombre, y debajo de ellos de qué trata (su carpeta, si no tiene descripción; un grupo dice “Reúne” y los nombres de sus proyectos). A la derecha, **Nueva sesión** empieza una sesión en el proyecto (en un teléfono, el lápiz); **Más** (⋯) tiene el menú del proyecto (consulta [El menú del proyecto](#the-projects-menu)); y ✕ cierra la ventana.
-- **Sus pestañas**: **Resumen**, **Archivos**, **Memoria**, **Habilidades**, **Agentes** y **Configuración** (consulta [La ventana de detalles de un proyecto](#a-projects-details-window)).
+- **El encabezado**, con el color del proyecto: en la página del proyecto, una flecha arriba a la izquierda (**Todos los proyectos**); luego su marca y su nombre, y debajo de ellos de qué trata (su carpeta cuando no tiene descripción; un grupo dice “Reúne” y los nombres de sus proyectos). A la derecha, **Nueva sesión** empieza una sesión en el proyecto (en un teléfono, el lápiz) y **Más** (⋯) tiene el menú del proyecto (consulta [El menú del proyecto](#the-projects-menu)). La ventana también tiene ✕, que la cierra.
+- **Sus pestañas**: **Resumen**, **Archivos**, **Memoria**, **Habilidades**, **Agentes** y **Configuración** (consulta [Los detalles de un proyecto](#a-projects-details)).
 
-Ciérrala con ✕, con Esc o haciendo clic en la página atenuada fuera de ella. Ir a otra página también la cierra: por ejemplo, abrir un documento desde la pestaña **Archivos** o seguir un enlace. En un teléfono la ventana ocupa toda la pantalla. Esc cierra primero un menú o un cuadro de diálogo sobre la ventana, y después la ventana.
+**En la página del proyecto**, la flecha vuelve a la página Proyectos, y lo mismo hace el botón Atrás del navegador; no hay ✕. La pestaña en la que estás figura en la dirección de la página (`/projects/<id>/files`, `/projects/<id>/memory`…), así que al recargar o usar un enlace se conserva. También figura una carpeta que abras en la pestaña **Archivos**, y Atrás sale de ella. Allí, un enlace a otro proyecto (uno que un grupo reúne) abre la página de ese proyecto. Al eliminar el proyecto vuelves a la página Proyectos.
+
+**La ventana** se cierra con ✕, con Esc o con un clic en la página atenuada fuera de ella. Ir a otra página también la cierra: por ejemplo, al abrir un documento desde la pestaña **Archivos** o al seguir un enlace. En un teléfono, la ventana ocupa toda la pantalla. Esc cierra primero un menú o un cuadro de diálogo que esté sobre la ventana, y después la ventana.
 
 ## Encontrar todos tus proyectos
 
@@ -51,7 +54,7 @@ Cada tarjeta muestra:
 - “2 trabajando” mientras sus sesiones están en marcha, y un punto cuando una sesión terminó desde la última vez que miraste;
 - cuándo trabajó por última vez, y pequeñas barras con los mensajes de sus últimas cuatro semanas.
 
-Apunta a una tarjeta (en una pantalla táctil siempre están) y **Nueva sesión** empieza una sesión en el proyecto, y **Más** (⋯) tiene el menú del proyecto: **Abrir su carpeta en Archivos**, en la app de escritorio **Mostrar en Finder**, **Mostrar en el Explorador de archivos** o **Mostrar en la carpeta**, **Solo sus sesiones en la barra lateral**, **Compartir con otras personas** y **Eliminar el proyecto** (consulta [El menú del proyecto](#the-projects-menu)). Haz clic en cualquier otra parte de una tarjeta para abrir los detalles del proyecto en una ventana sobre la página (consulta [Abrir los detalles de un proyecto](#open-a-projects-details)). Suelta archivos de tu computadora sobre una tarjeta para ponerlos en la carpeta del proyecto.
+Pasa el cursor sobre una tarjeta (en una pantalla táctil están siempre visibles) y **Nueva sesión** empieza una sesión en el proyecto, y **Más** (⋯) tiene el menú del proyecto: **Abrir su carpeta en Archivos**, en la app de escritorio **Mostrar en Finder**, **Mostrar en el Explorador de archivos** o **Mostrar en la carpeta**, **Solo sus sesiones en la barra lateral**, **Compartir con otras personas** y **Eliminar el proyecto** (consulta [El menú del proyecto](#the-projects-menu)). Haz clic en cualquier otra parte de una tarjeta para abrir la página propia del proyecto, con una flecha para volver a todos los proyectos (consulta [Abrir los detalles de un proyecto](#open-a-projects-details)). Suelta archivos de tu computadora sobre una tarjeta para ponerlos en la carpeta del proyecto.
 
 Bajo las tarjetas, **Carpetas en las que trabajas** lista las carpetas en las que tus sesiones trabajaron últimamente y que aún no tiene ningún proyecto (consulta [Carpetas en las que trabajas, aún sin proyecto](#folders-you-work-in-not-in-a-project-yet)). **Crear un proyecto** en una abre la ventana **Nuevo proyecto** con esa carpeta elegida; ✕ (**No es un proyecto: dejar de sugerirlo**) la quita de la lista para siempre. La lista se omite mientras buscas.
 
@@ -72,9 +75,9 @@ Sin proyectos todavía, la página explica qué es un proyecto y ofrece **Nuevo 
 4. Deja activado **Un agente para él** para que se cree un agente para el proyecto (consulta [Agentes](#agents)), o desactívalo.
 5. Haz clic en **Crear el proyecto**, o pulsa Intro en el campo del nombre.
 
-Una carpeta nueva va dentro de una carpeta **Projects** donde van las carpetas de tareas: “Impuestos 2026” obtiene `~/Hydor/Projects/taxes-2026`, a menos que hayas movido las carpetas de tareas a otro sitio (consulta [Mover las carpetas de tareas](/guide/agents#move-task-folders)). Si ese nombre ya existe, añade `-2`, `-3` y así sucesivamente. Si lo creas desde la barra lateral o desde la página Proyectos, los detalles del nuevo proyecto se abren en una ventana. Si lo creas desde la página de inicio, el nuevo proyecto queda elegido para la sesión que vas a empezar.
+Una carpeta nueva va dentro de una carpeta **Projects**, donde van las carpetas de tarea: “Impuestos 2026” recibe `~/Hydor/Projects/taxes-2026`, a menos que hayas movido las carpetas de tarea a otro lugar (consulta [Mover las carpetas de tarea](/guide/agents#move-task-folders)). Si ese nombre ya está ocupado, añade `-2`, `-3`, etc. Si lo creas desde la página Proyectos, se abre la página del nuevo proyecto. Si lo creas desde la barra lateral, sus detalles se abren en una ventana sobre la página en la que estás. Si lo creas desde la página de inicio, el nuevo proyecto queda elegido para la sesión que vas a empezar.
 
-Dos cosas más se configuran después en la pestaña **Configuración** del proyecto: el agente con el que empiezan sus sesiones y los proyectos que reúne. Sus notas, su wiki y sus documentos están en la pestaña **Memoria**, sus habilidades en la pestaña **Habilidades** y más carpetas en la pestaña **Archivos** (consulta [La ventana de detalles de un proyecto](#a-projects-details-window)).
+Después se configuran dos cosas más en la pestaña **Configuración** del proyecto: el agente con el que empiezan sus sesiones y los proyectos que reúne. Sus notas, su wiki y sus documentos están en su pestaña **Memoria**; sus habilidades, en su pestaña **Habilidades**, y más carpetas, en su pestaña **Archivos** (consulta [Los detalles de un proyecto](#a-projects-details)).
 
 ### Un proyecto para una carpeta que ya tienes
 
@@ -89,7 +92,7 @@ Hydor muestra las sesiones que tuviste en Claude Code y Codex fuera de Hydor: en
 - **Lo que se deja fuera**: tu carpeta personal; las carpetas ocultas (salvo las carpetas de los proyectos propios de Codex); las carpetas temporales; las carpetas que la app crea para sí misma (carpetas de tareas, ejecuciones de apps, worktrees y sus datos); las carpetas que marcaste como **No es un proyecto**; y las carpetas que un proyecto ya tiene: su carpeta propia, una con la que trabaja o una carpeta dentro de ellas.
 - **Cuándo**: una vez que Hydor ha leído tus sesiones después de iniciarse, y luego en cerca de un minuto tras las nuevas sesiones que haya allí.
 - **Su nombre**: el nombre que diste a la carpeta en la barra lateral (**Cambiar nombre**); si no, el nombre del proyecto de Codex; si no, el nombre de la propia carpeta. Si un proyecto ya tiene ese nombre, delante se pone el nombre de la carpeta superior (“client/app”), y después un número.
-- **En la barra lateral**: su grupo es el grupo del proyecto, con su marca y su nombre y, después del nombre, las marcas de los programas en los que se encontró. Apunta al nombre, o abre el **⋯** del encabezado, para ver de dónde vinieron sus sesiones (**Iniciada fuera de Hydor**), como en el grupo de una carpeta. Su ventana de detalles se abre como la de cualquier proyecto (consulta [Abrir los detalles de un proyecto](#open-a-projects-details)); no indica dónde se encontró el proyecto.
+- **En la barra lateral**: su grupo es el grupo del proyecto, con su marca y su nombre y, después del nombre, las marcas de los programas en los que se encontró. Pasa el puntero sobre el nombre, o abre el **⋯** del encabezado, para ver de dónde vinieron sus sesiones (**Iniciada fuera de Hydor**), igual que en el grupo de una carpeta. Sus detalles se abren como los de cualquier proyecto (consulta [Abrir los detalles de un proyecto](#open-a-projects-details)); no indican dónde se encontró el proyecto.
 - **Un proyecto como cualquier otro**: su carpeta propia es la carpeta donde se ejecutaron esas sesiones, y no se mueve ni se copia nada. Tiene documentos, habilidades, pautas, un agente, archivos y uso compartido como cualquier proyecto, y puedes cambiarle el nombre, describirlo o eliminarlo. Las habilidades propias de Claude Code en el `.claude/skills` de la carpeta aparecen en su pestaña **Habilidades** como antes, y los agentes siguen leyendo como antes el CLAUDE.md o AGENTS.md de la propia carpeta.
 - **Si lo eliminas**, Hydor no lo vuelve a crear, y aún puedes crear tú un proyecto para esa carpeta (consulta [Eliminar un proyecto](#delete-a-project)).
 
@@ -107,7 +110,7 @@ Las carpetas en las que trabajas con Claude Code y Codex se convierten solas en 
 
 Hay dos maneras:
 
-- **Desde el proyecto**: haz clic en el lápiz al final de su encabezado en la barra lateral, o en **Nueva sesión** en la parte superior de su ventana de detalles (en un teléfono, el lápiz). Se abre la página de inicio con el proyecto elegido y con lo que elegiste en él antes; si todavía no has elegido nada, con su agente cuando lo tiene.
+- **Desde el proyecto**: haz clic en el lápiz al final de su encabezado en la barra lateral, o en **Nueva sesión** en la parte superior de sus detalles (en un teléfono, en el lápiz). La página de inicio se abre con el proyecto elegido y con lo que elegiste en él antes; si todavía no has elegido nada allí, con su agente, cuando tiene uno.
 - **Desde la página de inicio**: abre el chip de carpeta en la fila bajo el cuadro de mensaje. Su menú tiene dos listas cortas: **Proyectos**, los cinco con trabajo más reciente (y el elegido, si no está entre ellos), cada uno con su marca, su nombre y su carpeta; después **Carpetas**, la carpeta en uso y las que usaste últimamente; y luego **Nueva carpeta de tarea**. **Nueva**, junto al encabezado **Proyectos**, crea un proyecto y lo elige. Escribe parte de un nombre en el campo de la parte superior para encontrar cualquier proyecto o cualquier carpeta. La carpeta propia de un proyecto nunca aparece como una carpeta: si la encuentras por su nombre o su ruta, o la elegiste antes en la página de inicio como carpeta, es el proyecto, y la sesión trabaja en el proyecto.
 
 Cuando eliges un proyecto, el chip muestra su marca y su nombre en lugar de una carpeta, y la sesión trabajará en la carpeta del proyecto. En un proyecto donde todavía no has elegido nada, el chip **Agente** muestra el agente propio del proyecto cuando lo tiene, con el programa, el modelo y los permisos que ese agente sugiere, y si no, **General**; en uno donde ya has elegido, muestra lo que elegiste allí. Todavía puedes cambiar cualquiera de ellos antes de empezar. Después escribe tu mensaje y haz clic en **Inicio**.
@@ -118,13 +121,13 @@ En un teléfono, el menú se abre como una hoja desde la parte inferior de la pa
 
 Cuando la carpeta del proyecto es un repositorio de Git, el final del menú ofrece **Nuevo worktree**, como para cualquier carpeta de un repositorio: la sesión trabaja entonces en una rama propia, en una copia separada del repositorio (consulta [Sesiones](/guide/sessions)). Las sesiones que empiezas por voz en modo manos libres empiezan en el último lugar elegido en la página de inicio, con sus elecciones (consulta [Documentos, imágenes, videos y voz](/guide/documents-voice)).
 
-## Ventana de detalles de un proyecto
+## Los detalles de un proyecto
 
-Ábrela como se describe en [Abrir los detalles de un proyecto](#open-a-projects-details). Las pestañas de la ventana son **Resumen**, **Archivos**, **Memoria**, **Habilidades**, **Agentes** y **Configuración**. **Memoria** y **Habilidades** muestran un contador, salvo en un teléfono, donde las pestañas no muestran sus contadores. En un teléfono (o en una ventana estrecha), las pestañas que no caben están en **Más**, al final de la fila: tócala para ver un menú con ellas. Mientras una de ellas está abierta, su nombre aparece ahí en lugar de **Más**. Cada pestaña se muestra al instante.
+Ábrelos como se describe en [Abrir los detalles de un proyecto](#open-a-projects-details). Sus pestañas son **Resumen**, **Archivos**, **Memoria**, **Habilidades**, **Agentes** y **Configuración**. **Memoria** y **Habilidades** tienen un contador, excepto en el teléfono, donde las pestañas no muestran contadores. En el teléfono (o en una ventana estrecha), las pestañas que no caben están en **Más**, al final de la fila: tócalo para ver un menú con ellas. Mientras una de ellas está abierta, su nombre aparece ahí en lugar de **Más**. Cada pestaña se muestra al instante.
 
 ### El menú del proyecto
 
-**Más** (⋯) en el encabezado de la ventana tiene:
+**Más** (⋯), en el encabezado, tiene:
 
 - **Abrir su carpeta en Archivos**: la carpeta del proyecto en la página Archivos.
 - **Mostrar en Finder**, **Mostrar en el Explorador de archivos** o **Mostrar en la carpeta**: en la app de escritorio, la carpeta del proyecto seleccionada en el administrador de archivos del sistema (consulta [Trabajar con archivos y carpetas](/guide/files-git#work-with-files-and-folders)).
@@ -165,7 +168,7 @@ Para añadir archivos desde otro lugar de la app, usa **Añadir a un proyecto** 
 
 ### Memoria
 
-Lo que el proyecto recuerda, en una sola lista: sus notas, los artículos de su wiki y sus documentos. Un cuadro de búsqueda en la parte superior busca en los tres a la vez, **Añadir** incorpora una nota, archivos o una carpeta para mantenerla actualizada, y los chips **Todos**, **Notas**, **Wiki** y **Documentos** reducen la lista. Haz clic en una fila para abrirla a la derecha (en un teléfono ocupa el lugar de la lista). Un enlace a un chip abre la ventana en él, y también lo hacen las direcciones de las antiguas pestañas Knowledge y LLM Wiki.
+Lo que recuerda el proyecto, en una sola lista: sus notas, los artículos de su wiki y sus documentos. Un cuadro de búsqueda arriba busca en los tres a la vez, **Añadir** incorpora una nota, archivos o una carpeta para mantener al día, y las etiquetas **Todos**, **Notas**, **Wiki** y **Documentos** acotan la lista. Haz clic en una fila para abrirla a la derecha (en el teléfono ocupa el lugar de la lista). Un enlace a una etiqueta abre el proyecto en ella, y también lo hacen las direcciones de las antiguas pestañas Knowledge y LLM Wiki.
 
 - **Notas**: las notas de memoria que los agentes guardaron sobre el proyecto, como las muestra [Configuración → Memoria](/settings?s=memory), con el perfil del proyecto primero. Son los datos breves con los que empieza cada sesión del proyecto (consulta [Memoria](/guide/memory)).
 - **Wiki**: los artículos y las fuentes de la memoria wiki del proyecto, para leer. Los agentes la escriben; tú la lees aquí. El menú **⋯** tiene sus tareas y **Actualizaciones de la wiki…** (consulta [Memoria wiki](/guide/wiki-memory#a-projects-memory-tab)).

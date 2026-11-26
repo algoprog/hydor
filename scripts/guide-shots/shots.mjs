@@ -146,8 +146,8 @@ export const SHOTS = [
   sessionShot('web', 'ebike', { height: 1000, unfold: ['Worked for', 'Look for recent reviews'] }),
   sessionShot('documents-voice', 'report', { unfold: ['Worked for', 'Read the report first'] }),
   {
-    // A project's details: its window over the Projects page, on Overview (the Thesis project, with its newest files, four
-    // weeks of work and two people it is shared with, taken out again after it).
+    // A project's details: its own page in the Projects section, on Overview (the Thesis project, with its newest files,
+    // four weeks of work and two people it is shared with, taken out again after it).
     id: 'projects',
     height: 860,
     async take(p, ctx) {
@@ -156,7 +156,7 @@ export const SHOTS = [
         const id = (await ctx.api('GET', '/api/projects')).spaces.find((x) => x.name === 'Thesis')?.id;
         await ctx.go(`/projects/${id}`, { settle: 2000 });
         // The Files card's six tiles: five pictures (the pages' are drawn a moment after the demo made them) and a note's first lines.
-        await p.waitFor(`[...document.querySelectorAll('[role="dialog"] img')].filter((i) => i.complete && i.naturalWidth).length >= 5`, { timeout: 45000 }).catch(() => {});
+        await p.waitFor(`[...document.querySelectorAll('main img')].filter((i) => i.complete && i.naturalWidth).length >= 5`, { timeout: 45000 }).catch(() => {});
         await p.park();
         await sleep(600);
         return await p.shot(ctx.file);
@@ -177,14 +177,14 @@ export const SHOTS = [
     },
   },
   {
-    // A project's Files: the Thesis project's window on Files, its folders, what was kept in it and its folder's files
+    // A project's Files: the Thesis project's page on Files, its folders, what was kept in it and its folder's files
     // as tiles, each with its picture.
     id: 'library',
     height: 860,
     async take(p, ctx) {
       const id = (await ctx.api('GET', '/api/projects')).spaces.find((x) => x.name === 'Thesis')?.id;
       await ctx.go(`/projects/${id}/files`, { settle: 2500 });
-      await p.waitFor(`[...document.querySelectorAll('[role="dialog"] img')].filter((i) => i.complete && i.naturalWidth).length >= 6`, { timeout: 45000 }).catch(() => {});
+      await p.waitFor(`[...document.querySelectorAll('main img')].filter((i) => i.complete && i.naturalWidth).length >= 6`, { timeout: 45000 }).catch(() => {});
       await p.park();
       await sleep(800);
       return p.shot(ctx.file);
@@ -248,7 +248,7 @@ export const SHOTS = [
   // The switches and the first notes fit in one picture.
   settingsShot('memory', 'memory', { height: 1101 }),
   {
-    // A project's Memory tab on its Wiki chip, in the project's details window: the wiki's areas as chips, one area's
+    // A project's Memory tab on its Wiki chip, on the project's page: the wiki's areas as chips, one area's
     // list (its overview first, then its articles) and that overview open in the pane on the right.
     id: 'wiki-memory',
     height: 860,
@@ -257,7 +257,7 @@ export const SHOTS = [
       await ctx.go(`/projects/${id}/memory?part=wiki`, { settle: 2000 });
       // The area's chip (the first button with its name: the list's row comes after the chips), then its overview, the first row of its list.
       const named = (which) =>
-        `js:[...document.querySelectorAll('[role="dialog"] button, [role="dialog"] [role="button"]')].filter((b) => b.textContent.trim().startsWith('Library use and services'))${which}`;
+        `js:[...document.querySelectorAll('main button, main [role="button"]')].filter((b) => b.textContent.trim().startsWith('Library use and services'))${which}`;
       await p.click(named('[0]'), { wait: 900 });
       await p.click(named('.pop()'), { wait: 900 });
       await p.park();

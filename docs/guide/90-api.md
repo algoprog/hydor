@@ -13,7 +13,7 @@ Everything the app's pages do goes through its HTTP API, and agents use the same
 - A session's permissions mode (`mode` in `POST /api/sessions/:key/config`) and spending caps (`capUsd` in `PATCH /api/sessions/:key/extra`, and `/api/budget/…`) change only on a card the user answers each time, in every mode, Full access included, with no **Allow for this session**.
 - An agent's own session is `this` in a path: `POST /api/sessions/this/config` changes its own model, effort or permissions when the user asks for that.
 - Never through app_api: the password and signing in, keys' values (ask with request_secret), a signature's picture or any change to one (ask_signature and place_signature), making access tokens and API keys, answering approval cards and the cards that ask the user to decide, files, terminals, notebooks and git (agents use their own tools), the live browser (the browser tools), the Mac's screen, mouse and keyboard and macOS's permissions for them (the computer tools; the user allows those in Settings).
-- Links for the user: the app's address plus the page: `/s/<session key>`, `/projects/<id>` (the project's details window, over the page that is open; `/projects/<id>/files` opens its **Files**), `/apps/<id>`, `/pages/<id>`, `/settings?s=<section>`, `/guide/<topic>#<section>`.
+- Links for the user: the app's address plus the page: `/s/<session key>`, `/projects/<id>` (the project's page; followed from another page, it opens the project's details in a window over that page; `/projects/<id>/files` opens its **Files**), `/apps/<id>`, `/pages/<id>`, `/settings?s=<section>`, `/guide/<topic>#<section>`.
 
 ## Settings kept on each device
 

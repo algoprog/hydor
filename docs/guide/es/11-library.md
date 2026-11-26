@@ -2,7 +2,7 @@
 
 Los agentes pueden responder con una página en lugar de texto sin formato: un informe, un gráfico, una tabla para comparar opciones o una pequeña herramienta, como un seguimiento o una lista de verificación. También crean diapositivas, documentos, hojas de cálculo, documentos LaTeX, cuadernos y diagramas que editas como en PowerPoint, Word, Excel, Overleaf, Jupyter o draw.io. Lo que conservas va a los archivos de su proyecto (los detalles del proyecto → **Archivos**), junto con tus imágenes, videos, sonidos y páginas web conservados. Este tema trata de cómo ver una página mientras se escribe, cambiarla y conservarla, imágenes, videos y sonidos, crear los tuyos, diseños, diagramas, tableros, diapositivas, exportar, pedir cambios a un agente y publicar.
 
-![La pestaña Archivos de un proyecto en su ventana de detalles: sus documentos, presentaciones e imágenes como mosaicos entre los archivos de la carpeta](images/library.webp)
+![La pestaña Archivos de un proyecto en su página: sus documentos, presentaciones e imágenes como mosaicos entre los archivos de la carpeta](images/library.webp)
 
 ## Páginas en la conversación
 
@@ -307,7 +307,7 @@ Todo lo que conservas pertenece a un proyecto o a ninguno (consulta [Proyectos y
 - Los archivos que sueltas en los **Archivos** de un proyecto van a su carpeta como archivos (consulta [Añadir archivos tuyos](#add-files-of-yours)).
 - Para mover algo, abre su **Más** (⋯) → **Mover a otro proyecto** en su mosaico (**Mover a un proyecto** en su propia página) y elige un proyecto o **Sin proyecto**. “Movido a Tesis” lo confirma. Moverlo no cambia nada más: sus versiones, sus datos y sus direcciones se mantienen.
 
-Los detalles de un proyecto muestran lo que contiene en sus pestañas **Resumen** y **Archivos** (consulta [La ventana de detalles de un proyecto](/guide/projects#a-projects-details-window)). Eliminar un proyecto conserva lo que contenía, sin proyecto: el cuadro de búsqueda lo encuentra, y su propia página puede moverlo a otro proyecto.
+Los detalles de un proyecto muestran lo que contiene en sus pestañas **Resumen** y **Archivos** (consulta [Los detalles de un proyecto](/guide/projects#a-projects-details)). Eliminar un proyecto conserva lo que contenía, sin proyecto: el cuadro de búsqueda lo encuentra, y su propia página puede moverlo a otro proyecto.
 
 Para mantener tu propio orden, crea carpetas reales en los **Archivos** del proyecto (**Nueva** → **Nueva carpeta**) y arrastra archivos a ellas: son carpetas normales de la carpeta del proyecto, como en todo [Trabajar con archivos y carpetas](/guide/files-git#work-with-files-and-folders). Para traer una carpeta entera de esta computadora, súbela (**Subir** → **Subir una carpeta**) o suéltala en la pestaña **Archivos**.
 

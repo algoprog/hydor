@@ -1,11 +1,13 @@
-// What a project's details window shows (ProjectDialog.tsx holds it over the page). At the top, in the project's colour:
-// its mark, name and what it is about, New session, one menu (open its folder in Files, show only its sessions in the
-// sidebar, share it with people, delete it) and Close; its tabs under them. Overview: its sessions, who it is shared
+// What a project's details show: its own page in the Projects section (feature.tsx, `page`), or the window over the page
+// elsewhere (ProjectDialog.tsx). At the top, in the project's colour: on its page the arrow back to all projects, its
+// mark, name and what it is about, New session, one menu (open its folder in Files, show only its sessions in the
+// sidebar, share it with people, delete it) and, in the window, Close; its tabs under them. Overview: its sessions, who it is shared
 // with (ShareDialog.tsx) and what every session in it gets (its folder, guidelines, memory, skills and assistant), with a
 // group's projects. Then its files (SpaceFiles: its folder, and the things kept in it), its
 // memory (memory/ProjectMemory: its notes, its wiki memory and its own documents in one list), its skills
-// (SpaceSkills), its agents and its settings. The tabs change in the window, not the address. It shows at once from the
-// projects the app knows, and fills in what it fetches.
+// (SpaceSkills), its agents and its settings. On its page the tab is in the address (replaced, so the browser's Back
+// leaves the project), and so is the folder its Files show; in the window they change in place. It shows at once from
+// the projects the app knows, and fills in what it fetches.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Bot, Boxes, Brain, Check, ChevronRight, FolderOpen, LayoutDashboard, MessagesSquare, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserRound, X } from 'lucide-react';
 import type { SessionSummary } from '@shared/types';
@@ -14,13 +16,14 @@ import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Empty, IconButton, inputCls, Segmented, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { api, enc, patch } from '../../lib/api';
 import { tildify, timeAgo } from '../../lib/format';
-import { closeProject, go, openProject, openSession, type ProjectPart, type ProjectTab } from '../../lib/nav';
+import { closeProject, go, openProject, openSession, projectHref, type ProjectPart, type ProjectTab } from '../../lib/nav';
 import { toastError, useApp, useSessions } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { AgentsBoard } from '../assistants/AgentsBoard';
 import { AssistantIcon } from '../assistants/icons';
 import { useAssistantsState } from '../assistants/state';
 import { useKnowledge } from '../knowledge/parts';
+import { BackButton } from '../layout/PageHeader';
 import { ActivityText } from '../sessions/SessionList';
 import { MemberPicker, memberNames, SpaceMark, startInSpace } from './parts';
 import { deleteSpace, SpaceMenu } from './ProjectMenu';
@@ -99,8 +102,8 @@ function Fact({ icon, label, children, onClick }: { icon: ReactNode; label: stri
 /** How much the project remembers: notes, wiki articles and documents (what is loaded so far). */
 const memoryTotal = (m: SpaceMemory, view?: SpaceView) => (m.notes ?? 0) + (m.wiki?.on ? (m.wiki.articles?.length ?? 0) : 0) + (view?.docs ?? 0) || undefined;
 
-/** Its mark, name and what it is about over a wash of its colour, New session, its menu and Close, and its tabs. */
-function Top({ s, view, tab, onTab, memory }: { s: Space; view?: SpaceView; tab: SpaceTab; onTab: (t: SpaceTab) => void; memory: SpaceMemory }) {
+/** Its mark, name and what it is about over a wash of its colour, New session, its menu, and its tabs; on its page the arrow back to all projects before them, in the window Close after them. */
+function Top({ s, view, tab, onTab, memory, page }: { s: Space; view?: SpaceView; tab: SpaceTab; onTab: (t: SpaceTab) => void; memory: SpaceMemory; page?: boolean }) {
   const spaces = useSpaces();
   const home = useApp((x) => x.boot?.home);
   const wide = useMediaQuery('(min-width: 640px)');
@@ -109,7 +112,8 @@ function Top({ s, view, tab, onTab, memory }: { s: Space; view?: SpaceView; tab:
   return (
     <header className="relative shrink-0 border-b border-line pt-[var(--safe-top)] sm:pt-0">
       <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `linear-gradient(180deg, color-mix(in oklab, ${c} 15%, transparent), color-mix(in oklab, ${c} 3%, transparent))` }} />
-      <div className="relative flex items-center gap-2 px-3 pt-3 sm:gap-3 sm:px-6 sm:pt-5">
+      <div className={cx('relative flex items-center gap-2 pt-3 sm:gap-3 sm:pt-5', page ? 'pr-3 pl-2 sm:pr-6 sm:pl-4' : 'px-3 sm:px-6')}>
+        {page && <BackButton label="All projects" onClick={closeProject} />}
         <SpaceMark s={s} size={wide ? 46 : 34} className="rounded-[12px] max-sm:rounded-[10px]" />
         <div className="min-w-0 flex-1">
           <h1 translate="no" className="truncate text-[17px] leading-tight font-semibold tracking-tight sm:text-[21px]">
@@ -123,9 +127,11 @@ function Top({ s, view, tab, onTab, memory }: { s: Space; view?: SpaceView; tab:
           <span className="max-sm:hidden">New session</span>
         </Button>
         <SpaceMenu s={s} />
-        <IconButton label="Close" onClick={closeProject}>
-          <X size={18} />
-        </IconButton>
+        {!page && (
+          <IconButton label="Close" onClick={closeProject}>
+            <X size={18} />
+          </IconButton>
+        )}
       </div>
       {/* The tabs that do not fit (on a phone) are under More at the row's end; the open one's line lies on the border. */}
       <div className="relative -mb-px px-1.5 pt-1 sm:px-4 sm:pt-3">
@@ -558,22 +564,29 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
 
 // ---- the window's content -----------------------------------------------------------------------------------------
 
-/** Only a Close, over a short message or while the project loads. */
-function Bare({ children }: { children: ReactNode }) {
+/** Only the way out (on its page the arrow back to all projects, in the window Close), over a short message or while the project loads. */
+function Bare({ page, children }: { page?: boolean; children: ReactNode }) {
   return (
     <>
-      <header className="flex shrink-0 items-center justify-end border-b border-line px-2 pt-[calc(var(--safe-top)+8px)] pb-2 sm:pt-2">
-        <IconButton label="Close" onClick={closeProject}>
-          <X size={18} />
-        </IconButton>
+      <header className={cx('flex shrink-0 items-center border-b border-line px-2 pt-[calc(var(--safe-top)+8px)] pb-2 sm:pt-2', page ? 'justify-start sm:px-4' : 'justify-end')}>
+        {page ? (
+          <BackButton label="All projects" onClick={closeProject} />
+        ) : (
+          <IconButton label="Close" onClick={closeProject}>
+            <X size={18} />
+          </IconButton>
+        )}
       </header>
       <div className="flex min-h-0 flex-1 flex-col pb-[var(--safe-bottom)]">{children}</div>
     </>
   );
 }
 
-/** The project's window: its header and tabs, and the tab that is open (`tab`, `part` and `share` are how it opened). */
-export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id: string; tab: SpaceTab; part?: MemoryPart; share?: boolean; req?: number }) {
+/**
+ * The project's details: its header and tabs, and the tab that is open (`tab`, `part`, `share` and `dir` are what its
+ * address or its window asked for). `page`: its own page in the workspace, not the window.
+ */
+export function SpacePage({ id, tab: first, part: firstPart, share, dir, req, page }: { id: string; tab: SpaceTab; part?: MemoryPart; share?: boolean; dir?: string; req?: number; page?: boolean }) {
   const spaces = useSpaces();
   const view = spaces?.find((x) => x.id === id);
   const [tab, setTab] = useState<SpaceTab>(first);
@@ -587,12 +600,14 @@ export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id:
     // The Memory tab opens on the chip asked for, else All.
     setPart(firstPart ?? 'all');
   }, [req, first, firstPart]);
-  // Opened to share it (from the search box, the guide or an agent): the Share dialog opens over the window, once.
+  // Opened to share it (from the search box, the guide or an agent): the Share dialog opens over it, once (on its page,
+  // the address then forgets it, so a reload does not ask again).
   const shared = useRef(false);
   useEffect(() => {
     if (!share || !view || shared.current) return;
     shared.current = true;
     openShareDialog(view);
+    if (page) go(projectHref(id, first, { part: firstPart, dir }), true);
   }, [share, !!view]);
   const [data, setData] = useState<{ space: Space; sessions: string[]; memoryKey?: string } | null>(null);
   const [gone, setGone] = useState(false);
@@ -614,7 +629,7 @@ export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id:
   }, [id, spaces]);
   if (gone)
     return (
-      <Bare>
+      <Bare page={page}>
         <Empty icon={<Boxes size={22} />} title="This project is gone">
           <span className="block">It was deleted, or the address is not one of your projects.</span>
         </Empty>
@@ -624,7 +639,7 @@ export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id:
   const s: Space | undefined = data?.space ?? view;
   if (!s)
     return (
-      <Bare>
+      <Bare page={page}>
         <div className="flex h-full items-center justify-center text-fg-3">
           <Throbber size={28} />
         </div>
@@ -634,15 +649,17 @@ export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id:
   const to = (t: SpaceTab) => {
     setTab(t);
     if (t === 'memory') setPart('all');
+    // On its page the address says which tab is open (in its place, so Back leaves the project rather than stepping through its tabs).
+    if (page) go(projectHref(id, t), true);
   };
   return (
     <>
-      <Top s={s} view={view} tab={tab} onTab={to} memory={memory} />
+      <Top s={s} view={view} tab={tab} onTab={to} memory={memory} page={page} />
       {tab === 'files' ? (
         // The folder scrolls in its own box, so the window keeps its height.
         <div className="min-h-0 flex-1 pb-[var(--safe-bottom)]">
           <div className="h-full px-3 pt-4 pb-3 sm:px-6">
-            <SpaceFiles s={s} onSaved={saved} />
+            <SpaceFiles s={s} asked={dir} onSaved={saved} />
           </div>
         </div>
       ) : tab === 'memory' ? (
@@ -654,7 +671,8 @@ export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id:
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto pb-[var(--safe-bottom)]">
-          <div className="px-3 py-5 sm:px-6 sm:py-6">
+          {/* On a wide page its cards keep the window's width, in the middle, as the Projects page's do. */}
+          <div className="mx-auto max-w-[1120px] px-3 py-5 sm:px-6 sm:py-6">
             {tab === 'skills' ? (
               <SpaceSkillsTab s={s} />
             ) : tab === 'agents' ? (

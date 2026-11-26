@@ -17,7 +17,7 @@ Deine konkrete Anweisung in der Unterhaltung hat Vorrang: Steht in den Richtlini
 Richtlinien gelten auf drei Ebenen, von allgemein bis spezifisch:
 
 1. **Für alle Sitzungen**: für jeden Agenten in jeder Sitzung. Du legst sie unter [Einstellungen → Agenten → Agentenrichtlinien](/settings?s=guidelines) fest.
-2. **Für ein Projekt**: für jede Sitzung in diesem [Projekt](/guide/projects). Du hinterlegst sie im Fenster mit den Projektdetails (Tab **Einstellungen**) im Feld **Agentenrichtlinien**.
+2. **Für ein Projekt**: für jede Sitzung in diesem [Projekt](/guide/projects). Du hinterlegst sie in den Projektdetails (Tab **Einstellungen**) im Feld **Agentenrichtlinien**.
 3. **Für eine Sitzung**: nur für diese Sitzung. Du legst sie vor dem Start unter **Optionen → Richtlinien** oder später im Sitzungsmenü (⋯) unter **Sitzungseinstellungen → Richtlinien** fest.
 
 Der Agent erhält alle zutreffenden Ebenen in dieser Reihenfolge. Widersprechen sich zwei Vorgaben, gilt die spezifischere: Sitzungsrichtlinien gehen vor Projektrichtlinien, Projektrichtlinien vor den allgemeinen Richtlinien. Der Hinweis (i) neben **Für eine Sitzung** in den Einstellungen erklärt das ebenfalls.

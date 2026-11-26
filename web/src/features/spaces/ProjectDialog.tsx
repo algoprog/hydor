@@ -1,8 +1,9 @@
-// A project's details, in a window over the page that is open (the shell holds it once). It opens from the Projects page's
-// cards, the sessions sidebar (a project's name, its ⋯ menu), the search box and every link to an old address of a project's page
-// (`/projects/<id>/<tab>`: lib/nav.ts's go() sends them here, so the page stays), and holds what the project's page
-// held (SpacePage.tsx: its header, its tabs). Escape, its Close or a click outside closes it, and so does going to
-// another page (a document opened from its Files, say). On a phone it fills the screen.
+// A project's details, in a window over the page that is open (the shell holds it once), outside the Projects section
+// (where a project's details are its own page: feature.tsx). It opens from the sessions sidebar (a project's name, its ⋯
+// menu), the search box and every link to a project's address (`/projects/<id>/<tab>`: lib/nav.ts's go() sends them
+// here, so the page stays), and holds what the project's page holds (SpacePage.tsx: its header, its tabs). Escape, its
+// Close or a click outside closes it, and so does going to another page (a document opened from its Files, say). On a
+// phone it fills the screen.
 import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
@@ -60,7 +61,7 @@ export function ProjectDialogHost() {
             </div>
           }
         >
-          <SpacePage key={at.n} id={at.id} tab={at.tab} part={at.part} share={at.share} req={at.req} />
+          <SpacePage key={at.n} id={at.id} tab={at.tab} part={at.part} share={at.share} dir={at.dir} req={at.req} />
         </Suspense>
       </div>
     </div>,

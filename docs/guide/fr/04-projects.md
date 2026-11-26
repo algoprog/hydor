@@ -2,7 +2,7 @@
 
 Un projet réunit un travail en un seul endroit : ses sessions, un dossier pour ses fichiers (et d’autres dossiers à vous avec lesquels il travaille), ce dont les agents se souviennent à son sujet (des notes, un wiki et des documents qui lui sont propres), les consignes que tout agent du projet suit, ses propres compétences, l’agent avec lequel ses sessions démarrent, et des agents qui lui sont propres. Les Connaissances partagées regroupent les documents et les dossiers que vous ajoutez une seule fois pour que toutes les sessions puissent les consulter et citer le fichier et la page lus. Cette rubrique explique la page Projets, comment ouvrir les détails d’un projet, créer et utiliser des projets et des groupes de projets, donner à un projet des compétences qui lui sont propres, partager un projet avec d’autres personnes, et ajouter, rechercher et gérer les documents que les agents consultent.
 
-![Les détails d’un projet dans une fenêtre au-dessus de la page : ses sessions, ses fichiers les plus récents et ce que reçoit chaque session, sous ses onglets](images/projects.webp)
+![La page d’un projet : ses sessions, ses fichiers les plus récents et ce que reçoit chacune de ses sessions, sous ses onglets](images/projects.webp)
 
 ## Ce qu’est un projet
 
@@ -21,19 +21,22 @@ Un projet peut aussi réunir d’autres projets. C’est un **groupe** : voir [R
 
 ## Ouvrir les détails d’un projet
 
-Les détails d’un projet s’ouvrent dans une fenêtre au-dessus de la page où vous êtes, qui reste derrière, assombrie. Il y a plusieurs façons d’y accéder :
+L’endroit où s’affichent les détails d’un projet dépend de l’endroit où vous êtes. Dans la section **Projets** (la page Projets ou la page d’un projet), ils constituent la page même du projet, à la place de la liste. Depuis n’importe quel autre endroit (une session, les Paramètres…), ils s’ouvrent dans une fenêtre par-dessus la page où vous êtes, qui reste derrière, assombrie. Il existe plusieurs façons d’y accéder :
 
-- **Depuis la page Projets** : cliquez sur la carte d’un projet (voir [Retrouver tous vos projets](#find-all-your-projects)).
+- **Depuis la page Projets** : cliquez sur la carte d’un projet (voir [Retrouver tous vos projets](#find-all-your-projects)). La page du projet s’ouvre.
 - **Depuis la barre latérale** : dans la liste des sessions, cliquez sur le nom du projet dans son en-tête (sur un téléphone, ouvrez d’abord la barre latérale, car c’est un tiroir, puis touchez le nom ; le tiroir se ferme et les détails occupent l’écran). Son menu ⋯ propose aussi **Détails du projet**, en premier élément. La petite flèche à côté du nom replie ou déplie les sessions du projet.
-- **Depuis la zone de recherche** : saisissez le nom du projet dans la zone de recherche (Ctrl+K, ou ⌘K sur Mac) et choisissez-le. Un projet sans session n’a pas encore d’en-tête dans la barre latérale ; c’est donc, avec la page Projets, le chemin pour y accéder (un projet que vous venez de créer ouvre sa fenêtre de lui-même).
-- **Depuis un lien** : un lien vers un projet dans une notification ou dans la réponse d’un agent ouvre aussi la fenêtre au-dessus de la page où vous êtes.
+- **Depuis le champ de recherche** : saisissez le nom du projet dans le champ de recherche (Ctrl+K, ou ⌘K sur un Mac) et choisissez-le. Dans la section Projets, sa page s’ouvre ; ailleurs, c’est la fenêtre. Un projet qui n’a pas encore de session n’a pas d’en-tête dans la barre latérale : ce champ et la page Projets sont donc les moyens d’y accéder (un projet que vous venez de créer s’ouvre tout seul).
+- **Depuis un lien** : un lien vers un projet dans une notification ou dans la réponse d’un agent, suivi depuis une autre page, ouvre lui aussi la fenêtre par-dessus cette page.
+- **Par son adresse** : saisir ou recharger `/projects/<id>`, suivi éventuellement d’un onglet, ouvre la page du projet.
 
-La fenêtre présente ce que contient un projet :
+La page et la fenêtre affichent les mêmes éléments :
 
-- **L’en-tête**, à la couleur du projet : son repère et son nom, et sous eux de quoi il s’agit (son dossier s’il n’a pas de description ; un groupe indique « Réunit » suivi des noms de ses projets). À droite, **Nouvelle session** démarre une session dans le projet (sur un téléphone, le crayon) ; **Plus** (⋯) ouvre le menu du projet (voir [Le menu du projet](#the-projects-menu)) ; et ✕ ferme la fenêtre.
-- **Ses onglets** : **Vue d’ensemble**, **Fichiers**, **Mémoire**, **Compétences**, **Agents** et **Paramètres** (voir [La fenêtre des détails d’un projet](#a-projects-details-window)).
+- **L’en-tête**, à la couleur du projet : sur la page du projet, une flèche en haut à gauche (**Tous les projets**) ; puis son symbole et son nom, et en dessous ce sur quoi il porte (son dossier quand il n’a pas de description ; un groupe indique les noms des projets qu’il rassemble). À droite, **Nouvelle session** démarre une session dans le projet (sur un téléphone, le stylo) et **Plus** (⋯) contient le menu du projet (voir [Le menu du projet](#the-projects-menu)). La fenêtre comporte aussi ✕, qui la ferme.
+- **Ses onglets** : **Vue d’ensemble**, **Fichiers**, **Mémoire**, **Compétences**, **Agents** et **Paramètres** (voir [Les détails d’un projet](#a-projects-details)).
 
-Fermez-la avec ✕, avec Échap, ou en cliquant sur la page assombrie à l’extérieur. Aller sur une autre page la ferme aussi : par exemple en ouvrant un document depuis l’onglet **Fichiers**, ou en suivant un lien. Sur un téléphone, la fenêtre occupe tout l’écran. Échap ferme d’abord un menu ou une boîte de dialogue ouverts au-dessus de la fenêtre, puis la fenêtre.
+**Sur la page du projet**, la flèche ramène à la page Projets, tout comme le bouton Précédent du navigateur ; il n’y a pas de ✕. L’onglet où vous êtes figure dans l’adresse de la page (`/projects/<id>/files`, `/projects/<id>/memory`…) : un rechargement ou un lien le conserve donc. Il en va de même pour un dossier que vous ouvrez dans l’onglet **Fichiers**, et Précédent permet d’en ressortir. Un lien qui y mène vers un autre projet (qu’un groupe rassemble) ouvre la page de ce projet. Supprimer le projet vous ramène à la page Projets.
+
+**La fenêtre** se ferme avec ✕, avec Échap ou d’un clic sur la page assombrie à l’extérieur. Passer à une autre page la ferme aussi : ouvrir un document depuis l’onglet **Fichiers**, par exemple, ou suivre un lien. Sur un téléphone, la fenêtre remplit l’écran. Échap ferme d’abord un menu ou une boîte de dialogue placés par-dessus la fenêtre, puis la fenêtre.
 
 ## Retrouver tous vos projets
 
@@ -51,7 +54,7 @@ Chaque carte affiche :
 - « 2 en cours » tant que ses sessions travaillent, et un point quand une session s’est terminée depuis votre dernier passage ;
 - quand il a travaillé pour la dernière fois, et de petites barres pour les messages de ses quatre dernières semaines.
 
-Pointez une carte (sur un écran tactile, elles sont toujours là) et **Nouvelle session** démarre une session dans le projet, et **Plus** (⋯) ouvre le menu du projet : **Ouvrir son dossier dans Fichiers**, dans l’app de bureau **Afficher dans le Finder**, **Afficher dans l’Explorateur de fichiers** ou **Afficher dans le dossier**, **Seulement ses sessions dans la barre latérale**, **Partager avec des personnes** et **Supprimer le projet** (voir [Le menu du projet](#the-projects-menu)). Cliquez n’importe où ailleurs sur une carte pour ouvrir les détails du projet dans une fenêtre au-dessus de la page (voir [Ouvrir les détails d’un projet](#open-a-projects-details)). Déposez des fichiers de votre ordinateur sur une carte pour les placer dans le dossier du projet.
+Pointez une carte (sur un écran tactile, ces boutons sont toujours visibles) : **Nouvelle session** démarre une session dans le projet, et **Plus** (⋯) contient le menu du projet : **Ouvrir son dossier dans Fichiers**, dans l’app de bureau **Afficher dans le Finder**, **Afficher dans l’Explorateur de fichiers** ou **Afficher dans le dossier**, **Seulement ses sessions dans la barre latérale**, **Partager avec des personnes** et **Supprimer le projet** (voir [Le menu du projet](#the-projects-menu)). Cliquez ailleurs sur une carte pour ouvrir la page du projet, avec une flèche pour revenir à tous les projets (voir [Ouvrir les détails d’un projet](#open-a-projects-details)). Déposez des fichiers de votre ordinateur sur une carte pour les placer dans le dossier du projet.
 
 Sous les cartes, **Dossiers dans lesquels vous travaillez** liste les dossiers dans lesquels vos sessions ont travaillé récemment et qu’aucun projet n’a encore (voir [Dossiers dans lesquels vous travaillez, pas encore dans un projet](#folders-you-work-in-not-in-a-project-yet)). **Créer un projet** sur l’un d’eux ouvre la fenêtre **Nouveau projet** avec ce dossier choisi ; ✕ (**Pas un projet : ne plus le suggérer**) le retire définitivement de la liste. La liste est omise pendant une recherche.
 
@@ -72,9 +75,9 @@ Sans projet pour l’instant, la page explique ce qu’est un projet et propose 
 4. Laissez activé **Un agent pour lui** pour qu’un agent soit créé pour le projet (voir [Agents](#agents)), ou désactivez-le.
 5. Cliquez sur **Créer le projet**, ou appuyez sur Entrée dans le champ du nom.
 
-Un nouveau dossier est placé dans un dossier **Projets** là où vont les dossiers de tâches : « Impôts 2026 » obtient `~/Hydor/Projects/taxes-2026`, sauf si vous avez déplacé les dossiers de tâches ailleurs (voir [Déplacer les dossiers de tâches](/guide/agents#move-task-folders)). Si ce nom est déjà pris, l’app ajoute `-2`, `-3`, etc. Quand le projet est créé depuis la barre latérale ou la page Projets, ses détails s’ouvrent dans une fenêtre. Quand il est créé depuis la page de démarrage, il est choisi pour la session que vous êtes sur le point de démarrer.
+Un nouveau dossier est placé dans un dossier **Projects**, à l’endroit où vont les dossiers de tâche : « Impôts 2026 » obtient `~/Hydor/Projects/taxes-2026`, sauf si vous avez déplacé les dossiers de tâche ailleurs (voir [Déplacer les dossiers de tâche](/guide/agents#move-task-folders)). Si ce nom est déjà pris, l’app ajoute `-2`, `-3` et ainsi de suite. Si le projet est créé depuis la page Projets, la page du nouveau projet s’ouvre. S’il est créé depuis la barre latérale, ses détails s’ouvrent dans une fenêtre par-dessus la page où vous êtes. S’il est créé depuis la page de démarrage, le nouveau projet est sélectionné pour la session que vous vous apprêtez à démarrer.
 
-Deux autres réglages se font ensuite dans l’onglet **Paramètres** du projet : l’agent avec lequel ses sessions démarrent, et les projets qu’il réunit. Ses notes, son wiki et ses documents se trouvent dans son onglet **Mémoire**, ses compétences dans son onglet **Compétences**, et les autres dossiers dans son onglet **Fichiers** (voir [La fenêtre des détails d’un projet](#a-projects-details-window)).
+Deux autres réglages se font ensuite dans l’onglet **Paramètres** du projet : l’agent avec lequel ses sessions démarrent, et les projets qu’il réunit. Ses notes, son wiki et ses documents se trouvent dans son onglet **Mémoire**, ses compétences dans son onglet **Compétences**, et d’autres dossiers dans son onglet **Fichiers** (voir [Les détails d’un projet](#a-projects-details)).
 
 ### Un projet pour un dossier existant
 
@@ -89,7 +92,7 @@ Hydor liste les sessions que vous aviez dans Claude Code et Codex en dehors de H
 - **Ce qui est écarté** : votre dossier personnel ; les dossiers cachés (hors dossiers des projets propres à Codex) ; les dossiers temporaires ; les dossiers que l’app crée pour elle-même (dossiers de tâches, exécutions des apps, worktrees et ses données) ; les dossiers que vous avez marqués **Pas un projet** ; et les dossiers qu’un projet a déjà : son dossier propre, un dossier avec lequel il travaille, ou un dossier situé à l’intérieur de ceux-ci.
 - **Quand** : une fois que Hydor a lu vos sessions après son démarrage, puis dans la minute environ qui suit l’arrivée de nouvelles sessions.
 - **Son nom** : le nom que vous avez donné au dossier dans la barre latérale (**Renommer**), sinon le nom du projet Codex, sinon le nom du dossier lui-même. Si un projet porte déjà ce nom, le nom du dossier parent est placé devant (« client/app »), puis un numéro.
-- **Dans la barre latérale** : son groupe est le groupe du projet, avec son repère et son nom et, après le nom, les repères des programmes où il a été trouvé. Pointez le nom, ou ouvrez le **⋯** de l’en-tête, pour voir d’où viennent ses sessions (**Démarrée en dehors de Hydor**), comme pour le groupe d’un dossier. Sa fenêtre de détails s’ouvre comme celle de n’importe quel projet (voir [Ouvrir les détails d’un projet](#open-a-projects-details)) ; elle n’indique pas où le projet a été trouvé.
+- **Dans la barre latérale** : son groupe est celui du projet, avec sa marque et son nom et, après le nom, les marques des programmes dans lesquels il a été trouvé. Pointez le nom, ou ouvrez le **⋯** de l’en-tête, pour voir d’où viennent ses sessions (**Démarrée en dehors de Hydor**), comme pour le groupe d’un dossier. Ses détails s’ouvrent comme ceux de n’importe quel projet (voir [Ouvrir les détails d’un projet](#open-a-projects-details)) ; ils n’indiquent pas où le projet a été trouvé.
 - **Un projet comme les autres** : son dossier propre est le dossier où ces sessions ont tourné, et rien n’est déplacé ni copié. Il a des documents, des compétences, des consignes, un agent, des fichiers et un partage comme tout projet, et vous pouvez le renommer, le décrire ou le supprimer. Les compétences propres à Claude Code dans le dossier `.claude/skills` apparaissent dans son onglet **Compétences** comme avant, et le fichier CLAUDE.md ou AGENTS.md du dossier est toujours lu par les agents comme avant.
 - **Si vous le supprimez**, Hydor ne le recrée pas, et vous pouvez toujours créer vous-même un projet pour ce dossier (voir [Supprimer un projet](#delete-a-project)).
 
@@ -107,7 +110,7 @@ Les dossiers dans lesquels vous travaillez avec Claude Code et Codex deviennent 
 
 Il y a deux façons de faire :
 
-- **Depuis le projet** : cliquez sur le crayon à la fin de son titre dans la barre latérale, ou sur **Nouvelle session** en haut de sa fenêtre de détails (sur téléphone, le crayon). La page de démarrage s’ouvre avec le projet sélectionné et avec ce que vous y aviez déjà choisi ; si vous n’y avez encore rien choisi, avec son agent lorsqu’il en a un.
+- **Depuis le projet** : cliquez sur le stylo au bout de son en-tête dans la barre latérale, ou sur **Nouvelle session** en haut de ses détails (sur un téléphone, le stylo). La page de démarrage s’ouvre avec le projet sélectionné et avec ce que vous y aviez choisi auparavant ; si vous n’y avez encore rien choisi, avec son agent s’il en a un.
 - **Depuis la page de démarrage** : ouvrez la pastille du dossier dans la rangée située sous la zone de message. Son menu comporte deux courtes listes : **Projets**, les cinq sur lesquels vous avez travaillé le plus récemment (et celui qui est sélectionné, s’il n’en fait pas partie), chacun avec son repère, son nom et son dossier ; puis **Dossiers**, le dossier en cours d’utilisation et ceux que vous avez utilisés en dernier ; puis **Nouveau dossier de tâche**. **Nouveau**, à côté du titre **Projets**, crée un projet et le sélectionne. Saisissez une partie d’un nom dans le champ en haut pour trouver n’importe quel projet ou dossier. Le dossier propre à un projet n’est jamais listé comme un dossier : trouvé par son nom ou son chemin, ou sélectionné auparavant sur la page de démarrage comme dossier, c’est le projet, et la session travaille dans le projet.
 
 Lorsque vous sélectionnez un projet, la pastille affiche son repère et son nom à la place d’un dossier, et la session travaillera dans le dossier du projet. Dans un projet où vous n’avez encore rien sélectionné, la pastille **Agent** affiche l’agent propre au projet lorsqu’il en a un, avec le programme, le modèle et les autorisations que cet agent suggère, sinon **Général** ; dans un projet où vous avez déjà fait des choix, elle affiche ce que vous y avez sélectionné. Vous pouvez encore modifier chacun de ces éléments avant de démarrer. Saisissez ensuite votre message et cliquez sur **Début**.
@@ -118,13 +121,13 @@ Sur téléphone, le menu s’ouvre sous forme de feuille depuis le bas de l’é
 
 Lorsque le dossier du projet est un dépôt Git, le bas du menu propose **Nouveau worktree**, comme pour tout dossier d’un dépôt : la session travaille alors sur sa propre branche, dans une copie séparée du dépôt (voir [Sessions](/guide/sessions)). Les sessions que vous démarrez à la voix en mode mains libres démarrent à l’endroit sélectionné en dernier sur la page de démarrage, avec ses choix (voir [Documents, images, vidéos et voix](/guide/documents-voice)).
 
-## La fenêtre de détails d’un projet
+## Les détails d’un projet
 
-Ouvrez-la comme indiqué dans [Ouvrir les détails d’un projet](#open-a-projects-details). Les onglets de la fenêtre sont **Vue d’ensemble**, **Fichiers**, **Mémoire**, **Compétences**, **Agents** et **Paramètres**. **Mémoire** et **Compétences** affichent un nombre, sauf sur téléphone, où les onglets omettent ces nombres. Sur téléphone (ou dans une fenêtre étroite), les onglets qui ne tiennent pas sont sous **Plus**, à la fin de la rangée : touchez-le pour afficher un menu qui les contient. Tant que l’un d’eux est ouvert, son nom s’affiche à la place de **Plus**. Chaque onglet s’affiche immédiatement.
+Ouvrez-les comme décrit dans [Ouvrir les détails d’un projet](#open-a-projects-details). Leurs onglets sont **Vue d’ensemble**, **Fichiers**, **Mémoire**, **Compétences**, **Agents** et **Paramètres**. **Mémoire** et **Compétences** affichent un nombre, sauf sur un téléphone, où les onglets n’en affichent pas. Sur un téléphone (ou dans une fenêtre étroite), les onglets qui ne tiennent pas se trouvent sous **Plus**, au bout de la rangée : touchez-le pour en afficher le menu. Quand l’un d’eux est ouvert, son nom s’affiche à cet endroit au lieu de **Plus**. Chaque onglet s’affiche immédiatement.
 
 ### Le menu du projet
 
-**Plus** (⋯) dans l’en-tête de la fenêtre propose :
+**Plus** (⋯), dans l’en-tête, propose :
 
 - **Ouvrir son dossier dans Fichiers** : le dossier du projet sur la page Fichiers.
 - **Afficher dans le Finder**, **Afficher dans l’Explorateur de fichiers** ou **Afficher dans le dossier** : dans l’app de bureau, le dossier du projet sélectionné dans le gestionnaire de fichiers du système (voir [Travailler avec des fichiers et des dossiers](/guide/files-git#work-with-files-and-folders)).
@@ -165,7 +168,7 @@ Pour ajouter des fichiers depuis un autre endroit de l’app, utilisez **Ajouter
 
 ### Mémoire
 
-Ce dont le projet se souvient, dans une seule liste : ses notes, les articles de son wiki et ses documents. Une zone de recherche en haut parcourt les trois à la fois, **Ajouter** permet d’ajouter une note, des fichiers ou un dossier à tenir à jour, et les pastilles **Tout**, **Notes**, **Wiki** et **Documents** restreignent la liste. Cliquez sur une ligne pour l’ouvrir à droite (sur un téléphone, elle prend la place de la liste). Un lien vers une pastille ouvre la fenêtre sur celle-ci, et il en va de même pour les adresses des anciens onglets Knowledge et LLM Wiki.
+Ce dont le projet se souvient, dans une seule liste : ses notes, les articles de son wiki et ses documents. Un champ de recherche en haut parcourt les trois à la fois, **Ajouter** permet d’ajouter une note, des fichiers ou un dossier à tenir à jour, et les pastilles **Tout**, **Notes**, **Wiki** et **Documents** restreignent la liste. Cliquez sur une ligne pour l’ouvrir à droite (sur un téléphone, elle prend la place de la liste). Un lien vers une pastille ouvre le projet sur celle-ci, tout comme les adresses des anciens onglets Knowledge et LLM Wiki.
 
 - **Notes** : les notes de mémoire que des agents ont conservées sur le projet, telles que les liste [Paramètres → Mémoire](/settings?s=memory), avec le profil du projet en premier. Ce sont les faits brefs avec lesquels démarre chaque session du projet (voir [Mémoire](/guide/memory)).
 - **Wiki** : les articles et les sources de la mémoire wiki du projet, à lire. Les agents l’écrivent ; vous le lisez ici. Le menu **⋯** propose ses tâches et **Mises à jour du wiki…** (voir [Mémoire wiki](/guide/wiki-memory#a-projects-memory-tab)).

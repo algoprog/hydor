@@ -2,7 +2,7 @@
 
 Um projeto mantém junto um trabalho inteiro: suas sessões, uma pasta para os arquivos dele (e outras pastas suas com as quais ele trabalha), o que os agentes lembram sobre ele (notas, uma wiki e documentos próprios), as diretrizes que todo agente nele segue, habilidades próprias, o agente com que suas sessões começam e agentes próprios. O Conhecimento compartilhado reúne os documentos e as pastas que você adiciona uma só vez para que todas as sessões possam pesquisá-los e citar o arquivo e a página que leram. Este tópico explica a página Projetos, como abrir os detalhes de um projeto, criar e usar projetos e grupos de projetos, dar habilidades próprias a um projeto, compartilhar um projeto com pessoas e adicionar, pesquisar e gerenciar os documentos que os agentes pesquisam.
 
-![Os detalhes de um projeto em uma janela sobre a página: suas sessões, seus arquivos mais recentes e o que toda sessão nele recebe, sob as abas](images/projects.webp)
+![A página de um projeto: suas sessões, seus arquivos mais novos e o que toda sessão nele recebe, sob as abas](images/projects.webp)
 
 ## O que é um projeto
 
@@ -21,19 +21,22 @@ Um projeto também pode reunir outros projetos. Isso é um **grupo**: veja [Reú
 
 ## Abra os detalhes de um projeto
 
-Os detalhes de um projeto abrem em uma janela sobre a página em que você está, que fica atrás, escurecida. Há várias formas de chegar lá:
+O lugar onde os detalhes de um projeto aparecem depende de onde você está. Na seção **Projetos** (a página Projetos ou a página de um projeto), eles são a própria página do projeto, no lugar da lista. De qualquer outro lugar (uma sessão, as Configurações…), eles abrem em uma janela sobre a página em que você está, que continua atrás, escurecida. Há várias maneiras de chegar lá:
 
-- **Pela página Projetos**: clique no cartão de um projeto (veja [Encontre todos os seus projetos](#find-all-your-projects)).
+- **Pela página Projetos**: clique no cartão de um projeto (veja [Encontre todos os seus projetos](#find-all-your-projects)). A página do projeto abre.
 - **Pela barra lateral**: na lista de sessões, clique no nome do projeto no cabeçalho dele (no celular, abra primeiro a barra lateral, que é uma gaveta, e toque no nome; a gaveta se fecha e os detalhes ocupam a tela). O menu ⋯ dele também tem **Detalhes do projeto**, como primeiro item. A setinha ao lado do nome recolhe ou expande as sessões do projeto.
-- **Pela caixa de busca**: digite o nome do projeto na caixa de busca (Ctrl+K, ou ⌘K no Mac) e escolha-o. Um projeto que ainda não tem sessões não tem cabeçalho na barra lateral, então esse e a página Projetos são os caminhos até ele (um projeto que você acabou de criar abre a janela sozinho).
-- **De um link**: um link para um projeto em uma notificação ou na resposta de um agente também abre a janela sobre a página em que você está.
+- **Pela caixa de pesquisa**: digite o nome do projeto na caixa de pesquisa (Ctrl+K, ou ⌘K no Mac) e escolha-o. Na seção Projetos, a página dele abre; em outros lugares, a janela. Um projeto ainda sem sessões não tem título na barra lateral, então esta opção e a página Projetos são os caminhos até ele (um projeto que você acabou de criar abre sozinho).
+- **De um link**: um link para um projeto em uma notificação ou na resposta de um agente, aberto a partir de outra página, também abre a janela sobre ela.
+- **Pelo endereço**: digitar ou recarregar `/projects/<id>`, com uma aba em seguida se quiser, abre a página do projeto.
 
-A janela mostra o que um projeto guarda:
+A página e a janela mostram as mesmas coisas:
 
-- **O cabeçalho**, na cor do projeto: a marca e o nome dele e, abaixo, do que ele trata (a pasta dele quando não há descrição; um grupo diz "Reúne" e os nomes dos seus projetos). À direita, **Nova sessão** inicia uma sessão no projeto (no celular, a caneta); **Mais** (⋯) tem o menu do projeto (veja [O menu do projeto](#the-projects-menu)); e ✕ fecha a janela.
-- **Suas abas**: **Visão geral**, **Arquivos**, **Memória**, **Habilidades**, **Agentes** e **Configurações** (veja [A janela de detalhes de um projeto](#a-projects-details-window)).
+- **O cabeçalho**, na cor do projeto: na página do projeto, uma seta no canto superior esquerdo (**Todos os projetos**); depois, a marca e o nome dele e, abaixo, do que ele trata (a pasta, quando não há descrição; um grupo diz “Reúne” e os nomes dos projetos). À direita, **Nova sessão** começa uma sessão no projeto (no celular, a caneta) e **Mais** (⋯) tem o menu do projeto (veja [O menu do projeto](#the-projects-menu)). A janela também tem ✕, que a fecha.
+- **As abas**: **Visão geral**, **Arquivos**, **Memória**, **Habilidades**, **Agentes** e **Configurações** (veja [Detalhes de um projeto](#a-projects-details)).
 
-Feche-a com ✕, com Esc ou com um clique na página escurecida fora dela. Ir para outra página também a fecha: abrir um documento pela aba **Arquivos**, por exemplo, ou seguir um link. No celular, a janela ocupa a tela inteira. O Esc fecha primeiro um menu ou uma caixa de diálogo sobre a janela e, depois, a própria janela.
+**Na página do projeto**, a seta volta para a página Projetos, assim como o Voltar do navegador; não há ✕. A aba em que você está faz parte do endereço da página (`/projects/<id>/files`, `/projects/<id>/memory`…), então recarregar a página ou usar um link a mantém. O mesmo vale para uma pasta que você abre na aba **Arquivos**, e o Voltar sai dela. Um link ali para outro projeto (um que um grupo reúne) abre a página desse projeto. Excluir o projeto leva você de volta à página Projetos.
+
+**A janela** fecha com ✕, com Esc ou com um clique na página escurecida fora dela. Ir para outra página também a fecha: abrir um documento pela aba **Arquivos**, por exemplo, ou seguir um link. No celular, a janela ocupa a tela. Esc fecha primeiro um menu ou uma caixa de diálogo sobre a janela, e depois a janela.
 
 ## Encontre todos os seus projetos
 
@@ -51,7 +54,7 @@ Cada cartão mostra:
 - "2 trabalhando" enquanto as sessões dele estão trabalhando, e um ponto quando uma sessão terminou desde a sua última visita;
 - quando ele trabalhou pela última vez, e barrinhas com as mensagens das últimas quatro semanas.
 
-Aponte para um cartão (em telas de toque eles estão sempre lá) e **Nova sessão** inicia uma sessão no projeto, e **Mais** (⋯) tem o menu do projeto: **Abrir a pasta em Arquivos**, no app para computador **Mostrar no Finder**, **Mostrar no Explorador de Arquivos** ou **Mostrar na pasta**, **Só as sessões dele na barra lateral**, **Compartilhar com pessoas** e **Excluir o projeto** (veja [O menu do projeto](#the-projects-menu)). Clique em qualquer outro lugar de um cartão para abrir os detalhes do projeto em uma janela sobre a página (veja [Abra os detalhes de um projeto](#open-a-projects-details)). Solte arquivos do seu computador em um cartão para colocá-los na pasta do projeto.
+Passe o ponteiro sobre um cartão (em uma tela sensível ao toque, eles estão sempre visíveis) e **Nova sessão** começa uma sessão no projeto, e **Mais** (⋯) tem o menu do projeto: **Abrir a pasta em Arquivos**, no app de computador **Mostrar no Finder**, **Mostrar no Explorador de Arquivos** ou **Mostrar na pasta**, **Só as sessões dele na barra lateral**, **Compartilhar com pessoas** e **Excluir o projeto** (veja [O menu do projeto](#the-projects-menu)). Clique em qualquer outro ponto do cartão para abrir a página do próprio projeto, com uma seta de volta para todos os projetos (veja [Abra os detalhes de um projeto](#open-a-projects-details)). Solte arquivos do seu computador sobre um cartão para colocá-los na pasta do projeto.
 
 Abaixo dos cartões, **Pastas em que você trabalha** lista as pastas em que suas sessões trabalharam recentemente e que nenhum projeto tem ainda (veja [Pastas em que você trabalha, ainda sem projeto](#folders-you-work-in-not-in-a-project-yet)). **Criar projeto** em uma delas abre a janela **Novo projeto** com essa pasta escolhida; ✕ (**Não é um projeto: parar de sugerir**) a tira da lista de vez. A lista fica de fora enquanto você pesquisa.
 
@@ -72,9 +75,9 @@ Sem projetos ainda, a página diz o que é um projeto e oferece **Novo projeto**
 4. Deixe **Um agente para ele** ativado para que um agente seja criado para o projeto (veja [Agentes](#agents)), ou desative-o.
 5. Clique em **Criar o projeto**, ou pressione Enter no campo do nome.
 
-Uma pasta nova vai para uma pasta **Projetos** onde ficam as pastas de tarefas: "Imposto de renda 2026" recebe `~/Hydor/Projects/taxes-2026`, a menos que você tenha movido as pastas de tarefas para outro lugar (veja [Mova as pastas de tarefas](/guide/agents#move-task-folders)). Se esse nome já existir, o app acrescenta `-2`, `-3` e assim por diante. Quando o projeto é criado pela barra lateral ou pela página Projetos, os detalhes dele abrem em uma janela. Quando é criado pela página inicial, o novo projeto fica escolhido para a sessão que você está prestes a começar.
+Uma pasta nova fica dentro de uma pasta **Projects**, no mesmo lugar das pastas de tarefa: “Impostos 2026” recebe `~/Hydor/Projects/taxes-2026`, a menos que você tenha movido as pastas de tarefa para outro lugar (veja [Mover as pastas de tarefa](/guide/agents#move-task-folders)). Se esse nome já estiver em uso, o app acrescenta `-2`, `-3` e assim por diante. Quando o projeto é criado pela página Projetos, a página do novo projeto se abre. Quando é criado pela barra lateral, os detalhes dele se abrem em uma janela por cima da página em que você está. Quando é criado pela página inicial, o novo projeto já fica escolhido para a sessão que você vai começar.
 
-Mais duas coisas são definidas depois, na aba **Configurações** do projeto: o agente com que as sessões dele começam e os projetos que ele reúne. As notas, a wiki e os documentos dele ficam na aba **Memória**, as habilidades na aba **Habilidades**, e mais pastas na aba **Arquivos** (veja [A janela de detalhes de um projeto](#a-projects-details-window)).
+Outras duas coisas são definidas depois, na aba **Configurações** do projeto: o agente com que as sessões dele começam e os projetos que ele reúne. As notas, a wiki e os documentos dele ficam na aba **Memória**, as habilidades na aba **Habilidades** e mais pastas na aba **Arquivos** (veja [Detalhes de um projeto](#a-projects-details)).
 
 ### Um projeto para uma pasta que você já tem
 
@@ -89,7 +92,7 @@ O Hydor lista as sessões que você teve no Claude Code e no Codex fora do Hydor
 - **O que fica de fora**: a sua pasta pessoal; pastas ocultas (exceto as pastas dos projetos do próprio Codex); pastas temporárias; as pastas que o app cria para si mesmo (pastas de tarefas, execuções de apps, worktrees e os dados dele); pastas que você marcou como **Não é um projeto**; e pastas que um projeto já tem: a própria pasta dele, uma com a qual ele trabalha ou uma pasta dentro delas.
 - **Quando**: assim que o Hydor lê as suas sessões depois de iniciar, e depois em cerca de um minuto após novas sessões aparecerem lá.
 - **Seu nome**: o nome que você deu à pasta na barra lateral (**Renomear**), ou então o nome do projeto do Codex, ou então o nome da própria pasta. Se um projeto já tem esse nome, o nome da pasta acima vai na frente ("cliente/app"), e depois um número.
-- **Na barra lateral**: o grupo dela é o grupo do projeto, com a marca e o nome dele e, depois do nome, as marcas dos programas em que foi encontrado. Aponte para o nome, ou abra o **⋯** do cabeçalho, para ver de onde vieram as sessões dele (**Iniciada fora do Hydor**), como no grupo de uma pasta. A janela de detalhes dele abre como a de qualquer projeto (veja [Abra os detalhes de um projeto](#open-a-projects-details)); ela não diz onde o projeto foi encontrado.
+- **Na barra lateral**: o grupo dela é o grupo do projeto, com a marca e o nome dele e, depois do nome, as marcas dos programas em que ele foi encontrado. Aponte para o nome ou abra o **⋯** do título para ver de onde vieram as sessões (**Iniciada fora do Hydor**), como no grupo de uma pasta. Os detalhes se abrem como os de qualquer projeto (veja [Abra os detalhes de um projeto](#open-a-projects-details)); eles não informam onde o projeto foi encontrado.
 - **Um projeto como qualquer outro**: a pasta própria dele é a pasta onde essas sessões foram executadas, e nada é movido nem copiado. Ele tem documentos, habilidades, diretrizes, um agente, arquivos e compartilhamento como qualquer projeto, e você pode renomeá-lo, descrevê-lo ou excluí-lo. As habilidades do próprio Claude Code em `.claude/skills` da pasta aparecem na aba **Habilidades** como antes, e o CLAUDE.md ou o AGENTS.md da própria pasta continua sendo lido pelos agentes como antes.
 - **Se você o excluir**, o Hydor não o cria de novo, e você ainda pode criar você mesmo um projeto para essa pasta (veja [Exclua um projeto](#delete-a-project)).
 
@@ -107,7 +110,7 @@ As pastas em que você trabalha com o Claude Code e o Codex viram projetos sozin
 
 Há duas maneiras:
 
-- **Pelo projeto**: clique na caneta no fim do título dele na barra lateral, ou em **Nova sessão** no alto da janela de detalhes dele (no celular, a caneta). A página inicial abre com o projeto escolhido e com o que você escolheu nele antes; se você ainda não escolheu nada ali, com o agente dele, quando ele tiver um.
+- **A partir do projeto**: clique na caneta no fim do título dele na barra lateral ou em **Nova sessão** no topo dos detalhes (no celular, na caneta). A página inicial se abre com o projeto escolhido e com o que você escolheu nele antes; se você ainda não escolheu nada ali, com o agente dele, quando houver.
 - **Pela página inicial**: abra o chip de pasta na linha abaixo da caixa de mensagem. O menu dele tem duas listas curtas: **Projetos**, os cinco em andamento mais recentes (e o escolhido, se não estiver entre eles), cada um com sua marca, seu nome e sua pasta; depois **Pastas**, a pasta em uso e as que você usou por último; e então **Nova pasta de tarefa**. **Nova**, ao lado do título **Projetos**, cria um projeto e o escolhe. Digite parte de um nome no campo no alto para encontrar qualquer projeto ou qualquer pasta. A pasta de um projeto nunca aparece na lista como pasta: se for encontrada pelo nome ou pelo caminho, ou se já tiver sido escolhida antes na página inicial como pasta, ela é o projeto, e a sessão trabalha no projeto.
 
 Quando você escolhe um projeto, o chip mostra a marca e o nome dele no lugar de uma pasta, e a sessão vai trabalhar na pasta do projeto. Em um projeto onde você ainda não escolheu nada, o chip **Agente** mostra o agente do próprio projeto, quando ele tiver um, com o programa, o modelo e as permissões que esse agente sugerir, ou então **Geral**; em um projeto onde você já escolheu, mostra o que você escolheu ali. Você ainda pode mudar qualquer um deles antes de começar. Depois, digite sua mensagem e clique em **Início**.
@@ -118,13 +121,13 @@ No celular, o menu abre como uma folha na parte de baixo da tela, com o título 
 
 Quando a pasta do projeto é um repositório Git, o fim do menu oferece **Novo worktree**, como para qualquer pasta de um repositório: a sessão passa a trabalhar em um branch próprio, em uma cópia separada do repositório (veja [Sessões](/guide/sessions)). As sessões que você começa por voz no modo Mãos livres começam no último lugar escolhido na página inicial, com as escolhas dele (veja [Documentos, imagens, vídeos e voz](/guide/documents-voice)).
 
-## Janela de detalhes de um projeto
+## Detalhes de um projeto
 
-Abra-a como descrito em [Abrir os detalhes de um projeto](#open-a-projects-details). As abas da janela são **Visão geral**, **Arquivos**, **Memória**, **Habilidades**, **Agentes** e **Configurações**. **Memória** e **Habilidades** mostram uma contagem, exceto no celular, onde as abas deixam as contagens de fora. No celular (ou em uma janela estreita), as abas que não cabem ficam em **Mais**, no fim da fila: toque nele para ver um menu com elas. Enquanto uma delas está aberta, o nome dela aparece ali no lugar de **Mais**. Cada aba aparece na hora.
+Abra-os como descrito em [Abra os detalhes de um projeto](#open-a-projects-details). As abas são **Visão geral**, **Arquivos**, **Memória**, **Habilidades**, **Agentes** e **Configurações**. **Memória** e **Habilidades** têm uma contagem, exceto no celular, onde as abas não mostram as contagens. No celular (ou em uma janela estreita), as abas que não cabem ficam em **Mais**, no fim da linha: toque para ver um menu com elas. Enquanto uma delas está aberta, o nome dela aparece ali no lugar de **Mais**. Cada aba é exibida na hora.
 
 ### O menu do projeto
 
-**Mais** (⋯) no cabeçalho da janela tem:
+**Mais** (⋯), no cabeçalho, tem:
 
 - **Abrir a pasta em Arquivos**: a pasta do projeto na página Arquivos.
 - **Mostrar no Finder**, **Mostrar no Explorador de Arquivos** ou **Mostrar na pasta**: no app para computador, a pasta do projeto selecionada no gerenciador de arquivos do sistema (veja [Trabalhar com arquivos e pastas](/guide/files-git#work-with-files-and-folders)).
@@ -165,7 +168,7 @@ Para adicionar arquivos de outros lugares do app, use **Adicionar a um projeto**
 
 ### Memória
 
-O que o projeto lembra, em uma lista: as notas, os artigos da wiki e os documentos dele. Uma caixa de busca no topo pesquisa nos três de uma vez, **Adicionar** coloca uma nota, arquivos ou uma pasta para manter atualizada, e as etiquetas **Todos**, **Notas**, **Wiki** e **Documentos** restringem a lista. Clique em uma linha para abri-la à direita (no celular, ela ocupa o lugar da lista). Um link para uma etiqueta abre a janela nela, e os endereços das antigas abas Knowledge e LLM Wiki também.
+O que o projeto lembra, em uma única lista: as notas, os artigos da wiki e os documentos. Uma caixa de busca no topo procura nos três de uma vez, **Adicionar** inclui uma nota, arquivos ou uma pasta para manter atualizada, e as etiquetas **Todos**, **Notas**, **Wiki** e **Documentos** restringem a lista. Clique em uma linha para abri-la à direita (no celular, ela ocupa o lugar da lista). Um link para uma etiqueta abre o projeto nela, assim como os endereços das antigas abas Knowledge e LLM Wiki.
 
 - **Notas**: as notas de memória que os agentes guardaram sobre o projeto, como [Configurações → Memória](/settings?s=memory) as lista, com o perfil do projeto primeiro. São os fatos curtos com que toda sessão do projeto começa (veja [Memória](/guide/memory)).
 - **Wiki**: os artigos e as fontes da memória wiki do projeto, para ler. Os agentes a escrevem; você a lê aqui. O menu **⋯** tem as tarefas dela e **Atualizações da wiki…** (veja [Memória wiki](/guide/wiki-memory#a-projects-memory-tab)).

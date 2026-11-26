@@ -1,8 +1,8 @@
 /**
  * The column beside the rail that a page has, if any (SideColumn.tsx): the sessions' on the start page, in a session
  * and in its review; the Apps page's; Settings'; the Agents page's (also on an agent's page); Help's topics; the
- * Browser's own tab column, which the page draws itself. Every other page uses the whole width (Projects and Shared
- * knowledge too: a project's details are a window over the page, not a page). All of them read
+ * Browser's own tab column, which the page draws itself. Every other page uses the whole width (Projects and a
+ * project's own page too, and Shared knowledge). All of them read
  * `useUI.sideOpen`, so Ctrl+B and the Hide and Show sidebar buttons mean the column of the page you are on. The Apps
  * page's index only (its places, Connected apps included): an app opened from it is shown whole.
  */

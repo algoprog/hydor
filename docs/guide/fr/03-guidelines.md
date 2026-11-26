@@ -17,7 +17,7 @@ Ce que vous demandez dans la conversation passe toujours en premier : si vos con
 Les consignes existent à trois niveaux, du plus général au plus précis :
 
 1. **Pour toutes les sessions** : chaque agent, dans chaque session. À définir dans [Paramètres → Agents → Consignes des agents](/settings?s=guidelines).
-2. **Pour un projet** : chaque session de ce [projet](/guide/projects). À définir dans la fenêtre de détails du projet (son onglet **Paramètres**), dans le champ **Consignes des agents**.
+2. **Pour un projet** : chaque session de ce [projet](/guide/projects). À définir dans les détails du projet (son onglet **Paramètres**), dans le champ **Consignes des agents**.
 3. **Pour une session** : uniquement cette session. À définir sur la page de démarrage (**Options → Consignes**) avant son lancement, ou plus tard depuis le menu de la session (⋯) → **Paramètres de la session → Consignes**.
 
 Un agent reçoit tous les niveaux qui s’appliquent à sa session, dans cet ordre. Quand deux niveaux se contredisent, le plus précis l’emporte : les consignes d’une session priment sur celles de son projet, et celles d’un projet priment sur celles pour toutes les sessions. (Le (i) à côté de **Pour une session** dans les Paramètres dit la même chose.)

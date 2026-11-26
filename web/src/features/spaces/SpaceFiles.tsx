@@ -12,7 +12,7 @@ import { FolderFinder } from '../../components/FolderPicker';
 import { Button, cx, Popover } from '../../components/ui';
 import { enc, patch } from '../../lib/api';
 import { basename, tildify } from '../../lib/format';
-import { go, openProject, useFilePeek, useProjectWindow } from '../../lib/nav';
+import { go, openProject, useFilePeek } from '../../lib/nav';
 import { toastError, useApp, useToasts } from '../../lib/store';
 import { dropInto, goFolder, takesDrop } from '../files/actions';
 import { FolderView } from '../files/FolderView';
@@ -20,12 +20,11 @@ import { KeptThings, useKept } from '../pages/kept';
 import { SpaceMark } from './parts';
 import { loadSpaces } from './state';
 
-export function SpaceFiles({ s, onSaved }: { s: Space; onSaved: (next: Space) => void }) {
+export function SpaceFiles({ s, asked, onSaved }: { s: Space; asked?: string; onSaved: (next: Space) => void }) {
   const home = useApp((x) => x.boot?.home);
   const roots = [s.folder, ...(s.folders ?? [])];
   const under = (p: string, r: string) => p === r || p.startsWith(`${r}/`);
-  // The folder the window's Files shows (its `dir`), when it is one of the project's.
-  const asked = useProjectWindow((x) => (x.at?.id === s.id ? x.at.dir : undefined));
+  // The folder asked for (the `dir` of the project's page or window), when it is one of the project's.
   const dir = asked && roots.some((r) => under(asked, r)) ? asked : s.folder;
   // The folder it is in: the space's own, else the one it works with that holds it (the deepest, if nested).
   const root = under(dir, s.folder) ? s.folder : (roots.filter((r) => under(dir, r)).sort((a, b) => b.length - a.length)[0] ?? s.folder);

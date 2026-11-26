@@ -4,12 +4,13 @@ import { crossFade } from './motion';
 import { machineBase, machineId, splitMachinePath } from './machine';
 import { useUI } from './store';
 
-/** The tabs of a project's details window, and the parts of its Memory tab. */
+/** The tabs of a project's details (its page or its window), and the parts of its Memory tab. */
 export type ProjectTab = 'overview' | 'files' | 'memory' | 'skills' | 'agents' | 'settings';
 export type ProjectPart = 'all' | 'notes' | 'wiki' | 'documents';
 
 /**
- * The project whose details show in a window over the page (features/spaces/ProjectDialog, held by the shell), if any:
+ * The project whose details show in a window over the page (features/spaces/ProjectDialog, held by the shell), if any
+ * (in the Projects section a project has its own page instead, `/projects/<id>`: see openProject):
  * the tab it opened on, the chip of its Memory (none: All), whether it opened to share it. `n` counts the openings, so one opened
  * again (on another tab, say) starts afresh.
  */
@@ -19,26 +20,57 @@ export const useProjectWindow = create<{ at: { id: string; tab: ProjectTab; part
 let opens = 0;
 let asks = 0;
 
-/**
- * Opens a project's details in a window over the page that is open, on a tab (Overview if none). `dir`: the folder its
- * Files tab shows. Asked for the Files of the project already open there, the window stays as it is and only `dir` changes.
- */
-export function openProject(id: string, tab: ProjectTab = 'overview', opts?: { part?: ProjectPart; share?: boolean; dir?: string }) {
+type ProjectOpts = { part?: ProjectPart; share?: boolean; dir?: string };
+
+/** The page shown now, without the machine's part of the address. */
+const here = () => location.pathname.slice(machineBase.length);
+
+/** The Projects section is on screen: its list (`/projects`) or a project's own page (`/projects/<id>…`). */
+const inProjects = () => /^\/projects(\/|$)/.test(here());
+
+/** The address of a project's own page, on a tab (Overview if none), with the Memory chip, the Share dialog or the Files folder asked for. */
+export function projectHref(id: string, tab: ProjectTab = 'overview', opts?: ProjectOpts) {
+  const q = new URLSearchParams();
+  if (tab === 'memory' && opts?.part && opts.part !== 'all') q.set('part', opts.part);
+  if (opts?.share) q.set('share', '1');
+  if (tab === 'files' && opts?.dir) q.set('dir', opts.dir);
+  const s = q.toString();
+  return `/projects/${encodeURIComponent(id)}${tab === 'overview' ? '' : `/${tab}`}${s ? `?${s}` : ''}`;
+}
+
+/** Opens a project's window over the page that is open (asked for the Files of the project already open there, it stays as it is and only `dir` changes). */
+function openWindow(id: string, tab: ProjectTab, opts?: ProjectOpts) {
   useProjectWindow.setState((s) => {
     const same = s.at?.id === id && tab === 'files' && s.at.tab === 'files';
     return { at: { id, tab, part: opts?.part, share: opts?.share, dir: opts?.dir, n: same && s.at ? s.at.n : ++opens, req: ++asks } };
   });
 }
 
-/** Closes the project's window. */
-export const closeProject = () => useProjectWindow.setState({ at: null });
+/**
+ * Opens a project's details on a tab (Overview if none). `dir`: the folder its Files tab shows. In the Projects section
+ * (its list, or a project's page) they are the project's own page in the workspace, with the way back to all projects;
+ * anywhere else (a session, the sidebar beside it) a window over the page that is open, which stays.
+ */
+export function openProject(id: string, tab: ProjectTab = 'overview', opts?: ProjectOpts) {
+  if (!inProjects()) return openWindow(id, tab, opts);
+  const to = projectHref(id, tab, opts);
+  // Another tab or folder of the project on screen changes the page in place (the browser's Back steps back to it).
+  if (projectAddress(here())?.id === id) return navigate(machineBase + to);
+  go(to);
+}
+
+/** Closes the project's window; on a project's own page (where there is none), goes back to all projects. */
+export function closeProject() {
+  if (useProjectWindow.getState().at) useProjectWindow.setState({ at: null });
+  else if (projectAddress(here())?.id) go('/projects');
+}
 
 const PROJECT_TABS = ['overview', 'files', 'memory', 'skills', 'agents', 'settings'];
 
 /**
- * What an address of a project's page (`/projects/<id>[/<tab>][?part=…&share=1]`, from before the details were a window)
- * means: the project and where its window opens, or no id for the Projects page (`/projects`). Null for any other address. The
- * Library tab is Files now, and the old Knowledge and LLM Wiki tabs are parts of Memory.
+ * What an address of a project's page (`/projects/<id>[/<tab>][?part=…&share=1&dir=…]`) means: the project and the tab
+ * it shows, or no id for the Projects page (`/projects`). Null for any other address. The Library tab is Files now, and
+ * the old Knowledge and LLM Wiki tabs are parts of Memory.
  */
 export function projectAddress(path: string): { id?: string; tab: ProjectTab; part?: ProjectPart; share?: boolean; dir?: string } | null {
   const m = /^\/projects(?:\/([^/?#]+)(?:\/([^/?#]+))?)?\/?(?:\?([^#]*))?(?:#.*)?$/.exec(path);
@@ -62,28 +94,28 @@ export function projectAddress(path: string): { id?: string; tab: ProjectTab; pa
 }
 
 /**
- * Moves to a page of the machine this page shows. A project's address (`/projects/<id>…`) opens its details window over
- * the page instead (the page stays); `/projects` alone is the Projects page.
+ * Moves to a page of the machine this page shows. A project's address (`/projects/<id>…`) is its own page in the
+ * Projects section; from anywhere else it opens the project's window over the page instead (the page stays).
  */
 export function go(path: string, replace = false) {
   const project = projectAddress(path);
   if (project?.id) {
-    const here = location.pathname.slice(machineBase.length);
-    // Typed, reloaded or followed from elsewhere, an old address of a page (a project's, the Library's…) gives way to the Projects page (as it was, the window opens over it).
-    if (/^\/(projects|spaces|library|pages)(\/|$)/.test(here) && !/^\/projects\/?$/.test(here)) navigate(`${machineBase}/projects`, { replace: true });
-    return openProject(project.id, project.tab, { part: project.part, share: project.share, dir: project.dir });
+    // An old address of a page (the Library's, a space's…), and a kept thing's own page (/pages/<id>, whose arrow leads
+    // back to its project's Files), give way to the project's page; from a session or any other page, its window opens over it.
+    if (/^\/(spaces|library|pages)(\/|$)/.test(here())) replace = true;
+    else if (!inProjects()) return openWindow(project.id, project.tab, { part: project.part, share: project.share, dir: project.dir });
   }
   // Going anywhere else from the project's window (New session, a session, a document from its Files) leaves it, even
   // when the page under it is that place already.
-  if (useProjectWindow.getState().at) closeProject();
+  if (useProjectWindow.getState().at) useProjectWindow.setState({ at: null });
   const to = machineBase + path;
   // Pages cross-fade (Motion: Full), but not to or from the Browser (its page is a window of its own, which cannot be
   // part of the picture), not for a change inside a page (its query or its # only), and not where code goes on at once
   // from the new address (a section's # to scroll to, a redirect that replaces the page).
-  const here = location.pathname;
+  const now = location.pathname;
   const target = to.split(/[?#]/)[0];
   const page = (p: string) => p.slice(machineBase.length).split('/')[1] ?? '';
-  if (replace || to.includes('#') || target === here || page(target) === 'browser' || page(here) === 'browser') return navigate(to, { replace });
+  if (replace || to.includes('#') || target === now || page(target) === 'browser' || page(now) === 'browser') return navigate(to, { replace });
   crossFade('page', () => navigate(to, { replace }));
 }
 

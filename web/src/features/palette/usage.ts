@@ -80,7 +80,7 @@ let last: string | null = null;
 export function CountVisits() {
   const [loc] = useLocation();
   const search = useSearch();
-  // A project's details are a window over the page, not an address of their own: its staying open is a visit too.
+  // A project's window over the page has no address of its own: its staying open is a visit too.
   const project = useProjectWindow((x) => x.at?.id);
   useEffect(() => {
     const place = project ? `space:${project}` : placeOf(loc, search, pages());

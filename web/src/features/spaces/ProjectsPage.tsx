@@ -1,7 +1,8 @@
 // The Projects page (/projects): every project in one place, as cards: its mark and colour, its name, what it is about,
 // its folder, what it holds, when it was last at work and how its sessions are doing now (working, finished since you
-// looked), with a few weeks of its work as small bars. A card opens the project's details (a window over the page,
-// ProjectDialog.tsx); New session and its menu show beside it on hover. Files dropped on a card go into its folder.
+// looked), with a few weeks of its work as small bars. A card opens the project's own page in its place
+// (/projects/<id>, SpacePage.tsx, with an arrow back here); New session and its menu show beside it on hover. Files
+// dropped on a card go into its folder.
 // Below the cards, the folders you work in that no project has yet, each a tap from one. Find a project, and a sort
 // (kept on this device), are above them.
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';

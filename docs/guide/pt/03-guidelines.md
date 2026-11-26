@@ -17,7 +17,7 @@ O que você pede na conversa sempre vem primeiro: se suas diretrizes dizem "resp
 As diretrizes têm três níveis, do mais geral ao mais específico:
 
 1. **Para todas as sessões**: todos os agentes, em todas as sessões. Definido em [Configurações → Agentes → Diretrizes dos agentes](/settings?s=guidelines).
-2. **Para um projeto**: todas as sessões desse [projeto](/guide/projects). Definido na janela de detalhes do projeto (na aba **Configurações**), no campo **Diretrizes dos agentes**.
+2. **Para um projeto**: todas as sessões desse [projeto](/guide/projects). Definido nos detalhes do projeto (na aba **Configurações**), no campo **Diretrizes dos agentes**.
 3. **Para uma sessão**: só essa sessão. Definido na página inicial (**Opções → Diretrizes**) antes de ela começar, ou depois, pelo menu da sessão (⋯) → **Configurações da sessão → Diretrizes**.
 
 Um agente recebe todos os níveis que se aplicam à sua sessão, nessa ordem. Quando dois discordam, o mais específico vence: as diretrizes de uma sessão valem mais que as do projeto, e as do projeto valem mais que as de todas as sessões. (O (i) ao lado de **Para uma sessão** em Configurações diz o mesmo.)

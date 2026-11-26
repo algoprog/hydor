@@ -2,7 +2,7 @@
 
 Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams you edit as in PowerPoint, Word, Excel, Overleaf, Jupyter or draw.io. What you keep goes in the files of its project (the project's details → **Files**), with your kept pictures, videos, sounds and web pages. This topic covers watching a page as it is written, changing and keeping it, pictures, videos and sounds, making your own, designs, diagrams, boards, slides, exporting, asking an agent for changes, and publishing.
 
-![A project's Files tab in its details window: its documents, slides and pictures as tiles among the folder's files](images/library.webp)
+![A project's Files tab on its page: its documents, slides and pictures as tiles among the folder's files](images/library.webp)
 
 ## Pages in the conversation
 
@@ -307,7 +307,7 @@ Everything you keep belongs to one project, or to none (see [Projects and knowle
 - Files you drop on a project's **Files** go in its folder as files (see [Add files of yours](#add-files-of-yours)).
 - To move something, open its **More** (⋯) → **Move to another project** on its tile (**Move to a project** on its own page), and pick a project or **No project**. "Moved to Thesis" confirms it. Moving it changes nothing else: its versions, its data and its addresses stay.
 
-A project's details show what it holds on its **Overview** and **Files** tabs (see [A project's details window](/guide/projects#a-projects-details-window)). Deleting a project keeps what it held, in no project: the search box finds it, and its own page can move it into another project.
+A project's details show what it holds on its **Overview** and **Files** tabs (see [A project's details](/guide/projects#a-projects-details)). Deleting a project keeps what it held, in no project: the search box finds it, and its own page can move it into another project.
 
 To keep your own order, make real folders in the project's **Files** (**New** → **New folder**) and drag files into them: they are ordinary folders of the project's folder, as everywhere in [Work with files and folders](/guide/files-git#work-with-files-and-folders). To bring in a whole folder of this computer, upload it (**Upload** → **Upload a folder**) or drop it on the **Files** tab.
 

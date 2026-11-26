@@ -2,7 +2,7 @@
 
 Les agents peuvent répondre par une page plutôt que par du texte brut : un rapport, un graphique, un tableau pour comparer des options, ou un petit outil comme un suivi ou une liste de contrôle. Ils créent aussi des diapositives, des documents, des feuilles de calcul, des documents LaTeX, des notebooks et des diagrammes que vous modifiez comme dans PowerPoint, Word, Excel, Overleaf, Jupyter ou draw.io. Ce que vous gardez va dans les fichiers de son projet (les détails du projet → **Fichiers**), avec vos images, vidéos, sons et pages web conservés. Cette rubrique explique comment regarder une page pendant qu’elle s’écrit, la modifier et la garder, les images, vidéos et sons, créer les vôtres, les designs, les diagrammes, les tableaux de bord, les diapositives, l’export, la demande de modifications à un agent, et la publication.
 
-![L’onglet Fichiers d’un projet dans sa fenêtre de détails : ses documents, présentations et images sous forme de vignettes parmi les fichiers du dossier](images/library.webp)
+![L’onglet Fichiers d’un projet sur sa page : ses documents, présentations et images sous forme de vignettes parmi les fichiers du dossier](images/library.webp)
 
 ## Les pages dans la conversation
 
@@ -307,7 +307,7 @@ Tout ce que vous gardez appartient à un projet, ou à aucun (voir [Projets et c
 - Les fichiers que vous déposez sur les **Fichiers** d’un projet vont dans son dossier en tant que fichiers (voir [Ajouter vos fichiers](#add-files-of-yours)).
 - Pour déplacer un élément, ouvrez son menu **Plus** (⋯) → **Déplacer vers un autre projet** sur sa vignette (**Déplacer vers un projet** sur sa propre page), puis choisissez un projet ou **Aucun projet**. « Déplacé vers Thesis » le confirme. Le déplacement ne change rien d’autre : ses versions, ses données et ses adresses restent.
 
-Les détails d’un projet montrent ce qu’il contient dans ses onglets **Vue d’ensemble** et **Fichiers** (voir [La fenêtre de détails d’un projet](/guide/projects#a-projects-details-window)). Supprimer un projet conserve ce qu’il contenait, sans projet : la zone de recherche le trouve, et sa propre page peut le déplacer dans un autre projet.
+Les détails d’un projet montrent ce qu’il contient dans ses onglets **Vue d’ensemble** et **Fichiers** (voir [Les détails d’un projet](/guide/projects#a-projects-details)). Supprimer un projet conserve ce qu’il contenait, sans projet : la zone de recherche le trouve, et sa propre page peut le déplacer dans un autre projet.
 
 Pour garder votre propre ordre, créez de vrais dossiers dans les **Fichiers** du projet (**Nouveau** → **Nouveau dossier**) et faites-y glisser des fichiers : ce sont des dossiers ordinaires du dossier du projet, comme partout dans [Travailler avec des fichiers et des dossiers](/guide/files-git#work-with-files-and-folders). Pour importer un dossier entier de cet ordinateur, importez-le (**Importer** → **Importer un dossier**) ou déposez-le sur l’onglet **Fichiers**.
 

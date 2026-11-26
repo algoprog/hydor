@@ -17,7 +17,7 @@ Lo que pides en la conversación siempre tiene prioridad: si tus pautas dicen �
 Las pautas tienen tres niveles, del más general al más específico:
 
 1. **Para todas las sesiones**: todos los agentes, en todas las sesiones. Se configura en [Configuración → Agentes → Pautas de los agentes](/settings?s=guidelines).
-2. **Para un proyecto**: todas las sesiones de ese [proyecto](/guide/projects). Se configura en la ventana de detalles del proyecto (su pestaña **Configuración**), en el campo **Pautas de los agentes**.
+2. **Para un proyecto**: todas las sesiones de ese [proyecto](/guide/projects). Se configura en los detalles del proyecto (su pestaña **Configuración**), en el campo **Pautas de los agentes**.
 3. **Para una sesión**: solo esa sesión. Se configura en la página de inicio (**Opciones → Pautas**) antes de empezarla, o más tarde desde el menú de la sesión (⋯) → **Configuración de la sesión → Pautas**.
 
 Un agente recibe todos los niveles que se aplican a su sesión, en ese orden. Cuando dos se contradicen, gana el más específico: las pautas de una sesión sobre las de su proyecto, y las de un proyecto sobre las de todas las sesiones. (El (i) junto a **Para una sesión** en Configuración dice lo mismo.)

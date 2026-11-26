@@ -2,7 +2,7 @@
 
 Agenten können mit einer Seite statt nur mit Text antworten: etwa einem Bericht, einem Diagramm, einer Vergleichstabelle oder einem kleinen Werkzeug wie einem Tracker oder einer Checkliste. Sie erstellen auch Präsentationen, Dokumente, Tabellen, LaTeX-Dokumente, Notebooks und Diagramme, die du ähnlich wie in PowerPoint, Word, Excel, Overleaf, Jupyter oder draw.io bearbeitest. Was du behältst, liegt in den Dateien seines Projekts (die Details des Projekts → **Dateien**), zusammen mit deinen behaltenen Bildern, Videos, Audiodateien und Webseiten. Dieser Artikel erklärt, wie du die Entstehung einer Seite verfolgst, sie bearbeitest und behältst, Bilder, Videos und Audiodateien, eigene Inhalte, Designs, Diagramme, Boards, Präsentationen, Export, Änderungsaufträge an Agenten und Veröffentlichungen.
 
-![Der Tab „Dateien“ eines Projekts im Detailfenster: seine Dokumente, Folien und Bilder als Kacheln zwischen den Dateien des Ordners](images/library.webp)
+![Der Tab „Dateien“ eines Projekts auf seiner Seite: seine Dokumente, Folien und Bilder als Kacheln zwischen den Dateien des Ordners](images/library.webp)
 
 ## Seiten in der Unterhaltung
 
@@ -307,7 +307,7 @@ Alles, was du behältst, gehört zu einem Projekt oder zu keinem (siehe [Projekt
 - Dateien, die du auf die **Dateien** eines Projekts ziehst, landen als Dateien in seinem Ordner (siehe [Eigene Dateien hinzufügen](#add-files-of-yours)).
 - Um etwas zu verschieben, öffne sein **Mehr** (⋯) → **In ein anderes Projekt verschieben** an seiner Kachel (**In ein Projekt verschieben** auf seiner eigenen Seite) und wähle ein Projekt oder **Kein Projekt**. „Verschoben nach Abschlussarbeit“ bestätigt es. Das Verschieben ändert sonst nichts: Seine Versionen, seine Daten und seine Adressen bleiben.
 
-Die Details eines Projekts zeigen, was es enthält, in seinen Tabs **Übersicht** und **Dateien** (siehe [Das Detailfenster eines Projekts](/guide/projects#a-projects-details-window)). Wird ein Projekt gelöscht, bleibt, was es enthielt, erhalten, in keinem Projekt: Das Suchfeld findet es, und seine eigene Seite kann es in ein anderes Projekt verschieben.
+Die Details eines Projekts zeigen, was es enthält, in seinen Tabs **Übersicht** und **Dateien** (siehe [Details eines Projekts](/guide/projects#a-projects-details)). Wird ein Projekt gelöscht, bleibt, was es enthielt, erhalten, in keinem Projekt: Das Suchfeld findet es, und seine eigene Seite kann es in ein anderes Projekt verschieben.
 
 Um deine eigene Ordnung zu halten, lege echte Ordner in den **Dateien** des Projekts an (**Neu** → **Neuer Ordner**) und ziehe Dateien hinein: Es sind gewöhnliche Ordner im Ordner des Projekts, wie überall unter [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders). Um einen ganzen Ordner dieses Computers hereinzuholen, lade ihn hoch (**Hochladen** → **Ordner hochladen**) oder ziehe ihn auf den Tab **Dateien**.
 
