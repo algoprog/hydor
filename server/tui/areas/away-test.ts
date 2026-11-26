@@ -62,7 +62,8 @@ test('away: the folded line, the rows most important first, next today, where to
 test('away: nothing new says so', async () => {
   const quiet: AwaySummary = { ...sum, rows: [sum.rows[3]], counts: { needs: 0, done: 0, failed: 0, quiet: 1 } };
   const r = await run(fakeConn({ [AWAY]: quiet }).conn, ['away']);
-  assert.match(r.out, /^Nothing new since \d\d?:\d\d/);
+  // In the half hour after midnight the time it counts from is yesterday's ("since yesterday 11:35 PM").
+  assert.match(r.out, /^Nothing new since (yesterday )?\d\d?:\d\d/);
 });
 
 test('away seen: marks what was listed as seen', async () => {
