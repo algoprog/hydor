@@ -973,6 +973,44 @@ with fees, a team tool with invitations, a knowledge base with search, a booking
 and the kit's fixed cost for a small app (its checks, its install, its notes) is work of its own. Ten pairs with one run each is a small
 sample: it can show a large difference and where the kit does not help, not a small one.
 
+### What the comparison found (26 November 2026)
+
+Six of the fourteen descriptions were built both ways by the same kind of agent, one build each way, and two of
+the larger ones were then changed by a fresh builder. The kit was at 0.6.1. Costs are worked out from each
+builder's tokens at list prices, since the builders ran on a subscription.
+
+| App | Checks passed, both ways | With the kit | From scratch | From scratch as a share |
+|---|---|---|---|---|
+| A one-page waiting list | 14 of 14 | $2.67 | $1.29 | 48% |
+| A calculator with rules of its own | 10 of 10 | $1.31 | $0.41 | 31% |
+| A tool with accounts, two shared lists and three numbers | 16 of 16 | $1.86 | $0.96 | 52% |
+| A page that works on a dropped file | 10 of 10 | $1.38 | $0.48 | 35% |
+| A club with roles, a monthly fee and notices for paid members | 17 of 17 | $2.69 | $0.92 | 34% |
+| Crews that see only their own, invitations, a person in two crews | 19 of 19 | $3.58 | $1.84 | 51% |
+| The club, changed afterwards (a new detail, a new fee) | 17 of 17 | $1.22 | $0.76 | 62% |
+| The crews tool, changed afterwards (a required field) | 19 of 19 | $1.03 | $0.43 | 42% |
+
+Every app passed every line of a judge that knows nothing of the kit and requires only what the maker's words
+require (real runs corrected it three times before a result counted: once against from scratch, once against the
+kit, once against both). From scratch cost a third to a half of the kit to build in every pair, and less to change
+in both changes; the difference did not narrow for the larger apps. The kit-built apps changed fewer lines for the
+same change and still cost more: what the kit adds for a builder is what it must read and run, not what it must
+write. On the app that should have suited a block best, the builder had to work round it (the teams block assumes
+one team at a time).
+
+It is a small sample: six pairs, one build each, one model, a judge that does not see how an app looks, how it
+holds up under attack beyond who sees which rows, or what a year of changes and updates costs. It shows a
+one-sided difference in every pair; it does not show that the kit is worse in general.
+
+**What follows, as a recommendation to decide.** By the rule that cost decides, a standalone app is built from
+scratch, and the kit is not the default for building. What is worth keeping is on Hydor's side: running an app
+inside Hydor with Hydor's sign-in, launching it to a server with backups and the way back, the keys card with how
+to get each key, the catalog of services, mail and models through the host. Today those work only for an app made
+with the kit. The move that fits the evidence is a small written contract any app can meet (how it starts, its
+port, where its data lives, how to tell it is ready, how it learns who is signed in), so that an app built from
+scratch gets them too, and the kit becomes one way of meeting the contract. Until that is decided, no new kit
+blocks are started (commerce, community and live were next); work that helps either way goes on.
+
 ## 14. Not in this plan
 
 - Native phone apps, and a hosting service of ours.
