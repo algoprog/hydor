@@ -6,7 +6,7 @@ tags: Product, Design
 cover: /img/blog/dynamic-uis/cover.webp
 coverAlt: A stream of glowing turquoise water pours across a dark mirror floor and fills clear glass shapes standing on it: the bars of a chart, a map pin, a ring and a small grid, each holding the water at its own level.
 og: /img/blog/dynamic-uis/og.jpg
-order: 5
+order: 1
 ---
 
 Ask a chatbot which robot vacuum to buy, and you get an essay. The answer is in there somewhere: a price in the second paragraph, the battery life in the fourth, the one it recommends at the end. But what you asked for was never an essay. It was a table, a few numbers and a decision.

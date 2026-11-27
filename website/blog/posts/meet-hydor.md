@@ -6,7 +6,7 @@ tags: Product, Introduction
 cover: /img/blog/meet-hydor/cover.webp
 coverAlt: A glowing arch of clear water, shaped like the Ω of Hydor's logo, stands on a dark mirror floor while thin streams of coral, lavender, blue, green and amber light flow into it.
 og: /img/blog/meet-hydor/og.jpg
-order: 1
+order: 5
 ---
 
 If you use AI agents every day, you know the scatter. Claude Code lives in one terminal, Codex in another, a chat app in a browser tab. Each has its own memory, or none, so you explain yourself again every time. Each runs on its own subscription. And when you leave your desk, the work either stops, or carries on where you cannot see it.

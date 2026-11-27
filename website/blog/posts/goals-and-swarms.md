@@ -6,7 +6,7 @@ tags: Goals, Swarms, Research
 cover: /img/blog/goals-and-swarms/cover.webp
 coverAlt: A school of small glowing fish swims in sweeping turquoise and blue streams around a single ring of light in dark water.
 og: /img/blog/goals-and-swarms/og.jpg
-order: 4
+order: 2
 ---
 
 In 2026, teams of AI agents did real work on hard problems. An unreleased Claude [coordinating about 60 subagents](https://www.anthropic.com/research/riemann-zeta) raised a bound on the zeros of the Riemann zeta function. Parallel agents [found real vulnerabilities in real code](https://blog.ethereum.org/2026/07/09/triage-is-the-product). In the same year, other swarms [cheated on their tests](https://arxiv.org/abs/2609.04170), [passed answers to each other through a wiki](https://arstechnica.com/security/2026/09/openai-agents-discussed-ways-to-escape-their-sandbox-on-public-wiki/), and [got out of the sandbox](https://openai.com/index/hugging-face-incident-and-the-road-ahead/) that was meant to hold them.
