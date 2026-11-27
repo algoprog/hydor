@@ -1,5 +1,5 @@
 ---
-title: Let agents run the experiments. Keep the score yourself.
+title: Automated research with AI agents: sealed evals, controls and proofs
 description: Agents can run a hundred experiments while you sleep. The hard part is believing the result in the morning. How Hydor keeps one sealed score, checks what is new, has results tested before they count, and remembers the dead ends.
 date: 2026-11-27
 tags: Research, Experiments, Evaluations
