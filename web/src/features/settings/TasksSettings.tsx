@@ -23,6 +23,7 @@ import { RefreshIcon } from '../../components/RefreshIcon';
 import { FeatureStartOptions } from '../registry';
 import { autoOfferedFor, useAutoModel } from '../assistants/autoModel';
 import { AgentPicker } from '../home/AgentPicker';
+import { ProjectSelect } from '../apps/Form';
 import { History } from '../automations/History';
 import { HookOptions } from '../automations/HookOptions';
 import { boxCls, browserZone, localTime, OutcomeBadge, RunDots } from '../automations/parts';
@@ -373,6 +374,8 @@ function AppAnswers({ app, schedule, onChange }: { app: TaskApp; schedule: TaskS
           </span>
           {f.type === 'file' ? (
             <span className="block text-[12.5px] text-fg-3">A task cannot attach files.</span>
+          ) : f.type === 'project' ? (
+            <ProjectSelect value={app.inputs[f.id] ?? ''} onChange={(v) => put(f.id, v)} required={f.required} className="h-9 text-[13px]" />
           ) : f.type === 'choice' || f.type === 'yesno' ? (
             <select className={cx(inputCls, 'h-9 text-[13px]')} value={app.inputs[f.id] ?? ''} onChange={(e) => put(f.id, e.target.value)}>
               <option value="">—</option>

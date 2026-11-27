@@ -59,8 +59,9 @@ const sleep = (ms: number, signal?: AbortSignal) =>
     signal?.addEventListener('abort', () => (clearTimeout(t), reject(new Error('aborted'))), { once: true });
   });
 
-/** Models whose server refused the extra options once: they are not sent again. */
+/** Models (with the effort asked for) whose server refused the extra options once: they are not sent again. */
 const plain = new Set<string>();
+const plainKey = (m: AgentModel, extra: Record<string, any> | undefined) => `${m.id}\n${extra?.reasoning_effort ?? extra?.reasoning?.effort ?? ''}`;
 const STALL_MS = Number(process.env.HYDOR_STALL_MS) || 10 * 60_000;
 
 function overflow(err: string): ContextOverflow | null {
@@ -80,6 +81,11 @@ export interface ChatOptions {
   maxTokens?: number;
   /** Sampling and reasoning options, dropped if the server refuses them. */
   extra?: Record<string, unknown>;
+  /**
+   * The effort picked for the session, for a model of your plan (its program takes it only if the model lists it); the
+   * other models get theirs in `extra`.
+   */
+  effort?: string;
   /** The same for every step of a conversation (its session's id): a provider that caches by it reads the last step's back. */
   cacheKey?: string;
 }
@@ -101,7 +107,7 @@ export async function chat(m: AgentModel, o: ChatOptions): Promise<Reply> {
   // own): asked with each request, the next one reads it back, sooner and at a tenth of the price. A server that refuses
   // it gets requests without it, as for any option (plain).
   const cached = m.provider === 'openrouter' && /^~?anthropic\//.test(m.model) ? { cache_control: { type: 'ephemeral' } } : {};
-  const extra = plain.has(m.id) ? {} : { ...cached, ...(o.extra ?? {}) };
+  const extra = plain.has(plainKey(m, o.extra)) ? {} : { ...cached, ...(o.extra ?? {}) };
   const body: Record<string, unknown> = {
     model: m.model,
     messages: o.messages,
@@ -139,7 +145,7 @@ export async function chat(m: AgentModel, o: ChatOptions): Promise<Reply> {
       const named = Object.keys(extra).filter((k) => err.includes(k));
       if (r.status >= 400 && r.status < 500 && Object.keys(extra).some((k) => k in body) && (named.length || /unrecognized|unknown|unsupported|not supported|extra (fields|inputs)|additional properties|invalid param/i.test(err))) {
         for (const k of Object.keys(extra)) delete body[k];
-        plain.add(m.id);
+        plain.add(plainKey(m, o.extra));
         continue;
       }
       if (r.status === 400 && /max_completion_tokens/.test(err) && body.max_tokens) {

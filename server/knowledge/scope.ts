@@ -36,6 +36,9 @@ export function basesFor(db: DB, space: string | null, includeWiki = true): (Bas
   return out;
 }
 
+/** The bases a tool call searches: those of an app step's project (it has no session of its own), else its session's. */
+export const basesOfCall = (db: DB, call: { key: string; project?: string }) => (call.project ? basesFor(db, call.project) : basesOfSession(db, call.key));
+
 /** The bases the session of a tool call searches. */
 export const basesOfSession = (db: DB, key: string) => {
   const extra = sessionExtra(db, key);

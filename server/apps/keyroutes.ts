@@ -122,6 +122,8 @@ export function keyRoutes(d: Deps, link: (key: string) => string) {
       slug: a.slug,
       recipe: a,
       source: 'api',
+      // With no app key the caller is the signed-in person, who may choose any project; a key's holder may not.
+      signedIn: !keyId,
       inputs: inputs && typeof inputs === 'object' ? inputs : rest,
       files: files && typeof files === 'object' ? files : undefined,
       flow: flow && flow !== 'run' ? flow : undefined,

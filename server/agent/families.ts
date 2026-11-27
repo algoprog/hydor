@@ -1,6 +1,7 @@
 // What differs between model families: the sampling each maker recommends, a few lines for habits a
 // family is known for, the edit format it was trained on, whether it handles several tool calls in one
 // reply, and request options (reasoning effort) where the server takes them.
+import { effortsOf, OPENROUTER_EFFORT } from '../../shared/efforts.ts';
 import type { AgentModel } from '../../shared/types.ts';
 
 export interface Sampling {
@@ -72,8 +73,10 @@ export function callId(seed?: string): string {
 
 /**
  * Sampling and reasoning options for a request, as far as the model's server takes them. `chosen` is the effort picked
- * for the session: an endpoint's reasoning model gets it as `reasoning_effort` (the OpenAI Chat Completions parameter),
- * and nothing when none is picked (the endpoint's own default).
+ * for the session; one the model does not offer (kept from another model) counts as none picked, and "default" sends no
+ * reasoning options. An OpenRouter reasoning model gets it as `reasoning: { effort }`, medium when none is picked; an
+ * endpoint's gets it as `reasoning_effort` (the OpenAI Chat Completions parameter), nothing when none is picked (the
+ * endpoint's own default).
  */
 export function requestOptions(m: AgentModel, fam: Family, chosen?: string): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -81,11 +84,15 @@ export function requestOptions(m: AgentModel, fam: Family, chosen?: string): Rec
   // vLLM already uses the model's own generation settings; others get the maker's recommendation.
   const keys: (keyof Sampling)[] = m.provider === 'openrouter' ? ['temperature', 'top_p', 'top_k', 'min_p', 'repetition_penalty'] : m.provider === 'endpoint' ? ['temperature', 'top_p', 'top_k', 'min_p'] : m.provider === 'ollama' ? ['temperature', 'top_p'] : [];
   for (const k of keys) if (s[k] !== undefined) out[k] = s[k];
-  const effort = (process.env.HYDOR_EFFORT ?? 'medium').toLowerCase();
-  if (m.provider === 'openrouter' && m.reasoning && effort !== 'default') out.reasoning = { effort };
-  else if (m.provider === 'endpoint' && m.reasoning) {
-    const e = (chosen ?? '').toLowerCase();
-    if (e && e !== 'default') out.reasoning_effort = e;
-  } else if (fam.effort && (m.provider === 'vllm' || m.provider === 'ollama') && /^(low|medium|high)$/.test(effort)) out.reasoning_effort = effort;
+  const e = (chosen ?? '').toLowerCase();
+  if (e === 'default') return out;
+  const picked = effortsOf(m).includes(e) ? e : undefined;
+  if (m.provider === 'openrouter' && m.reasoning) {
+    // A model whose efforts leave out medium is left at its own default.
+    const effort = picked ?? (!m.efforts || m.efforts.includes(OPENROUTER_EFFORT) ? OPENROUTER_EFFORT : undefined);
+    if (effort) out.reasoning = { effort };
+  } else if (m.provider === 'endpoint') {
+    if (picked) out.reasoning_effort = picked;
+  } else if (fam.effort && (m.provider === 'vllm' || m.provider === 'ollama')) out.reasoning_effort = /^(low|medium|high)$/.test(e) ? e : 'medium';
   return out;
 }

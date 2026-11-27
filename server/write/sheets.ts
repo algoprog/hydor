@@ -16,7 +16,8 @@ import { AI_BATCH, cellAnswer, jsonIn, TABLE_COL_TYPES, type AnalyzeAnswer, type
 import { FUNCTION_NAMES, formulaProblem, formulaRefs, type CellValue } from '../../shared/sheets.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
-import { helper, helperModelId, helperOptions, localHelper } from '../helper.ts';
+import { helper, helperModelId, helperOptions, localHelper, helperName, automaticNow } from '../helper.ts';
+import { NOTHING_SET_UP } from '../oneshot.ts';
 import { rateFor } from '../prices.ts';
 
 type Ask = { system: string; prompt: string; signal?: AbortSignal };
@@ -36,19 +37,26 @@ function goneSignal(reply: FastifyReply): AbortSignal {
 }
 
 /** The helper model's name, as the answers say it. */
-function helperName(db: DB): string {
-  if (helperForTests) return 'the test helper';
-  const id = helperModelId(db);
-  return id === 'auto' ? 'Claude' : (helperOptions(db).options.find((x) => x.value === id)?.label ?? id);
+function modelName(db: DB): string {
+  return helperForTests ? 'the test helper' : helperName(db);
 }
 
 /** What the AI helpers cost with the helper model picked now, in a line. */
 export function sheetAiCost(db: DB): SheetAiCost {
-  const id = helperModelId(db);
-  const model = helperName(db);
-  if (id === 'auto') return { model, note: `Answered by ${model} through Claude Code, as part of your plan: no charge of its own.`, free: true };
-  if (localHelper(db)) return { model, note: `Answered by ${model} on this computer: free.`, free: true };
+  const picked = helperModelId(db);
+  const model = modelName(db);
+  // On Automatic: Claude Code or Codex on your plan, else the Custom model it turns to, with that model's price.
+  const auto = picked === 'auto' ? automaticNow(db) : null;
+  if (picked === 'auto') {
+    if (!auto) return { model, note: NOTHING_SET_UP, free: true };
+    if ('program' in auto) {
+      const note = auto.program === 'claude' ? `Answered by ${model} through Claude Code, as part of your plan: no charge of its own.` : `Answered by ${model} on your ChatGPT plan: no charge of its own.`;
+      return { model, note, free: true };
+    }
+  }
+  const id = auto && 'model' in auto ? auto.model.id : picked;
   const m = helperOptions(db).options.find((x) => x.value === id);
+  if (localHelper(db) || (auto && 'model' in auto && auto.model.local)) return { model, note: `Answered by ${model} on this computer: free.`, free: true };
   const rate = rateFor(db, id) ?? rateFor(db, m?.label ?? null);
   if (rate && Number.isFinite(rate.input) && Number.isFinite(rate.output)) {
     // About 120 words in and 30 out a cell, the prompt shared by the cells asked together.
@@ -121,7 +129,7 @@ export async function aiCells(db: DB, body: unknown, signal: AbortSignal): Promi
     if (v === null || v === '') failed[a.key] = got ? 'The model gave no answer for it' : 'The model did not answer as asked';
     else answers[a.key] = v;
   });
-  return { answers, ...(Object.keys(failed).length ? { failed } : {}), model: helperName(db) };
+  return { answers, ...(Object.keys(failed).length ? { failed } : {}), model: modelName(db) };
 }
 
 // ---- a formula written, or explained ---------------------------------------------------------------------------------
@@ -168,7 +176,7 @@ export async function writeFormula(db: DB, body: unknown, signal: AbortSignal): 
     if (why) problem = `${formula} cannot be read: ${why}`;
     else if (unknown.length) problem = `${formula} uses ${unknown.join(', ')}, which this spreadsheet does not have.`;
     else if (!formulaRefs(formula.slice(1)).length && !/\(/.test(formula)) problem = 'it is no formula of the sheet’s cells.';
-    else return { formula, explain, model: helperName(db) };
+    else return { formula, explain, model: modelName(db) };
   }
   throw new HttpError(502, `The helper model did not write a formula that works (${problem.replace(/\.$/, '')}): say it another way and ask again.`);
 }
@@ -185,7 +193,7 @@ export async function explainFormula(db: DB, body: unknown, signal: AbortSignal)
   const raw = await ask(db, EXPLAIN_SYSTEM, `${contextOf(b)}\n\nThe formula in ${str(b.at, 12) || 'the active cell'}: ${formula.startsWith('=') ? formula : `=${formula}`}`, signal, 1200);
   const text = raw.replace(/```[\s\S]*?```/g, '').replace(/^#+\s*/gm, '').trim().slice(0, 2000);
   if (!text) throw new HttpError(502, 'The helper model gave no explanation: try again');
-  return { text, model: helperName(db) };
+  return { text, model: modelName(db) };
 }
 
 // ---- Fill with AI --------------------------------------------------------------------------------------------------
@@ -212,7 +220,7 @@ export async function fillColumn(db: DB, body: unknown, signal: AbortSignal): Pr
     const v = cellAnswer(list[i]);
     return v === null || v === '' ? null : String(v);
   });
-  return { outputs, model: helperName(db) };
+  return { outputs, model: modelName(db) };
 }
 
 // ---- Analyze the data ------------------------------------------------------------------------------------------------
@@ -278,7 +286,7 @@ export async function analyze(db: DB, body: unknown, signal: AbortSignal): Promi
   const got = jsonIn(await ask(db, ANALYZE_SYSTEM, prompt, signal, 2500));
   const answer = typeof got?.answer === 'string' ? got.answer.trim().slice(0, 3000) : '';
   if (!answer) throw new HttpError(502, 'The helper model did not answer as asked: try again');
-  return { answer, ideas: ideasOf(got?.ideas), model: helperName(db) };
+  return { answer, ideas: ideasOf(got?.ideas), model: modelName(db) };
 }
 
 // ---- a table made from words ------------------------------------------------------------------------------------------
@@ -312,7 +320,7 @@ export async function makeTable(db: DB, body: unknown, signal: AbortSignal): Pro
       return typeof v === 'number' || typeof v === 'boolean' ? v : str(v, 500);
     }),
   );
-  return { title: str(got?.title, 31).trim() || undefined, columns, rows, model: helperName(db) };
+  return { title: str(got?.title, 31).trim() || undefined, columns, rows, model: modelName(db) };
 }
 
 // ---- the routes ------------------------------------------------------------------------------------------------------

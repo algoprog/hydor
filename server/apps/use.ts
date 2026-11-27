@@ -34,6 +34,8 @@ import { byWords, FIND_K, FIND_MAX, findApps } from './search.ts';
 import { words } from '../memory/store.ts';
 import { getApp, getRun, listApps, updateRun, type RunRecord } from './store.ts';
 import { missingSecrets } from './secrets.ts';
+import { missingPlugins, pluginsError } from './plugins.ts';
+import { allSpaces } from '../spaces/index.ts';
 import { startsFor } from './me.ts';
 import { pinsOf, theirsFirst } from './pins.ts';
 
@@ -62,7 +64,7 @@ function findApp(list: Usable[], want: string): Usable | null {
   return list.find((u) => u.ref === w) ?? list.find((u) => u.app === w || u.slug === low || `tpl:${u.slug}` === low) ?? list.find((u) => u.recipe.name.toLowerCase() === low) ?? null;
 }
 
-const typeWord = (f: AppField) => (f.type === 'choice' ? (f.options ?? []).join(' | ') : f.type === 'yesno' ? 'yes/no' : f.type === 'long' ? 'long text' : f.type === 'file' ? 'a file’s path' : f.type);
+const typeWord = (f: AppField) => (f.type === 'choice' ? (f.options ?? []).join(' | ') : f.type === 'yesno' ? 'yes/no' : f.type === 'long' ? 'long text' : f.type === 'file' ? 'a file’s path' : f.type === 'project' ? 'a project’s name' : f.type);
 const clipLine = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : s);
 
 /** One app, for the tools and the notes: how to name it, what it does, and what its form asks; `marks`: what else to say of it (pinned, used lately). */
@@ -217,8 +219,28 @@ async function turnAnchor(d: Deps, key: string): Promise<string | undefined> {
   return undefined;
 }
 
-/** A value as the card shows what the request said. */
-const shown = (f: AppField, v: string) => (f.type === 'file' ? path.basename(v) : clipLine(v.replace(/\s+/g, ' '), 120));
+/** A value as the card shows what the request said (a project by its name). */
+const shown = (db: DB, f: AppField, v: string) => (f.type === 'file' ? path.basename(v) : clipLine((f.type === 'project' ? (allSpaces(db).find((s) => s.id === v)?.name ?? v) : v).replace(/\s+/g, ' '), 120));
+
+/**
+ * Project questions answered by a project's name (or id): its id, as the form takes it. A name that is no project is
+ * left out, so the card asks; `unknown`: there was one.
+ */
+function projectAnswers(db: DB, fields: AppField[], values: Record<string, string>): { unknown: boolean } {
+  let unknown = false;
+  for (const f of fields) {
+    const v = f.type === 'project' ? values[f.id]?.trim() : undefined;
+    if (!v) continue;
+    const spaces = allSpaces(db);
+    const s = spaces.find((x) => x.id === v) ?? spaces.find((x) => x.name.trim().toLowerCase() === v.toLowerCase());
+    if (s) values[f.id] = s.id;
+    else {
+      delete values[f.id];
+      unknown = true;
+    }
+  }
+  return { unknown };
+}
 
 /** Whether the session is running a scheduled task now (the user set it up, and nobody is there to answer a card). */
 function inTaskRun(db: DB, key: string): boolean {
@@ -280,12 +302,15 @@ async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, r
     form: {
       fields: asked.map((f) => {
         const said = got.values[f.id] ?? (raw[f.id] !== undefined && raw[f.id] !== null ? String(raw[f.id]) : '');
-        const keep = said && f.type !== 'file' && fine(f, { [f.id]: said }, {});
+        // (A project's name that was not found stays in `raw` alone.)
+        const keep = said && f.type !== 'file' && (f.type !== 'project' || got.values[f.id] !== undefined) && fine(f, { [f.id]: said }, {});
         // What the request said that the form does not take ("in May" for a date) shows under the question.
         const note = said && !keep && f.type !== 'file' ? `From your message: “${clipLine(said, 80)}”` : got.unread.includes(f.id) ? `“${clipLine(String(raw[f.id] ?? ''), 80)}” is not a file here: pick it` : '';
         // Nothing said for it: filled in with what it starts from (About you, the last answer), to change.
         const start = !said && starts[f.id] !== undefined ? starts[f.id] : undefined;
-        return { ...f, ...(keep ? { default: checkInputs([f], { [f.id]: said }).values[f.id] } : start !== undefined ? { default: start } : {}), ...(note ? { help: [note, f.help].filter(Boolean).join(' · ') } : {}) };
+        // The pages list the projects themselves; a terminal picks among these names.
+        const options = f.type === 'project' ? { options: allSpaces(ctx.deps.db).map((s) => s.name) } : {};
+        return { ...f, ...options, ...(keep ? { default: checkInputs([f], { [f.id]: said }).values[f.id] } : start !== undefined ? { default: start } : {}), ...(note ? { help: [note, f.help].filter(Boolean).join(' · ') } : {}) };
       }),
     },
     app: {
@@ -293,7 +318,7 @@ async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, r
       name: u.recipe.name,
       icon: u.recipe.icon,
       color: u.recipe.color,
-      given: given.map((f) => ({ label: f.label, value: shown(f, got.values[f.id] ?? '') })).filter((g) => g.value),
+      given: given.map((f) => ({ label: f.label, value: shown(ctx.deps.db, f, got.values[f.id] ?? '') })).filter((g) => g.value),
       ...(approve ? overview(ctx.deps.db, u) : {}),
       ...(keys.length ? { secrets: keys.map(({ name, label, help, url }) => ({ name, label, ...(help ? { help } : {}), ...(url ? { url } : {}) })) } : {}),
     },
@@ -609,10 +634,14 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
       // A program that is not signed in: said before the card asks the user anything.
       const asked = { app: u.app, recipe: u.recipe, source: 'session' as const };
       await lookAgain(db, asked);
-      const { why } = settle(db, asked);
+      const { recipe: settled, why } = settle(db, asked);
       if (why) return { text: `${u.recipe.name} could not start: ${why}`, isError: true };
       const raw = args.inputs && typeof args.inputs === 'object' && !Array.isArray(args.inputs) ? (args.inputs as Record<string, unknown>) : {};
+      // A plugin it needs that is not on: said before anything is asked.
+      const lacking = missingPlugins(db, settled);
+      if (lacking.length) return { text: `${u.recipe.name} could not start: ${pluginsError(lacking)} Tell the user: the app's page (${pageOf(u)}) says it too, with a button to add or turn on a plugin.`, isError: true };
       let got = intake(u.recipe.fields, raw, c.cwd);
+      const projects = projectAnswers(db, u.recipe.fields, got.values);
       // What the questions it left out start from: About you, the user's last answers.
       const given = (f: AppField) => got.values[f.id] !== undefined || !!got.files[f.id];
       const starts = Object.fromEntries(Object.entries(startsFor(db, u.recipe.fields, u.app)).filter(([id]) => !given(u.recipe.fields.find((f) => f.id === id)!)));
@@ -620,7 +649,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
       // What it needs and lacks (or the user may add to, when asked): the app's card.
       // Asked first unless the user chose to always run it, or a scheduled task runs in this session (the user set it up and nobody is there to answer).
       const approve = !allowedApps(db).includes(u.app) && !inTaskRun(db, c.key);
-      if (approve || u.recipe.fields.some((f) => !fine(f, withStarts, got.files)) || args.ask === true || missingSecrets(db, u.recipe).length) {
+      if (approve || projects.unknown || u.recipe.fields.some((f) => !fine(f, withStarts, got.files)) || args.ask === true || missingSecrets(db, u.recipe).length) {
         const a = await askUser(c, u, got, raw, CALL_MS - 60_000, approve, starts);
         if ('why' in a) {
           if (a.why === 'declined' && approve) return `The user chose not to run ${u.recipe.name}. Don't run it again for this request: do what they asked another way, or ask them in words.`;

@@ -190,7 +190,7 @@ Only a model from a different company than the one whose model did the work, so 
 - A **Codex** session, or any session running an OpenAI model, can be checked by **Claude** (Sonnet, through Claude Code) or by one of Custom's models that is not OpenAI's.
 - Any other session (Custom or another agent with another maker's model) can be checked by Claude, Codex, or one of Custom's models from a different maker than the session's model.
 
-Claude and Codex are offered only when you are signed in to them.
+Claude and Codex are offered only when you are signed in to them (and so are the models of their plans). Without the other program, the suggested reviewer is one of your Custom models from another maker: one that Custom's **Best**, **Max** or **Standard** tier names, when there is one. With no model from another maker either, add one in [Settings → Models](/settings?s=models).
 
 Custom's models are the ones you added in [Settings → Models](/settings?s=models). The reviewer only reads: Claude and Codex may open files in the session's folder to check something specific, but they change nothing. Besides the turn itself, the reviewer sees your first message in the session and your message before that turn, for context. When the changes are too large to show in full, part of them is left out, and the card says so.
 
@@ -220,7 +220,7 @@ The message names the reviewer, lists each point with its severity and file, and
 
 ## Compare models in the arena
 
-The model arena sends the same prompt to two or three models at once, so you can compare their answers side by side and keep the best. Each answer you keep counts toward a rating that shows which models win on your own tasks.
+The model arena sends the same prompt to two or three models at once, so you can compare their answers side by side and keep the best. A Claude Code or Codex you are not signed in to is not offered. Each answer you keep counts toward a rating that shows which models win on your own tasks.
 
 ### Start a match
 

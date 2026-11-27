@@ -231,3 +231,26 @@ export function satisfies(version: string | undefined, range: string): boolean {
     return parts.length > 0 && parts.every((c) => one(v, c));
   });
 }
+
+// ---- a plugin an app needs (requires.plugins) -----------------------------------------------------------
+
+/**
+ * How one plugin an app needs stands on this computer. on: ready for the app. missing: a built-in one not added;
+ * unknown: not added, and not one that comes with the app. off, installing, setup (not set up, or it failed), broken
+ * (its folder cannot be read), needs (a plugin it needs is not on), agent (it does not work with the program the run uses).
+ */
+export type PluginNeedState = 'on' | 'missing' | 'unknown' | 'off' | 'installing' | 'setup' | 'broken' | 'needs' | 'agent';
+
+export interface PluginNeed {
+  name: string;
+  title: string;
+  state: PluginNeedState;
+  /** What is wrong, after "the <title> plugin": "is turned off". Empty when it is on. */
+  problem: string;
+  /** What to do about it, as a sentence without its full stop: "Turn it on in Settings → Plugins". */
+  fix: string;
+  /** What Hydor can do for it from the app's page, through Settings → Plugins' own routes: add, turn on or set up a plugin. */
+  action?: { do: 'install' | 'enable' | 'setup'; plugin: string; title: string };
+  /** The programs it works with (none known when it is not added and not built in). */
+  agents?: PluginAgent[];
+}

@@ -52,13 +52,15 @@ These need nothing from you and are on from the first start, except where noted.
 | `api.anthropic.com` | While the app is open and reads your Claude plan's usage, and while a session waits for a limit to lift. Only when Claude Code is signed in with a claude.ai account. | The sign-in token Claude Code already keeps, to read your plan's limits and any limit resets you hold. Nothing from your conversations. |
 
 **Small jobs by the helper model.** By default the helper model is Automatic: Claude Haiku through Claude Code
-(or Codex if Claude is not signed in), with your own sign-in. It names new sessions from your first message, and,
+(or Codex if Claude is not signed in), with your own sign-in; with neither signed in, one of your Custom models,
+and neither program is started. It names new sessions from your first message, and,
 with memory on (it is on by default), writes memory notes, tidies them and learns from your conversations; it
 also checks steps in Auto mode, drafts agents, reads pages for one question and, before a Naget Search, reads the
 filters the words of a web search state (a site, dates, a kind of page). In your own browser it also translates the
 words of a page when you ask it to (or for a language you set to always be translated), and groups your tabs by their
-titles and addresses when you press the button. Those go to Anthropic or OpenAI
-the way a session does, so they carry words of yours.
+titles and addresses when you press the button. It writes commit messages, pull request descriptions, terminal
+commands and drawings' code when you ask for them. Those go to Anthropic or OpenAI
+the way a session does (or to your Custom model's provider), so they carry words of yours.
 
 ## Only when you turn something on or use it
 

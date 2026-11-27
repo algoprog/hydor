@@ -46,6 +46,7 @@ import { LibraryRedirect } from './LibraryRedirect';
 import { PublishDialog, RenameDialog } from './parts';
 import { openOriginal, TurnMenu } from './kept';
 import { folderName } from '../spaces/FolderPick';
+import { withProjects } from '../apps/projects';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { pageStore, previewStore, type AppBridge } from './frame';
@@ -332,6 +333,7 @@ function PageView({ id }: { id: string }) {
   const store = useMemo(() => (old ? previewStore(id) : pageStore(id)), [id, old]);
   // A template's screen works here as on its template's page: window.hydor.app, for that template.
   const [screenOf, setScreenOf] = useState<AppBridge | undefined>();
+  const screenWithProjects = useMemo(() => screenOf && { ...screenOf, info: withProjects(screenOf.info, (spaces ?? []).map((s) => s.name)) }, [screenOf, spaces]);
   const owner = data?.page.app;
   useEffect(() => {
     setScreenOf(undefined);
@@ -460,7 +462,7 @@ function PageView({ id }: { id: string }) {
   }
   const page = data?.page;
   const title = old?.title ?? page?.title ?? 'Page';
-  const doc: StudioDoc | null = data && !kind ? { key: old ? `${id}:v${old.version}` : `${id}:${data.page.version}`, title, html: old?.html ?? data.html ?? '', store, app: screenOf } : null;
+  const doc: StudioDoc | null = data && !kind ? { key: old ? `${id}:v${old.version}` : `${id}:${data.page.version}`, title, html: old?.html ?? data.html ?? '', store, app: screenWithProjects } : null;
   const askOpen = ask.open && !!page;
   const askThis = (text?: string) => {
     if (text !== undefined) setPart(text);

@@ -6,6 +6,7 @@
 import { answerOf, type AppField, type RunSource } from '../../shared/apps.ts';
 import { changeMe, cleanMe, langOf, fromField, meOf, startFrom, type AboutMe, type MeId, type MeSource } from '../../shared/app-me.ts';
 import { userLang } from '../language/index.ts';
+import { allSpaces } from '../spaces/index.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { userTimezone } from '../userPrefs.ts';
 
@@ -79,6 +80,8 @@ export function startsFor(db: DB, fields: AppField[], app: string, values: About
     // A last answer kept under a former id (the question was renamed since) counts as its own.
     const kept = f.remember ? answerOf(f, last) : undefined;
     const v = id ? startFrom(f, id, values) : typeof kept === 'string' ? kept : undefined;
+    // A project deleted since it was last picked is no start.
+    if (f.type === 'project' && v && !allSpaces(db).some((s) => s.id === v)) continue;
     if (v !== undefined && v !== '') out[f.id] = v;
   }
   return out;

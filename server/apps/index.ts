@@ -51,7 +51,7 @@ import { PUBLIC_RUN_ENV } from './publicRun.ts';
 import { adviceOf } from './advice.ts';
 import { defaultFolder, folderOf, folderSaved, initFolders, linkFolder, unlinkFolder, unwatch } from './folder.ts';
 import { appSchema } from './schema.ts';
-import { appChanged, askRun, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, runFolder, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, whyNoAsks, WORK_DIR } from './runs.ts';
+import { appChanged, askRun, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, runFolder, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, uploadsDir, useFlows, waitFor, whyNoAsks, WORK_DIR } from './runs.ts';
 import {
   createKey,
   dayStart,
@@ -92,6 +92,7 @@ import { FROM_FIELDS, fromField } from '../../shared/app-me.ts';
 import { appHint, findAppsTool, tellAsker, usableApps, useAppTool, useNote } from './use.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { setModelsHere } from './models.ts';
+import { closeAllPluginServers, pluginNeeds } from './plugins.ts';
 import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
 import { missingSecrets, saveAppSecrets, secretsOf } from './secrets.ts';
 import { dropDaily, homeOf, saveHome } from './home.ts';
@@ -169,6 +170,7 @@ export function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; error
     const name = String(x.label || x.id || 'A question');
     if (x.from !== undefined && x.from !== null && x.from !== '' && !fromField(x.from)) errors.push(`${name}: from names a field of About you: ${FROM_FIELDS.map((f) => `me.${f.id}`).join(', ')}`);
     if (x.type === 'file' && (x.from || x.remember)) errors.push(`${name}: a file question starts empty (no from or remember)`);
+    else if (x.type === 'project' && x.from) errors.push(`${name}: About you has no project (remember: true starts it from the last answer)`);
     else if (fromField(x.from) && x.remember === true) errors.push(`${name}: from or remember, not both`);
   }
   const checked = checkFlow(recipe);
@@ -184,6 +186,8 @@ export function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; error
   errors.push(...viewed.errors);
   warnings.push(...viewed.warnings);
   for (const f of [recipe.flow, ...Object.values(recipe.flows ?? {})]) for (const s of f ? allSteps(f.steps) : []) if (s.do === 'app' && !getApp(db, s.app)) warnings.push(`Step “${s.id}” calls the app “${s.app}”, which is not here`);
+  // The plugins it needs that are not on here: it saves, but does not run until they are.
+  for (const p of pluginNeeds(db, recipe)) if (p.state !== 'on') warnings.push(`It needs the ${p.title} plugin, which ${p.problem}: it does not run until then. ${p.fix}`);
   return { recipe, errors: [...new Set(errors)], warnings };
 }
 
@@ -266,21 +270,21 @@ function routes(d: Deps) {
   d.scheduler?.useApps({
     id: (idOrSlug) => (idOrSlug.startsWith('tpl:') ? (templateById(idOrSlug.slice(4)) ? idOrSlug : undefined) : getApp(db, idOrSlug)?.id),
     name: (id) => (id.startsWith('tpl:') ? templateById(id.slice(4))?.name : getApp(db, id)?.name),
-    start: async ({ app: id, inputs, test }) => {
+    start: async ({ app: id, inputs, test, outside }) => {
       // A ready-made app ("tpl:<id>"), as it is: Explore's Update automatically.
       if (id.startsWith('tpl:')) {
         const t = templateById(id.slice(4));
         if (!t) throw new HttpError(404, 'Its app is gone');
         installedOr409(db, t);
         await lookAgain(db, { app: id, recipe: t, source: 'task' });
-        const r = startRun({ app: id, slug: t.id, recipe: t, source: 'task', inputs });
+        const r = startRun({ app: id, slug: t.id, recipe: t, source: 'task', inputs, outside });
         return { id: r.id, ...(r.key ? { key: r.key } : {}) };
       }
       const a = getApp(db, id);
       if (!a) throw new HttpError(404, 'Its app is gone');
       if (!test) checkDaily(db, a);
       await lookAgain(db, { app: a.id, recipe: a, source: 'task' });
-      const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'task', inputs });
+      const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'task', inputs, outside });
       return { id: r.id, ...(r.key ? { key: r.key } : {}) };
     },
     ended: (id) => {
@@ -318,12 +322,17 @@ function routes(d: Deps) {
     const last = new Map((db.prepare("select app_id as id, max(created_at) as at from app_runs where source not in ('step', 'chat') group by app_id").all() as { id: string; at: number }[]).map((r) => [r.id, r.at]));
     const uses = useCounts(db);
     // A key it cannot run without that the vault does not have yet: its card says so (a mark that never keeps the page from loading).
+    // The plugins it needs that are not on: its card names them.
     const keyed = (r: AppRecipe) => {
+      let out: { needsKey?: true; needsPlugin?: string[] } = {};
       try {
-        return missingSecrets(db, r).length ? { needsKey: true } : {};
-      } catch {
-        return {};
-      }
+        if (missingSecrets(db, r).length) out = { needsKey: true };
+      } catch {}
+      try {
+        const off = pluginNeeds(db, r).filter((p) => p.state !== 'on');
+        if (off.length) out.needsPlugin = off.map((p) => p.title);
+      } catch {}
+      return out;
     };
     const apps = listApps(db).map((a) => ({ ...a, usage: usageShown(a.id, today), ...(last.get(a.id) ? { lastRunAt: last.get(a.id) } : {}), ...(uses.get(a.id) ? { uses: uses.get(a.id) } : {}), ...keyed(a) }));
     // Not those of an app that opens on its own page (Explore): its page shows its latest, and its daily runs would crowd the rest out.
@@ -508,14 +517,16 @@ function routes(d: Deps) {
     };
     // What its questions start from (About you, the last answers), for its form.
     const starts = (id: string, r: AppRecipe) => (r.fields.some((f) => f.from || f.remember) ? { starts: startsFor(db, r.fields, id) } : {});
+    // The plugins it needs, and how each stands: its page says what is missing and adds or turns it on.
+    const needs = (r: AppRecipe) => (r.requires?.plugins?.length ? { plugins: pluginNeeds(db, r) } : {});
     if (template) {
       // How it runs now (the choice kept for it, else the setting), with the sign-ins read.
       await programStatus();
-      return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template), runsWith: runsWithView(db, template), ...ownPage(`tpl:${template.id}`, template), ...starts(`tpl:${template.id}`, template) };
+      return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template), runsWith: runsWithView(db, template), ...needs(template), ...ownPage(`tpl:${template.id}`, template), ...starts(`tpl:${template.id}`, template) };
     }
     const today = dayStart();
     const own = ownPage(a!.id, a!);
-    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), secrets: secretsOf(db, a!), ...own, ...starts(a!.id, a!) };
+    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), secrets: secretsOf(db, a!), ...needs(a!), ...own, ...starts(a!.id, a!) };
   });
 
   /** One value its own page's view keeps: null removes it. Gives all it keeps now. */
@@ -772,7 +783,7 @@ function routes(d: Deps) {
       if (f.type !== 'file' || f.id in changes || !old.inputs[f.id]) continue;
       const name = path.basename(String(old.inputs[f.id])).replace(/[^\w.\- ()]+/g, '_').replace(/^\.+/, '').slice(0, 120) || 'file';
       try {
-        files[f.id] = { name: String(old.inputs[f.id]), data: fs.readFileSync(path.join(runFolder(old, slug), 'uploads', name)).toString('base64') };
+        files[f.id] = { name: String(old.inputs[f.id]), data: fs.readFileSync(path.join(uploadsDir(old, slug), name)).toString('base64') };
       } catch {
         throw new HttpError(409, `Its file “${old.inputs[f.id]}” is gone: run it again from its form`);
       }
@@ -1309,7 +1320,7 @@ function prepare(a: AppDef): AppDef {
 
 /** What every session that is not a template's run is told of templates and their tools. */
 const BUILDER_NOTE =
-  "Apps (the Apps page in Hydor) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, with maps, plots, pictures, videos and widgets of its own, and events for what a click does), files of its own, the keys it needs (by name: the user gives their values), data it keeps, screens, and examples with checks. To make or change one, use app_get (the ready-made ones too, to build like them: ready, like, tpl:<id>), app_sketch (a new app's sketch for the user, before anything is made), app_save (its view is its ui) and app_try (try its examples before you hand it over, look: true to see its view, and say what a run costs), app_screen for a screen, app_data for the records it keeps, and app_services for free data services to call; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
+  "Apps (the Apps page in Hydor) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, with maps, plots, pictures, videos and widgets of its own, and events for what a click does), files of its own, the keys it needs (by name: the user gives their values), the Hydor plugins it needs (requires.plugins), data it keeps, screens, and examples with checks. To make or change one, use app_get (the ready-made ones too, to build like them: ready, like, tpl:<id>), app_sketch (a new app's sketch for the user, before anything is made), app_save (its view is its ui) and app_try (try its examples before you hand it over, look: true to see its view, and say what a run costs), app_screen for a screen, app_data for the records it keeps, and app_services for free data services to call; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
 
 export const apps: Feature = {
   id: 'apps',
@@ -1365,7 +1376,13 @@ export const apps: Feature = {
     const line = own.slug ? envLine(own, own.slug) : null;
     // Its keys, by name: how to use each (never a value).
     const keys = secretsLine(secretsOf(d.db, own).filter((k) => !k.provider));
-    return { instructions: [[runInstructions({ ...hit.run, ...own }), line, keys].filter(Boolean).join('\n')], ...(env ? { env } : {}) };
+    // The plugins it needs: this agent gets their tools and skills (the plugins' part gives them to every agent).
+    const plugins = pluginNeeds(d.db, own).filter((p) => p.state === 'on').map((p) => (p.title === p.name ? p.name : `${p.title} (${p.name})`));
+    const needed = plugins.length ? `The app needs ${plugins.length === 1 ? 'the plugin' : 'the plugins'} ${plugins.join(', ')}: ${plugins.length === 1 ? 'its' : 'their'} tools and skills are among yours. Use them for what they are made for, as the task says.` : null;
+    return { instructions: [[runInstructions({ ...hit.run, ...own }), needed, line, keys].filter(Boolean).join('\n')], ...(env ? { env } : {}) };
+  },
+  stop() {
+    closeAllPluginServers();
   },
   // Templates the user changed in their editor, for the agents that built them, with the next message.
   beforeMessage: (key, d) => takeAppEdits(d.db, key),

@@ -1,8 +1,9 @@
 // One question to a model, outside any session: Claude (Haiku unless asked otherwise) when signed in,
-// else Codex. No tools, settings, hooks or MCP servers, and nothing saved, so no session is left behind.
-// Used for terminal command suggestions and pull-request descriptions and reading guides, and by the helper
-// model on "Automatic" (an app's model steps, memory notes…). An account that has reached its usage limit, or
-// is signed out, hands the question to the next one signed in, as sessions switch accounts at a limit.
+// else Codex; a program that is not signed in here is never started. No tools, settings, hooks or MCP
+// servers, and nothing saved, so no session is left behind. The helper model on "Automatic" (server/helper.ts)
+// asks through it, and falls back to one of Custom's models when neither program can answer. An account that
+// has reached its usage limit, or is signed out, hands the question to the next one signed in, as sessions
+// switch accounts at a limit.
 import { execFile } from 'node:child_process';
 import { execProgram } from './platform.ts';
 import crypto from 'node:crypto';
@@ -10,6 +11,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { HttpError } from './auth.ts';
+import { programStatus, signedInBefore } from './agents/programs.ts';
+import { PROGRAM_IDS, PROGRAM_LABEL, type ProgramStatus } from '../shared/programs.ts';
 import { config } from './config.ts';
 import { agentBaseEnv } from './env.ts';
 import { backgroundDone, isSignedOut, markSignedIn, markSignedOut, signedOutText } from './signin.ts';
@@ -217,29 +220,41 @@ export class NoModel extends HttpError {
 /** The signed-out accounts a failed call found, when the error says (none for any other error). */
 export const signedOutOf = (e: unknown): SignedOutAccount[] => (e instanceof NoModel ? e.signedOut : []);
 
-/** The model's answer as text. */
-export async function oneShot(q: OneShot): Promise<string> {
-  let claude: NoAnswer;
-  try {
-    return await askClaude(q);
-  } catch (e) {
-    claude = asNoAnswer(e);
-  }
-  if (q.signal?.aborted) throw new HttpError(409, 'It was stopped');
-  try {
-    return await askCodex(q);
-  } catch (e) {
-    const codex = asNoAnswer(e);
-    throw new NoModel(`Could not reach a model. Claude Code: ${claude.message.replace(/\.$/, '')}. Codex: ${codex.message.replace(/\.$/, '')}.`, [...claude.signedOutAccounts, ...codex.signedOutAccounts]);
-  }
+/** What to say when there is neither a program to ask nor a Custom model: what to set up. */
+export const NOTHING_SET_UP = 'No model to do this with: add one in Settings → Models, or set up Claude Code or Codex in Settings → Agents → Accounts.';
+
+/** Whether Claude Code and Codex are signed in here, for a question about to be asked. */
+export async function signedInPrograms(): Promise<ProgramStatus> {
+  const status = await programStatus();
+  // Neither, though one was used here: asked again before giving up on it (signed in from a terminal meanwhile).
+  if (PROGRAM_IDS.some((p) => status[p]) || !PROGRAM_IDS.some(signedInBefore)) return status;
+  return programStatus({ fresh: true });
 }
 
-/** The model's answer as JSON (the first object in it); `what` names it in the error. */
-export async function oneShotJson<T>(q: OneShot, what: string): Promise<T> {
-  const raw = await oneShot(q);
-  try {
-    return JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)) as T;
-  } catch {
-    throw new HttpError(502, `The model did not answer with ${what}`);
+/** The model's answer as text, from the first of Claude Code and Codex that is signed in here and can give one. */
+export async function oneShot(q: OneShot): Promise<string> {
+  const status = await signedInPrograms();
+  const failed: string[] = [];
+  const out: SignedOutAccount[] = [];
+  for (const program of PROGRAM_IDS) {
+    if (!status[program]) {
+      // One used here before and signed out now is why, and may be signed in to again; one never set up goes unsaid.
+      if (signedInBefore(program)) {
+        failed.push(`${PROGRAM_LABEL[program]}: signed out`);
+        out.push(...accountsOf(program).map(({ account }) => ({ agent: program, account })));
+      }
+      continue;
+    }
+    if (q.signal?.aborted) break;
+    try {
+      return await (program === 'claude' ? askClaude(q) : askCodex(q));
+    } catch (e) {
+      const why = asNoAnswer(e);
+      failed.push(`${PROGRAM_LABEL[program]}: ${why.message.replace(/\.$/, '')}`);
+      out.push(...why.signedOutAccounts);
+    }
   }
+  if (q.signal?.aborted) throw new HttpError(409, 'It was stopped');
+  if (!failed.length) throw new NoModel(NOTHING_SET_UP);
+  throw new NoModel(`Could not reach a model. ${failed.join('. ')}.`, out);
 }

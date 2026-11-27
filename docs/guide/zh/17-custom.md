@@ -22,7 +22,7 @@ Custom 会读取项目的 `AGENTS.md` 或 `CLAUDE.md` 文件，并像其他智�
 
 1. 在起始页上，点击**智能体**并选择 **Custom**（“任意模型：OpenRouter、Ollama、vLLM”）。
 2. 点击**模型**并选择你的某个模型；菜单提供**自动**时也可以选它：Custom 的档位会根据它拥有的模型自动填充（先是你的 Claude 套餐的模型，然后是你的 ChatGPT 套餐的模型，再然后是你添加的、不在这台电脑上的模型），一旦它的“最佳”档位指定了模型，处于**自动**的会话就会从该模型开始，并由它带领子智能体（参见[档位：为每类工作选择模型](/guide/agents-models#tiers-a-model-for-each-kind-of-job)）。如果列表是空的，请先添加模型：**智能体** → **Custom 的模型**。
-3. 在 **选项** 下，选择 **权限**（参阅[选择 Custom 无需询问就能做的事](#choose-what-custom-may-do-without-asking)）。对于会推理的[端点](/guide/agents-models#other-openai-compatible-endpoints)模型（端点会这样声明，或者你把它的 **推理强度** 设为 **是**），会提供 **思考强度**；对于其他模型，Custom 没有思考强度设置。
+3. 在**选项**下选择**权限**（参阅[选择 Custom 无需询问就能做什么](#choose-what-custom-may-do-without-asking)）。能进行推理的模型会提供**思考强度**设置：Claude 或 ChatGPT 套餐中的模型，可选其程序为它列出的强度（选中**默认**时，用程序自己的默认值）；[OpenRouter 模型](/guide/agents-models#effort-for-openrouter-models)，可选 OpenRouter 为它列出的强度（选中**默认**时为中等）；或[端点](/guide/agents-models#other-openai-compatible-endpoints)的模型（端点表明它能推理，或你将它的**推理强度**设为**是**），可选它的**思考强度级别**。对于其他模型，Custom 没有思考强度设置。
 4. 输入任务并按 Enter。
 
 由 vLLM 提供服务的这台电脑上的模型会在会话第一次使用它时启动；会话会显示“Starting … with vLLM (the first time takes a minute or two)…”。

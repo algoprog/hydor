@@ -35,7 +35,7 @@ function Asked({ d }: { d: RunDetail }) {
           {fields.map((f) => (
             <div key={f.id}>
               <dt className="text-[12px] text-fg-3">{f.label}</dt>
-              <dd className="text-[13.5px] break-words whitespace-pre-wrap">{f.type === 'file' ? d.run.inputs[f.id].split('/').pop() : d.run.inputs[f.id]}</dd>
+              <dd className="text-[13.5px] break-words whitespace-pre-wrap">{f.type === 'file' ? d.run.inputs[f.id].split('/').pop() : f.type === 'project' && d.run.project ? d.run.project.name : d.run.inputs[f.id]}</dd>
             </div>
           ))}
         </dl>
@@ -187,10 +187,10 @@ export function RunPage({ id }: { id: string }) {
         sub={
           r ? (
             <span className="flex min-w-0 items-center gap-1.5">
-              {inputsLine(d!.recipe.fields, r.inputs, 70) && (
+              {inputsLine(d!.recipe.fields, r.inputs, 70, r.project) && (
                 <>
                   <span className="truncate text-fg-2" translate="no">
-                    {inputsLine(d!.recipe.fields, r.inputs, 70)}
+                    {inputsLine(d!.recipe.fields, r.inputs, 70, r.project)}
                   </span>
                   <span className="shrink-0">·</span>
                 </>

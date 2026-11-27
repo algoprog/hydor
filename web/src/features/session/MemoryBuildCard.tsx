@@ -28,6 +28,8 @@ export function memoryPills(c: MemoryAsk['counts']): string[] {
 /** How long it takes and what it costs, as one line. */
 export function memoryLine(m: Pick<MemoryAsk, 'minutes' | 'helper'>): string {
   const min = Math.max(1, m.minutes);
+  // Automatic uses the plan; a model of your own with no price in the app is named instead.
+  if (!m.helper.priced && m.helper.label !== 'Automatic') return tr(`About ${min} min, then the agent starts. The rest builds in the background, with ${m.helper.label}.`);
   if (!m.helper.priced) return tr(`About ${min} min, then the agent starts. The rest builds in the background, on your Claude plan.`);
   if (!m.helper.usd) return tr(`About ${min} min, then the agent starts. The rest builds in the background, free on this computer.`);
   return tr(`About ${min} min, then the agent starts. The rest builds in the background, about ${money(m.helper.usd)} in all.`);

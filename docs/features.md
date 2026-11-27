@@ -75,7 +75,12 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   hand-off and Do on a browser tab leave it out; a Hydor subagent asked for it is refused with the reason and that
   Custom works. Nothing swaps in another program for you. What nobody picked a program for (the first start page,
   an agent with none, a chat, a board's refresh, an agent on call) runs on Claude Code if signed in, else Codex, else
-  Custom, and a program never signed in here is not started, or installed, by any of the app's defaults.
+  Custom, and a program never signed in here is not started, or installed, by any of the app's defaults. Background
+  work starts none that is not signed in either: the helper model on Automatic, and what asks a model by itself
+  (commit messages, pull request descriptions and reading guides, terminal commands, drawings and plots, captions,
+  LaTeX from a picture, second opinions), go to Custom's models instead (long questions to one that can read them,
+  pictures to one that sees them), and with none they say to add one or set up Claude Code or Codex. The arena offers
+  only what is signed in, and with Custom picked and no model, the start page says what to set up and sends nothing.
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - **Goals** (the session's menu → Set a goal, or Options → Goal on the start page), for every agent: the person and the
@@ -176,7 +181,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   whose turn it turned away moves to another signed-in account with usage left and carries on (with the setting off,
   or none left, it stops with a banner and a **Sign in** button, and continues by itself once you are signed in
   again); the helper model's background jobs pass it over for 15 minutes, then the next signed-in account, then
-  Codex, then one of your Custom models (the one Custom's Quick tier names, else the cheapest you added; not your plans' models, which go through the same two programs) answer; and
+  Codex, then one of your Custom models (the one Custom's Quick tier names, then Standard, else the cheapest you added; not your plans' models, which go through the same two programs) answer; and
   only when nothing could do the work does a card on every page ask you to sign in again (just "sign in" for a
   Claude Code or Codex never signed in here).
   With **Use API credit at a limit** (off by default), Claude Code sessions carry on billed to an Anthropic API key saved for an
@@ -1183,7 +1188,15 @@ agents that speak ACP and take MCP servers.
   start from a field of it (Filled in from), and those not needed fold into one line under the form ("For Thessaloniki
   · metric · EUR", with Change); one About you has nothing for offers Remember for all apps; another can start from
   your last answer to it in that app (Remember the last answer, kept on the server for every device). Runs from the
-  API, rows of a CSV, schedules and agents take those starting values for what they leave out. Each run writes in a
+  API, rows of a CSV, schedules and agents take those starting values for what they leave out. A question can also
+  be one of your projects (Project): the run then works in that project's folder, its agents' sessions belong to the
+  project, and its look-ups through your documents search the project's knowledge. Only you choose it
+  freely: a run started with an app's key, from a public page or by a webhook call uses the project the app sets
+  (Filled in at first), or none, and naming another is refused. An app can need Hydor plugins
+  (requires.plugins): a run starts only while each is on for the program the run uses (its page, with Add the plugin, Turn the plugin on
+  or Set the plugin up, its card on the Apps page, use_app and app_try say which and what to do), its agents get their skills
+  and tools, its tool steps call their MCP tools (plugin:<plugin>/<tool>, the server started when a step needs it and stopped while
+  the run waits for you, after ten idle minutes and when the run ends), and a public page does not run it. Each run writes in a
   language: the page's, a public visitor's, the one you write to an agent in, else About you's, else English, kept
   for Run again from here; an app with Answers in the person’s language (on for new apps) has its models and agents
   write in it, steps read {{language}}, {{lang}} and {{me.units}}…, and code steps get ctx.locale (language,
@@ -1699,9 +1712,10 @@ agents that speak ACP and take MCP servers.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
   sixty that come with the app for every agent (ways of working, writing, documents, research and the web,
   planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
-  Code's and Codex's own, and each project's own. A search, a row of filters and a switch on every skill, for
-  every session (a project can switch any skill the other way for its own sessions, and the row says so: "Off in
-  Thesis"); write your own for every agent or for one, copy the ones you made in other agents (Memory → Bring in…), change a built-in one (your version takes its place),
+  Code's and Codex's own (Custom, which reads both, follows their switches too), and each project's own. A search,
+  a row of filters and a switch on every skill, for every session (a project can switch any skill the other way for
+  its own sessions, and the row says so: "Off in Thesis"); write your own for every agent or for one, copy the ones
+  you made in other agents (Memory → Bring in…), change a built-in one (your version takes its place),
   remove and bring back. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a project,
   for the project alone. Other ACP agents get the list of skills to read when one fits; Custom's instructions name them by group, and it can find one by what the work is. A new session's agent
   hears which skills fit its first message, found by words and by meaning, when any clearly do.
@@ -1759,7 +1773,7 @@ agents that speak ACP and take MCP servers.
   side, you keep the best one and the others are archived. Usage → Arena shows which models win on your own
   tasks, as a rating over the matches you decided.
 - **A second opinion, and caps**: one click has another company's model check a turn's work against what you
-  asked (Claude and Codex offered only when signed in); a spending cap stops a session, or a scheduled task's run, at its limit, checked after each model call.
+  asked (Claude and Codex offered only when signed in, else a Custom model from another maker); a spending cap stops a session, or a scheduled task's run, at its limit, checked after each model call.
 
 ## For researchers
 
@@ -1984,7 +1998,7 @@ long conversation to stay within the model's context. In Auto mode routine steps
 about risky ones, and commands can run in a sandbox that lets them change files only in the folder and the temporary folders (bubblewrap on Linux, Seatbelt on a Mac; on Windows, low integrity, with the folder marked once and a temporary folder of their own). Forks and
 "Edit from here" (with the files put back) work for it as they do for Claude Code and Codex, and goals work for it as for every agent.
 
-- **Your plans' models, and any others**: Custom's Model menu groups models under **Your subscriptions**, **On this computer** and **In the cloud**, each row with what it comes through (Claude Code, Codex, OpenRouter, Ollama, vLLM, an endpoint's name). With nothing to set up, a signed-in Claude Code offers Claude Opus, Fable, Sonnet and Haiku (always the newest of each), and Codex signed in with ChatGPT offers the models the plan lists (a program found signed out drops its models; Codex on an API key lends none). They use the plan's usage, not an API key or money per token (a session shows $0 for those steps), and each account of the program is tried in turn, so one at its limit or signed out hands the step to the next (with **Switch accounts at a limit** on). Claude's models answer through Claude Code itself, one step at a time, as Anthropic lets only its own programs use a plan's sign-in: Custom's tools are described in its instructions and Claude writes its calls as text, each step reusing the last one's cache. Claude Code cannot end a reply at its calls, so Custom ends it there and stops the program: what Claude writes after its calls (results it imagined, more calls on top of them) is never run, shown or kept. A step cut short by an update of the app is asked again once the app is back. Codex's are asked directly on the ChatGPT plan, with Custom's tools as real tools. A confidential session never uses them. They can be picked wherever Custom's models can: the start page, a session's model menu, Custom's tiers, the helper model, an agent's or app's model. Settings → Agents → Models shows them in **Your subscriptions**, after **Tiers**.
+- **Your plans' models, and any others**: Custom's Model menu groups models under **Your subscriptions**, **On this computer** and **In the cloud**, each row with what it comes through (Claude Code, Codex, OpenRouter, Ollama, vLLM, an endpoint's name). With nothing to set up, a signed-in Claude Code offers Claude Opus, Fable, Sonnet and Haiku (always the newest of each), and Codex signed in with ChatGPT offers the models the plan lists (a program found signed out drops its models; Codex on an API key lends none). They use the plan's usage, not an API key or money per token (a session shows $0 for those steps), and each account of the program is tried in turn, so one at its limit or signed out hands the step to the next (with **Switch accounts at a limit** on). The Effort menu offers each the efforts its program lists; the program's own is used while Default is picked. Claude's models answer through Claude Code itself, one step at a time, as Anthropic lets only its own programs use a plan's sign-in: Custom's tools are described in its instructions and Claude writes its calls as text, each step reusing the last one's cache. Claude Code cannot end a reply at its calls, so Custom ends it there and stops the program: what Claude writes after its calls (results it imagined, more calls on top of them) is never run, shown or kept. A step cut short by an update of the app is asked again once the app is back. Codex's are asked directly on the ChatGPT plan, with Custom's tools as real tools. A confidential session never uses them. They can be picked wherever Custom's models can: the start page, a session's model menu, Custom's tiers, the helper model, an agent's or app's model. Settings → Agents → Models shows them in **Your subscriptions**, after **Tiers**.
 - **A helper for anything**: research, writing, documents and everyday tasks, with an engineer's habits in a code
   project (it runs the project's checks before it says it is done). It reads PDFs, Office files and images
   (described by the helper model for a model that does not see), and web pages as clean Markdown.
@@ -2019,16 +2033,19 @@ Its models come from Settings → Models:
 
 - **OpenRouter**: add a key, then add the suggested models (GPT-6 Luna, fast and cheap; Grok 4.7, good with fewer
   refusals; GPT-6.1 Sol, better; Claude Opus 5.5, best overall) or search its catalog (each model's maker, context,
-  longest reply, price, release date, and whether it reasons, sees images or calls tools; filter and sort).
+  longest reply, price, release date, and whether it reasons, sees images or calls tools; filter and sort). A model
+  that reasons offers the efforts OpenRouter lists for it (among none, minimal, low, medium, high, xhigh and max) in
+  the Effort menu, medium unless you pick one.
 - **Ollama**: the models of an Ollama server, with GGUF weights pulled straight from Hugging Face.
 - **vLLM**: Hugging Face models downloaded here and served on a GPU (a 16-bit model too big for it at 8-bit, FP8),
   split across 2, 4 or 8 GPUs when one has too little memory, or on a Mac's Apple silicon (vllm-metal), started
   when a session first uses them.
 - **Any OpenAI-compatible endpoint** (LM Studio, llama.cpp's server, a LiteLLM gateway, another provider), with what
   each of its models can do: whether it sees images (screenshots and pictures reach it as pictures) and whether it
-  reasons (the Effort menu offers Low, Medium and High, sent as `reasoning_effort`). Hydor reads it from the endpoint's
+  reasons (the Effort menu offers its levels, sent as `reasoning_effort`). Hydor reads it from the endpoint's
   model list (OpenRouter's, Mistral's and other styles) or LiteLLM's model information, and you set it by hand,
-  per model, when the endpoint says nothing or says it wrong.
+  per model, when the endpoint says nothing or says it wrong. Each model's effort levels are Low, Medium and High
+  until you set others: ticked among none, minimal, low, medium, high, xhigh and max, or typed.
 
 Before any search, the models suggested for this computer show by what it can run, each with how it would run here
 and Install: LFM3-VL 2B (almost any computer), Gemma 4 12B (a good graphics card), Flint (a Mac with Apple silicon and
@@ -2088,6 +2105,8 @@ programs shows each program's version and what is out, with Check now, Update no
 - Tables, code blocks and Mermaid diagrams open full screen (a small button at a table's corner, beside Copy on code,
   in a diagram's bar), where − 100% +, Ctrl or ⌘ with + − 0, Ctrl and the wheel or a pinch (about the pointer) zoom
   them, a drag moves about once zoomed and scrolling works too.
+- A code block has a **Wrap lines** button beside Full screen and Copy: on, its long lines break at the edge instead of
+  scrolling sideways (per block, off again on reload; the full screen view keeps it).
 - Answer UIs: when part of an answer is something to look at, compare, choose from, follow, try or practise, the agent
   shows it in one of more than 140 ready-made UIs drawn in the app's look as the reply streams, by writing a
   ```` ```ui <name> ```` block of JSON. Agents are told to use one for every such part, which is most of an answer of more
@@ -2260,7 +2279,8 @@ programs shows each program's version and what is out, with Check now, Update no
   Shortcuts shortcut can open the start page with shared text (/?prompt=).
 
 ## Shipping the work
-- Open a pull request on GitHub or Gitea from a session's branch, with a description written for you; its
+- Open a pull request on GitHub or Gitea from a session's branch, with a description written for you by the helper
+  model; its
   state and checks show in the sidebar.
 - Review what a branch changes file by file, mark files viewed, and let a guide put them in an order that is
   easy to read, with a note on each.

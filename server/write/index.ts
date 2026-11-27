@@ -21,7 +21,7 @@ import { cleanLang, IDEA_WAYS, REWRITE_HOWS, REWRITE_MAX, type DescribeAnswer, t
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
-import { helper, helperModelId, helperOptions } from '../helper.ts';
+import { helper, helperName } from '../helper.ts';
 import { writeWith, type WriteAsk } from '../images/writer.ts';
 import { userLang } from '../language/index.ts';
 import { captionWriter } from '../media/caption.ts';
@@ -55,12 +55,6 @@ function goneSignal(reply: FastifyReply): AbortSignal {
   const gone = new AbortController();
   reply.raw.on('close', () => reply.raw.writableFinished || gone.abort());
   return gone.signal;
-}
-
-/** The helper model's name, as the answer says it. */
-function helperName(db: DB): string {
-  const id = helperModelId(db);
-  return id === 'auto' ? 'Claude' : (helperOptions(db).options.find((x) => x.value === id)?.label ?? id);
 }
 
 // ---- design ideas -------------------------------------------------------------------------------------------------

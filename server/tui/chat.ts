@@ -17,6 +17,7 @@ import { agentMode, type Assistant } from '../../shared/assistants.ts';
 import type { AppField } from '../../shared/apps.ts';
 import { childLabel } from '../../shared/children.ts';
 import type { BrowserView } from '../../shared/browser.ts';
+import { firstUsableProgram } from '../../shared/programs.ts';
 import type { AgentCatalog, AgentUsage, ApprovalRequest, Question, ServerEvent, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import type { Opts } from './args.ts';
 import { enc, spentOf, type Conn } from './client.ts';
@@ -122,7 +123,7 @@ export class Chat {
   private printer: Printer;
   private plan!: Plan;
   private cat: AgentCatalog = { models: [], modes: [], defaultMode: '' };
-  private prog: { agent: Plan['agent']; acpAgent?: string } = { agent: 'claude' };
+  private prog: { agent: Plan['agent']; acpAgent?: string };
   private tiers: TiersState | null = null;
   private ui: Ui = { kind: 'input' };
   private shown = new Set<string>();
@@ -168,6 +169,9 @@ export class Chat {
     private boot: Boot,
     private plain: boolean,
   ) {
+    // Until the start is planned: the first signed in of Claude Code and Codex, else Custom.
+    const first = firstUsableProgram(boot.programs);
+    this.prog = { agent: first.agent, ...(first.acp ? { acpAgent: first.acp } : {}) };
     const out = process.stdout;
     const level = colorLevel(out, o.noColor);
     this.look = { p: makePaint(!plain && level > 0, level || undefined), width: out.columns || 100, home: boot.home, verbose: o.verbose, thinking: o.thinking };
@@ -1699,7 +1703,8 @@ function backgroundWords(list: { task: { description: string; startedAt?: number
 
 /** A form field's choices: a choice's options, or Yes and No. */
 function choicesOf(f: AppField): string[] {
-  if (f.type === 'choice') return f.options ?? [];
+  // A project question's card names the projects (server/apps/use.ts).
+  if (f.type === 'choice' || f.type === 'project') return f.options ?? [];
   if (f.type === 'yesno') return ['Yes', 'No'];
   return [];
 }

@@ -9,7 +9,7 @@ import { HttpError } from './auth.ts';
 import { config } from './config.ts';
 import type { DB } from './db.ts';
 import { git } from './git.ts';
-import { oneShotJson } from './oneshot.ts';
+import { helperJson } from './helper.ts';
 
 export interface HistoryEntry {
   cmd: string;
@@ -306,12 +306,12 @@ const ASK_SYSTEM = [
   '"why" says in under 12 plain words what it does. Prefer safe, read-only commands when the request allows.',
 ].join(' ');
 
-/** Up to three commands for a plain description, written by Claude (or Codex when Claude is not signed in). */
-export async function askCommands(text: string, o: { cwd: string; shell: string; codexModel?: string }): Promise<{ command: string; why: string }[]> {
+/** Up to three commands for a plain description, written by the helper model (Settings → Models). */
+export async function askCommands(db: DB, text: string, o: { cwd: string; shell: string; codexModel?: string }): Promise<{ command: string; why: string }[]> {
   const request = text.trim().slice(0, 2000);
   if (!request) throw new HttpError(400, 'Describe what the command should do');
   const prompt = [`Shell: ${o.shell || 'bash'} on ${os.platform() === 'darwin' ? 'macOS' : os.platform() === 'win32' ? `Windows${o.shell === 'bash' ? ' (Git for Windows)' : ''}` : 'Linux'}.`, `Folder: ${o.cwd}`, await folderNotes(o.cwd), `Request: ${request}`].filter(Boolean).join('\n');
-  const list = (await oneShotJson<{ commands?: unknown }>({ system: ASK_SYSTEM, prompt, codexModel: o.codexModel }, 'a command')).commands;
+  const list = (await helperJson<{ commands?: unknown }>(db, { system: ASK_SYSTEM, prompt, codexModel: o.codexModel, maxTokens: 2000, task: 'suggesting a command' }, 'a command')).commands;
   if (!Array.isArray(list)) throw new HttpError(502, 'The model did not answer with a command');
   return list
     .filter((c) => c && typeof c.command === 'string' && c.command.trim())

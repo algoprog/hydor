@@ -10,7 +10,7 @@
 //   GET  /api/write/latex/picture    → who reads pictures here and about what one costs; POST {data, kind?} → {latex,
 //     packages, kind, model, cost?}: a picture of an equation, a table or text (a screenshot, a photo of handwriting) as
 //     LaTeX, read by the helper model when it sees pictures, else a vision model through OpenRouter (priced), else
-//     Claude through Claude Code.
+//     Claude through Claude Code when it is signed in, else a Custom model that sees pictures.
 //   POST /api/write/latex/error      {how: explain|fix, message, hint?, file, line, lines, log?} → {text, fix?, model}: an
 //     error of the typesetting explained in plain words, or the lines around it changed to fix it.
 //   POST /api/write/latex/cite       {claim, context?} → {queries, papers, model}: papers that back a claim, found in
@@ -45,7 +45,8 @@ import type { AgentModel } from '../../shared/types.ts';
 import { chat, type Part } from '../agent/llm.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
-import { helper, helperModelId, helperOptions, helperSees } from '../helper.ts';
+import { helper, helperModelId, helperName, helperSees, seeingModel } from '../helper.ts';
+import { programStatus } from '../agents/programs.ts';
 import { HEADERS } from '../images/openrouter.ts';
 import { loadConfig } from '../models/config.ts';
 import { catalog, OPENROUTER_URL } from '../models/openrouter.ts';
@@ -70,11 +71,6 @@ function goneSignal(reply: FastifyReply): AbortSignal {
   const gone = new AbortController();
   reply.raw.on('close', () => reply.raw.writableFinished || gone.abort());
   return gone.signal;
-}
-
-function helperName(db: DB): string {
-  const id = helperModelId(db);
-  return id === 'auto' ? 'Claude' : (helperOptions(db).options.find((x) => x.value === id)?.label ?? id);
 }
 
 /** The helper model's answer, its name, and what it cost when that is known and not nothing. */
@@ -245,19 +241,27 @@ const claudeHere = () => {
   }
 };
 
-/** Who reads a picture here: the helper model when it sees pictures, else one through OpenRouter, else Claude through Claude Code. */
+/**
+ * Who reads a picture here: the helper model when it sees pictures, else one through OpenRouter, else Claude through
+ * Claude Code when it is signed in here, else one of Custom's models that sees pictures.
+ */
+/** The helper (or one of Custom's models, by `model`) reads the picture. */
+const byHelper = (db: DB, label: string, model?: string): Reader => ({
+  label,
+  where: 'helper',
+  read: async (system, prompt, data, mime, signal) => {
+    let cost: number | undefined;
+    const text = await helper(db, { system, prompt, images: [{ data: data.toString('base64'), mimeType: mime }], model, signal, maxTokens: 4000, timeoutMs: 120_000, onCost: (usd) => (cost = usd) });
+    return { text, cost };
+  },
+});
+
 export async function pictureReader(db: DB): Promise<Reader> {
   if (helperForTests) return { label: 'the test helper', where: 'helper', read: async (system, prompt, data, mime) => ({ text: await helperForTests!({ system, prompt, images: [{ data: data.toString('base64'), mimeType: mime }] }) }) };
-  if (helperSees(db))
-    return {
-      label: helperName(db),
-      where: 'helper',
-      read: async (system, prompt, data, mime, signal) => {
-        let cost: number | undefined;
-        const text = await helper(db, { system, prompt, images: [{ data: data.toString('base64'), mimeType: mime }], signal, maxTokens: 4000, timeoutMs: 120_000, onCost: (usd) => (cost = usd) });
-        return { text, cost };
-      },
-    };
+  if (helperSees(db)) {
+    // On Automatic with no program signed in, the helper turns to a Custom model that sees pictures: named as itself.
+    return byHelper(db, helperModelId(db) === 'auto' ? seeingModel(db)!.label : helperName(db));
+  }
   const key = loadConfig().openrouter.apiKey;
   if (key) {
     const list = await catalog().catch(() => []);
@@ -290,7 +294,7 @@ export async function pictureReader(db: DB): Promise<Reader> {
       };
     }
   }
-  if (claudeHere())
+  if (claudeHere() && (await programStatus()).claude)
     return {
       label: 'Claude Sonnet, through Claude Code',
       where: 'claude',
@@ -305,6 +309,8 @@ export async function pictureReader(db: DB): Promise<Reader> {
         }
       },
     };
+  const own = seeingModel(db);
+  if (own) return byHelper(db, own.label, own.id);
   return { why: 'No model here reads pictures: pick a helper model that sees pictures in Settings → Models, or add an OpenRouter key there.' };
 }
 

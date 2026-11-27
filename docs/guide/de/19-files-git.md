@@ -551,7 +551,7 @@ Es gibt keinen getrennten Staging-Schritt. Kästchen je Datei bestimmen den näc
 
 Zum Committen unten:
 
-1. Schreibe Zusammenfassung und bei Bedarf Beschreibung. **Nachricht schreiben** lässt ein Modell ausgewählte Änderungen im Stil jüngster Repository-Commits beschreiben: Claude bei angemeldetem Claude Code, sonst Codex.
+1. Schreibe Zusammenfassung und bei Bedarf Beschreibung. **Nachricht schreiben** lässt das [Hilfsmodell](/settings?s=models&find=Helper%20model) ausgewählte Änderungen im Stil jüngster Repository-Commits beschreiben.
 2. Wähle **Commit** oder **Commit & Push**, um ihn gleich an den Remote zu senden (dabei wird der Branch veröffentlicht, falls der Remote ihn noch nicht hat). Auch Strg+Enter committet.
 
 Nur ausgewählte Dateien gehen ein, auch wenn andernorts weitere gestagt wurden.
@@ -638,7 +638,7 @@ Ablauf:
 1. Wähle im Menü der Sitzung (⋯) **Ordner und Code** → **Pull-Request öffnen**.
 2. Der Dialog zeigt Branch und Ziel wie `my-branch → main on owner/repo`, Anzahl Commits und Dateien sowie Pushstatus. Noch nicht veröffentlichte Branches werden beim Öffnen gepusht.
 3. Aktiviere bei Bedarf **Uncommittete Änderungen zuerst mit dem Titel als Nachricht committen**. Ohne Auswahl bleiben sie außen vor. Ohne vorhandene Commits ist die Option vorausgewählt.
-4. Schreibe Titel und Markdown-Beschreibung oder nutze **Für mich schreiben**. Ein Modell liest Commits, Änderungen und Sitzungsauftrag. Mindestens ein Commit ist nötig.
+4. Schreibe Titel und Markdown-Beschreibung oder nutze **Für mich schreiben**. Das [Hilfsmodell](/settings?s=models&find=Helper%20model) liest Commits, Änderungen und Sitzungsauftrag. Mindestens ein Commit ist nötig.
 5. Setze den Haken bei **Entwurf**, um ihn als Entwurf zu öffnen. (Gitea kennzeichnet einen Entwurf mit „WIP:“ vor dem Titel.)
 6. **Pull-Request öffnen** pusht den Branch, erstellt und verknüpft den PR mit der Sitzung und öffnet einen neuen Tab.
 
@@ -665,7 +665,7 @@ Jede geänderte Datei zeigt ihren Statusbuchstaben (A hinzugefügt, M geändert,
 
 - Setze bei einer Datei, die du gelesen hast, den Haken bei **Gesehen**: Sie klappt ein und zählt zu „… von … angesehen“. Die Markierung gilt, bis sich die Datei wieder ändert, und wird in diesem Browser gespeichert.
 - Auf einem breiten Bildschirm steht links eine Liste der Dateien mit einem Fortschrittsbalken: Klicke eine Datei an, um zu ihr zu springen.
-- **Änderungen Schritt für Schritt erklären**: Ein Modell liest die Änderungen und schreibt eine kurze Zusammenfassung, eine leicht nachzuvollziehende Reihenfolge (zuerst die Kernidee, dann was sie verwendet, Tests und Dokumentation zuletzt) und zu jeder Datei eine Notiz, was sich geändert hat und worauf du genau achten solltest. Danach wechseln **Empfohlene Reihenfolge** und **Nach Dateipfad** zwischen dieser Reihenfolge und den Dateien nach Namen. Die Erklärung wird genau für diese Änderungen gespeichert, sie ist also beim nächsten Mal da, bis sich der Branch ändert.
+- **Änderungen Schritt für Schritt erklären**: Das [Hilfsmodell](/settings?s=models&find=Helper%20model) liest die Änderungen und schreibt eine kurze Zusammenfassung, eine leicht nachzuvollziehende Reihenfolge (zuerst die Kernidee, dann was sie verwendet, Tests und Dokumentation zuletzt) und zu jeder Datei eine Notiz, was sich geändert hat und worauf du genau achten solltest. Danach wechseln **Empfohlene Reihenfolge** und **Nach Dateipfad** zwischen dieser Reihenfolge und den Dateien nach Namen. Die Erklärung wird genau für diese Änderungen gespeichert, sie ist also beim nächsten Mal da, bis sich der Branch ändert.
 - **Neu laden** liest die Änderungen erneut.
 
 Noch nicht von Git erfasste neue Dateien erscheinen, wenn sie kleine Textdateien sind. Binärdateien zeigen nur einen entsprechenden Hinweis ohne Textvergleich.
@@ -706,7 +706,7 @@ Vorschläge gelten nur am Shellprompt, nicht innerhalb von Editoren oder Python.
 
 ### Befehl in Worten beschreiben
 
-Schreibe am Prompt etwa `find the biggest files here`, drücke Strg+Leertaste und wähle **Befehl für „Finde die größten Dateien hier“ schreiben**. Ein Modell, Claude bei angemeldetem Claude Code, sonst Codex, erstellt bis zu drei passende Befehle für Shell und Ordner mit kurzer Erklärung. Übernimm einen, prüfe ihn und führe ihn selbst mit Enter aus.
+Schreibe am Prompt etwa `find the biggest files here`, drücke Strg+Leertaste und wähle **Befehl für „Finde die größten Dateien hier“ schreiben**. Das [Hilfsmodell](/settings?s=models&find=Helper%20model) erstellt bis zu drei passende Befehle für Shell und Ordner mit kurzer Erklärung. Übernimm einen, prüfe ihn und führe ihn selbst mit Enter aus.
 
 ### Auf dem Smartphone
 

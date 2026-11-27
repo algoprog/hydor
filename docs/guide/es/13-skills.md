@@ -17,7 +17,7 @@ La página Habilidades muestra habilidades de cinco orígenes, cada uno indicado
 - **Integrado**: las habilidades que vienen con la app (más de sesenta). Se actualizan con la app.
 - **Tuyos**: habilidades que escribiste en esta página, que aprobaste cuando un agente te las sugirió, que copiaste de otros agentes de esta computadora (consulta [Trae contenido de otros asistentes](/guide/memory#bring-in-from-other-assistants)), o que pusiste tú mismo en tu carpeta de habilidades.
 - **De plugins**: las habilidades de los [plugins](/guide/plugins) que activaste. Van y vienen con su plugin.
-- **Claude Code y Codex**: las habilidades propias de esos agentes, en sus propias carpetas. Solo las recibe ese agente.
+- **Claude Code y Codex**: las habilidades propias de esos agentes, en sus propias carpetas. Solo las reciben ese agente y [Custom](/guide/custom).
 - **En proyectos**: las habilidades propias de un proyecto, que solo reciben sus sesiones. Las cambias en la pestaña **Habilidades** del proyecto: consulta [Dale a un proyecto habilidades propias](/guide/projects#give-a-project-skills-of-its-own).
 
 Las tres primeras forman la biblioteca de habilidades, que reciben todos los agentes que inicia la app. Un agente también puede nombrar habilidades que prefiere: cuando una de ellas encaja con la tarea, la carga antes de empezar. Consulta [Agentes](/guide/agents).
@@ -37,7 +37,7 @@ Una sesión en un proyecto recibe las habilidades propias del proyecto junto con
 
 Tus propias habilidades tienen prioridad sobre las integradas: una tuya con el nombre de una habilidad integrada ocupa su lugar. Una habilidad de un plugin con un nombre que la biblioteca ya tiene se deja fuera, y la página de su plugin indica qué habilidad reciben los agentes en su lugar.
 
-Custom lee habilidades de varias carpetas, en este orden: las habilidades propias del proyecto (en sus carpetas `.claude/skills` y `.agents/skills`), las propias de Claude Code y de Codex en tu carpeta personal, y después la biblioteca. Cuando dos habilidades comparten nombre, gana la primera que se encuentra. Así, una habilidad que escribas para Claude Code o para Codex llega también a Custom. Custom admite hasta 200 habilidades, de las cuales como máximo 40 son del proyecto y tuyas; sus instrucciones las nombran por grupo (las propias del proyecto, las tuyas y luego los grupos de la biblioteca, como Programación o Documentos) en lugar de listar cada una.
+Custom lee habilidades de varias carpetas, en este orden: las habilidades propias del proyecto (en sus carpetas `.claude/skills` y `.agents/skills`), las propias de Claude Code y de Codex en tu carpeta personal, y después la biblioteca. Cuando dos habilidades comparten nombre, gana la primera que se encuentra. Así, una habilidad que escribas para Claude Code o para Codex llega también a Custom, mientras su [interruptor](#turn-a-skill-on-or-off) esté activado. Custom admite hasta 200 habilidades, de las cuales como máximo 40 son del proyecto y tuyas; sus instrucciones las nombran por grupo (las propias del proyecto, las tuyas y luego los grupos de la biblioteca, como Programación o Documentos) en lugar de listar cada una.
 
 ## Ve cuándo un agente usa una habilidad
 
@@ -75,6 +75,7 @@ Cada habilidad de la biblioteca y de Claude Code y Codex tiene un interruptor al
 
 - Una habilidad de la biblioteca (integrada, tuya o de un plugin) que desactivas se deja fuera para todos los agentes, en todos los proyectos que no la activen por su cuenta.
 - Claude Code guarda su propia elección en su configuración, por el nombre de la habilidad; Codex la guarda en su propia configuración.
+- Custom también respeta estos interruptores. Lee las carpetas de ambos agentes, y tiene una habilidad de ellas solo mientras esté activada para el agente en cuya carpeta se encuentra: Claude Code para `.claude/skills`, Codex para `.codex/skills` y `.agents/skills`. Una habilidad desactivada no está en su lista, no se menciona como una que encaje y no se activa por palabras clave. El interruptor de un proyecto cuenta primero. Una sesión de Custom ya en marcha conserva su lista hasta que su agente vuelva a arrancar. Un interruptor que cambies en el propio Codex, y no aquí, se recoge en segundo plano, así que puede que la primera sesión que inicies después del cambio todavía no lo tenga.
 
 Los interruptores de aquí valen para todas las sesiones. Un proyecto puede activar o desactivar cualquier habilidad al revés para sus propias sesiones, en su pestaña **Habilidades**: consulta [Activa o desactiva una habilidad para este proyecto](/guide/projects#turn-a-skill-on-or-off-for-this-project). Entonces la fila de la habilidad aquí lo indica: "Desactivada en Tesis" o "Activada en 2 proyectos".
 

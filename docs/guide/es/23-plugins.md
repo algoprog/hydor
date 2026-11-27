@@ -142,6 +142,8 @@ Cada sesión que inicia la app recibe los plugins que están activados, configur
 
 Un plugin puede ser solo para algunos agentes; su ventana indica cuáles. Las sesiones que ya están en marcha reciben los cambios de un plugin desde su siguiente inicio.
 
+Una [app](/guide/apps#what-an-app-needs-on-this-computer) puede necesitar un plugin: solo se ejecuta mientras ese plugin está activado, sus agentes reciben las skills y las herramientas del plugin, y sus pasos pueden llamar a esas herramientas.
+
 ## Plugins propios de Claude Code y Codex
 
 Claude Code y Codex tienen plugins propios, que vienen de sus marketplaces y que solo ellos usan. Cada uno tiene una pestaña en la página de Plugins:

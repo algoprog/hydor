@@ -190,7 +190,7 @@ Solo un modelo de una empresa distinta a la del modelo que hizo el trabajo, de m
 - Una sesión de **Codex**, o cualquier sesión que use un modelo de OpenAI, puede ser comprobada por **Claude** (Sonnet, mediante Claude Code) o por uno de los modelos de Custom que no sea de OpenAI.
 - Cualquier otra sesión (Custom u otro agente con un modelo de otro fabricante) puede ser comprobada por Claude, Codex o uno de los modelos de Custom de un fabricante distinto al del modelo de la sesión.
 
-Claude y Codex solo se ofrecen cuando has iniciado sesión en ellos.
+Claude y Codex solo se ofrecen cuando has iniciado sesión en ellos (y lo mismo ocurre con los modelos de sus planes). Sin el otro programa, el revisor sugerido es uno de tus modelos de Custom de otro fabricante: uno que nombre el nivel **Mejor**, **Máximo** o **Estándar** de Custom, cuando lo hay. Si tampoco tienes un modelo de otro fabricante, agrega uno en [Configuración → Modelos](/settings?s=models).
 
 Los modelos de Custom son los que añadiste en [Configuración → Modelos](/settings?s=models). El revisor solo lee: Claude y Codex pueden abrir archivos de la carpeta de la sesión para comprobar algo concreto, pero no cambian nada. Además del turno en sí, el revisor ve tu primer mensaje de la sesión y tu mensaje anterior a ese turno, como contexto. Cuando los cambios son demasiado grandes para mostrarlos completos, se omite una parte, y la tarjeta lo indica.
 
@@ -220,7 +220,7 @@ El mensaje nombra al revisor, enumera cada punto con su gravedad y su archivo, y
 
 ## Comparar modelos en la arena
 
-La arena de modelos envía el mismo mensaje a dos o tres modelos a la vez, para que puedas comparar sus respuestas lado a lado y conservar la mejor. Cada respuesta que conservas cuenta para una valoración que muestra qué modelos ganan en tus propias tareas.
+La arena de modelos envía el mismo mensaje a dos o tres modelos a la vez, para que puedas comparar sus respuestas lado a lado y conservar la mejor. No se ofrece un Claude Code o un Codex en el que no hayas iniciado sesión. Cada respuesta que conservas cuenta para una valoración que muestra qué modelos ganan en tus propias tareas.
 
 ### Empezar un enfrentamiento
 

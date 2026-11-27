@@ -174,7 +174,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['models', 'On this machine', 'local models ollama vllm gpu download', 'Models installed here, and their downloads', 'Models on this machine'],
   ['models', 'Add a model from Hugging Face', 'hugging face hf download install gguf vllm ollama suggested recommended for this computer lfm3 gemma flint glm', 'The ones suggested for this computer, or search, see how each would run here, and install it'],
   ['models', 'OpenRouter', 'openrouter api key models cloud suggested gpt grok claude opus', 'Models through OpenRouter, with your key'],
-  ['models', 'Runtimes and endpoints', 'ollama vllm openai compatible endpoint url', 'Ollama, vLLM and other OpenAI-compatible endpoints'],
+  ['models', 'Runtimes and endpoints', 'ollama vllm openai compatible endpoint url reasoning effort levels sees images', 'Ollama, vLLM and other OpenAI-compatible endpoints'],
   ['models', 'Hugging Face token', 'hf token gated private', 'Only for gated or private models'],
   // Agents › Agent Guidelines
   ['guidelines', 'For every session', 'rules instructions preferences system prompt always never how to talk to you tone style claude.md agents.md', 'What every agent follows, in every session', 'Agent Guidelines for every session'],

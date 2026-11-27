@@ -77,7 +77,7 @@ export interface AppRunner {
   /** The template's name; undefined when there is none of that id. */
   name(id: string): string | undefined;
   /** Starts a run of it with these answers: the run, and its session when one agent does it. */
-  start(o: { app: string; inputs: Record<string, string>; test: boolean }): { id: string; key?: string } | Promise<{ id: string; key?: string }>;
+  start(o: { app: string; inputs: Record<string, string>; test: boolean; outside?: string[] }): { id: string; key?: string } | Promise<{ id: string; key?: string }>;
   /** How a run of it ended; null while it goes on, undefined when there is no such run. */
   ended(id: string): AppRunEnd | null | undefined;
 }
@@ -975,7 +975,10 @@ export class Scheduler extends EventEmitter {
       } else if (app && answers) {
         if (!this.apps) throw new Error('Apps are not on here');
         // Its run ends when the template's does (appRunEnded); it has no session of its own to watch.
-        const started = await this.apps.start({ app: app.id, inputs: answers, test });
+        // The answers the task leaves to a webhook call or a watcher ({{body…}}, {{change}}): from outside, not the person's.
+        // A webhook's run is someone's call even when it fills none.
+        const outside = Object.entries(app.inputs).filter(([, v]) => v.includes('{{')).map(([k]) => k);
+        const started = await this.apps.start({ app: app.id, inputs: answers, test, ...(outside.length || o.trigger === 'webhook' ? { outside } : {}) });
         setRun(this.db, runId, { app_run: started.id });
         key = started.key;
       } else if (r.target || (standingKey = await this.standingOf(r))) {

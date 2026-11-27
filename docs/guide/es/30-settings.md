@@ -351,7 +351,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 [Configuración → Apps](/settings?s=apps): lo que las apps saben sobre ti y cuáles se ejecutan sin preguntar. Más en [Apps](/guide/apps).
 
 - [**Sobre ti**](/settings?s=apps&find=About%20you): Desde qué parten las preguntas de las apps, para que no pregunten cada vez.
-- [**Ready-made apps run with**](/settings?s=apps&find=Ready-made%20apps%20run%20with): The program that runs the ready-made apps: Automatic, Claude Code, Codex or Custom.
+- [**Las apps listas para usar se ejecutan con**](/settings?s=apps&find=Ready-made%20apps%20run%20with): El programa que ejecuta las apps listas para usar: Automático, Claude Code, Codex o Custom.
 - [**Ejecutar sin preguntar**](/settings?s=apps&find=Run%20without%20asking): Las apps que los agentes ejecutan por ti sin preguntar antes; quita una para que se vuelva a preguntar.
 
 ### Custom

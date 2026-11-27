@@ -351,7 +351,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 [Paramètres → Apps](/settings?s=apps) : ce que les apps savent de vous, et lesquelles s’exécutent sans rien demander. Pour en savoir plus : [Apps](/guide/apps).
 
 - [**À propos de vous**](/settings?s=apps&find=About%20you) : Ce à partir de quoi les apps commencent leurs questions, pour ne pas les poser à chaque fois.
-- [**Ready-made apps run with**](/settings?s=apps&find=Ready-made%20apps%20run%20with) : The program that runs the ready-made apps: Automatic, Claude Code, Codex or Custom.
+- [**Les apps prêtes à l’emploi s’exécutent avec**](/settings?s=apps&find=Ready-made%20apps%20run%20with) : Le programme qui exécute les apps prêtes à l’emploi : Automatique, Claude Code, Codex ou Custom.
 - [**Exécuter sans demander**](/settings?s=apps&find=Run%20without%20asking) : Les apps que les agents exécutent pour vous sans demander d’abord ; retirez-en une pour qu’on vous redemande.
 
 ### Custom

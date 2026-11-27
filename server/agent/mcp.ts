@@ -1,6 +1,7 @@
 // MCP servers for Console: the user's (Claude Code's user and project settings, the project's
 // .mcp.json, Codex's config.toml) and those the app hands over (its show_html page server). Over stdio
 // (newline-delimited JSON-RPC) or Streamable HTTP; their tools join Console's as mcp__<server>__<tool>.
+// An app's tool steps call a plugin's tools with the same client (server/apps/plugins.ts).
 import { spawn, type ChildProcess } from 'node:child_process';
 import { spawnProgram } from '../platform.ts';
 import fs from 'node:fs';
@@ -18,6 +19,8 @@ export interface McpDef {
   /** Codex's enabled_tools and disabled_tools. */
   only?: string[];
   skip?: string[];
+  /** The environment a stdio server starts with, before `env` (this process's unless given). */
+  baseEnv?: Record<string, string>;
 }
 
 export interface McpTool {
@@ -213,6 +216,10 @@ const clean = (s: string) => s.replace(/[^A-Za-z0-9_]/g, '_');
 export class McpClient {
   tools: McpTool[] = [];
   error?: string;
+  /** A stdio server that ended (or never started): it answers nothing more. */
+  stopped = false;
+  /** The last of what a stdio server wrote on stderr, to say why it stopped. */
+  private said = '';
   private proc?: ChildProcess;
   private seq = 0;
   private waiting = new Map<number, (m: any) => void>();
@@ -222,8 +229,11 @@ export class McpClient {
 
   async connect(): Promise<void> {
     if (this.def.type === 'stdio') {
-      this.proc = spawnProgram(this.def.command!, this.def.args ?? [], { env: { ...process.env, ...(this.def.env ?? {}) }, stdio: ['pipe', 'pipe', 'ignore'] });
+      this.proc = spawnProgram(this.def.command!, this.def.args ?? [], { env: { ...(this.def.baseEnv ?? process.env), ...(this.def.env ?? {}) }, stdio: ['pipe', 'pipe', 'pipe'] });
       let buf = '';
+      this.proc.stderr!.on('data', (d) => (this.said = (this.said + d.toString()).slice(-4000)));
+      // A server that ended: writing to it fails here, not as a crash of this process.
+      this.proc.stdin!.on('error', () => {});
       this.proc.stdout!.on('data', (d) => {
         buf += d.toString();
         let i: number;
@@ -236,10 +246,14 @@ export class McpClient {
           } catch {}
         }
       });
-      this.proc.on('exit', () => {
-        for (const w of this.waiting.values()) w({ error: { message: 'The MCP server stopped' } });
+      const ended = (why?: string) => {
+        this.stopped = true;
+        const tail = why ?? this.said.trim().split('\n').slice(-3).join(' ').slice(0, 300);
+        for (const w of this.waiting.values()) w({ error: { message: `The MCP server stopped${tail ? `: ${tail}` : ''}` } });
         this.waiting.clear();
-      });
+      };
+      this.proc.on('exit', () => ended());
+      this.proc.on('error', (e) => ended(e.message));
     }
     await this.request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'console', version: '1' } }, 30_000);
     this.notify('notifications/initialized');
@@ -268,8 +282,8 @@ export class McpClient {
    * A tool's result: its text, its images (a screenshot) for the models that see them, and its
    * structured content when the text does not already carry it.
    */
-  async call(tool: string, args: unknown, signal: AbortSignal): Promise<{ text: string; images: { data: string; mimeType: string }[]; isError: boolean }> {
-    const r = await this.request('tools/call', { name: tool, arguments: args ?? {} }, 600_000, signal);
+  async call(tool: string, args: unknown, signal: AbortSignal, timeoutMs = 600_000): Promise<{ text: string; images: { data: string; mimeType: string }[]; isError: boolean; structured?: unknown }> {
+    const r = await this.request('tools/call', { name: tool, arguments: args ?? {} }, timeoutMs, signal);
     const images: { data: string; mimeType: string }[] = [];
     const parts: string[] = [];
     for (const c of r.content ?? []) {
@@ -294,11 +308,15 @@ export class McpClient {
       const compact = (s: string) => s.replace(/\s+/g, '');
       if (!compact(text).includes(compact(json).slice(0, 200))) text = text ? `${text}\n\nStructured result:\n${JSON.stringify(r.structuredContent, null, 1)}` : JSON.stringify(r.structuredContent, null, 1);
     }
-    return { text: text || (images.length ? '' : '(no output)'), images, isError: !!r.isError };
+    return { text: text || (images.length ? '' : '(no output)'), images, isError: !!r.isError, ...(r.structuredContent !== undefined ? { structured: r.structuredContent } : {}) };
   }
 
   close() {
-    this.proc?.kill();
+    const p = this.proc;
+    if (!p) return;
+    // Its input closed first: a server ends on that even behind a launcher that is killed.
+    p.stdin?.end();
+    p.kill();
   }
 
   private notify(method: string, params: unknown = {}) {
@@ -312,6 +330,7 @@ export class McpClient {
     const msg = { jsonrpc: '2.0', id, method, params };
     let m: any;
     if (this.proc) {
+      if (this.stopped) throw new Error(`${this.def.name}: The MCP server stopped`);
       m = await new Promise((resolve, reject) => {
         const t = setTimeout(() => (this.waiting.delete(id), reject(new Error(`${this.def.name}: ${method} took too long`))), timeout);
         signal?.addEventListener('abort', () => (clearTimeout(t), this.waiting.delete(id), reject(new Error('stopped'))), { once: true });

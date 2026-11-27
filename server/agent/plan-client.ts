@@ -31,7 +31,7 @@ export function planClient(runtime: string) {
     const r = await fetch(`${runtime}/model`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id: m.id, messages: o.messages, tools: o.tools, toolChoice: o.toolChoice, maxTokens: o.maxTokens, cacheKey: o.cacheKey }),
+      body: JSON.stringify({ id: m.id, messages: o.messages, tools: o.tools, toolChoice: o.toolChoice, maxTokens: o.maxTokens, cacheKey: o.cacheKey, effort: o.effort }),
       signal: o.signal,
     });
     if (!r.ok || !r.body) {

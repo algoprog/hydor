@@ -2,7 +2,8 @@
 // Claude Code is given it (one message, each step in its own block, so the cache of the last step holds) and as the
 // ChatGPT plan's Responses API takes it (messages, calls, what they returned, sealed reasoning); the tag a reply may
 // open or close with; and asking with each account in turn, a fake Claude Code and a fake Responses API answering:
-// one at its limit or signed out hands the step on, a token that ended is refreshed once. Build and run:
+// one at its limit or signed out hands the step on, a token that ended is refreshed once; and the session's effort,
+// passed to each program only when the model lists it, and offered by Custom's pickers. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/models/subscription-test.ts
 //   DATA_DIR=/tmp/hydor-test-plans node dist/dev/subscription-test.js
 import assert from 'node:assert/strict';
@@ -46,7 +47,7 @@ process.stdin.on('end', () => {
     delta('<tool_call>\\n{"name": "bash", "arguments": {"command": "pwd"}}\\n</tool_call>');
     return setTimeout(() => out({ type: 'result', subtype: 'success', is_error: false, result: 'never read', usage: { input_tokens: 1, output_tokens: 1 } }), 8000);
   }
-  const said = JSON.stringify({ model: args[args.indexOf('--model') + 1], tools: args[args.indexOf('--tools') + 1], sys, blocks: msg.message.content.map((x) => x.type) });
+  const said = JSON.stringify({ model: args[args.indexOf('--model') + 1], tools: args[args.indexOf('--tools') + 1], sys, blocks: msg.message.content.map((x) => x.type), ...(args.includes('--effort') ? { effort: args[args.indexOf('--effort') + 1] } : {}) });
   out({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'hmm' } } });
   for (const piece of ['<assi', 'stant>', said.slice(0, 10), said.slice(10), '</assistant>'])
     out({ type: 'stream_event', event: { type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text: piece } } });
@@ -89,6 +90,7 @@ await new Promise<void>((r) => api.listen(0, '127.0.0.1', () => r()));
 process.env.HYDOR_CODEX_RESPONSES_URL = `http://127.0.0.1:${(api.address() as { port: number }).port}/responses`;
 
 const { claudeBlocks, codexInput, initPlans, planChat, planModels, TagTrim } = await import('./subscription.ts');
+const { effortsOf } = await import('../../shared/efforts.ts');
 const { isSignedOut } = await import('../signin.ts');
 const { ContextOverflow } = await import('../agent/llm.ts');
 
@@ -319,6 +321,42 @@ test('Codex signed in with an API key, not ChatGPT, lends no plan: it says so', 
   await assert.rejects(planChat(m, { messages: [{ role: 'user', content: 'Hi' }], signal: new AbortController().signal, ...quiet }), /signed out/);
   assert.ok(isSignedOut('codex', 'keyed'));
   codexMethod = 'chatgpt';
+});
+
+test('a plan model gets the session’s effort when it lists it, else none: the program’s own default', async () => {
+  const efforts = ['low', 'medium', 'high', 'xhigh'];
+  initPlans({
+    accounts: () => [{ account: 'effort', env: { FAKE_CLAUDE: 'ok' } }],
+    codexToken: async () => ({ token: jwt('effort'), method: 'chatgpt' }),
+    claudeModels: async () => [
+      { value: 'sonnet', label: 'Sonnet 5.5', efforts },
+      { value: 'haiku', label: 'Haiku 5.5', efforts: [] },
+    ],
+    codexModels: async () => [{ value: 'gpt-6-luna', label: 'GPT-6-Luna', efforts }],
+  });
+  const { models } = await planModels();
+  const of = (id: string) => models.find((m) => m.id === id)!;
+  // The pickers offer each model's own list (the app's agent accepts the same: server/agent/effort-test.ts).
+  assert.deepEqual(effortsOf(of('claude/sonnet')), efforts);
+  assert.deepEqual(effortsOf(of('codex/gpt-6-luna')), efforts);
+  assert.deepEqual(effortsOf(of('claude/haiku')), []);
+  const ask = (id: string, effort?: string) => planChat(of(id), { messages: [{ role: 'system', content: 's' }, { role: 'user', content: 'Hi' }], effort, signal: new AbortController().signal, ...quiet });
+  const claude = async (id: string, effort?: string) => JSON.parse((await ask(id, effort)).text).effort;
+  const codex = async (effort?: string) => {
+    seen.length = 0;
+    await ask('codex/gpt-6-luna', effort);
+    return seen[0].body.reasoning;
+  };
+  assert.equal(await claude('claude/sonnet', 'xhigh'), 'xhigh');
+  assert.deepEqual(await codex('xhigh'), { effort: 'xhigh', summary: 'auto' });
+  // The environment's effort counts for nothing.
+  process.env.HYDOR_EFFORT = 'high';
+  for (const none of [undefined, 'default', 'turbo', 'max']) {
+    assert.equal(await claude('claude/sonnet', none), undefined, `claude, ${none}`);
+    assert.deepEqual(await codex(none), { summary: 'auto' }, `codex, ${none}`);
+  }
+  assert.equal(await claude('claude/haiku', 'high'), undefined, 'a model that lists no efforts');
+  delete process.env.HYDOR_EFFORT;
 });
 
 for (const [name, fn] of tests) {

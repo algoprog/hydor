@@ -30,6 +30,7 @@ function inputSchema(a: AppDef): Record<string, unknown> {
     else if (f.type === 'choice') properties[f.id] = { type: 'string', enum: f.options ?? [], description };
     else if (f.type === 'date') properties[f.id] = { type: 'string', description: `${description}. A date, YYYY-MM-DD.` };
     else if (f.type === 'file') properties[f.id] = { type: 'string', description: `${description}. The file's text, or the path of a file on this machine.` };
+    else if (f.type === 'project') properties[f.id] = { type: 'string', description: `${description}. One of the user's projects, by its name or id.` };
     else properties[f.id] = { type: 'string', description };
   }
   properties.wait = { type: 'number', description: 'Seconds to wait for the answer (default 120, at most 600). A longer run returns its id: then call app_run_status.' };

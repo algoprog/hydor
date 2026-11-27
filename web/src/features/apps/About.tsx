@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react';
 import { AppWindow, Bell, BookOpen, Bot, Brain, Code, Database, FileSearch, FileText, FlaskConical, Globe, GitBranch, Hand, Image, LibraryBig, Link2, MessagesSquare, Repeat, Sparkles, Split } from 'lucide-react';
 import type { AppTemplate } from '@shared/apps';
 import type { AppSummary, WorkKind } from '@shared/app-summary';
+import { pluginStepTool } from '@shared/app-manifest';
 import { appSummary } from '@shared/app-summary';
 import { enc, post, put } from '../../lib/api';
 import { go } from '../../lib/nav';
@@ -59,7 +60,8 @@ const TOOLS: Record<string, { icon: ReactNode; text: string }> = {
 function howLines(s: AppSummary): { icon: ReactNode; text: string }[] {
   const out: { icon: ReactNode; text: string }[] = [];
   for (const h of s.how) {
-    const line = h.kind === 'tool' ? (TOOLS[h.tool ?? ''] ?? { icon: <Sparkles size={14} />, text: `Uses ${h.tool}` }) : WORK[h.kind];
+    const plugin = h.kind === 'tool' ? pluginStepTool(h.tool)?.plugin : undefined;
+    const line = h.kind === 'tool' ? (TOOLS[h.tool ?? ''] ?? { icon: <Sparkles size={14} />, text: plugin ? `Uses the ${plugin} plugin` : `Uses ${h.tool}` }) : WORK[h.kind];
     if (!out.some((x) => x.text === line.text)) out.push(line);
   }
   return out.slice(0, 7);

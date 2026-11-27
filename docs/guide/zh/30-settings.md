@@ -351,7 +351,7 @@
 [设置 → 应用](/settings?s=apps)：应用对你了解什么，以及哪些无需询问就能运行。详见[应用](/guide/apps)。
 
 - [**关于你**](/settings?s=apps&find=About%20you)：应用从哪里开始提问，这样就不用每次都问。
-- [**Ready-made apps run with**](/settings?s=apps&find=Ready-made%20apps%20run%20with)：The program that runs the ready-made apps: Automatic, Claude Code, Codex or Custom。
+- [**现成应用的运行程序**](/settings?s=apps&find=Ready-made%20apps%20run%20with)：运行现成应用的程序：自动、Claude Code、Codex 或 Custom。
 - [**无需询问直接运行**](/settings?s=apps&find=Run%20without%20asking)：智能体无需先询问就为你运行的应用；移除某个应用后会再次询问。
 
 ### Custom

@@ -15,7 +15,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { cleanLang } from '../../shared/write.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
-import { helper, helperModelId, helperOptions } from '../helper.ts';
+import { helper, helperName } from '../helper.ts';
 
 type Ask = { system: string; prompt: string; signal?: AbortSignal; maxTokens?: number };
 let helperForTests: ((q: Ask) => Promise<string>) | null = null;
@@ -29,12 +29,6 @@ function goneSignal(reply: FastifyReply): AbortSignal {
   const gone = new AbortController();
   reply.raw.on('close', () => reply.raw.writableFinished || gone.abort());
   return gone.signal;
-}
-
-/** The helper model's name, as the answer says it. */
-function helperName(db: DB): string {
-  const id = helperModelId(db);
-  return id === 'auto' ? 'Claude' : (helperOptions(db).options.find((x) => x.value === id)?.label ?? id);
 }
 
 /** The helper model's answer, its name, and what it cost when that is known (a model paid by the word). */

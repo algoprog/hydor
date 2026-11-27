@@ -351,7 +351,7 @@
 [Ρυθμίσεις → Εφαρμογές](/settings?s=apps): τι γνωρίζουν οι εφαρμογές για εσάς, και ποιες εκτελούνται χωρίς να ρωτούν. Περισσότερα στο [Εφαρμογές](/guide/apps).
 
 - [**Σχετικά με εσάς**](/settings?s=apps&find=About%20you): Από τι ξεκινούν οι εφαρμογές τις ερωτήσεις τους, ώστε να μη ρωτούν κάθε φορά.
-- [**Ready-made apps run with**](/settings?s=apps&find=Ready-made%20apps%20run%20with): The program that runs the ready-made apps: Automatic, Claude Code, Codex or Custom.
+- [**Οι έτοιμες εφαρμογές εκτελούνται με**](/settings?s=apps&find=Ready-made%20apps%20run%20with): Το πρόγραμμα που εκτελεί τις έτοιμες εφαρμογές: Αυτόματα, Claude Code, Codex ή Custom.
 - [**Εκτέλεση χωρίς ερώτηση**](/settings?s=apps&find=Run%20without%20asking): Οι εφαρμογές που εκτελούν οι πράκτορες για εσάς χωρίς να ρωτήσουν πρώτα· αφαιρέστε μία για να ρωτούν ξανά.
 
 ### Custom

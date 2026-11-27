@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { agentToOpen, type ProgramStatus } from '../../shared/programs.ts';
 import { ALL_COMMAND_NAMES, commandDef, describeCommand, didYouMean, optionDef, OPTION_TABLE, programOf, routeOf, UsageError, verbOptions, type Route } from './args.ts';
 import { areaByName, defaultVerb } from './areas/index.ts';
 import { LOADERS, type Candidate, type Loaded } from './areas/loaders.ts';
@@ -408,7 +409,13 @@ async function valuesOf(name: string, line: Line, c: { get: <T>(p: string) => Pr
       return [...PROGRAMS, ...(boot?.acpAgents ?? []).filter((a) => a.id !== 'console').map((a) => [a.id, a.name] as Candidate)];
     }
     case 'model': {
-      const prog = programOf(line.opts.get('agent')) ?? { agent: 'claude' as const };
+      let prog = programOf(line.opts.get('agent'));
+      if (!prog) {
+        // No --agent: what a new session would open with (as start.ts plans it).
+        const boot = await get<{ start?: { agent?: string }; acpAgents?: { id: string }[]; programs?: ProgramStatus }>('/api/bootstrap');
+        const open = agentToOpen(boot?.start?.agent, boot?.acpAgents, boot?.programs);
+        prog = { agent: open.agent, ...(open.acp ? { acpAgent: open.acp } : {}) };
+      }
       // As start.ts's catalogOf asks for it.
       const cat = await get<{ models?: { value: string; label: string }[] }>(`/api/catalog/${prog.agent}${prog.agent === 'acp' ? `?acp=${encodeURIComponent(prog.acpAgent ?? 'console')}` : ''}`);
       return [['auto', 'Automatic: the team’s tiers choose'], ...(cat?.models ?? []).map((m) => [m.value, m.label] as Candidate)];

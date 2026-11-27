@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppBatch, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunAsk, RunProgress, RunStepView } from '@shared/apps';
 import type { EnvView } from '@shared/app-manifest';
 import { withPick, type RunsWithView } from '@shared/app-run-with';
+import type { PluginNeed } from '@shared/plugins';
 import { isActive } from '@shared/apps';
 import { api, enc } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
@@ -14,7 +15,7 @@ export interface Usage {
 }
 
 /** A ready-made app as the Apps page lists it: installed (all are until you uninstall one), and whether agents may run it. */
-export type ReadyApp = AppTemplate & { installed: boolean; agents: boolean; lastRunAt?: number; needsKey?: true };
+export type ReadyApp = AppTemplate & { installed: boolean; agents: boolean; lastRunAt?: number; needsKey?: true; needsPlugin?: string[] };
 
 /** One of the apps you ran lately: its id ("tpl:<id>" for a ready-made one) and its latest run. */
 export interface UsedApp {
@@ -24,7 +25,7 @@ export interface UsedApp {
 
 export interface Gallery {
   /** Yours, each with today's use, when it last ran, how often it ran all told, and whether it lacks a key it cannot run without. */
-  apps: (AppDef & { usage: Usage; lastRunAt?: number; uses?: number; needsKey?: true })[];
+  apps: (AppDef & { usage: Usage; lastRunAt?: number; uses?: number; needsKey?: true; needsPlugin?: string[] })[];
   templates: ReadyApp[];
   recent: AppRun[];
   /** The apps pinned to the top of the page, in their order. */
@@ -72,6 +73,8 @@ export interface AppDetail {
   latest?: number;
   /** The keys it needs, and how the vault has each (never a value). */
   secrets?: KeyState[];
+  /** The plugins it needs, and how each stands on this computer. */
+  plugins?: PluginNeed[];
   /** What its questions start from, by question: About you's field (from), the last answer (remember). */
   starts?: Record<string, string>;
 }

@@ -190,7 +190,7 @@ Apenas um modelo de uma empresa diferente da do modelo que fez o trabalho, para 
 - Uma sessão do **Codex**, ou qualquer sessão que use um modelo da OpenAI, pode ser verificada pelo **Claude** (Sonnet, por meio do Claude Code) ou por um dos modelos do Custom que não seja da OpenAI.
 - Qualquer outra sessão (Custom ou outro agente com o modelo de outro fabricante) pode ser verificada pelo Claude, pelo Codex ou por um dos modelos do Custom de um fabricante diferente do do modelo da sessão.
 
-O Claude e o Codex só são oferecidos quando você entrou neles.
+O Claude e o Codex só são oferecidos quando você entrou neles (e o mesmo vale para os modelos dos planos deles). Sem o outro programa, o revisor sugerido é um dos seus modelos do Custom de outro fabricante: um que o nível **Melhor**, **Máximo** ou **Padrão** do Custom indique, quando houver. Se também não houver nenhum modelo de outro fabricante, adicione um em [Configurações → Modelos](/settings?s=models).
 
 Os modelos do Custom são os que você adicionou em [Configurações → Modelos](/settings?s=models). O revisor apenas lê: o Claude e o Codex podem abrir arquivos na pasta da sessão para verificar algo específico, mas não alteram nada. Além da vez em si, o revisor vê a sua primeira mensagem na sessão e a sua mensagem anterior a essa vez, para contexto. Quando as mudanças são grandes demais para serem mostradas por inteiro, parte delas fica de fora, e o cartão avisa isso.
 
@@ -220,7 +220,7 @@ A mensagem cita o revisor, lista cada ponto com sua gravidade e arquivo, e pede 
 
 ## Comparar modelos na arena
 
-A arena de modelos envia o mesmo prompt para dois ou três modelos ao mesmo tempo, para você comparar as respostas lado a lado e manter a melhor. Cada resposta que você mantém conta para uma avaliação que mostra quais modelos vencem nas suas próprias tarefas.
+A arena de modelos envia o mesmo prompt para dois ou três modelos ao mesmo tempo, para você comparar as respostas lado a lado e manter a melhor. Um Claude Code ou Codex no qual você não entrou não é oferecido. Cada resposta que você mantém conta para uma avaliação que mostra quais modelos vencem nas suas próprias tarefas.
 
 ### Começar uma disputa
 

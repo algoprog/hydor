@@ -1,6 +1,7 @@
 // What an OpenAI-compatible endpoint's models can do (see images, reason), as far as the endpoint says, and the
 // person's own setting over it. Read from the entries of its /models (OpenRouter's, Mistral's and others' fields),
 // and from LiteLLM's /model/info when /models carries none of them (LiteLLM's /models gives only ids).
+import { ENDPOINT_EFFORTS } from '../../shared/efforts.ts';
 import type { EndpointModelCaps } from '../../shared/types.ts';
 import type { EndpointModelSetting } from './config.ts';
 
@@ -62,13 +63,11 @@ export function resolve(set: EndpointModelSetting | undefined, endpoint: Said | 
   return {
     vision: set?.vision ?? endpoint?.vision ?? false,
     reasoning: set?.reasoning ?? endpoint?.reasoning ?? false,
+    efforts: set?.efforts?.length ? set.efforts : ENDPOINT_EFFORTS,
     endpoint: { ...(endpoint?.vision !== undefined ? { vision: endpoint.vision } : {}), ...(endpoint?.reasoning !== undefined ? { reasoning: endpoint.reasoning } : {}) },
-    set: { ...(set?.vision !== undefined ? { vision: set.vision } : {}), ...(set?.reasoning !== undefined ? { reasoning: set.reasoning } : {}) },
+    set: { ...(set?.vision !== undefined ? { vision: set.vision } : {}), ...(set?.reasoning !== undefined ? { reasoning: set.reasoning } : {}), ...(set?.efforts?.length ? { efforts: set.efforts } : {}) },
   };
 }
-
-/** The reasoning levels Custom offers a model that reasons, and sends as reasoning_effort. */
-export const ENDPOINT_EFFORTS = ['low', 'medium', 'high'];
 
 /** What an endpoint's /models and, when those entries say nothing of these, LiteLLM's /model/info say of its models. */
 export async function read(

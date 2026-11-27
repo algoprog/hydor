@@ -117,6 +117,10 @@ export function ensureTables(db: DB) {
   if (!cols.has('person_id')) db.exec('alter table app_runs add column person_id text');
   // The caller's own short reference for a run an app's key started, and the index to list a reference's runs by.
   if (!cols.has('ref')) db.exec('alter table app_runs add column ref text');
+  // The project a run works in, as its project question was answered: { id, name, folder } as JSON.
+  if (!cols.has('project')) db.exec('alter table app_runs add column project text');
+  // A run someone other than the person started, or whose answers came from outside: what it starts is held the same way.
+  if (!cols.has('outside')) db.exec('alter table app_runs add column outside integer not null default 0');
   db.exec('create index if not exists app_runs_ref on app_runs (app_id, ref, created_at desc)');
   db.exec('create index if not exists app_runs_person on app_runs (app_id, person_id, created_at desc)');
 }
@@ -320,11 +324,13 @@ interface RunRow {
   nudged: number;
   asked_by: string | null;
   told: number | null;
+  outside: number | null;
   misses: string | null;
   lang: string | null;
   partial: string | null;
   person: string | null;
   ref: string | null;
+  project: string | null;
   created_at: number;
   started_at: number | null;
   ended_at: number | null;
@@ -340,6 +346,8 @@ export interface RunRecord extends AppRun {
   nudged: boolean;
   /** The session whose agent ran it for the user (use_app). */
   askedBy?: string;
+  /** Someone other than the person started it, or its answers came from outside (an app's key, a public page, a webhook). */
+  outside?: boolean;
   /** That session heard how it ended (in the call that ran it, or by a message after). */
   told?: boolean;
 }
@@ -383,10 +391,12 @@ function toRun(r: RunRow): RunRecord {
     ...(r.version ? { version: r.version } : {}),
     nudged: !!r.nudged,
     ...(r.asked_by ? { askedBy: r.asked_by, told: !!r.told } : {}),
+    ...(r.outside ? { outside: true } : {}),
     ...(r.misses ? { misses: parse<RunMiss[]>(r.misses, []) } : {}),
     ...(r.lang ? { lang: r.lang } : {}),
     ...(r.person !== null ? personOf(r.person) : {}),
     ...(r.ref ? { ref: r.ref } : {}),
+    ...(r.project ? { project: parse<AppRun['project']>(r.project, undefined) } : {}),
     // What its steps have given so far, only while it works.
     ...(r.partial && isActive(r.status as RunStatus) ? { partial: parse<Record<string, unknown>>(r.partial, {}) } : {}),
     createdAt: r.created_at,
@@ -404,19 +414,19 @@ const personOf = (text: string): { person?: RunPerson | null } => {
 
 /** What the pages see of a run (no recipe, no visitor). */
 export function runView(r: RunRecord): AppRun {
-  const { recipe: _r, visitor: _v, ip: _i, nudged: _n, askedBy: _a, told: _t, ...view } = r;
+  const { recipe: _r, visitor: _v, ip: _i, nudged: _n, askedBy: _a, told: _t, outside: _o, ...view } = r;
   return view;
 }
 
-export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string; askedBy?: string; lang?: string; person?: RunPerson | null; ref?: string }): RunRecord {
+export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string; askedBy?: string; lang?: string; person?: RunPerson | null; ref?: string; project?: AppRun['project']; outside?: boolean }): RunRecord {
   const id = newId(8);
   // The version it runs, when it runs the template as saved (a try of changes not saved yet runs none).
   const last = r.source === 'step' ? null : latestVersion(db, r.app);
   const version = last && last.core === coreOf(r.recipe) ? last.n : null;
   db.prepare(
-    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, version, asked_by, lang, person, person_id, ref, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, version, r.askedBy ?? null, r.lang ?? null, r.person === undefined ? null : JSON.stringify(r.person), r.person?.id ?? null, r.ref ?? null, Date.now());
+    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, version, asked_by, lang, person, person_id, ref, project, outside, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, version, r.askedBy ?? null, r.lang ?? null, r.person === undefined ? null : JSON.stringify(r.person), r.person?.id ?? null, r.ref ?? null, r.project ? JSON.stringify(r.project) : null, r.outside ? 1 : 0, Date.now());
   return getRun(db, id)!;
 }
 

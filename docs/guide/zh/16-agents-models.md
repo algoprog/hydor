@@ -190,7 +190,7 @@ Antigravity CLI 是 Google 为你的 Google AI 套餐提供的智能体，添加
 - 在已达限额的账户上新启动的会话，会改为在仍有用量的账户上启动；而你向其账户已达限额的会话发送消息时，会先移动会话，这样你的消息不会被拒之门外。随你的消息一起，智能体会得知它现在运行在一个仍有用量的账户上，所以不会等待旧账户的重置，也会知道它的哪些子智能体可以继续。
 - 在 VS Code 或终端中打开的会话会留在它们的账户上。
 - 限额重置（Codex 重置额度、Claude 重置授予）和 API 额度仍然只适用于 Claude Code 和 Codex。
-- 应用自己向 Claude Code 或 Codex 提出的快速提问（设为 **自动** 的辅助模型、应用的快速模型步骤、拉取请求描述、命令建议），在其中一个达到限额或已退出登录时，会以同样的方式交给你的下一个已登录账户。当 Claude Code 和 Codex 都无法回答时，你的某个 Custom 模型会接手（参见[账户退出登录时](#when-an-account-is-signed-out)）。
+- 应用自己向 Claude Code 或 Codex 提出的快速提问（设为 **自动** 的辅助模型、应用的快速模型步骤、提交信息、拉取请求描述、命令建议），在其中一个达到限额或已退出登录时，会以同样的方式交给你的下一个已登录账户。当 Claude Code 和 Codex 都无法回答时，你的某个 Custom 模型会接手（参见[账户退出登录时](#when-an-account-is-signed-out)）。
 
 ## 账户登出时
 
@@ -200,7 +200,7 @@ Antigravity CLI 没有其他账户可以切换。如果你在它登出时新建�
 
 - **你的会话.** 当某个会话的一轮请求因其账户已登出而被拒绝，并且 [达到限额时切换账户](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) 已开启（默认开启）时，该会话会连同全部历史记录，转移到同一智能体的另一个仍有用量的已登录账户，并继续运行。屏幕底部会出现一条简短的提示："<session>: <account> is signed out, so it continues on <other account>"，同时智能体会收到这样的告知："… is signed out, so this session now runs on …. Continue where you left off."。如果你向一个不久前被发现账户已登出的会话发送消息，会话会先以同样的方式转移，这样你的消息就不会被拒绝。
 - **会话无法转移时。** 如果 **达到限额时切换账户** 已关闭，或者该智能体没有其他账户还有用量，会话就会停止。消息框上方会出现一条横幅，写着 "<account> is signed out" 和 "This session continues once you sign in again."，并带有一个 **登录** 按钮。你重新登录后（无论是在这里还是在终端中），会话会自行继续，智能体会收到这样的告知："Signed in again. Continue where you left off."。
-- **后台工作。** 在 [辅助模型](/settings?s=models&find=Helper%20model) 设为 **自动** 时，它负责的小任务（会话标题、记忆备注、精简[你的个人资料](/guide/memory#your-profile)、应用的快速模型步骤、拉取请求描述等）会跳过已登出的账户 15 分钟，之后再重试，因此你在终端中完成的登录会被察觉。接下来由下一个已登录的账户来回答，再之后是 Codex。当 Claude Code 和 Codex 都无法回答（已登出、已达限额或未安装）时，会由你的某个 **Custom** 模型来完成：即 Custom 的 **快速** 档位在 [设置 → 智能体 → 模型 → 档位](/settings?s=models&find=Tiers) 中指定的那个模型（其次是 **标准**，遇到少见的较大任务则依次是 **最佳**、**最大值**），否则就用你添加的最便宜的模型（本机上的模型视为免费）。最多尝试两个。它的花费和其他 Custom 模型的用量一样计算。
+- **后台工作。** 在 [辅助模型](/settings?s=models&find=Helper%20model) 设为 **自动** 时，它负责的小任务（会话标题、记忆备注、精简[你的个人资料](/guide/memory#your-profile)、应用的快速模型步骤、提交信息、拉取请求描述等）会跳过已登出的账户 15 分钟，之后再重试，因此你在终端中完成的登录会被察觉。接下来由下一个已登录的账户来回答，再之后是 Codex。你没有登录的程序根本不会启动。当 Claude Code 和 Codex 都无法回答（已登出、已达限额或未安装）时，会由你的某个 **Custom** 模型来完成：即 Custom 的 **快速** 档位在 [设置 → 智能体 → 模型 → 档位](/settings?s=models&find=Tiers) 中指定的那个模型（其次是 **标准**，遇到少见的较大任务则依次是 **最佳**、**最大值**），否则就用你添加的最便宜的模型（本机上的模型视为免费）。最多尝试两个。它的花费和其他 Custom 模型的用量一样计算。
 - **登录提示。** 只有在没有任何方式能完成工作、且有账户已登出时，每个页面的右下角（手机上则在消息框上方）才会显示一张卡片。标题是 "Sign in to Claude Code again"（或 Codex、Grok Build；如果你从未在这里登录过它，则是 "Sign in to Claude Code"），下面是 "<account> is signed out."，然后说明原因："Background work needs it (shortening your profile), and no other account or Custom model could do it."，如果是它停止的会话，则是 "… continues once you sign in."。**登录** 会打开与 [设置 → 智能体 → 账户](/settings?s=accounts) 相同的登录对话框。**暂不** 会把这张卡片隐藏一小时；如果有会话因此而停止，卡片会再次显示，而该会话中的横幅会一直保留。同时最多显示两张卡片，多出的部分会显示为 "+N more"，点击后会跳转到 设置 → 智能体 → 账户。账户重新登录后，卡片就会消失，无论是通过卡片、设置还是在终端中登录（应用会在下一次成功的调用时察觉）。当后台工作通过其他方式重新得以完成（其他账户或某个 Custom 模型作答）时，卡片也会消失。当 Claude Code 和 Codex 都已登出时，只会询问最先作答的 Claude Code。
 
 你的个人资料也会显示这一点：如果精简它时因账户已登出而失败，下方的原因会这样说明（"Your Claude Code account “Work” is signed out, and no other account or Custom model could do this: sign in again (Settings → Agents → Accounts)."），并且会出现这张卡片。
@@ -325,7 +325,7 @@ irm https://antigravity.google/cli/install.ps1 | iex
 
 Custom 可以运行你的 Claude 和 ChatGPT 套餐中的模型、这台电脑上的模型以及云端的模型，使用的工具、技能和 MCP 服务器与其他智能体相同。在开始页面选择 Custom，然后选择模型。它们来自三个地方：
 
-- **你的订阅**：你的 Claude 和 ChatGPT 套餐中的模型，通过这台电脑上 Claude Code 和 Codex 的登录获得。无需任何设置：当 Claude Code 已登录时，Custom 的 **模型** 菜单会提供 Claude Opus、Fable、Sonnet 和 Haiku（始终是各自最新的版本）；当 Codex 以 ChatGPT 登录时，它会提供你的 ChatGPT 套餐列出的模型（例如 GPT-6 Luna）。如果发现某个程序已退出登录，它的模型会从菜单中消失，直到你重新登录；而以 API 密钥而不是 ChatGPT 登录的 Codex 不会提供任何模型。它们使用的是你套餐的用量，而不是 API 密钥，也不按词元计费，所以 Custom 会话在这些步骤上显示 $0。程序的每个账户会依次尝试，与其他一次性工作相同：某个账户达到用量上限或已退出登录时，会把这一步交给你的下一个账户（需开启 **达到限额时切换账户**）。[保密会话](/guide/sessions#keep-a-session-confidential) 永远不会使用它们，因为它们运行在 Anthropic 或 OpenAI 的服务器上。关于它们如何回答，参见 [Custom](/guide/custom#what-custom-is-and-when-to-use-it)。
+- **你的订阅**：你的 Claude 和 ChatGPT 方案中的模型，借助这台电脑上 Claude Code 和 Codex 的登录状态使用。无需任何设置：Claude Code 登录后，Custom 的**模型**菜单会提供 Claude Opus、Fable、Sonnet 和 Haiku（始终是各自的最新版本）；Codex 用 ChatGPT 登录后，菜单会提供你的 ChatGPT 方案列出的模型（例如 GPT-6 Luna）。如果发现某个程序已退出登录，它的模型会从菜单中消失，直到你重新登录；用 API 密钥而不是 ChatGPT 登录的 Codex 不提供任何模型。这些模型消耗的是你的方案用量，不使用 API 密钥，也不按 token 收费，因此 Custom 会话中使用它们的步骤显示为 $0。**思考强度**菜单为每个模型提供其程序列出的级别；选择**默认**时，使用程序自身的默认值。和其他一次性工作一样，程序的各个账户会依次尝试：如果某个账户达到用量限额或已退出登录，这一步会交给你的下一个账户（需开启**达到限额时切换账户**）。[保密会话](/guide/sessions#keep-a-session-confidential)从不使用这些模型，因为它们运行在 Anthropic 或 OpenAI 的服务器上。它们的回答方式见 [Custom](/guide/custom#what-custom-is-and-when-to-use-it)。
 - **在这台电脑上**：安装在这里的模型（Ollama、vLLM），以及你网络中的端点。
 - **在云端**：OpenRouter、其他地方的端点，以及 Ollama 的云端模型。
 
@@ -353,16 +353,17 @@ Custom 可以运行你的 Claude 和 ChatGPT 套餐中的模型、这台电脑�
 - 回答关于浏览器已打开网页的某个问题；
 - 在 Naget Search 搜索之前，读取网络搜索的文字所表达的筛选条件（网站、日期、网页类型、语言）（参见[智能体如何搜索网络](/guide/web#how-agents-search-the-web)）；
 - 为看不了图片的 Custom 模型描述图片；
+- 撰写提交信息、拉取请求的描述及其阅读指南、根据你的话生成终端命令，以及编写绘图和数据图的代码；
 - 概括 Hydor 子智能体的长回复；
 - 根据会话起草应用或定时任务；
 - 免提语音模式。
 
 打开 [设置 → 智能体 → 模型](/settings?s=models&find=Helper%20model)，点击**辅助模型**组中的**模型**菜单（其中的 (i) 列出了这些小任务）：
 
-- **自动**（默认）：通过 Claude Code 使用 Claude Haiku；Claude Code 无法回答时使用 Codex。如果某个账户已达到用量上限，会先把问题交给你的下一个已登录账户（需开启**达到限额时切换账户**），已退出登录的账户会被跳过。两个程序都无法回答时，由你的某个 Custom 模型来完成（即 Custom 的**快速**档位所指定的模型，否则是你添加的最便宜的模型；你的套餐中的模型在这里会被跳过，因为它们走的是同样的两个程序），只有在没有任何模型能完成时，才会出现一张卡片请你登录（参见[账户已退出登录时](#when-an-account-is-signed-out)）。当没有任何模型回答时，错误信息会逐一说明原因：“You've hit your weekly limit”、你的 Codex 套餐不提供的模型……
+- **自动**（默认）：通过 Claude Code 使用 Claude Haiku；Claude Code 无法回答时使用 Codex。只会询问你已登录的程序：你没有登录的程序永远不会启动。如果某个账户已达到用量上限，会先把问题交给你的下一个已登录账户（需开启**达到限额时切换账户**），已退出登录的账户会被跳过。两个程序都无法回答，或者两个你都没有登录时，由你的某个 Custom 模型来完成（即 Custom 的**快速**档位所指定的模型，其次是**标准**，否则是你添加的最便宜的模型；你的套餐中的模型在这里会被跳过，因为它们走的是同样的两个程序）。较长的问题会先交给能读完全部内容的模型。只有在没有任何模型能完成时，才会出现一张卡片请你重新登录你在这里用过的程序（参见[账户已退出登录时](#when-an-account-is-signed-out)）；如果你从未设置过其中任何一个，也没有添加过模型，错误信息会请你在[设置 → 模型](/settings?s=models)中添加一个，或者设置 Claude Code 或 Codex。当没有任何模型回答时，错误信息会逐一说明原因：“You've hit your weekly limit”、你的 Codex 套餐不提供的模型……
 - Custom 的任一模型，分组与 Custom 的**模型**菜单相同（**你的订阅**、**在这台电脑上**和**在云端**），并标明它通过什么提供（Claude Code、Codex、OpenRouter、Ollama、vLLM 或某个端点的名称），能看图片的模型会标注“能看图片”。你的 Claude 或 ChatGPT 套餐中的模型也可以做辅助模型：它通过 Claude Code 或 Codex 回答，消耗你套餐的用量。
 
-自动无法查看图片。如果你使用的 Custom 模型看不了图片，请选择一个能看图片的辅助模型，否则 Custom 无法为你的图片生成描述。
+通过 Claude Code 或 Codex 时，自动无法查看图片；当两个你都没有登录时，它会询问你的某个能看图片的 Custom 模型。如果你使用的 Custom 模型看不了图片，请选择一个能看图片的辅助模型，否则 Custom 无法为你的图片生成描述。
 
 ## 查看这台电脑能运行什么
 
@@ -474,6 +475,10 @@ OpenRouter（openrouter.ai）让你用同一个密钥使用来自众多制作方
 
 点击模型上的**添加**。它所在的行随后会显示**已添加**，该模型会出现在搜索框上方的**你的 OpenRouter 模型**组（“In the model pickers”）中，也会出现在 Custom 的**模型**菜单里。点击其中某个模型上的 × 可以把它从菜单中移除。在你至少添加一个模型之前，OpenRouter 不提供任何模型（“Add at least one model to use OpenRouter.”）。
 
+### OpenRouter 模型的思考强度
+
+会推理的模型在**思考强度**菜单中提供 OpenRouter 为它列出的强度，范围包括**无**（不推理）、**极简**、**最低**、**中等**、**最高**、**Xhigh** 和**最大值**。选择**默认**时，Custom 请求中等强度；否则请求你选择的强度。如果某个模型的强度列表里没有中等，它会保留自己的默认值；如果模型没有列出任何强度，则没有**思考强度**设置，Custom 向它请求中等强度。
+
 ## 连接 Ollama、vLLM 或其他端点
 
 **运行时和端点**分组用来连接运行模型的程序。你可以在 [设置 → 智能体 → 模型](/settings?s=models&find=Runtimes%20and%20endpoints) 中打开它。
@@ -496,7 +501,9 @@ vLLM 是一个适用于 NVIDIA 显卡的快速模型服务器，也是来自 Hug
 
 端点会显示为一行，其中有它的地址和它提供的模型数量。它的模型会以“模型（名称）”的形式出现在 Custom 的列表中。× 可以移除它。添加同名的另一个端点会替换第一个。
 
-点击该行下方的 **设置每个模型的能力**，可以查看它的模型，每个模型有两个选项：**能看图片** 和 **推理强度**。每个选项都可以选 **自动**、**是** 或 **否**。能看图片的模型会以图片的形式收到截图和图片，而不能看图片的模型会收到它们的文字描述（见 [不能看图的模型如何处理图片](/guide/custom#images-for-models-that-dont-see)）；会推理的模型会在 **思考强度** 菜单中提供低、中、高三档，Custom 会把你选的那一档作为 `reasoning_effort` 发送，这是兼容 OpenAI 的服务器所接受的设置（选择 **默认** 时不会发送任何内容）。**自动** 会遵循端点对该模型的说明，菜单中会显示具体是什么：会描述自身模型的服务器（OpenRouter 风格、Mistral 等）会在模型列表中一并说明；对于 LiteLLM 网关，Hydor 还会用同一个密钥查询它的模型信息。没有任何说明的端点按“否”处理：对于你确定能看图片或会推理的模型，请设为 **是**。再次添加该端点时，你的设置会保留。
+点击该行下方的**设置每个模型的能力**，可以查看它的模型。每个模型都有两项设置：**能看图片**和**推理强度**。每项都可选**自动**、**是**或**否**。能推理的模型还有第三项：**思考强度级别**。能看图片的模型会直接收到截图和图片本身，看不了图片的模型收到的则是对图片的文字描述（参见[为看不了图片的模型处理图片](/guide/custom#images-for-models-that-dont-see)）；能推理的模型会在**思考强度**菜单中提供它的各个级别（除非你另行设置，否则是 Low、Medium 和 High），Custom 会把你选的级别作为 `reasoning_effort` 发送出去，这是兼容 OpenAI 的服务器所接受的设置（选择**默认**时不发送任何内容）。**自动**以端点对模型的说明为准，菜单会显示说明的结果：会描述自家模型的服务器（OpenRouter 风格的、Mistral 的以及其他一些）在模型列表中给出这些信息；对于 LiteLLM 网关，Hydor 还会用同一个密钥查询它的模型信息。端点什么都没说明时按“否”处理：对于你知道能看图片或能推理的模型，请设为**是**。重新添加该端点时，你的设置会保留。
+
+要更改某个模型的级别，请点击它旁边的**思考强度级别**。在 `none`、`minimal`、`low`、`medium`、`high`、`xhigh` 和 `max` 中勾选它支持的级别，或者在**另一个级别**中输入端点支持的其他级别，然后点击**添加**（只能是一个词；至少要保留一个勾选的级别）。**使用 low、medium 和 high** 可以恢复常用的这三个级别。模型到底支持哪些级别，由它的服务器决定：如果服务器拒绝某个级别，Custom 会去掉它重新发送请求，模型按自己的默认级别运行。
 
 [保密会话](/guide/sessions#keep-a-session-confidential)可以使用地址为本机或你的私有网络的端点：`localhost`、`127.0.0.1`、`::1`、`10.…`、`192.168.…`、`172.16.…` 到 `172.31.…`，或以 `.local` 结尾的名称。任何其他地址都视为在线，即使它指向你自己的服务器也一样：请改用它的私有地址。Ollama 的地址同样适用这条规则，而 Ollama 的云端模型（名称以“cloud”结尾）始终视为在线。
 
@@ -515,6 +522,7 @@ vLLM 是一个适用于 NVIDIA 显卡的快速模型服务器，也是来自 Hug
 - “为什么定时任务不能使用 Antigravity CLI？”
 - “为工作添加第二个 Grok 账户，并让我的下一个会话使用它。”
 - “让我的下一个 Grok 会话使用 xhigh 思考强度。”
+- “让我网关端点上的 gpt 模型提供 low、high 和 xhigh 这几个思考强度级别。”
 - “我的 Grok 套餐这周还剩多少？”
 - “使用我所有的 Grok 账户：一个达到上限时，就换另一个继续。”
 - “把 Gemini CLI 和 Goose 添加到我的智能体中，并告诉我还需要安装什么。”

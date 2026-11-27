@@ -399,10 +399,12 @@ function StartComposer({
   const acct = accounts.some((a) => a.id === account) ? account : undefined;
   // The program picked is not signed in here: nothing starts on it, and the box says why.
   const notSetUp = isProgram(agent) && !programUsable(programs, agent) ? PROGRAM_LABEL[agent] : null;
+  // Custom with no model at all (none added, no plan signed in): nothing could answer, so the box says what to do.
+  const noModel = agent === 'acp' && acpId === CUSTOM && !isConfidential(extra) && !!cat && !cat.models.length;
   // The session's page opens at once, with your message, while the server starts the agent (lib/starting.ts).
   const starting = useRef(false);
   const start = () => {
-    if (starting.current || !cwd || notSetUp || (confidential && local && !local.models.length)) return;
+    if (starting.current || !cwd || notSetUp || noModel || (confidential && local && !local.models.length)) return;
     starting.current = true;
     // Kept as it was used, the whole of it, for the next start, and as the picks of the place it starts in.
     saveStart(
@@ -588,7 +590,7 @@ function StartComposer({
     });
   };
   // Confidential with no model on this computer can't start: its option says how to get one.
-  const ready = !!cwd && !notSetUp && !(confidential && local && !local.models.length);
+  const ready = !!cwd && !notSetUp && !noModel && !(confidential && local && !local.models.length);
   const iconBtn = 'shrink-0 rounded-lg p-2 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg';
   return (
     <div>
@@ -755,6 +757,18 @@ function StartComposer({
           {`${notSetUp} is not set up here: pick another agent under Runs on, or sign in to it.`}{' '}
           <button type="button" onClick={() => go('/settings?s=accounts')} className="font-medium text-accent hover:underline">
             Set up
+          </button>
+        </div>
+      )}
+      {noModel && (
+        <div role="status" className="mt-2.5 px-1 text-center text-[12.5px] leading-snug text-fg-2">
+          Custom has no model yet: add one, or set up Claude Code or Codex.{' '}
+          <button type="button" onClick={() => go('/settings?s=models')} className="font-medium text-accent hover:underline">
+            Add a model
+          </button>
+          {' · '}
+          <button type="button" onClick={() => go('/settings?s=accounts')} className="font-medium text-accent hover:underline">
+            Set up Claude Code or Codex
           </button>
         </div>
       )}

@@ -9,7 +9,7 @@ import { cleanAssets, cleanMedia, type AppAsset } from './app-media.ts';
 import { cleanSecrets, type AppSecret } from './app-secrets.ts';
 import { fromField, ME_REFS } from './app-me.ts';
 
-export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
+export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file' | 'project';
 
 /** One question of an app's form; its answer fills {{id}} in the prompt. */
 export interface AppField {
@@ -290,6 +290,8 @@ export interface AppRun {
   checks?: CheckResult[];
   /** The template's version it ran (none: a try of changes not saved, or a template as it was before versions). */
   version?: number;
+  /** The project it works in, as its project question was answered (its name and folder as they were when it started). */
+  project?: { id: string; name: string; folder: string };
   /** What its flow could not have: calls that still failed after their tries, steps that failed (at most 30). */
   misses?: RunMiss[];
   /** The language it writes in, a tag ("el"): what started it said so, else About you's (none kept: English). */
@@ -438,6 +440,8 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'choice', label: 'Choice' },
   { value: 'yesno', label: 'Yes / no' },
   { value: 'file', label: 'File' },
+  // One of the person's projects: its value is the project's id, and the run works in that project (server/apps/project.ts).
+  { value: 'project', label: 'Project' },
 ];
 
 export const ANSWER_TYPES: { value: AnswerType; label: string }[] = [
@@ -572,7 +576,7 @@ export function fillTemplate(
 }
 
 /** Names a task fills besides its questions: the moment, the run's language and About you (`me.units`). */
-export const TASK_VALUES = ['today', 'now', 'weekday', 'timezone', 'language', 'lang', ...ME_REFS.map((r) => `me.${r}`)];
+export const TASK_VALUES = ['today', 'now', 'weekday', 'timezone', 'language', 'lang', 'project_name', 'project_folder', ...ME_REFS.map((r) => `me.${r}`)];
 
 /** The placeholders a prompt uses. */
 export function placeholders(tpl: string): string[] {
@@ -1001,8 +1005,8 @@ export function cleanFields(raw: unknown): AppField[] {
     const id = fieldId(str(x.id, 40) || label, taken);
     taken.push(id);
     const options = type === 'choice' ? [...new Set<string>((Array.isArray(x.options) ? x.options : []).map((o: unknown) => str(o, 80)).filter(Boolean))].slice(0, 30) : undefined;
-    // It starts from About you, or from the last answer (one or the other; never a file).
-    const from = type === 'file' ? undefined : fromField(x.from);
+    // It starts from About you, or from the last answer (one or the other; never a file, and About you has no project).
+    const from = type === 'file' || type === 'project' ? undefined : fromField(x.from);
     const remember = !from && type !== 'file' && x.remember === true;
     // Its former ids: ids as a question's would be, none its own, nor another question's own id.
     const ids = (Array.isArray(raw) ? raw : []).map((y: any) => (y && typeof y === 'object' ? str(y.id, 40) : ''));
@@ -1132,10 +1136,11 @@ export function cleanPublic(raw: any, prev: PublicSettings = DEFAULT_PUBLIC): Pu
 }
 
 /** A short line naming a run by its inputs ("Lisbon · 4 days"). */
-export function inputsLine(fields: AppField[], inputs: Record<string, string>, max = 60): string {
+export function inputsLine(fields: AppField[], inputs: Record<string, string>, max = 60, project?: { id: string; name: string }): string {
   const parts = fields
     .filter((f) => f.type !== 'file' && f.type !== 'yesno')
-    .map((f) => (inputs[f.id] ?? '').replace(/\s+/g, ' ').trim())
+    // A project's answer is its id: it reads as the run's project's name (left out when that is not known).
+    .map((f) => (f.type === 'project' ? (project && project.id === inputs[f.id] ? project.name : '') : (inputs[f.id] ?? '')).replace(/\s+/g, ' ').trim())
     .filter(Boolean);
   const s = parts.slice(0, 3).join(' · ');
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;

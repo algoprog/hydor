@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppWindow, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Plus, RefreshCw, SlidersHorizontal, Trash2, TriangleAlert } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
 import type { AppDef, AppField, AppRun, AppTemplate } from '@shared/apps';
-import { appInfo } from '@shared/app-manifest';
 import { pagesFor } from '@shared/app-ui';
 import { inputsLine, isActive, madeForSessions, prefillOf } from '@shared/apps';
 import { appSummary } from '@shared/app-summary';
@@ -35,6 +34,10 @@ import { openWebApp, webAppPath } from '../webapps/api';
 import { DownloadDialog, EnvLine } from './Install';
 import { AppScreen } from './Screen';
 import { AppView } from './View';
+import { useAppInfo } from './projects';
+import { PluginNotice } from './PluginNotice';
+import { appPrograms } from '@shared/app-manifest';
+import type { PluginNeed } from '@shared/plugins';
 import { programsOf, samePick, withPick, type AppPick, type RunsWithView } from '@shared/app-run-with';
 import { isProgram, PROGRAM_LABEL, programUsable } from '@shared/programs';
 import { Schedules } from './Schedules';
@@ -140,7 +143,7 @@ function LatestRuns({ id, recipe, template }: { id: string; recipe: AppDef | App
             <button key={r.id} type="button" onClick={() => go(runPath(r.id))} className="flex w-full items-center gap-2.5 px-4 py-2 text-left hover:bg-bg-1">
               <span className={cx('h-2 w-2 shrink-0 rounded-full', DOT[r.status])} title={r.status} />
               <span className="min-w-0 flex-1 truncate text-[13px]" translate="no">
-                {inputsLine(recipe.fields, r.inputs, 60) || '—'}
+                {inputsLine(recipe.fields, r.inputs, 60, r.project) || '—'}
               </span>
               <span className="shrink-0 text-[11.5px] text-fg-3">{isActive(r.status) ? 'now' : timeAgo(r.endedAt ?? r.createdAt)}</span>
             </button>
@@ -153,7 +156,7 @@ function LatestRuns({ id, recipe, template }: { id: string; recipe: AppDef | App
   );
 }
 
-function RunTab({ id, recipe, template, again, given, agents, secrets, starts = {}, runsWith }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; given?: Record<string, string>; agents?: ReactNode; secrets?: KeyState[]; starts?: Record<string, string>; runsWith?: RunsWithView }) {
+function RunTab({ id, recipe, template, again, given, agents, secrets, starts = {}, runsWith, plugins, onPlugins }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; given?: Record<string, string>; agents?: ReactNode; secrets?: KeyState[]; starts?: Record<string, string>; runsWith?: RunsWithView; plugins?: PluginNeed[]; onPlugins?: () => void }) {
   // The keys it needs: those the vault lacks are asked for here, and saved there as it starts (not those only its other flows need).
   const [keyStates, setKeyStates] = useState<KeyState[]>(keysFor(secrets));
   useEffect(() => setKeyStates(keysFor(secrets)), [secrets]);
@@ -248,6 +251,8 @@ function RunTab({ id, recipe, template, again, given, agents, secrets, starts = 
     <div className="mx-auto grid max-w-[1120px] items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8 lg:py-8">
       <div className="min-w-0 space-y-5">
         <AppIntro recipe={recipe} template={template} />
+        {/* The plugins it needs that are not on, for the program picked here: added or turned on from here. */}
+        {plugins && <PluginNotice needs={plugins} programs={appPrograms({ ...recipe, agent, acpAgent: acpAgent ?? undefined })} onChanged={() => onPlugins?.()} />}
         <section className="overflow-hidden rounded-2xl border border-line bg-panel">
           <div className="px-5 pt-4 pb-5 sm:px-6">
             <h2 className="mb-4 text-[15px] font-semibold">{recipe.fields.length ? 'Your answers' : 'Ready to run'}</h2>
@@ -672,7 +677,7 @@ function firstLine(recipe: AppDef | AppTemplate, r: AppRun): string {
  * no run yet, what it is and a button that makes the first; under it, the earlier ones.
  */
 function HomeView({ id, recipe, template, view, home, own, onHome }: { id: string; recipe: AppDef | AppTemplate; template: boolean; view?: Record<string, unknown>; home?: HomeSettings; own: OwnPage; onHome: (h: HomeSettings) => void }) {
-  const info = useMemo(() => appInfo(id, recipe), [id, recipe]);
+  const info = useAppInfo(id, recipe);
   const [starting, setStarting] = useState(false);
   // Before the first one, its questions as an ordinary app's form has them: those it cannot do without that its settings
   // leave empty (your venues, your name), and those filled in from About you or your last answer that are needed, to see
@@ -793,7 +798,7 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
                 <button type="button" onClick={() => go(runPath(r.id))} className="-mx-2 flex w-[calc(100%+1rem)] items-baseline gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-bg-1">
                   <span className="w-28 shrink-0 text-[12.5px] text-fg-3">{new Date(r.endedAt ?? r.createdAt).toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
                   <span className="min-w-0 flex-1 truncate text-[13.5px]" translate="no">
-                    {firstLine(recipe, r) || inputsLine(recipe.fields, r.inputs, 80) || '—'}
+                    {firstLine(recipe, r) || inputsLine(recipe.fields, r.inputs, 80, r.project) || '—'}
                   </span>
                   <ChevronRight size={14} className="shrink-0 self-center text-fg-3" />
                 </button>
@@ -820,7 +825,7 @@ export function RunsList({ app, runs, more, onMore }: { app: { fields: AppDef['f
       {runs.map((r) => (
         <button key={r.id} type="button" onClick={() => go(runPath(r.id))} className="flex w-full items-center gap-3 border-b border-line px-4 py-2.5 text-left last:border-0 hover:bg-bg-1">
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13.5px]">{inputsLine(app.fields, r.inputs, 90) || 'No inputs'}</span>
+            <span className="block truncate text-[13.5px]">{inputsLine(app.fields, r.inputs, 90, r.project) || 'No inputs'}</span>
             <span className="block truncate text-[12px] text-fg-3">
               {SOURCE_LABEL[r.source]}
               {r.row ? ` ${r.row}` : ''} · {timeAgo(r.createdAt)} ago{r.costUsd != null ? ` · ${money(r.costUsd)}` : ''}
@@ -1115,6 +1120,12 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                 <EnvLine appId={d.app.id} env={d.env} onChange={load} />
               </div>
             )}
+            {/* Where its own page, its screen or its rows stand in place of the form, the plugins it needs are said above them (the form says them itself). */}
+            {d?.plugins && installed && (ownPage || tab === 'rows' || (tab === 'run' && !!d.app?.screens?.main && !again && !filled)) && (
+              <div className="mx-auto max-w-[920px] px-4 pt-5 sm:px-6">
+                <PluginNotice needs={d.plugins} programs={appPrograms(d.runsWith ? withPick(recipe, d.runsWith.pick) : recipe)} onChanged={load} />
+              </div>
+            )}
             {/* Its view's own page, or its screen, in place of its form (the form comes back to run again with earlier answers). */}
             {template && !installed && d?.template ? (
               <NotInstalled id={id} t={d.template} onInstalled={load} />
@@ -1125,7 +1136,7 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                 <AppScreen app={d.app} />
               </div>
             ) : (
-              (tab === 'run' || template) && <RunTab key={`${id}:${JSON.stringify(given)}:${d ? 1 : 0}`} id={id} recipe={recipe} template={template} again={again} given={given} agents={agentsCard} secrets={d?.secrets} starts={d?.starts} runsWith={d?.runsWith} />
+              (tab === 'run' || template) && <RunTab key={`${id}:${JSON.stringify(given)}:${d ? 1 : 0}`} id={id} recipe={recipe} template={template} again={again} given={given} agents={agentsCard} secrets={d?.secrets} starts={d?.starts} runsWith={d?.runsWith} plugins={d?.plugins} onPlugins={load} />
             )}
             {tab === 'runs' && !template && <RunsTab id={id} app={recipe} def={d?.app} />}
             {tab === 'rows' && d?.app && <BatchTab app={d.app} />}

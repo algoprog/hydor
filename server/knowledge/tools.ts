@@ -5,7 +5,7 @@ import { citation } from '../../shared/knowledge.ts';
 import type { DB } from '../db.ts';
 import type { RunTool } from '../features/types.ts';
 import { meaningOn } from '../memory/embed.ts';
-import { basesFor, basesOfSession } from './scope.ts';
+import { basesFor, basesOfCall } from './scope.ts';
 import { searchKnowledge, type SearchMode } from './search.ts';
 import { baseRow, baseRows, baseView, chunkById, chunksOf, docByPath, docById, docsOf, type BaseRow } from './store.ts';
 import { isWikiBase, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
@@ -60,7 +60,7 @@ const SEARCH: RunTool = {
     const db = ctx.deps.db;
     const query = String(a.query ?? '').trim();
     if (!query) throw new Error('query is empty');
-    const scope = basesOfSession(db, ctx.key);
+    const scope = basesOfCall(db, ctx);
     if (!scope.length) return NONE;
     const mode = (['auto', 'words', 'meaning', 'exact'] as const).includes(a.mode) ? (a.mode as SearchMode) : undefined;
     const r = await searchKnowledge(db, { query, mode, bases: a.base ? [String(a.base)] : undefined, within: scope.map((b) => b.id), limit: Math.min(Number(a.limit) || 8, 25) });
@@ -97,7 +97,7 @@ const READ: RunTool = {
     const db = ctx.deps.db;
     // Another project's own documents (not its wiki: wiki_read with project), when it is open to this session.
     const other = otherProject(db, ctx.key, ctx.cwd, a.project);
-    const within = (other ? baseRows(db).filter((b) => b.space === other.id && !isWikiBase(db, b.id)) : basesOfSession(db, ctx.key)).map((b) => b.id);
+    const within = (other ? baseRows(db).filter((b) => b.space === other.id && !isWikiBase(db, b.id)) : basesOfCall(db, ctx)).map((b) => b.id);
     let doc: ReturnType<typeof docById>;
     let from = Math.max(0, (Number(a.from) || 1) - 1);
     const count = Math.max(1, Math.min(Number(a.count) || 6, 30));
@@ -137,7 +137,7 @@ const LIST: RunTool = {
   annotations: { readOnlyHint: true },
   async run(a, ctx) {
     const db = ctx.deps.db;
-    const rows = basesOfSession(db, ctx.key);
+    const rows = basesOfCall(db, ctx);
     if (!rows.length) return NONE;
     if (a.base) {
       const b = rows.find((x) => x.name.toLowerCase() === String(a.base).toLowerCase() || x.id === a.base);
