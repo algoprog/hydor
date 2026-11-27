@@ -1005,7 +1005,7 @@ app.post('/agent/run/:token/ensure', async (req, reply) => {
 app.post('/agent/run/:token/model', async (req, reply) => {
   const run = runOf((req.params as { token: string }).token);
   if (!run) return reply.code(403).send({ error: 'Not a running agent' });
-  const b = (req.body ?? {}) as { id?: string; messages?: ChatMessage[]; tools?: ToolSchema[]; toolChoice?: 'auto' | 'none'; maxTokens?: number; cacheKey?: string };
+  const b = (req.body ?? {}) as { id?: string; messages?: ChatMessage[]; tools?: ToolSchema[]; toolChoice?: 'auto' | 'none'; maxTokens?: number; cacheKey?: string; effort?: string };
   const m = models.agentModels().find((x) => x.id === b.id);
   if (!m || !isSubscription(m.provider)) return reply.code(404).send({ error: `${b.id ?? 'That model'} is not one of your plans' models here: Claude Code or Codex may be signed out (Settings → Models)` });
   if (!Array.isArray(b.messages) || !b.messages.length) return reply.code(400).send({ error: 'No conversation to answer' });
@@ -1028,6 +1028,7 @@ app.post('/agent/run/:token/model', async (req, reply) => {
     toolChoice: b.toolChoice === 'none' ? 'none' : 'auto',
     maxTokens: typeof b.maxTokens === 'number' ? b.maxTokens : undefined,
     cacheKey: typeof b.cacheKey === 'string' ? b.cacheKey : undefined,
+    effort: typeof b.effort === 'string' ? b.effort : undefined,
     signal: ac.signal,
     onText: (v) => line({ t: 'text', v }),
     onReasoning: (v) => line({ t: 'reasoning', v }),

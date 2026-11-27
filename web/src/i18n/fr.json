@@ -28968,5 +28968,12 @@
   "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "{0} n’est pas configuré ici : choisissez un autre agent sous « Fonctionne avec », ou connectez-vous-y.",
   "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "{0} n’est pas connecté ici : connectez-vous dans Paramètres → Comptes, ou choisissez un autre agent.",
   "· Not set up": "· Non configuré",
-  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Vous n’êtes pas connecté à {0} ici : connectez-vous dans Paramètres → Agents → Comptes, ou choisissez un autre agent."
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Vous n’êtes pas connecté à {0} ici : connectez-vous dans Paramètres → Agents → Comptes, ou choisissez un autre agent.",
+  "An effort level is one word, as the endpoint takes it (like low or xhigh)": "Un niveau d’effort est un seul mot, tel que le point de terminaison l’accepte (comme low ou xhigh)",
+  "Another level": "Autre niveau",
+  "Effort levels": "Niveaux d’effort",
+  "Effort levels: {0}": "Niveaux d’effort : {0}",
+  "Offered in the Effort menu. Tick the ones this model takes.": "Proposés dans le menu Effort. Cochez ceux que ce modèle accepte.",
+  "Use low, medium and high": "Utiliser low, medium et high",
+  "ollama vllm openai compatible endpoint url reasoning effort levels sees images": "ollama vllm openai compatible point de terminaison endpoint url effort raisonnement niveaux voit images"
 }

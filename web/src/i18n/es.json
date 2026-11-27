@@ -28968,5 +28968,12 @@
   "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "{0} no está configurado aquí: elige otro agente en «Se ejecuta en» o inicia sesión en él.",
   "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "No has iniciado sesión en {0} aquí: inicia sesión en Configuración → Cuentas o elige otro agente.",
   "· Not set up": "· Sin configurar",
-  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "No has iniciado sesión en {0} aquí: inicia sesión en Configuración → Agentes → Cuentas o elige otro agente."
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "No has iniciado sesión en {0} aquí: inicia sesión en Configuración → Agentes → Cuentas o elige otro agente.",
+  "An effort level is one word, as the endpoint takes it (like low or xhigh)": "Un nivel de esfuerzo es una sola palabra, tal como la recibe el endpoint (como low o xhigh)",
+  "Another level": "Otro nivel",
+  "Effort levels": "Niveles de esfuerzo",
+  "Effort levels: {0}": "Niveles de esfuerzo: {0}",
+  "Offered in the Effort menu. Tick the ones this model takes.": "Se ofrecen en el menú Esfuerzo. Marca los que admite este modelo.",
+  "Use low, medium and high": "Usar low, medium y high",
+  "ollama vllm openai compatible endpoint url reasoning effort levels sees images": "ollama vllm openai compatible endpoint url dirección razonamiento reasoning niveles de esfuerzo effort ve imágenes"
 }

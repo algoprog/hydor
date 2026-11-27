@@ -1,6 +1,7 @@
 // OpenRouter's catalog (openrouter.ai): every model it routes, with its maker, context length, price,
 // whether it takes tools and images or reasons, and when it was listed. Kept for an hour; the pickers
 // show the models you pinned.
+import { KNOWN_EFFORTS } from '../../shared/efforts.ts';
 import type { OpenRouterModel, OpenRouterSort } from '../../shared/types.ts';
 
 export const OPENROUTER_URL = 'https://openrouter.ai/api/v1';
@@ -17,6 +18,19 @@ function plain(s: unknown): string | undefined {
     .replace(/\s+/g, ' ')
     .trim();
   return t ? (t.length > 360 ? `${t.slice(0, 357).replace(/\s+\S*$/, '')}…` : t) : undefined;
+}
+
+/**
+ * The reasoning efforts a catalog entry's `reasoning` object offers, as OpenRouter's docs say to read it:
+ * `supported_efforts` lists them (null: every value it documents; left out: no choice of effort), and a model whose
+ * reasoning is mandatory takes no "none". Only documented values are kept.
+ */
+export function effortsFrom(r: any): { efforts?: string[]; defaultEffort?: string } {
+  if (!r || typeof r !== 'object' || r.supported_efforts === undefined) return {};
+  const said: unknown = r.supported_efforts;
+  const efforts = KNOWN_EFFORTS.filter((v) => (said === null || (Array.isArray(said) && said.includes(v))) && !(v === 'none' && r.mandatory));
+  if (!efforts.length) return {};
+  return { efforts, ...(efforts.includes(r.default_effort) ? { defaultEffort: String(r.default_effort) } : {}) };
 }
 
 export async function catalog(): Promise<OrModel[]> {
@@ -43,6 +57,7 @@ export async function catalog(): Promise<OrModel[]> {
       description: plain(m.description),
       maxOutput: Number(m.top_provider?.max_completion_tokens) || undefined,
       reasoning: params.includes('reasoning') || params.includes('include_reasoning'),
+      ...effortsFrom(m.reasoning),
       org: name.includes(':') ? name.slice(0, name.indexOf(':')).trim() : undefined,
     };
   });

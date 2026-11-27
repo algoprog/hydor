@@ -1617,8 +1617,13 @@ export interface AgentModel {
   maxOutput?: number;
   /** It runs on this computer or your private network (Ollama, vLLM, a local endpoint): a confidential session may use it. */
   local?: boolean;
-  /** A plan's model (provider claude or codex): the reasoning efforts its program takes, as it lists them. */
+  /**
+   * The reasoning efforts it takes: a plan's model (provider claude or codex) as its program lists them, OpenRouter's as
+   * its catalog does (absent: it offers no choice), an endpoint's as set for it (low, medium and high until then).
+   */
   efforts?: string[];
+  /** OpenRouter's: the effort it runs with when none is picked, where that is one of its efforts. */
+  defaultEffort?: string;
 }
 
 export interface ModelEntry {
@@ -1643,6 +1648,10 @@ export interface OpenRouterModel extends ModelEntry {
   maxOutput?: number;
   /** It can think before it answers. */
   reasoning?: boolean;
+  /** The reasoning efforts it takes, as OpenRouter lists them; absent: it offers no choice of effort. */
+  efforts?: string[];
+  /** The effort OpenRouter uses for it when a request names none. */
+  defaultEffort?: string;
   /** Its maker, as OpenRouter names it ("DeepSeek"). */
   org?: string;
 }
@@ -1826,10 +1835,12 @@ export interface EndpointModelCaps {
   vision: boolean;
   /** Custom offers it a reasoning effort and sends the one chosen. */
   reasoning: boolean;
+  /** The levels offered when it reasons: the person's list, else low, medium and high. */
+  efforts: string[];
   /** What the endpoint says (absent: it does not say). */
   endpoint: { vision?: boolean; reasoning?: boolean };
-  /** The person's setting (absent: Automatic, what the endpoint says). */
-  set: { vision?: boolean; reasoning?: boolean };
+  /** The person's setting (absent: Automatic, what the endpoint says; for the levels, low, medium and high). */
+  set: { vision?: boolean; reasoning?: boolean; efforts?: string[] };
 }
 
 export interface ModelsState {

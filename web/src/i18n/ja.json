@@ -28969,5 +28969,12 @@
   "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "ここでは{0}が設定されていません。「実行環境」で別のエージェントを選ぶか、サインインしてください。",
   "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "ここでは{0}にサインインしていません。「設定」→「アカウント」でサインインするか、別のエージェントを選んでください。",
   "· Not set up": "· 未設定",
-  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "このマシンでは{0}にサインインしていません。「設定」→「エージェント」→「アカウント」でサインインするか、別のエージェントを選んでください。"
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "このマシンでは{0}にサインインしていません。「設定」→「エージェント」→「アカウント」でサインインするか、別のエージェントを選んでください。",
+  "An effort level is one word, as the endpoint takes it (like low or xhigh)": "思考レベルは、エンドポイントが受け付ける形の1単語です（lowやxhighなど）",
+  "Another level": "別のレベル",
+  "Effort levels": "思考レベル",
+  "Effort levels: {0}": "思考レベル：{0}",
+  "Offered in the Effort menu. Tick the ones this model takes.": "思考レベルのメニューに表示されます。このモデルが対応しているものにチェックを入れてください。",
+  "Use low, medium and high": "low、medium、highを使う",
+  "ollama vllm openai compatible endpoint url reasoning effort levels sees images": "ollama vllm openai 互換 エンドポイント url reasoning effort 思考レベル 画像認識"
 }

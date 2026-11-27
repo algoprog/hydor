@@ -30808,5 +30808,12 @@
   "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "Ο πράκτορας {0} δεν έχει ρυθμιστεί εδώ: επιλέξτε άλλον πράκτορα στο «Τρέχει σε» ή συνδεθείτε σε αυτόν.",
   "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "Δεν έχει γίνει σύνδεση στον πράκτορα {0} εδώ: συνδεθείτε από τις Ρυθμίσεις → Λογαριασμοί ή επιλέξτε άλλον πράκτορα.",
   "· Not set up": "· Δεν έχει ρυθμιστεί",
-  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Δεν έχει γίνει σύνδεση στο {0} εδώ: συνδεθείτε από τις Ρυθμίσεις → Πράκτορες → Λογαριασμοί ή επιλέξτε άλλον πράκτορα."
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Δεν έχει γίνει σύνδεση στο {0} εδώ: συνδεθείτε από τις Ρυθμίσεις → Πράκτορες → Λογαριασμοί ή επιλέξτε άλλον πράκτορα.",
+  "An effort level is one word, as the endpoint takes it (like low or xhigh)": "Ένα επίπεδο έντασης σκέψης είναι μία λέξη, όπως τη δέχεται το endpoint (π.χ. low ή xhigh)",
+  "Another level": "Άλλο επίπεδο",
+  "Effort levels": "Επίπεδα έντασης σκέψης",
+  "Effort levels: {0}": "Επίπεδα έντασης σκέψης: {0}",
+  "Offered in the Effort menu. Tick the ones this model takes.": "Εμφανίζονται στο μενού «Ένταση σκέψης». Επιλέξτε όσα δέχεται αυτό το μοντέλο.",
+  "Use low, medium and high": "Χρήση low, medium και high",
+  "ollama vllm openai compatible endpoint url reasoning effort levels sees images": "ollama vllm openai συμβατό endpoint διεύθυνση url reasoning effort ένταση σκέψης επίπεδα βλέπει εικόνες"
 }

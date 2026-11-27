@@ -30805,5 +30805,12 @@
   "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "这里尚未设置 {0}：请在“运行于”下选择其他智能体，或登录它。",
   "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "这里尚未登录 {0}：请在“设置 → 账户”中登录，或选择其他智能体。",
   "· Not set up": "· 未设置",
-  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "这里尚未登录 {0}：请在“设置 → 智能体 → 账户”中登录，或换一个智能体。"
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "这里尚未登录 {0}：请在“设置 → 智能体 → 账户”中登录，或换一个智能体。",
+  "An effort level is one word, as the endpoint takes it (like low or xhigh)": "思考强度级别是一个单词，与端点接受的写法一致（例如 low 或 xhigh）",
+  "Another level": "另一个级别",
+  "Effort levels": "思考强度级别",
+  "Effort levels: {0}": "思考强度级别：{0}",
+  "Offered in the Effort menu. Tick the ones this model takes.": "会显示在“思考强度”菜单中。勾选此模型支持的级别。",
+  "Use low, medium and high": "使用 low、medium 和 high",
+  "ollama vllm openai compatible endpoint url reasoning effort levels sees images": "ollama vllm openai 兼容 端点 接口 url 网址 推理 思考强度 级别 看图 识图 图片"
 }

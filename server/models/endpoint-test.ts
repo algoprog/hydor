@@ -1,8 +1,9 @@
 // Script tests for what an endpoint's models can do (server/models/endpoint.ts, manager.ts): vision and reasoning read from
 // /models entries of each style (OpenRouter's, a modality list, Mistral's capabilities, flags) and from LiteLLM's
 // /model/info when /models says nothing; the person's setting over what the endpoint says, kept when the endpoint is saved
-// again; /model/info not asked again after an error; the reasoning effort sent as reasoning_effort; and images sent as
-// images to a model that sees them. Small servers here answer for the endpoints. Build and run:
+// again; /model/info not asked again after an error; each model's effort levels; the reasoning effort sent as
+// reasoning_effort to an endpoint and as reasoning.effort to OpenRouter (with the efforts its catalog lists); and images
+// sent as images to a model that sees them. Small servers here answer for the endpoints. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/models/endpoint-test.ts
 //   DATA_DIR=/tmp/hydor-i23-t1 CUDA_VISIBLE_DEVICES= node dist/dev/endpoint-test.js
 import assert from 'node:assert/strict';
@@ -16,7 +17,9 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const { said, litellmInfo, resolve, ENDPOINT_EFFORTS } = await import('./endpoint.ts');
+const { said, litellmInfo, resolve } = await import('./endpoint.ts');
+const { ENDPOINT_EFFORTS, KNOWN_EFFORTS } = await import('../../shared/efforts.ts');
+const { effortsFrom } = await import('./openrouter.ts');
 const { ModelManager } = await import('./manager.ts');
 
 let passed = 0;
@@ -51,7 +54,8 @@ test('reasoning from each style of entry', () => {
 });
 
 test('the setting wins over the endpoint, which wins over no', () => {
-  assert.deepEqual(resolve(undefined, undefined), { vision: false, reasoning: false, endpoint: {}, set: {} });
+  assert.deepEqual(resolve(undefined, undefined), { vision: false, reasoning: false, efforts: ['low', 'medium', 'high'], endpoint: {}, set: {} });
+  assert.deepEqual(resolve({ efforts: ['low', 'xhigh'] }, undefined).efforts, ['low', 'xhigh']);
   assert.equal(resolve(undefined, { vision: true }).vision, true);
   assert.equal(resolve({ vision: false }, { vision: true }).vision, false);
   assert.equal(resolve({ vision: true }, { vision: false }).vision, true);
@@ -203,6 +207,92 @@ test('the pickers offer effort levels for an endpoint model that reasons, and fo
   assert.deepEqual(opt('endpoint/plain/llama').efforts, []);
 });
 
+test('an endpoint model’s own levels: offered, kept with the endpoint, and low, medium and high again without them', async () => {
+  const opt = (id: string) => mgr.options().find((o) => o.value === id)!;
+  const kept = () => loadConfig().endpoints.find((e) => e.id === 'gw')!.models?.think;
+  const caps = async () => (await mgr.state()).endpoints.find((e) => e.id === 'gw')!.modelCaps.think;
+  await mgr.configure({ endpointModel: { endpoint: 'gw', model: 'think', efforts: [' XHigh', 'low', 'high', 'low'] } });
+  assert.deepEqual(kept(), { efforts: ['low', 'high', 'xhigh'] }, 'trimmed, lower case, each once, lowest first');
+  assert.deepEqual(opt('endpoint/gw/think').efforts, ['low', 'high', 'xhigh']);
+  assert.deepEqual(agent('endpoint/gw/think')!.efforts, ['low', 'high', 'xhigh']);
+  assert.deepEqual([(await caps()).efforts, (await caps()).set.efforts], [['low', 'high', 'xhigh'], ['low', 'high', 'xhigh']]);
+  assert.deepEqual(opt('endpoint/router/a/seer').efforts, ENDPOINT_EFFORTS, 'another model is as it was');
+  // A level of the endpoint's own, after the known ones.
+  await mgr.configure({ endpointModel: { endpoint: 'gw', model: 'think', efforts: ['ultra', 'max'] } });
+  assert.deepEqual(opt('endpoint/gw/think').efforts, ['max', 'ultra']);
+  // Saving the endpoint again keeps them.
+  await mgr.configure({ endpoint: { id: 'gw', name: 'Team gateway', baseUrl: gateway.url } });
+  assert.deepEqual(kept(), { efforts: ['max', 'ultra'] });
+  for (const bad of [['two words'], ['default'], [''], [3], 'high', Array.from({ length: 17 }, (_, i) => `l${i}`)])
+    await assert.rejects(mgr.configure({ endpointModel: { endpoint: 'gw', model: 'think', efforts: bad as string[] } }), /one word|No such option/, JSON.stringify(bad));
+  assert.deepEqual(kept(), { efforts: ['max', 'ultra'] }, 'a refused list changes nothing');
+  // Another setting leaves them; low, medium and high, an empty list or null are not kept.
+  await mgr.configure({ endpointModel: { endpoint: 'gw', model: 'think', vision: true } });
+  assert.deepEqual(kept(), { vision: true, efforts: ['max', 'ultra'] });
+  for (const none of [['high', 'medium', 'low'], [], null]) {
+    await mgr.configure({ endpointModel: { endpoint: 'gw', model: 'think', efforts: ['xhigh'] } });
+    await mgr.configure({ endpointModel: { endpoint: 'gw', model: 'think', efforts: none } });
+    assert.deepEqual(kept(), { vision: true }, JSON.stringify(none));
+    assert.deepEqual(opt('endpoint/gw/think').efforts, ENDPOINT_EFFORTS);
+  }
+  await mgr.configure({ endpointModel: { endpoint: 'gw', model: 'think', vision: null } });
+});
+
+test('the pickers offer a plan model the efforts its program lists, and none without them', async () => {
+  const plan = (id: string, efforts: string[]): AgentModel => ({ id, label: id, provider: id.startsWith('claude/') ? 'claude' : 'codex', baseUrl: '', model: id.split('/')[1], tools: 'native', reasoning: true, efforts });
+  mgr.setPlans(async () => ({ models: [plan('claude/sonnet', ['low', 'medium', 'high', 'max']), plan('claude/haiku', []), plan('codex/gpt', ['minimal', 'low', 'xhigh'])], state: [] }));
+  await mgr.refresh();
+  const opt = (id: string) => mgr.options().find((o) => o.value === id)!;
+  assert.deepEqual(opt('claude/sonnet').efforts, ['low', 'medium', 'high', 'max']);
+  assert.deepEqual(opt('codex/gpt').efforts, ['minimal', 'low', 'xhigh']);
+  assert.deepEqual(opt('claude/haiku').efforts, []);
+  assert.equal(opt('claude/sonnet').defaultEffort, undefined, 'Default is the program’s own');
+});
+
+test('OpenRouter: the efforts its catalog lists, of those it documents; none for a model that offers no choice', () => {
+  assert.deepEqual(effortsFrom({ supported_efforts: ['high', 'medium', 'low', 'none', 'turbo'], default_effort: 'high', mandatory: false }), { efforts: ['none', 'low', 'medium', 'high'], defaultEffort: 'high' });
+  assert.deepEqual(effortsFrom({ supported_efforts: ['high', 'low', 'none'], mandatory: true }), { efforts: ['low', 'high'] }, 'mandatory reasoning takes no none');
+  assert.deepEqual(effortsFrom({ supported_efforts: null }), { efforts: KNOWN_EFFORTS }, 'null: all of them');
+  assert.deepEqual(effortsFrom({ mandatory: false }), {}, 'left out: no choice');
+  assert.deepEqual(effortsFrom({ supported_efforts: [] }), {});
+  assert.deepEqual(effortsFrom(undefined), {});
+});
+
+test('OpenRouter’s reasoning models offer their efforts, medium by default; a model with no choice offers none', async () => {
+  // OpenRouter's catalog is answered here: nothing goes out.
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (url: any, init?: any) =>
+    String(url).startsWith('https://openrouter.ai/')
+      ? new Response(
+          JSON.stringify({
+            data: [
+              { id: 'x/all', name: 'All', supported_parameters: ['tools', 'reasoning'], reasoning: { supported_efforts: ['max', 'xhigh', 'high', 'medium', 'low'], default_effort: 'high' } },
+              { id: 'x/few', name: 'Few', supported_parameters: ['reasoning'], reasoning: { supported_efforts: ['xhigh', 'high'], default_effort: 'xhigh', mandatory: true } },
+              { id: 'x/fixed', name: 'Fixed', supported_parameters: ['reasoning'], reasoning: { mandatory: false } },
+              { id: 'x/plain', name: 'Plain', supported_parameters: ['tools'] },
+            ],
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        )
+      : real(url, init)) as typeof fetch;
+  try {
+    await mgr.configure({ openrouterKey: 'sk-or-test' });
+    for (const id of ['x/all', 'x/few', 'x/fixed', 'x/plain']) await mgr.configure({ pin: id });
+    const of = (id: string) => {
+      const o = mgr.options().find((x) => x.value === `openrouter/${id}`)!;
+      return [o.efforts, o.defaultEffort];
+    };
+    assert.deepEqual(of('x/all'), [['low', 'medium', 'high', 'xhigh', 'max'], 'medium']);
+    assert.deepEqual(of('x/few'), [['high', 'xhigh'], 'xhigh'], 'without medium: the model’s own');
+    assert.deepEqual(of('x/fixed'), [[], undefined]);
+    assert.deepEqual(of('x/plain'), [[], undefined]);
+    const all = agent('openrouter/x/all')!;
+    assert.deepEqual(requestOptions(all, familyOf(all), 'max').reasoning, { effort: 'max' });
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
 // ---- what Custom sends ---------------------------------------------------------------------------------
 
 const model = (o: Partial<AgentModel> = {}): AgentModel => ({ id: 'endpoint/gw/m', label: 'm (gw)', provider: 'endpoint', baseUrl: 'http://x/v1', model: 'm', tools: 'native', ...o });
@@ -215,8 +305,40 @@ test('reasoning_effort goes to an endpoint model that reasons, when an effort is
   assert.equal('reasoning_effort' in requestOptions(m, familyOf(m), 'default'), false);
   const plainModel = model();
   assert.equal('reasoning_effort' in requestOptions(plainModel, familyOf(plainModel), 'high'), false, 'a model that does not reason');
-  const or = model({ provider: 'openrouter', reasoning: true });
-  assert.deepEqual(requestOptions(or, familyOf(or), 'high').reasoning, { effort: 'medium' }, 'OpenRouter is as it was');
+});
+
+test('an endpoint model takes the levels set for it, low, medium and high without a list', () => {
+  const own = model({ reasoning: true, efforts: ['low', 'high', 'xhigh'] });
+  assert.equal(requestOptions(own, familyOf(own), 'xhigh').reasoning_effort, 'xhigh');
+  assert.equal('reasoning_effort' in requestOptions(own, familyOf(own), 'medium'), false, 'a level it does not offer: the endpoint’s own default');
+  const m = model({ reasoning: true });
+  assert.equal(requestOptions(m, familyOf(m), 'medium').reasoning_effort, 'medium');
+  assert.equal('reasoning_effort' in requestOptions(m, familyOf(m), 'xhigh'), false);
+});
+
+test('an OpenRouter reasoning model gets the effort chosen, medium when none is, and none for "default"', () => {
+  const or = model({ id: 'openrouter/a/b', provider: 'openrouter', model: 'a/b', reasoning: true, efforts: ['none', 'low', 'medium', 'high', 'xhigh'] });
+  const sent = (chosen?: string, m = or) => requestOptions(m, familyOf(m), chosen).reasoning;
+  assert.deepEqual(sent('high'), { effort: 'high' });
+  assert.deepEqual(sent('xhigh'), { effort: 'xhigh' });
+  assert.deepEqual(sent('none'), { effort: 'none' });
+  assert.deepEqual(sent(), { effort: 'medium' });
+  assert.equal(sent('default'), undefined);
+  assert.deepEqual(sent('max'), { effort: 'medium' }, 'one it does not offer (kept from another model)');
+  assert.equal(sent(undefined, { ...or, efforts: ['high', 'xhigh'] }), undefined, 'without medium: its own default');
+  assert.deepEqual(sent('xhigh', { ...or, efforts: ['high', 'xhigh'] }), { effort: 'xhigh' });
+  assert.deepEqual(sent('high', { ...or, efforts: undefined }), { effort: 'medium' }, 'no choice of effort');
+  assert.equal(sent('high', { ...or, reasoning: false }), undefined, 'a model that does not reason');
+  // The effort of the environment no longer counts.
+  process.env.HYDOR_EFFORT = 'low';
+  assert.deepEqual(sent('high'), { effort: 'high' });
+  delete process.env.HYDOR_EFFORT;
+});
+
+test('gpt-oss on this computer takes the session’s low, medium or high, medium otherwise', () => {
+  const oss = model({ id: 'ollama/gpt-oss:20b', provider: 'ollama', model: 'gpt-oss:20b', label: 'gpt-oss' });
+  const sent = (chosen?: string) => requestOptions(oss, familyOf(oss), chosen).reasoning_effort;
+  assert.deepEqual([sent('high'), sent(), sent('xhigh'), sent('default')], ['high', 'medium', 'medium', undefined]);
 });
 
 test('images go as image_url parts to a model that sees them, and as a line of text to one that does not', () => {

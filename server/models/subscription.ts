@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
+import { effortsOf } from '../../shared/efforts.ts';
 import type { AgentModel, ModelOption, SubscriptionModels, SubscriptionProvider } from '../../shared/types.ts';
 import { ContextOverflow, StreamCut, type ChatMessage, type ChatOptions, type Part, type Reply } from '../agent/llm.ts';
 import { CallGate } from '../agent/parse.ts';
@@ -98,10 +99,10 @@ class PlanSignedOut extends Error {}
 const textOf = (c: ChatMessage['content']): string => (typeof c === 'string' ? c : Array.isArray(c) ? c.map((p) => (p.type === 'text' ? p.text : '')).join('') : '');
 const partsOf = (c: ChatMessage['content']): Part[] => (typeof c === 'string' ? (c ? [{ type: 'text', text: c }] : []) : (c ?? []));
 
-/** The effort to ask for: HYDOR_EFFORT when the model takes it, else the program's own default. */
-function effortFor(m: AgentModel): string | undefined {
-  const e = (process.env.HYDOR_EFFORT ?? '').toLowerCase();
-  return e && m.efforts?.includes(e) ? e : undefined;
+/** The effort to ask for: the one chosen when the model takes it, else none (the program's own default). */
+function effortFor(m: AgentModel, chosen: string | undefined): string | undefined {
+  const e = (chosen ?? '').toLowerCase();
+  return effortsOf(m).includes(e) ? e : undefined;
 }
 
 /** A step of a plan's model: each account of its program in turn, while one at its limit or signed out hands it on. */
@@ -222,7 +223,7 @@ async function claudeStep(m: AgentModel, o: ChatOptions, a: PlanAccount): Promis
   // The instructions go in a file of their own (a command line holds 32 KB on Windows), readable by this user alone.
   const file = path.join(os.tmpdir(), `hydor-plan-${crypto.randomBytes(6).toString('hex')}.txt`);
   fs.writeFileSync(file, sys?.role === 'system' ? textOf(sys.content) : '', { mode: 0o600 });
-  const effort = effortFor(m);
+  const effort = effortFor(m, o.effort);
   // --tools takes a list, so another flag follows it.
   const args = ['-p', '--model', m.model, ...(effort ? ['--effort', effort] : []), '--tools', '', '--setting-sources', '', '--strict-mcp-config', '--no-session-persistence', '--disable-slash-commands', '--input-format', 'stream-json', '--output-format', 'stream-json', '--include-partial-messages', '--verbose', '--system-prompt-file', file];
   const env: Env = { ...agentBaseEnv(), ...a.env, DISABLE_AUTOUPDATER: '1', ...(o.maxTokens ? { CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(Math.max(1024, Math.min(o.maxTokens, 64_000))) } : {}) };
@@ -387,7 +388,7 @@ const codexLimit = (status: number, t: string) => /usage_limit_reached|usage lim
 
 async function codexStep(m: AgentModel, o: ChatOptions, a: PlanAccount): Promise<Reply> {
   const [sys, ...rest] = o.messages;
-  const effort = effortFor(m);
+  const effort = effortFor(m, o.effort);
   const body: Record<string, unknown> = {
     model: m.model,
     instructions: sys?.role === 'system' ? textOf(sys.content) : '',
