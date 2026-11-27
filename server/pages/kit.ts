@@ -544,7 +544,8 @@ function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
     if (f.type === 'yesno') return h('label', { class: 'n-app-check' }, h('input', { type: 'checkbox', name: f.id, checked: /^(yes|true)$/i.test(f.default ?? '') }), f.label);
     let input: any;
     if (f.type === 'long') input = h('textarea', { name: f.id, rows: 4, placeholder: f.placeholder, required: !!f.required }, f.default ?? '');
-    else if (f.type === 'choice') input = h('select', { name: f.id, required: !!f.required }, ...(f.required ? [] : [h('option', { value: '' }, '')]), ...(f.options ?? []).map((o: string) => h('option', { value: o, selected: o === f.default }, o)));
+    // A project question picks by name (the pages give the projects' names as its options).
+    else if (f.type === 'choice' || (f.type === 'project' && f.options)) input = h('select', { name: f.id, required: !!f.required }, ...(f.required ? [] : [h('option', { value: '' }, '')]), ...(f.options ?? []).map((o: string) => h('option', { value: o, selected: o === f.default }, o)));
     else input = h('input', { name: f.id, type: f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text', step: f.type === 'number' ? 'any' : undefined, placeholder: f.placeholder, required: !!f.required, value: f.default });
     return h('label', { class: 'n-field' }, `${f.label}${f.required ? ' *' : ''}`, input, f.help ? h('span', { class: 'n-muted' }, f.help) : null);
   };

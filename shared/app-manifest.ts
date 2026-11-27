@@ -21,6 +21,7 @@ import type { AppSummary } from './app-summary.ts';
 import type { AppSecretState } from './app-secrets.ts';
 import { ANSWER_TYPES, cardName, cleanAnswer, cleanFields, readDate, readNumber } from './apps.ts';
 import { ME_FIELDS, ME_REFS } from './app-me.ts';
+import { validPluginName, type PluginAgent } from './plugins.ts';
 
 // ---- the format ---------------------------------------------------------------------------------------
 
@@ -99,6 +100,18 @@ export interface ToolStep extends StepCommon {
 
 /** A tool step may also name one of the functions of the web app its app is the flows half of: `fn:<name>` (server/apps/appfns.ts). */
 export const FN_STEP_TOOL = /^fn:[a-z][a-z0-9_]{1,63}$/;
+
+/**
+ * Or one of the MCP tools of a plugin the app needs (requires.plugins): `plugin:<plugin>/<tool>`, the plugin by its
+ * name and the tool as its server lists it (server/apps/plugins.ts).
+ */
+export const PLUGIN_STEP_TOOL = /^plugin:([a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?)\/([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})$/;
+
+/** The plugin and tool a step's `tool` names, when it is a plugin's. */
+export function pluginStepTool(tool: unknown): { plugin: string; tool: string } | null {
+  const m = typeof tool === 'string' ? PLUGIN_STEP_TOOL.exec(tool) : null;
+  return m ? { plugin: m[1], tool: m[2] } : null;
+}
 
 /** The longest a tool step may keep an answer (cache), in seconds: a week. */
 export const MOST_CACHE_SECONDS = 7 * 24 * 3600;
@@ -255,6 +268,11 @@ export const DATA_LIMITS = { collections: 20, records: 20_000, record: 64 * 1024
  * template's own (never for the whole computer), and commands that must be here (looked for, not installed).
  */
 export interface Requires {
+  /**
+   * Hydor plugins it needs, by name (Settings → Plugins): each must be installed and on for the program the run uses,
+   * or the run does not start. Its tool steps may call their MCP tools ("plugin:<plugin>/<tool>").
+   */
+  plugins?: string[];
   /** npm packages: name → version ("^1.0.0", "latest"). */
   node?: Record<string, string>;
   /** Python packages as pip takes them ("pandas>=2", "requests"). */
@@ -294,9 +312,19 @@ const COMMAND = /^[A-Za-z0-9][\w.+-]{0,40}$/;
 export function cleanRequires(raw: unknown): { requires?: Requires; errors: string[] } {
   const errors: string[] = [];
   if (raw === undefined || raw === null) return { errors };
-  if (typeof raw !== 'object' || Array.isArray(raw)) return { errors: ['What it needs ("requires") is { "node": {…}, "python": […], "commands": […] }'] };
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { errors: ['What it needs ("requires") is { "plugins": […], "node": {…}, "python": […], "commands": […] }'] };
   const r = raw as Record<string, unknown>;
   const out: Requires = {};
+  if (r.plugins !== undefined) {
+    const names = (Array.isArray(r.plugins) ? r.plugins : []).map((x) => String(x).trim()).filter(Boolean);
+    if (!Array.isArray(r.plugins)) errors.push('What it needs: "plugins" is a list of plugin names ("sqlite")');
+    const ok = names.slice(0, 20).filter((x) => {
+      if (validPluginName(x)) return true;
+      errors.push(`What it needs: “${String(x).slice(0, 60)}” is not a plugin's name (lowercase letters, digits, dashes and dots, as its plugin.json has it)`);
+      return false;
+    });
+    if (ok.length) out.plugins = [...new Set(ok)];
+  }
   if (r.node !== undefined) {
     const node: Record<string, string> = {};
     const list: [string, unknown][] = Array.isArray(r.node) ? r.node.map((n) => [String(n), 'latest']) : r.node && typeof r.node === 'object' ? Object.entries(r.node) : [];
@@ -412,6 +440,19 @@ export function appInfo(id: string, r: Pick<AppRecipe, 'name' | 'fields' | 'answ
   };
 }
 
+/**
+ * The programs a run of the recipe (or of one of its other flows) uses, as plugins name them: its one agent's, or its
+ * agent steps'. Each plugin the app needs must work with them.
+ */
+export function appPrograms(r: { agent: Agent; acpAgent?: string; flow?: Flow; flows?: Record<string, NamedFlow> }, flow?: string): PluginAgent[] {
+  const kinds = new Set<PluginAgent>();
+  const add = (agent: Agent, acpAgent?: string) => kinds.add(agent === 'claude' || agent === 'codex' ? agent : !acpAgent || acpAgent === 'console' ? 'custom' : 'acp');
+  const f = flow ? r.flows?.[flow] : r.flow;
+  if (!f?.steps.length) add(r.agent, r.acpAgent);
+  else for (const s of allSteps(f.steps)) if (s.do === 'agent') add(s.agent ?? r.agent, s.acpAgent ?? (s.agent && s.agent !== r.agent ? undefined : r.acpAgent));
+  return [...kinds];
+}
+
 /** Tools a step may call on its own, outside a session: they answer without a conversation to answer in. */
 export const STEP_TOOLS = [
   'web_search',
@@ -484,17 +525,20 @@ export const BUILTIN_VALUES: readonly { ref: string; label: string; hint: string
   { ref: 'timezone', label: 'The time zone', hint: 'Where those are, as Europe/Athens' },
   { ref: 'run.source', label: 'What started the run', hint: 'web (its form), test, api, mcp, public, batch, task, screen, chat, app, session (an agent ran it for you in a session)' },
   { ref: 'run.id', label: 'The run', hint: 'Its id, as its page has it' },
+  { ref: 'run.folder', label: 'The run’s folder', hint: 'Where its files go (the project’s folder when it works in one): for a tool that writes a file' },
   { ref: 'language', label: 'The language to write in', hint: 'Its English name, as Greek: the one the run was started in, else English' },
   { ref: 'lang', label: 'Its language code', hint: 'As el, de or en' },
+  { ref: 'project_name', label: 'The project’s name', hint: 'Of the project the run works in, chosen in a project question (empty without one)' },
+  { ref: 'project_folder', label: 'The project’s folder', hint: 'Its path, where the run works (empty without one)' },
   ...ME_REFS.map((r) => ({ ref: `me.${r}`, label: r === 'author_id' ? 'Your author id' : ME_FIELDS.find((f) => f.id === r)!.label, hint: ME_HINTS[r], group: 'About you' as const })),
 ];
 /** The names those values go by. */
-export const BUILTIN_ROOTS = new Set(['today', 'now', 'weekday', 'timezone', 'run', 'language', 'lang', 'me']);
+export const BUILTIN_ROOTS = new Set(['today', 'now', 'weekday', 'timezone', 'run', 'language', 'lang', 'me', 'project_name', 'project_folder']);
 /**
  * Of those, the names added after apps had steps and questions of their own: an app's step or question by that name
  * (the step "me" that reads the person's profile, Translate's question "language") still means its own.
  */
-export const OWN_FIRST = new Set(['language', 'lang', 'me']);
+export const OWN_FIRST = new Set(['language', 'lang', 'me', 'project_name', 'project_folder']);
 
 /** The moment's values in a time zone (an IANA name; UTC when it is not one). */
 export function momentOf(timeZone = 'UTC', at = Date.now()): { today: string; now: string; weekday: string; timezone: string } {
@@ -910,7 +954,7 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
       return step;
     }
     case 'tool': {
-      const tool = short(x.tool, 80);
+      const tool = short(x.tool, 200);
       if (!tool) t.errors.push(`${where}: name the tool it uses`);
       const w = cleanWith(x.with, t.errors, where);
       let cache: false | number | undefined;
@@ -1227,7 +1271,7 @@ export function lookup(path: string, s: Scope): { found: boolean; value: unknown
   // A question of the app's own by one of the later built-in names is its own.
   else if (OWN_FIRST.has(root) && has(s.inputs, root)) v = s.inputs[root];
   else if (has(s.vars, root)) v = s.vars[root];
-  else if (BUILTIN_ROOTS.has(root)) v = root === 'run' || root === 'me' ? {} : root === 'language' ? 'English' : root === 'lang' ? 'en' : momentOf()[root as 'today'];
+  else if (BUILTIN_ROOTS.has(root)) v = root === 'run' || root === 'me' ? {} : root === 'language' ? 'English' : root === 'lang' ? 'en' : root.startsWith('project_') ? '' : momentOf()[root as 'today'];
   else if (has(s.inputs, root)) v = s.inputs[root];
   else return { found: false, value: undefined };
   for (const k of rest) {
@@ -1516,7 +1560,8 @@ export interface InstallPreview {
   memory: boolean;
   limits: { runsPerDay?: number; capUsd?: number };
   /** What it installs for itself (Node and Python packages), and commands it needs that are, or are not, on this computer. */
-  needs: { node: string[]; python: string[]; commands: string[]; missing: string[] };
+  /** `plugins`: those it needs, by their titles, each with whether it is on here. */
+  needs: { node: string[]; python: string[]; commands: string[]; missing: string[]; plugins?: { name: string; title: string; on: boolean }[] };
   /**
    * The models it asks for: here as they are, the same one under another name here, or not here (then
    * `options` lists what could stand in; `use` is the one picked unless you pick another; "" for the agent's default).
@@ -1580,13 +1625,13 @@ interface Seen {
  * words: values it uses that come later, sit inside a Repeat, run at the same time, or name nothing;
  * rules that cannot be read; tools a step cannot call on its own; answer fields nothing gives.
  */
-export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?: Flow; data?: Record<string, DataCollection>; flows?: Record<string, NamedFlow> }, o: { named?: boolean } = {}): { errors: string[]; warnings: string[] } {
+export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?: Flow; data?: Record<string, DataCollection>; flows?: Record<string, NamedFlow>; requires?: Requires }, o: { named?: boolean } = {}): { errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
   // Each flow beside the main one: its own form (its inputs), and outputs of its own names.
   if (!o.named)
     for (const [name, f] of Object.entries(r.flows ?? {})) {
-      const c = checkFlow({ fields: f.inputs ?? [], answer: [], flow: f, data: r.data }, { named: true });
+      const c = checkFlow({ fields: f.inputs ?? [], answer: [], flow: f, data: r.data, requires: r.requires }, { named: true });
       errors.push(...c.errors.map((e) => `Flow “${name}”: ${e}`));
       warnings.push(...c.warnings.map((w) => `Flow “${name}”: ${w}`));
     }
@@ -1613,7 +1658,7 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
         continue;
       }
       if (root === 'run') {
-        if (field && field !== 'id' && field !== 'source') note(errors, `${where} uses {{${p}}}: a run gives id and source`);
+        if (field && field !== 'id' && field !== 'source' && field !== 'folder') note(errors, `${where} uses {{${p}}}: a run gives id and source, and its folder`);
         continue;
       }
       // About you, the language: unless the app has a step or a question of that name, which is its own.
@@ -1659,10 +1704,15 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
         case 'model':
           checkRefs(where, s.instructions, seen, names, siblings);
           break;
-        case 'tool':
-          if (s.tool && !STEP_TOOLS.includes(s.tool) && !FN_STEP_TOOL.test(s.tool)) note(errors, `${where}: ${s.tool} cannot run as a step on its own; use it in an Ask an agent step (on their own: ${STEP_TOOLS.join(', ')})`);
+        case 'tool': {
+          const plugin = pluginStepTool(s.tool);
+          if (plugin) {
+            if (!r.requires?.plugins?.includes(plugin.plugin)) note(errors, `${where}: ${s.tool} is a tool of the plugin ${plugin.plugin}: name the plugin in what it needs (requires: { "plugins": ["${plugin.plugin}"] })`);
+          } else if (s.tool?.startsWith('plugin:')) note(errors, `${where}: a plugin's tool is "plugin:<plugin>/<tool>" ("plugin:sqlite/sqlite_query"), not ${s.tool}`);
+          else if (s.tool && !STEP_TOOLS.includes(s.tool) && !FN_STEP_TOOL.test(s.tool)) note(errors, `${where}: ${s.tool} cannot run as a step on its own; use it in an Ask an agent step (on their own: ${STEP_TOOLS.join(', ')}, and a needed plugin's tools as plugin:<plugin>/<tool>)`);
           checkRefs(where, s.with, seen, names, siblings);
           break;
+        }
         case 'app':
           checkRefs(where, s.with, seen, names, siblings);
           break;

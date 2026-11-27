@@ -3,11 +3,11 @@
 // page as it changes (an agent's new version, an edit in Pages).
 import { useEffect, useMemo, useState } from 'react';
 import type { AppDef } from '@shared/apps';
-import { appInfo } from '@shared/app-manifest';
 import { api, enc } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { Empty, Throbber } from '../../components/ui';
 import { pageStore, PageFrame } from '../pages/frame';
+import { useAppInfo } from './projects';
 
 export function AppScreen({ app }: { app: AppDef }) {
   const page = app.screens?.main?.page;
@@ -28,7 +28,8 @@ export function AppScreen({ app }: { app: AppDef }) {
   useEffect(load, [page]);
   useFeatureEvent('pages', ({ data: e }) => (e as { what?: string })?.what === 'pages' && load());
   const store = useMemo(() => (page ? pageStore(page) : null), [page]);
-  const bridge = useMemo(() => ({ info: appInfo(app.id, app) }), [app]);
+  const info = useAppInfo(app.id, app);
+  const bridge = useMemo(() => ({ info }), [info]);
   if (err) return <Empty title="Its screen could not be opened">{err}</Empty>;
   if (!page || html === null || !store)
     return (

@@ -20,20 +20,21 @@ import { checkAnswer, cleanRecipe, isActive, MAX_MISSES, PUBLIC_WEB_TOOLS, quest
 import { cardLines } from '../../shared/app-cards.ts';
 import { languageLine, localeOf } from '../../shared/app-me.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
-import { allSteps, asText, cleanFlow, evalRule, FN_STEP_TOOL, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
+import { allSteps, asText, cleanFlow, evalRule, FN_STEP_TOOL, fillRefs, FLOW_LIMITS, lookup, momentOf, order, pluginStepTool, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { isTier } from '../../shared/tiers.ts';
 import { extractText } from '../documents/extract.ts';
 import { runTools } from '../features/registry.ts';
 import { runFunctions } from './appfns.ts';
 import { AGENT_FILE } from '../models/config.ts';
-import type { RunCtx } from '../features/types.ts';
+import type { RunCtx, RunTool } from '../features/types.ts';
 import { helper } from '../helper.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { checkDaily } from './api.ts';
 import { runCode } from './code.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
-import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, runVars, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
+import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, runVars, startRun, stopRun, uploadsDir, waitFor, WORK_DIR, type FlowRunner, type StartInput } from './runs.ts';
+import { closePluginServers, pluginTool } from './plugins.ts';
 import { aboutMe } from './me.ts';
 import { takeInAnswer } from './media.ts';
 import { callKey, callTool, firstLine, whatOf, whyOf } from './sturdy.ts';
@@ -100,7 +101,7 @@ async function inputValues(r: RunRecord, o: FlowStart, folder: string): Promise<
   for (const f of formOf(r.recipe, r.flow)) {
     if (f.type !== 'file' || !r.inputs[f.id]) continue;
     const sent = o.files?.[f.id];
-    const file = path.join(folder, 'uploads', safeName(sent?.name ?? r.inputs[f.id]));
+    const file = path.join(o.public ? path.join(folder, 'uploads') : uploadsDir(r, o.slug), safeName(sent?.name ?? r.inputs[f.id]));
     if (sent) {
       fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
       fs.writeFileSync(file, Buffer.from(sent.data, 'base64'), { mode: 0o600 });
@@ -210,7 +211,7 @@ async function pauseAt(x: Exec, at: string) {
 
 async function go(x: Exec, inputs: Record<string, unknown>) {
   // The built-in values: the moment, in the user's time zone, what started the run, the language it writes in, and About you (none for a public page's run).
-  const vars = { ...momentOf(userTimezone(runDeps().db)), run: { id: x.run.id, source: x.run.source }, ...runVars(x.run, !!x.pub) };
+  const vars = { ...momentOf(userTimezone(runDeps().db)), run: { id: x.run.id, source: x.run.source, folder: x.pub ? '' : x.folder }, ...runVars(x.run, !!x.pub) };
   const scope: Scope = { inputs, steps: Object.fromEntries(allSteps(x.flow.steps).map((s) => [s.id, null])), vars };
   try {
     await runList(x, x.flow.steps, scope, '');
@@ -342,7 +343,8 @@ function agentPrompt(x: Exec, instructions: string, scope: Scope, at: string): s
   const whole = fillRefs(instructions, scope);
   if (whole.length <= 28_000) return whole;
   if (x.pub) return fillRefs(instructions, scope, { max: 4000 }).slice(0, 29_000);
-  const dir = path.join(x.folder, 'values');
+  // Beside the app's folders, not in the project's, when the run works in one.
+  const dir = x.run.project ? path.join(WORK_DIR, x.slug, `run-${x.run.id}`, 'values') : path.join(x.folder, 'values');
   fs.mkdirSync(dir, { recursive: true });
   let n = 0;
   const vars = { ...scope.vars };
@@ -873,10 +875,14 @@ async function judge(x: Exec, question: string, cost: Cost): Promise<{ yes: bool
 async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope, at: string): Promise<Record<string, unknown>> {
   // One of the functions of the web app this app is the flows half of (fn:<name>): its own rules say if it is offered (appfns.ts); it goes through the same tools every call does.
   const fn = FN_STEP_TOOL.test(s.tool);
+  // An MCP tool of a plugin the app needs (plugins.ts): what it needs says which, so the list of tools does not.
+  const plugin = pluginStepTool(s.tool);
   let toolName = s.tool;
-  if (!fn && !STEP_TOOLS.includes(s.tool)) throw new Error(`${s.tool} cannot run as a step on its own: use it in an Ask an agent step`);
+  if (!fn && !plugin && !STEP_TOOLS.includes(s.tool)) throw new Error(`${s.tool} cannot run as a step on its own: use it in an Ask an agent step`);
   if (x.pub && !(x.pub.web && PUBLIC_WEB_TOOLS.includes(s.tool))) throw new Error(`A run from a public page cannot use ${s.tool}`);
-  if (fn) {
+  if (plugin) {
+    if (!x.run.recipe.requires?.plugins?.includes(plugin.plugin)) throw new Error(`${s.tool} is a tool of the plugin ${plugin.plugin}, which the app does not name in what it needs (requires.plugins)`);
+  } else if (fn) {
     const given = runFunctions()?.stepTool(x.run, s.tool);
     if (!given) throw new Error('The app’s functions are not available in this Hydor');
     if ('problem' in given) throw new Error(given.problem);
@@ -885,8 +891,12 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope,
     const allowed = x.run.recipe.tools;
     if (allowed && !allowed.includes(s.tool)) throw new Error(`The app does not let its runs use ${s.tool} (Tools, in its settings)`);
   }
-  const ctx: RunCtx = { runId: `flow-${x.run.id}`, key: `acp:flow-${x.run.id}`, agent: 'acp', acpAgent: CONSOLE_ID, cwd: x.folder, deps: runDeps(), signal: x.abort.signal, notice: { url: `/apps/runs/${encodeURIComponent(x.run.id)}`, title: x.run.appName }, step: true };
-  const tool = runTools(ctx).find((t) => t.name === toolName);
+  const ctx: RunCtx = { runId: `flow-${x.run.id}`, key: `acp:flow-${x.run.id}`, agent: 'acp', acpAgent: CONSOLE_ID, cwd: x.folder, deps: runDeps(), signal: x.abort.signal, notice: { url: `/apps/runs/${encodeURIComponent(x.run.id)}`, title: x.run.appName }, step: true, ...(x.run.project ? { project: x.run.project.id } : {}) };
+  let tool: RunTool | undefined;
+  // What a plugin's tool answered besides its text (MCP's structured content), for {{id.data}}.
+  let structured: () => unknown = () => undefined;
+  if (plugin) ({ tool, data: structured } = await pluginTool(db(), x.run.id, s.tool, x.abort.signal));
+  else tool = runTools(ctx).find((t) => t.name === toolName);
   if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of Hydor turned on?`);
   const args = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
   // A step's search is an exact call: its words are searched as written. A search otherwise has filters read out of its
@@ -912,6 +922,7 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope,
       values.data = JSON.parse(text);
     } catch {}
   }
+  if (values.data === undefined && structured() !== undefined) values.data = structured();
   return values;
 }
 
@@ -1200,6 +1211,7 @@ async function kept(x: Exec, recipe: AppRecipe, value: Record<string, unknown>):
 
 async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'stopped', error?: string) {
   execs.delete(x.run.id);
+  closePluginServers(x.run.id);
   const recipe: AppRecipe = x.run.recipe;
   let result: Record<string, unknown> | null = null;
   if (status === 'done' && x.run.flow && scope) {

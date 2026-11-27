@@ -142,6 +142,8 @@ Jede von der App gestartete Sitzung erhält die aktivierten und vollständig ein
 
 Ein Plugin kann auf bestimmte Agenten beschränkt sein; das steht im Detailfenster. Laufende Sitzungen erhalten Änderungen am Plugin erst bei ihrem nächsten Start.
 
+Eine [App](/guide/apps#what-an-app-needs-on-this-computer) kann ein Plugin benötigen: Sie läuft nur, solange das Plugin eingeschaltet ist, ihre Agenten bekommen dessen Skills und Tools, und ihre Schritte können die Tools des Plugins aufrufen.
+
 ## Eigene Plugins von Claude Code und Codex
 
 Claude Code und Codex haben eigene Plugins aus ihren Marktplätzen, die jeweils nur der betreffende Agent verwendet. Beide haben einen Tab auf der Plugin-Seite:

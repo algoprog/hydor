@@ -1169,7 +1169,13 @@ agents that speak ACP and take MCP servers.
   start from a field of it (Filled in from), and those not needed fold into one line under the form ("For Thessaloniki
   · metric · EUR", with Change); one About you has nothing for offers Remember for all apps; another can start from
   your last answer to it in that app (Remember the last answer, kept on the server for every device). Runs from the
-  API, rows of a CSV, schedules and agents take those starting values for what they leave out. Each run writes in a
+  API, rows of a CSV, schedules and agents take those starting values for what they leave out. A question can also
+  be one of your projects (Project): the run then works in that project's folder, its agents' sessions belong to the
+  project, and its look-ups through your documents search the project's knowledge. An app can need Hydor plugins
+  (requires.plugins): a run starts only while each is on for the program the run uses (its page, with Add the plugin, Turn the plugin on
+  or Set the plugin up, its card on the Apps page, use_app and app_try say which and what to do), its agents get their skills
+  and tools, its tool steps call their MCP tools (plugin:<plugin>/<tool>, the server started for the run and stopped
+  with it), and a public page does not run it. Each run writes in a
   language: the page's, a public visitor's, the one you write to an agent in, else About you's, else English, kept
   for Run again from here; an app with Answers in the person’s language (on for new apps) has its models and agents
   write in it, steps read {{language}}, {{lang}} and {{me.units}}…, and code steps get ctx.locale (language,

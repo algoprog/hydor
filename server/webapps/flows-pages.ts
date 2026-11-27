@@ -39,7 +39,7 @@ export function flowsPageRoutes(d: Deps, h: { enabled: () => void; own: (req: { 
       flow: r.flow ?? "run",
       status: r.status,
       person: person(r.person),
-      inputs: inputsLine(r.recipe.fields, r.inputs, 100) || undefined,
+      inputs: inputsLine(r.recipe.fields, r.inputs, 100, r.project) || undefined,
       createdAt: r.createdAt,
       ...(r.endedAt ? { endedAt: r.endedAt } : {}),
       ...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}),

@@ -32,6 +32,7 @@ import { createPage } from '../pages/store.ts';
 import { isInstalled, setInstalled } from './builtins.ts';
 import { mediaBytes, putMediaBuffer } from './media.ts';
 import { secretsOf } from './secrets.ts';
+import { pluginNeeds } from './plugins.ts';
 import { templateById } from './templates.ts';
 
 /** The newest package format this server reads. */
@@ -462,13 +463,19 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
     warnings.push(...c.warnings);
   }
   // What it needs on this computer.
-  const needs = { node: [] as string[], python: [] as string[], commands: [] as string[], missing: [] as string[] };
+  const needs = { node: [] as string[], python: [] as string[], commands: [] as string[], missing: [] as string[], plugins: [] as { name: string; title: string; on: boolean }[] };
   for (const r of all) {
     for (const [n, v] of Object.entries(r.requires?.node ?? {})) if (!needs.node.includes(`${n} ${v}`)) needs.node.push(`${n} ${v}`);
     for (const p of r.requires?.python ?? []) if (!needs.python.includes(p)) needs.python.push(p);
     for (const c of r.requires?.commands ?? []) if (!needs.commands.includes(c)) needs.commands.push(c);
   }
   needs.missing = needs.commands.filter((c) => !hasCommand(c));
+  // The plugins it needs: installing the app adds none of them, its page offers to.
+  const plugins = [...new Set(all.flatMap((r) => r.requires?.plugins ?? []))];
+  for (const p of pluginNeeds(db, { requires: { plugins } })) {
+    needs.plugins.push({ name: p.name, title: p.title, on: p.state === 'on' });
+    if (p.state !== 'on') warnings.push(`It needs the ${p.title} plugin, which ${p.problem}: it does not run until then. ${p.fix}`);
+  }
   for (const c of needs.missing) warnings.push(`It uses the command ${c}, which is not on this computer: install it, or the steps that use it fail`);
   const data = Object.keys(recipe.data ?? {}).map((name) => ({ name, records: Array.isArray(pkg.records?.[name]) ? Math.min(pkg.records![name].length, DATA_LIMITS.records) : 0 }));
   for (const name of Object.keys(pkg.records ?? {})) if (!recipe.data?.[name]) warnings.push(`Its file holds records for “${name}”, a collection it does not keep: they are left out`);

@@ -141,7 +141,8 @@ export default function PublicAppPage({ slug }: { slug: string }) {
 
         <section className="rounded-[20px] border border-line bg-panel p-4 shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:p-5">
           <AppForm
-            fields={app.fields}
+            // A visitor chooses none of your projects.
+            fields={app.fields.filter((f) => f.type !== 'project')}
             values={values}
             files={files}
             errors={errors}
