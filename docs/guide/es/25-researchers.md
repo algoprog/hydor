@@ -249,7 +249,7 @@ Los agentes de tus sesiones también conocen estos oficios, gracias a habilidade
 
 ## Ejecuta el trabajo de tu laboratorio
 
-Tres apps listas para usar, en **Laboratorio** dentro de la página de [Apps](/apps), ayudan con el trabajo diario de un laboratorio: etiquetar datos y comprobar un modelo con tus etiquetas, probar una idea en tu propio código desde las hipótesis hasta un informe, y optimizar los ajustes de un modelo. El sprint y el barrido ejecutan sus trabajos en [Experimentos](/guide/experiments), así que necesitan que tenga una computadora (o un clúster) con GPU.
+Tres apps listas para usar, en **Laboratorio** dentro de la página de [Apps](/apps), ayudan con el trabajo diario de un laboratorio: etiquetar datos y comprobar un modelo con tus etiquetas, probar una idea en tu propio código desde las hipótesis hasta un informe, y optimizar los ajustes de un modelo. El sprint y el barrido ejecutan sus trabajos en [Experimentos](/guide/experiments), así que necesitan que tenga una computadora (o un clúster) con GPU. La pestaña **Investigación** de un proyecto es donde ves lo que estas apps y tus otros agentes hicieron durante la noche, qué te necesita y cómo cambió la puntuación (consulta [Investigación](/guide/projects#research)).
 
 ### Banco de anotación
 

@@ -126,7 +126,8 @@ export function GuestItem({ it }: { it: TimelineItem }) {
       if (it.meta === 'command-output') return <div className="px-1 font-mono text-[12px] text-fg-3">{it.text}</div>;
       const goal = goalMessageOf(it.text);
       if (goal) return <div data-i18n="goal" className="px-1 text-[12.5px] text-fg-3">Goal{goal.head && <span className="text-fg-2"> · {goal.head}</span>}</div>;
-      if (experimentNoticeOf(it.text)) return <div className="px-1 text-[12.5px] text-fg-3"><ExperimentNoticeLabel /></div>;
+      const notice = experimentNoticeOf(it.text);
+      if (notice) return <div className="px-1 text-[12.5px] text-fg-3"><ExperimentNoticeLabel wrong={notice.wrong} /></div>;
       const run = splitRunMessage(it.text);
       if (run) return <div className="px-1 text-[12.5px] text-fg-3">Scheduled task <span className="text-fg-2">{run.task}</span> · {run.when}</div>;
       return (

@@ -8,7 +8,7 @@ import type { RunRecord } from '../../shared/experiments.ts';
 import type { DB } from '../db.ts';
 import { files } from './local.ts';
 import { MAX_METRICS, parseLine, readFrom, Tracker } from './metrics.ts';
-import { offsetsOf, runFolder, saveSeries, seriesOf, updateRun } from './records.ts';
+import { offsetsOf, ranIn, runFolder, saveSeries, seriesOf, updateRun } from './records.ts';
 import { runFile } from './sweeps.ts';
 
 /**
@@ -74,7 +74,12 @@ function* repairing(db: DB, r: RunRecord, local: boolean, maxLog: number): Gener
       const off = offsetsOf(db, r.id);
       const t = new Tracker(r.better);
       yield* feed(t, log, Math.min(off.log, size), at);
-      if (r.metricsFile) yield* feed(t, path.resolve(r.cwd, runFile(r, r.metricsFile, folder)), off.file, at);
+      if (r.metricsFile) {
+        // From its copy, or from its folder once the file it made there was moved back.
+        const named = runFile(r, r.metricsFile, folder);
+        const own = path.resolve(ranIn(r), named);
+        yield* feed(t, fs.existsSync(own) ? own : path.resolve(r.cwd, named), off.file, at);
+      }
       // What the reading found is for the record, not for the agent on call to be told of.
       t.nan = [];
       t.diverged = [];

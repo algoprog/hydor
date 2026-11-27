@@ -1,7 +1,8 @@
 // A run's or several runs' metrics over steps, one chart each, in sections (dev, train, Metrics, Other…): a toolbar
 // to find a metric, smooth the curves and choose what the x axis is, a log scale and leaving out outliers (kept on this
 // device), cards that draw their chart only once they come near the screen (an experiment can have a hundred
-// metrics), and a bigger view of one with its numbers.
+// metrics), and a bigger view of one with its numbers. A single run's page also shows what it used over time (memory,
+// GPU, processor), after the others in a section of its own, System, folded on a phone.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Maximize2, Search, SlidersHorizontal } from 'lucide-react';
 import { betterOf, type MetricSeries } from '@shared/experiments';
@@ -9,6 +10,8 @@ import { Dialog, IconButton, MenuItem, MenuLabel, MenuSep, Popover, cx, useIsMob
 import { alongX, sectionsOf, xChoices } from './analysis';
 import { num } from './api';
 import { LineChart, type ChartView, type LineSeries } from './Charts';
+import { tr } from '../../i18n/runtime';
+import { fill, systemOrder, systemTitle } from './tryWords';
 
 /** A run as ChartsPanel draws it. */
 export interface PanelRun {
@@ -84,7 +87,32 @@ function seriesFor(runs: PanelRun[], metric: string, x: string): LineSeries[] {
   return out;
 }
 
-function MetricCard({ metric, runs, x, view, better, single, ring, onBigger, cardRef }: { metric: string; runs: PanelRun[]; x: string; view: ChartView; better: 'min' | 'max'; single: boolean; ring: boolean; onBigger: () => void; cardRef: (el: HTMLDivElement | null) => void }) {
+function MetricCard({
+  metric,
+  runs,
+  x,
+  view,
+  better,
+  single,
+  ring,
+  onBigger,
+  cardRef,
+  title,
+  along,
+}: {
+  metric: string;
+  runs: PanelRun[];
+  x: string;
+  view: ChartView;
+  better: 'min' | 'max';
+  single: boolean;
+  ring: boolean;
+  onBigger: () => void;
+  cardRef: (el: HTMLDivElement | null) => void;
+  /** A System chart: its title in words, and what its x axis counts. */
+  title?: string;
+  along?: string;
+}) {
   const [box, seen] = useNear<HTMLDivElement>();
   const series = seriesFor(runs, metric, x);
   const only = single ? runs.find((r) => r.series?.[metric]?.length) : undefined;
@@ -102,15 +130,15 @@ function MetricCard({ metric, runs, x, view, better, single, ring, onBigger, car
     >
       <div className="mb-1 flex items-center gap-2">
         <div translate="no" title={metric} className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-fg-2">
-          {metric}
+          {title ?? metric}
         </div>
         {last !== undefined && <span className="tnum shrink-0 text-[13px] font-semibold">{num(last)}</span>}
-        {last !== undefined && bestV !== undefined && num(bestV) !== num(last) && <span className="tnum shrink-0 text-[11.5px] text-fg-3">{`best ${num(bestV)}`}</span>}
+        {last !== undefined && bestV !== undefined && num(bestV) !== num(last) && <span className="tnum shrink-0 text-[11.5px] text-fg-3">{title ? fill(tr('peak {0}'), num(bestV)) : `best ${num(bestV)}`}</span>}
         <IconButton label="Bigger" size="sm" onClick={onBigger} className="-mr-1.5">
           <Maximize2 size={13} />
         </IconButton>
       </div>
-      {seen ? <LineChart series={series} height={CARD_H} view={view} better={better} xLabel={x || undefined} zoom /> : <div style={{ height: CARD_H }} />}
+      {seen ? <LineChart series={series} height={CARD_H} view={view} better={better} xLabel={along ?? (x || undefined)} zoom /> : <div style={{ height: CARD_H }} />}
     </div>
   );
 }
@@ -128,7 +156,7 @@ function statsOf(r: PanelRun, metric: string, dir: 'min' | 'max') {
  * Every metric the runs have over steps, a chart each, in sections (sectionsOf), with a toolbar: Find a metric,
  * Smoothing, and Chart options (X axis, Log scale, Ignore outliers), kept on this device.
  */
-export function ChartsPanel({ runs, single, focus, empty, toolbarEnd }: { runs: PanelRun[]; single?: boolean; focus?: string | null; empty?: ReactNode; toolbarEnd?: ReactNode }) {
+export function ChartsPanel({ runs, single, focus, empty, toolbarEnd, system }: { runs: PanelRun[]; single?: boolean; focus?: string | null; empty?: ReactNode; toolbarEnd?: ReactNode; system?: MetricSeries }) {
   const mobile = useIsMobile();
   const [opts, setOpts] = useState(readOptions);
   const [toggled, setToggled] = useState(readToggled);
@@ -219,7 +247,13 @@ export function ChartsPanel({ runs, single, focus, empty, toolbarEnd }: { runs: 
     </>
   );
   const loading = !metrics.length && runs.some((r) => r.series === undefined);
-  const bigRuns = big ? runs.map((r) => statsOf(r, big, betterOf(big, betterTold))).filter((s): s is NonNullable<typeof s> => !!s) : [];
+  // System: the run's own use of the computer, along the minutes since it started; its own run, so no name meets a metric's.
+  const used = useMemo(() => (system && runs[0] ? [{ ...runs[0], series: system, better: undefined, last: undefined, best: undefined }] : []), [system, runs]);
+  const usedNames = useMemo(() => systemOrder(Object.entries(system ?? {}).flatMap(([k, pts]) => (pts.length >= 2 ? [k] : []))).filter((k) => !q || k.toLowerCase().includes(q) || systemTitle(k).toLowerCase().includes(q)), [system, q]);
+  // Folded on a phone until opened; searching shows what matches.
+  const usedFolded = !q && mobile !== toggled.has('system');
+  const bigUsed = big?.startsWith('\u0001') ? big.slice(1) : null;
+  const bigRuns = big && !bigUsed ? runs.map((r) => statsOf(r, big, betterOf(big, betterTold))).filter((s): s is NonNullable<typeof s> => !!s) : [];
   const bigDir = big ? betterOf(big, betterTold) : 'max';
   bigRuns.sort((a, b) => (bigDir === 'min' ? a.best - b.best : b.best - a.best));
 
@@ -332,10 +366,27 @@ export function ChartsPanel({ runs, single, focus, empty, toolbarEnd }: { runs: 
         </div>
       )}
 
-      <Dialog open={big !== null} onClose={() => setBig(null)} width={1000} part="experiments" title={<span translate="no">{big}</span>}>
+      {usedNames.length > 0 && (
+        <section className="mt-5">
+          <button type="button" onClick={() => toggle('system')} aria-expanded={!usedFolded} className="mb-2 flex min-h-8 items-center gap-1 text-[12.5px] font-semibold text-fg-2 hover:text-fg">
+            {usedFolded ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+            System
+            <span className="tnum font-normal text-fg-3">{usedNames.length}</span>
+          </button>
+          {!usedFolded && (
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr))]">
+              {usedNames.map((m) => (
+                <MetricCard key={m} metric={m} title={systemTitle(m)} along={tr('Minute')} runs={used} x="" view={view} better="max" single ring={false} onBigger={() => setBig(`\u0001${m}`)} cardRef={() => {}} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <Dialog open={big !== null} onClose={() => setBig(null)} width={1000} part="experiments" title={bigUsed ? <span>{systemTitle(bigUsed)}</span> : <span translate="no">{big}</span>}>
         {big && (
           <div>
-            <LineChart series={seriesFor(runs, big, x)} height={420} view={view} better={bigDir} xLabel={x || undefined} zoom />
+            <LineChart series={bigUsed ? seriesFor(used, bigUsed, '') : seriesFor(runs, big, x)} height={420} view={view} better={bigDir} xLabel={bigUsed ? tr('Minute') : x || undefined} zoom />
             {bigRuns.length > 0 && (
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-[12.5px] whitespace-nowrap">

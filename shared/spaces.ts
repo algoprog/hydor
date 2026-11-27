@@ -57,6 +57,8 @@ export interface SpaceView extends Space {
   library: number;
   /** How many people it is shared with now (links that work); absent when none. */
   people?: number;
+  /** It has research in it (runs in its folder, a finding, an evaluation): its page shows the Research tab. Absent when none. */
+  research?: true;
 }
 
 /** A project's work over the days asked for (the Projects page's Where the work went). */

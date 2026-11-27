@@ -8,13 +8,17 @@ import type { EvaluationListed } from '@shared/evaluations';
 import type { Evolution } from '@shared/evolve';
 import { Meter } from '../../components/charts';
 import { Button, cx, Empty, inputCls } from '../../components/ui';
+import { AgentHoursLine } from './AgentHours';
 import { bestRun, keyMetricOf, runKey, valueOf } from './analysis';
 import { gpuWords, isActive, keyMetrics, leftWords, num, progressOf, statusTone, statusWords, useSeries } from './api';
 import { Sparkline } from './Charts';
 import { LOCALE } from '../../i18n/locale';
 import { nightDay, saidByStatus } from './nightWords';
 import { RunsTable, type RunsSort } from './RunsTable';
-import { agoWords, byCategory, type Entry, EvaluationLine, findEntries, FindBox, fullDate, GpuMeters, lastOf, QueueLine, runsWords } from './Sidebar';
+import { toastError } from '../../lib/store';
+import { markRun } from './marksApi';
+import { standingsOf } from './runList';
+import { activeTone, agoWords, ArchivedExperiments, byCategory, type Entry, EvaluationLine, findEntries, FindBox, fullDate, GpuMeters, lastOf, QueueLine, RunCount, VerdictWord } from './Sidebar';
 
 /** Cards of runs going or waiting shown before "Show all". */
 const FIRST_GOING = 12;
@@ -43,8 +47,9 @@ function GoingCard({ r, title, series, onOpen }: { r: RunRecord; title: string; 
         </div>
       )}
       {waiting && r.why && !saidByStatus(r.why) && (
-        <div translate="no" className="line-clamp-2 text-[12px] text-fg-3">
-          {r.why}
+        <div className="line-clamp-2 text-[12px] text-fg-3">
+          {/* A held run's status says "Waits for you" already. One piece of text, so the rest is translated as a sentence. */}
+          {r.why.replace(/^Waits for you: (.)/, (_, first: string) => first.toUpperCase())}
         </div>
       )}
       {prog && (
@@ -73,8 +78,8 @@ function GoingCard({ r, title, series, onOpen }: { r: RunRecord; title: string; 
 
 /** An experiment: its category, title, description, and how its runs are going and did. */
 function ExperimentCard({ e, onOpen }: { e: Entry & { viaRuns?: number }; onOpen: () => void }) {
-  const metric = useMemo(() => keyMetricOf(e.runs), [e.runs]);
-  const best = useMemo(() => (metric ? bestRun(e.runs, metric, 'best') : undefined), [e.runs, metric]);
+  const metric = useMemo(() => keyMetricOf(e.rows), [e.rows]);
+  const best = useMemo(() => (metric ? bestRun(e.rows, metric, 'best') : undefined), [e.rows, metric]);
   const bestValue = best && metric ? valueOf(best, metric, 'best') : undefined;
   const active = e.going + e.waiting > 0;
   return (
@@ -93,8 +98,10 @@ function ExperimentCard({ e, onOpen }: { e: Entry & { viaRuns?: number }; onOpen
         </div>
       )}
       <div className="mt-auto flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-1.5 text-[12px] text-fg-3">
-        {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
-        <span>{runsWords(e.total)}</span>
+        {active && <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', activeTone(e))} />}
+        <span>
+          <RunCount e={e} />
+        </span>
         {e.going > 0 && (
           <>
             <span>·</span>
@@ -109,6 +116,12 @@ function ExperimentCard({ e, onOpen }: { e: Entry & { viaRuns?: number }; onOpen
         )}
         <span>·</span>
         <span title={fullDate(e.lastAt)}>{agoWords(e.lastAt)}</span>
+        {e.verdict && e.verdict !== 'open' && (
+          <>
+            <span>·</span>
+            <VerdictWord verdict={e.verdict} />
+          </>
+        )}
       </div>
       {/* The best on a line of its own: after the counts it would wrap with a separator left hanging. */}
       {metric && bestValue !== undefined && (
@@ -207,23 +220,39 @@ export function Home({
   const goingShown = allGoing ? now : now.slice(0, FIRST_GOING);
   const series = useSeries(useMemo(() => goingShown.filter((r) => r.status === 'running' || r.status === 'starting'), [goingShown]));
 
-  const found = useMemo(() => findEntries(entries, q), [entries, q]);
+  const listed = useMemo(() => entries.filter((e) => !e.archivedAt), [entries]);
+  const archived = useMemo(() => entries.filter((e) => e.archivedAt), [entries]);
+  const found = useMemo(() => findEntries(listed, q), [listed, q]);
   const cards = useMemo(() => {
     const { blocks, none } = byCategory(found);
     return [...blocks.flatMap((b) => b.items), ...(none ? [none] : [])];
   }, [found]);
 
-  const latest = useMemo(() => [...all].sort((a, b) => lastOf(b) - lastOf(a)), [all]);
+  // The latest runs leave out what was put aside, and fold earlier attempts under the run that took their place.
+  const stand = useMemo(() => {
+    const gone = new Set(archived.map((e) => e.group));
+    return standingsOf([...all].filter((r) => !gone.has(r.group ?? '')).sort((a, b) => lastOf(b) - lastOf(a)));
+  }, [all, archived]);
+  const latest = stand.rows;
+  // The night's runs but those put aside.
+  const nightShown = useMemo(() => {
+    const gone = new Set(archived.map((e) => e.group));
+    const mine = (night?.runs ?? []).filter((r) => !gone.has(r.group ?? ''));
+    const away = new Set(standingsOf(mine).archived);
+    return mine.filter((r) => !away.has(r));
+  }, [night?.runs, archived]);
   const latestShown = useMemo(() => {
     if (!allLatest) return latest.slice(0, FIRST_LATEST);
     const words = findRun.trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (!words.length) return latest;
     return latest.filter((r) => {
-      const t = [r.name, r.command, r.id, r.group ? (titleOf.get(r.group) ?? r.group) : '', r.group, ...(r.tags ?? [])].join('\n').toLowerCase();
+      const t = [r.name, r.note, r.command, r.id, r.group ? (titleOf.get(r.group) ?? r.group) : '', r.group, ...(r.tags ?? [])].join('\n').toLowerCase();
       return words.every((w) => t.includes(w));
     });
   }, [latest, allLatest, findRun, titleOf]);
   const places = useMemo(() => new Set(all.map((r) => placeOf(r).id)), [all, placeOf]);
+
+  const star = (r: RunRecord) => void markRun(r, { starred: !r.starredAt }).catch(toastError);
 
   if (runs && !runs.length) {
     return (
@@ -260,9 +289,10 @@ export function Home({
           </div>
           {!night.runs ? (
             <div className="h-40 animate-pulse rounded-xl border border-line bg-bg-1" aria-hidden />
-          ) : night.runs.length ? (
+          ) : nightShown.length ? (
             <RunsTable
-              runs={night.runs}
+              onStar={star}
+              runs={nightShown}
               columns={NO_COLUMNS}
               experiment={(r) => (r.group ? (titleOf.get(r.group) ?? r.group) : null)}
               summary
@@ -314,9 +344,10 @@ export function Home({
               <ExperimentCard key={e.group} e={e} onOpen={() => onOpenExperiment(e.group)} />
             ))}
           </div>
-        ) : (
+        ) : q.trim() ? (
           <p className="py-4 text-[13px] text-fg-3">No experiment is like that.</p>
-        )}
+        ) : null}
+        {narrow && <ArchivedExperiments entries={archived} onOpen={onOpenExperiment} className="mt-2" />}
       </section>
 
       {!night && (runs === null || all.length > 0) && (
@@ -330,6 +361,8 @@ export function Home({
           ) : (
             <>
               <RunsTable
+                onStar={star}
+                earlier={stand.earlier}
                 runs={latestShown}
                 columns={NO_COLUMNS}
                 experiment={(r) => (r.group ? (titleOf.get(r.group) ?? r.group) : null)}
@@ -344,9 +377,9 @@ export function Home({
                 limit={allLatest ? 50 : FIRST_LATEST}
               />
               {allLatest && !latestShown.length && <p className="py-3 text-[13px] text-fg-3">No run is like that.</p>}
-              {!allLatest && all.length > FIRST_LATEST && (
+              {!allLatest && latest.length > FIRST_LATEST && (
                 <button type="button" onClick={() => setAllLatest(true)} className="mt-2 rounded-lg px-1 py-1 text-[12.5px] text-accent hover:underline">
-                  {`Show all ${all.length} runs`}
+                  {`Show all ${latest.length} runs`}
                 </button>
               )}
               {allLatest && (
@@ -382,6 +415,7 @@ function Top({ runs, queue, q, onQ, onOpenRun }: { runs: RunRecord[]; queue: Que
       <div data-intro="exp-queue" className="space-y-3">
         <QueueLine runs={runs} />
         {queue && queue.gpus.length > 0 && <GpuMeters gpus={queue.gpus} runs={runs} onOpen={(id) => onOpenRun({ id })} className="sm:grid-cols-4" />}
+        <AgentHoursLine queue={queue} />
       </div>
       <FindBox value={q} onChange={onQ} />
     </div>

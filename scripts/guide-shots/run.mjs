@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Browser, sleep } from './cdp.mjs';
-import { awayData, CATALOG, EMAIL, evolveData, makeData, makeFiles, makeImported, makeSessions, overrides, seedApi, wikiData } from './demo.mjs';
+import { awayData, CATALOG, EMAIL, evolveData, makeData, makeFiles, makeImported, makeSessions, overrides, researchData, researchWaiting, seedApi, wikiData } from './demo.mjs';
 import { SHOTS as GUIDE_SHOTS } from './shots.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -196,6 +196,7 @@ async function main() {
   awayData(db, sessions, now);
   wikiData(db, seeded.spaces, now);
   evolveData(db, home, now, seeded.evaluationId);
+  researchData(db, home, now, seeded.evaluationId);
   db.close();
   // The sessions once the app has read their transcripts.
   const keys = [...Object.values(sessions), ...Object.values(imported)].map((s) => s.key);
@@ -234,7 +235,7 @@ async function main() {
       const fake = overrides(sessions, Date.now(), shot.goal, shot.jobs);
       await p.initScript(pageScript(theme, fake.live, !!fake.jobs));
       if (LIST?.desktop && !shot.phone) await p.initScript(DESKTOP);
-      await route(p, api, fake);
+      await route(p, api, fake, sessions);
       const file = path.join(o.out, `${shot.id}${theme === 'light' ? '-light' : ''}.webp`);
       try {
         const size = await shot.take(p, { ...ctx, theme, file, go: (u, opts) => p.goto(base + u, opts) });
@@ -265,7 +266,15 @@ async function demoJobs(api, list, project) {
 /** The faked parts: sessions waiting on a card, Claude Code's models, the plans' usage, the inbox (and what waits on you
  * in While you were away), Settings → Models and the models it suggests, Experiments' GPUs, and the jobs in the
  * background of a shot that asks for them. */
-async function route(p, api, fake) {
+async function route(p, api, fake, sessions) {
+  // The Dense retriever's Research tab: the real brief, with what waits for Alex (the server's memory holds that: see researchWaiting).
+  await p.route(/\/api\/projects\/[^/?]+\/research(\?|$)/, async (req) => {
+    if (req.method !== 'GET') return null;
+    const u = new URL(req.url);
+    const real = await api('GET', u.pathname + u.search);
+    const waiting = real.folder?.endsWith('/code/retriever') ? researchWaiting(sessions, real.evaluations?.[0], real.at) : [];
+    return waiting.length ? { json: { ...real, waiting } } : { json: real };
+  });
   await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|goals\/[^/?]+|usage|inbox|away(\?|$)|catalog\/claude|models(\?|$)|models\/picks|experiments\/queue|jobs(\?|\/[^/?]+\/log|$))/, async (req) => {
     if (req.method !== 'GET') return null;
     const u = new URL(req.url);

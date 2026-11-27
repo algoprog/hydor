@@ -16,13 +16,14 @@ import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { agentBaseEnv } from '../env.ts';
+import { refuseAtCeiling } from './budget.ts';
 import type { Deps } from '../features/types.ts';
 import { git } from '../git.ts';
 import { repoRoot } from '../memory/store.ts';
 import { captureGit, localShell } from './capture.ts';
 import { parseLine } from './metrics.ts';
 import { cleanJob, depsOf, ended, stopRun, submit, tellRuns, tick } from './queue.ts';
-import { deleteInfo, deleteRun, getRun, isScoringRun, newId, RUNS_ROOT, tables, updateRun, type RunInfo } from './records.ts';
+import { deleteInfo, deleteRun, getRun, isScoringRun, keepRunFiles, newId, RUNS_ROOT, tables, updateRun, type RunInfo } from './records.ts';
 import { mean, std, welch } from './stats.ts';
 import { fillCommand, placeholders } from './sweeps.ts';
 
@@ -1139,6 +1140,12 @@ export interface ScoreAsk {
   /** Its runs wait for the night (a night evolution's scores; nothing else asks for it). */
   when?: 'night';
   by: EvalScore['by'];
+  /** The session its runs' project comes from, when `by` names none (an evolution's, started by an agent). */
+  projectSession?: string;
+  /** An evolution an agent started: its scores' runs count as an agent's. */
+  agent?: boolean;
+  /** An evolution you let run beyond the limit on agents' GPU hours: its runs are not held. */
+  letRun?: boolean;
 }
 
 /** Checks a folder and puts the runs that score it in line, one for each seed. */
@@ -1175,6 +1182,7 @@ export async function startScore(d: Deps, id: string, o: ScoreAsk): Promise<Eval
       specs.push(
         await cleanJob(d.db, {
           command: seed === undefined ? command : fillCommand(command, { seed }),
+          seedTemplate: command,
           cwd: folder,
           name: seed === undefined ? ev.name : `${ev.name} · seed ${seed}`,
           group: evalGroup(ev.id),
@@ -1191,6 +1199,9 @@ export async function startScore(d: Deps, id: string, o: ScoreAsk): Promise<Eval
         }),
       );
     }
+    // An agent's new score does not start at the ceiling on agents' GPU hours. A score of an evolution or a goal
+    // already going is put in line, where its runs are held like any other agent's.
+    if (o.by.who === 'agent' || o.by.who === 'app') for (const spec of specs) refuseAtCeiling(d.db, spec);
     const repo = await captureGit(localShell(folder, agentBaseEnv())).catch(() => ({}) as Awaited<ReturnType<typeof captureGit>>);
     const scoreId = newId('c');
     const info: ScoreInfo = {
@@ -1207,17 +1218,19 @@ export async function startScore(d: Deps, id: string, o: ScoreAsk): Promise<Eval
     };
     d.db.prepare("insert into exp_scores (id, eval, seal, kind, status, info, created_at) values (?, ?, ?, ?, 'waiting', ?, ?)").run(scoreId, ev.id, ev.seal.n, o.kind, JSON.stringify(info), Date.now());
     if (o.kind === 'final') d.db.prepare('update exp_evals set finals = finals + 1 where id = ?').run(ev.id);
-    const startedBy: RunInfo['startedBy'] = o.by.session ? { session: o.by.session } : { page: true };
+    // Whose it is: the session's, the person's, else an agent's (an app's step, an agent through the API, an evolution an agent started).
+    const startedBy: RunInfo['startedBy'] = o.by.session ? { session: o.by.session } : o.by.who === 'you' || (o.by.who === 'evolve' && !o.agent) ? { page: true } : { agent: true, ...(o.agent && o.projectSession ? { for: o.projectSession } : {}) };
     try {
       for (const spec of specs) {
-        const run = await submit(d, spec, { startedBy });
+        // The project is the evaluation's, wherever it is scored (a worktree, an evolution's copy).
+        const run = await submit(d, spec, { startedBy, projectFrom: { session: o.by.session ?? o.projectSession, folder: ev.cwd }, ...(o.by.who === 'evolve' ? { evolution: o.by.evolution, letRun: o.letRun } : {}) });
         info.runs.push(run.id);
         // Kept at once: the queue looks for the score as each run starts.
         saveScore(d.db, scoreId, 'waiting', info);
       }
     } catch (e) {
       saveScore(d.db, scoreId, 'failed', { ...info, starting: false, why: `It could not be started: ${(e as Error).message}` }, Date.now());
-      for (const run of info.runs) await stopRun(d, run, 'Its score could not be started').catch(() => {});
+      for (const run of info.runs) await stopRun(d, run, 'Its score could not be started', { app: true }).catch(() => {});
       throw e;
     }
     info.starting = false;
@@ -1305,7 +1318,7 @@ export async function resumeScores(d: Deps): Promise<void> {
     const info = infoOf(row);
     if (info.starting) {
       saveScore(d.db, row.id, 'failed', { ...info, starting: false, why: STOPPED_WHILE_STARTING }, Date.now());
-      for (const run of info.runs) await stopRun(d, run, 'Its score was not started in full').catch(() => {});
+      for (const run of info.runs) await stopRun(d, run, 'Its score was not started in full', { app: true }).catch(() => {});
       tell(d, [row.eval]);
     } else await settle(d, row.id).catch((e) => console.error(`[experiments] score ${row.id}:`, (e as Error)?.message ?? e));
   }
@@ -1340,6 +1353,12 @@ export async function stopScore(d: Deps, id: string): Promise<EvalScore> {
   return getScore(d.db, id)!;
 }
 
+/** Every run of an evaluation's scores (what removing it deletes). */
+export const runsOfEvaluation = (db: DB, id: string): string[] => {
+  tables(db);
+  return scoreRows(db, id).flatMap((r) => infoOf(r).runs);
+};
+
 function dropRuns(d: Deps, runs: string[]) {
   for (const run of runs) deleteRun(d.db, run);
   tellRuns(d, runs);
@@ -1358,20 +1377,24 @@ export function setBaseline(d: Deps, id: string, score: string): Evaluation {
   return mustEvaluation(d.db, id);
 }
 
-export function deleteScore(d: Deps, id: string): void {
+/** `keepFiles`: what its runs wrote into their own folders is moved aside first; where, when anything was. */
+export function deleteScore(d: Deps, id: string, o: { keepFiles?: boolean } = {}): string | undefined {
   const r = scoreRow(d.db, id);
   if (!r) throw new HttpError(404, 'There is no such score');
   const info = infoOf(r);
   if (isOpen(r.status) || info.runs.some((run) => ACTIVE.includes(getRun(d.db, run)?.status ?? 'done'))) throw new HttpError(409, 'It has not ended: stop it first');
+  const kept = o.keepFiles ? keepRunFiles(info.runs) : undefined;
   d.db.prepare('delete from exp_scores where id = ?').run(id);
   d.db.prepare('update exp_evals set baseline = null where baseline = ?').run(id);
   dropRuns(d, info.runs);
   tell(d, [r.eval]);
+  return kept;
 }
 
 /** Removes an evaluation: its runs still going are stopped, then its scores, their runs' records and its copies go. */
-export async function removeEvaluation(d: Deps, id: string): Promise<void> {
+export async function removeEvaluation(d: Deps, id: string, o: { keepFiles?: boolean } = {}): Promise<string | undefined> {
   mustEvaluation(d.db, id);
+  let kept: string | undefined;
   await locked(id, async () => {
     const runs = scoreRows(d.db, id).flatMap((r) => infoOf(r).runs);
     const going = () => runs.filter((run) => ACTIVE.includes(getRun(d.db, run)?.status ?? 'done'));
@@ -1382,6 +1405,7 @@ export async function removeEvaluation(d: Deps, id: string): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
     if (going().length) throw new HttpError(409, 'Its runs are still stopping: try again in a moment');
+    if (o.keepFiles) kept = keepRunFiles(runs);
     d.db.transaction(() => {
       d.db.prepare('delete from exp_scores where eval = ?').run(id);
       d.db.prepare('delete from exp_eval_files where eval = ?').run(id);
@@ -1393,6 +1417,7 @@ export async function removeEvaluation(d: Deps, id: string): Promise<void> {
     if (path.dirname(dir) === EVALS_ROOT) fs.rmSync(dir, { recursive: true, force: true });
     tell(d, [id]);
   });
+  return kept;
 }
 
 // ---- every run's mark ------------------------------------------------------------------------------------------
@@ -1407,9 +1432,42 @@ const mark = (ev: Evaluation, changed: SealChange[]): NonNullable<RunRecord['sea
   ...(changed.length ? { changed: changed.slice(0, 10).map((c) => c.path) } : {}),
 });
 
-async function markPlain(d: Deps, r: RunRecord) {
+/** A run that runs from a copy of its code: the repository's top and the copy's. */
+type FromCopy = { top: string; copy: string };
+
+/** Whether a path of the copy is reached through a link of it into the original: what is there is the original's. */
+function throughLinkTo(root: string, rel: string, top: string): boolean {
+  const parts = rel.split('/');
+  return parts.some((_, i) => {
+    const at = path.join(root, ...parts.slice(0, i + 1));
+    try {
+      if (!fs.lstatSync(at).isSymbolicLink()) return false;
+      const to = fs.readlinkSync(at);
+      return to === top || to.startsWith(`${top}/`);
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * What differs from the seal where the run really runs. In a copy of the code, its code is the copy's, and what the
+ * copy links to (data) is judged where it is.
+ */
+async function changedFor(db: DB, evaluation: Evaluation, root: string, from?: FromCopy): Promise<SealChange[]> {
+  const here = (await compare(db, evaluation, root, { absentOk: true })).changed;
+  const rel = from ? path.relative(from.top, real(root)) : '';
+  if (!from || rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) return here;
+  const copy = path.join(from.copy, rel);
+  if (!isFolder(copy)) return here;
+  const linked = (c: SealChange) => throughLinkTo(copy, c.path, from.top);
+  const there = (await compare(db, evaluation, copy, { absentOk: true })).changed;
+  return [...there.filter((c) => !linked(c)), ...here.filter(linked)];
+}
+
+async function markPlain(d: Deps, r: RunRecord, from?: FromCopy) {
   const sealed = [];
-  for (const { evaluation, root } of await evaluationsFor(d.db, r.cwd)) sealed.push(mark(evaluation, (await compare(d.db, evaluation, root, { absentOk: true })).changed));
+  for (const { evaluation, root } of await evaluationsFor(d.db, r.cwd)) sealed.push(mark(evaluation, await changedFor(d.db, evaluation, root, from)));
   if (!sealed.length) return;
   updateRun(d.db, r.id, { info: { sealed } });
   tellRuns(d, [r.id]);
@@ -1420,7 +1478,7 @@ async function markPlain(d: Deps, r: RunRecord) {
  * differ (this throws). Any other run in an evaluation's folder is marked with whether they are as sealed; that
  * never fails the run, and costs nothing when there are no evaluations.
  */
-export async function stampRun(d: Deps, r: RunRecord): Promise<void> {
+export async function stampRun(d: Deps, r: RunRecord, from?: FromCopy): Promise<void> {
   tables(d.db);
   const own = isScoringRun(r) ? scoreOfRun(d.db, r.id) : undefined;
   if (own) {
@@ -1437,7 +1495,7 @@ export async function stampRun(d: Deps, r: RunRecord): Promise<void> {
     return;
   }
   if (!d.db.prepare('select 1 from exp_evals limit 1').get()) return;
-  const work = markPlain(d, r).catch((e) => console.error(`[experiments] ${r.id}: its evaluation could not be checked:`, (e as Error)?.message ?? e));
+  const work = markPlain(d, r, from).catch((e) => console.error(`[experiments] ${r.id}: its evaluation could not be checked:`, (e as Error)?.message ?? e));
   let timer: NodeJS.Timeout | undefined;
   await Promise.race([work, new Promise<void>((resolve) => (timer = setTimeout(resolve, STAMP_WAIT_MS)))]);
   clearTimeout(timer);

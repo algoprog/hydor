@@ -3,6 +3,7 @@
 // points of the chart. No React here: evolveWords-test.ts checks it. Sentences are plain template strings, which the
 // page's translator takes whole.
 import type { Candidate, Evolution } from '@shared/evolve';
+import { HELD_WHY } from '@shared/experiments';
 import type { Evaluation } from '@shared/evaluations';
 import { LOCALE } from '../../i18n/locale';
 import { num, took } from './api';
@@ -76,8 +77,11 @@ export function gainStanding(gain: number | undefined, start?: number): Standing
   return gain > 0 ? { tone: 'better', long: `${by} better than the start`, short: `${by} better` } : { tone: 'worse', long: `${by} worse than the start`, short: `${by} worse` };
 }
 
-/** A night evolution holding still by day: the words a night run waits with, else null. */
-export const waitsWords = (e: Pick<Evolution, 'status' | 'waits'>): string | null => (e.waits && isGoing(e) ? nightStatusPlain(e.waits) : null);
+/** Every score it waits for is held at the limit on agents' GPU hours: it waits for you. */
+export const heldSearch = (e: Pick<Evolution, 'status' | 'waits'>) => isGoing(e) && !!e.waits?.startsWith(HELD_WHY);
+
+/** A search holding still (held at that limit, or a night evolution by day): the words a run waits with, else null. */
+export const waitsWords = (e: Pick<Evolution, 'status' | 'waits'>): string | null => (heldSearch(e) ? 'Waits for you' : e.waits && isGoing(e) ? nightStatusPlain(e.waits) : null);
 
 /** Its row on the evaluation's page: its state, and for one that is done, what came of it. */
 export function rowWords(e: Evolution & { bestGain?: number }): { text: string; standing: Standing | null } {

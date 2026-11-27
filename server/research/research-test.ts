@@ -43,7 +43,7 @@ const deps = {
   sessions: { summary: (k: string) => ({ key: k, live: status.has(k) ? { status: status.get(k) } : null }) as unknown as SessionSummary },
   toSubscribers: (_k: string, e: unknown) => void told.push(e),
   broadcast: () => {},
-  app: { get: () => {} },
+  app: { get: () => {}, post: () => {} },
 } as unknown as Deps;
 // Stand-ins for the tools research keeps count of.
 const fakeTools: Feature = {

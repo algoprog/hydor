@@ -42,6 +42,8 @@ interface Pattern {
   /** How many letters, and words, its fixed text has. */
   fixed: number;
   words: number;
+  /** It holds a time of day (CLOCK). */
+  clock: boolean;
   /** Values that are an English plural's ending ("time{1}"): "s", "es" or nothing, or, when the translation keeps them, a value from a space or a mark on. */
   endings: Set<number>;
   /** Values with no word beside them on a side (at an end, or after a mere space or dot), which could take in anything. */
@@ -61,6 +63,18 @@ const PHRASE_LETTERS = 30;
 
 /** The fixed letters a pattern needs to be taken for a sentence of a text of several ("{0} stopped holding"): not "into your {0}". */
 const SENTENCE_LETTERS = 12;
+
+/** A day of a month ("{0} December"): its value is the day's number, so no sentence that ends in a month is taken for one. */
+const DAY_OF_MONTH = /^\{0\} (?:January|February|March|April|May|June|July|August|September|October|November|December)$/;
+
+/**
+ * A time of day written as two values ("About {0}:{1}"): digits only, and a sentence of a text however few its words
+ * (why a run waits ends with one).
+ */
+const CLOCK = /(?:^|\s)\{0\}:\{1\}(?=$|[\s,])/;
+
+/** Letters and marks of Chinese and Japanese writing: a translation with them ends its sentences with "。". */
+const WIDE = /[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/;
 
 /** Where one sentence ends and the next begins: a full stop, "!" or "?", a space, and a capital (or an opening quote). */
 const SENTENCE_END = /[.!?]\s+[A-Z“‘]/;
@@ -97,7 +111,9 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
       const before = /[A-Za-z]$/.test(parts[i - 1] ?? '');
       return after && before ? '([^A-Za-z](?:.*?[^A-Za-z])?)' : after ? '(.*?[^A-Za-z])' : before ? '([^A-Za-z].*?)' : null;
     };
-    const body = parts.map((p, i) => (isValue(p) ? (endings.has(num(p)) ? ending(p) : (glued(i) ?? (p === last ? '(.*?)' : '(.+?)'))) : esc(p))).join('');
+    const day = DAY_OF_MONTH.test(k);
+    const clock = CLOCK.test(k);
+    const body = parts.map((p, i) => (isValue(p) ? (day || (clock && num(p) === 0) ? '(\\d{1,2})' : clock && num(p) === 1 ? '(\\d{2})' : endings.has(num(p)) ? ending(p) : (glued(i) ?? (p === last ? '(.*?)' : '(.+?)'))) : esc(p))).join('');
     const re = new RegExp(`^${cased(k[0]) ? `[${k[0].toLowerCase()}${k[0].toUpperCase()}]${body.slice(1)}` : body}$`, 's');
     const text = parts.filter((p) => !isValue(p));
     const longest = [...text].sort((a, b) => b.length - a.length)[0]?.trim() ?? '';
@@ -114,6 +130,7 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
       needle: anyCase ? longest.toLowerCase() : longest,
       anyCase,
       fixed: text.join('').replace(/[^A-Za-z]/g, '').length,
+      clock,
       words: words(text.join(' ')),
       endings,
       loose,
@@ -161,6 +178,22 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
     return out.every((x) => x != null) ? out.join(', ') : null;
   };
 
+  /**
+   * Clauses a value joins with "; " ("the most free now is 11 GB, on GPU 0; your other runs hold GPU 1", why a run waits):
+   * each translated by an entry or a sure pattern of its own, and only when every one is.
+   */
+  const clauses = (t: string, depth: number): string | null => {
+    const items = t.split('; ');
+    if (depth >= 2 || items.length < 2) return null;
+    const out: string[] = [];
+    for (const x of items) {
+      const hit = scored(x, depth + 1);
+      if (!hit || hit[1] < SENTENCE_LETTERS) return null;
+      out.push(hit[0]);
+    }
+    return out.join(/[\u3000-\u9fff]/.test(out.join('')) ? '；' : '; ');
+  };
+
   /** A value in a sentence: itself when it is one of the app's phrases or a list of them, or one with a number in it ("3m ago"). */
   const value = (v: string, depth: number) => {
     const t = v.trim();
@@ -171,7 +204,7 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
       const hit = scored(t, depth + 1);
       return hit && hit[1] >= PHRASE_LETTERS ? hit[0] : null;
     };
-    const known = appWord(t) ?? list(t) ?? (depth < 2 && /\d/.test(t) && !TECHNICAL.test(t) ? match(t, depth + 1) : null) ?? phrase();
+    const known = appWord(t) ?? list(t) ?? clauses(t, depth) ?? (depth < 2 && /\d/.test(t) && !TECHNICAL.test(t) ? match(t, depth + 1) : null) ?? phrase();
     return known == null ? v : `${/^\s*/.exec(v)![0]}${known}${/\s*$/.exec(v)![0]}`;
   };
 
@@ -184,9 +217,9 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
    * not "{0}, checked {1}"), then the one whose loose values take the least of the string ("in 2 h 28 min" is
    * "in {0} h{1}", not "{0} min").
    */
-  function scored(t: string, depth = 0): [string, number, boolean] | null {
+  function scored(t: string, depth = 0): [string, number, boolean, boolean, boolean] | null {
     const hit = exact.get(t);
-    if (hit != null) return [hit, Infinity, false];
+    if (hit != null) return [hit, Infinity, false, false, WIDE.test(hit)];
     let best: { p: Pattern; m: RegExpExecArray; slack: number } | null = null;
     const small = t.toLowerCase();
     for (const p of patterns) {
@@ -195,7 +228,12 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
       const m = p.re.exec(t);
       if (!m || !fits(p, m)) continue;
       const slack = p.loose.reduce((n, i) => n + (m[i + 1]?.length ?? 0), 0);
-      if (!best || p.loose.length < best.p.loose.length || (p.loose.length === best.p.loose.length && slack < best.slack)) best = { p, m, slack };
+      // Of two as sure ("Round {0}" and "round {0}"), the one written with the string's own first letter: lowering a
+      // translation for the other would lower a German noun ("runde").
+      const tie = !!best && p.loose.length === best.p.loose.length;
+      // As much fixed text and a time of day written as one (CLOCK) is the surer: it matched digits ("hacia las 14:20").
+      const surer = !!best && (p.clock !== best.p.clock ? p.clock : p.loose.length < best.p.loose.length || (tie && slack < best.slack) || (tie && slack === best.slack && p.key[0] === t[0] && best.p.key[0] !== t[0]));
+      if (!best || surer) best = { p, m, slack };
     }
     if (!best) return null;
     const { p, m } = best;
@@ -205,7 +243,10 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
     });
     // Whether a value took in the end of a sentence and the next one: see `line`.
     const spans = [...m].slice(1).some((v) => SENTENCE_END.test(v ?? ''));
-    return [cased(p.key[0]) && t[0] !== p.key[0] ? recase(out, t) : out, p.fixed, spans];
+    // Whether a value at the pattern's end took in the full stop after it: see `sentences`.
+    const tookStop = p.key.endsWith('}') && t.endsWith('.');
+    const sureness = p.clock ? Math.max(p.fixed, SENTENCE_LETTERS) : p.fixed;
+    return [cased(p.key[0]) && t[0] !== p.key[0] ? recase(out, t) : out, sureness, spans, tookStop, WIDE.test(p.to)];
   }
 
   /** Pieces translated one by one, joined again: lines, or facts joined by " · "; null when none is. */
@@ -227,22 +268,33 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
    * full stop (the parts of a round's reason are joined with ". ") is found without it, and its stop put back.
    */
   const sentences = (t: string): string | null => {
-    const parts = t.split(SENTENCE_SPLIT);
+    // A quoted line (what a program said, kept as it wrote it) is one piece, whatever full stops it has.
+    const parts: string[] = [];
+    for (const x of t.split(SENTENCE_SPLIT)) {
+      const last = parts.at(-1);
+      if (last !== undefined && last.split('“').length > last.split('”').length) parts[parts.length - 1] = `${last} ${x}`;
+      else parts.push(x);
+    }
     if (parts.length < 2 && !t.endsWith('.')) return null;
     const out: string[] = [];
     // A sentence counts when it is a whole entry or a pattern with enough fixed words of its own: no weak pattern ("into
     // your {0}") takes a piece of a sentence, which would leave the rest of it in English.
-    const sure = (x: string) => {
-      const r = scored(x);
-      return r && r[1] >= SENTENCE_LETTERS ? r[0] : null;
+    const sure = (r: ReturnType<typeof scored>) => (r && r[1] >= SENTENCE_LETTERS ? r[0] : null);
+    // A sentence found without its full stop, which goes back at the end of the translation, after a closing bracket or
+    // quote too, unless it has one inside it: CJK writes its own ("。", also after a name or a number), the others keep
+    // the one the text had.
+    const stopped = (x: string) => {
+      const r = scored(x.slice(0, -1));
+      const bare = sure(r);
+      return bare == null ? null : /(?:[.。!！?？…:：]|[.。!！?？…][)）”“」』"»])$/.test(bare) ? bare : `${bare}${r![4] ? '。' : '.'}`;
     };
     for (const x of parts) {
-      let hit = sure(x);
-      if (hit == null && x.endsWith('.')) {
-        const bare = sure(x.slice(0, -1));
-        // CJK writes its own full stop; the others keep the one the text had.
-        hit = bare == null ? null : /[.。!！?？…:：)）”」]$/.test(bare) ? bare : `${bare}${/[\u3000-\u9fff]$/.test(bare) ? '。' : '.'}`;
-      }
+      const whole = scored(x);
+      const ends = x.endsWith('.');
+      // A pattern that ends with a value would carry the full stop to wherever its translation puts that value
+      // ("… waited 2 h." as "… schon 2 h. wartet"): without the stop first then, when that puts it back at the end.
+      const early = ends && whole?.[3] ? stopped(x) : null;
+      const hit = (early && /[.。]$/.test(early) ? early : null) ?? sure(whole) ?? (ends ? stopped(x) : null);
       if (hit == null) return null;
       out.push(hit);
     }

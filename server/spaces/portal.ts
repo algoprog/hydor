@@ -42,7 +42,7 @@ import type { Space } from '../../shared/spaces.ts';
 import type { NotifyEvent, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { clientAddress, HttpError, linkPause, wrongLink } from '../auth.ts';
 import type { DB } from '../db.ts';
-import { listRuns } from '../experiments/records.ts';
+import { awayIds, listRuns } from '../experiments/records.ts';
 import type { Deps } from '../features/types.ts';
 import { guestItem } from '../guests.ts';
 import { previewItem } from '../history/common.ts';
@@ -183,11 +183,14 @@ function projectSessions(d: Deps, space: string): PortalSession[] {
   return out;
 }
 
-/** The project's experiments: what they were and how they went; never their commands, folders, logs or machines. */
+/** The project's experiments: what they were and how they went; never their commands, folders, logs or machines. Archived ones are left out. */
 function projectRuns(db: DB, space: string): PortalRun[] {
   try {
-    return listRuns(db, { project: space, limit: 200 })
-      .filter((r) => r.project === space)
+    // Not the runs that score evaluations: they are not experiments, and a final test is its owner's alone to read.
+    const away = awayIds(db);
+    return listRuns(db, { project: space, plain: true, limit: 5000 })
+      .filter((r) => r.project === space && !away.has(r.id))
+      .slice(0, 200)
       .map((r) => ({
         id: r.id,
         ...(r.name ? { name: r.name } : {}),

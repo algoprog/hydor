@@ -9,7 +9,7 @@
 // leaves the project), and so is the folder its Files show; in the window they change in place. It shows at once from
 // the projects the app knows, and fills in what it fetches.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Bot, Boxes, Brain, Check, ChevronRight, FolderOpen, LayoutDashboard, MessagesSquare, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserRound, X } from 'lucide-react';
+import { Bot, Boxes, Brain, Check, ChevronRight, FlaskConical, FolderOpen, LayoutDashboard, MessagesSquare, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserRound, X } from 'lucide-react';
 import type { SessionSummary } from '@shared/types';
 import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type Space, type SpaceView } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
@@ -18,7 +18,7 @@ import { api, enc, patch } from '../../lib/api';
 import { tildify, timeAgo } from '../../lib/format';
 import { closeProject, go, openProject, openSession, projectHref, type ProjectPart, type ProjectTab } from '../../lib/nav';
 import { toastError, useApp, useSessions } from '../../lib/store';
-import { tr } from '../../i18n/runtime';
+import { tr, trIn } from '../../i18n/runtime';
 import { AgentsBoard } from '../assistants/AgentsBoard';
 import { AssistantIcon } from '../assistants/icons';
 import { useAssistantsState } from '../assistants/state';
@@ -37,6 +37,8 @@ import { DEFAULT_WIKI_DOCUMENTS } from '@shared/wiki';
 import { DocumentLimit } from '../wiki/DocumentLimit';
 import { useSpaceMemory, useWikiSettings, type SpaceMemory } from '../wiki/spaceMemory';
 import { ProjectMemory } from './memory/ProjectMemory';
+import { ResearchTab } from '../research/ResearchTab';
+import { useFeatureEvent } from '../../lib/featureEvents';
 import { loadSpaces, useSpaces } from './state';
 
 export type SpaceTab = ProjectTab;
@@ -145,6 +147,8 @@ function Top({ s, view, tab, onTab, memory, page }: { s: Space; view?: SpaceView
             { value: 'overview', label: 'Overview', icon: <LayoutDashboard size={15} /> },
             { value: 'files', label: 'Files', icon: <FolderOpen size={15} /> },
             { value: 'memory', label: 'Memory', count: wide ? memoryTotal(memory, view) : undefined, icon: <Brain size={15} /> },
+            // Only a project with research in it (runs in its folder, a finding, an evaluation) has this tab.
+            ...(view?.research || tab === 'research' ? [{ value: 'research' as const, label: trIn('research', 'Research'), icon: <FlaskConical size={15} /> }] : []),
             { value: 'skills', label: 'Skills', count: wide ? view?.skills : undefined, icon: <Sparkles size={15} /> },
             { value: 'agents', label: 'Agents', icon: <Bot size={15} /> },
             { value: 'settings', label: 'Settings', icon: <Settings size={15} /> },
@@ -596,11 +600,13 @@ function Bare({ page, children }: { page?: boolean; children: ReactNode }) {
  * The project's details: its header and tabs, and the tab that is open (`tab`, `part`, `share` and `dir` are what its
  * address or its window asked for). `page`: its own page in the workspace, not the window.
  */
-export function SpacePage({ id, tab: first, part: firstPart, share, dir, req, page }: { id: string; tab: SpaceTab; part?: MemoryPart; share?: boolean; dir?: string; req?: number; page?: boolean }) {
+export function SpacePage({ id, tab: first, part: firstPart, share, dir, note: firstNote, req, page }: { id: string; tab: SpaceTab; part?: MemoryPart; share?: boolean; dir?: string; note?: number; req?: number; page?: boolean }) {
   const spaces = useSpaces();
   const view = spaces?.find((x) => x.id === id);
   const [tab, setTab] = useState<SpaceTab>(first);
   const [part, setPart] = useState<MemoryPart>(firstPart ?? 'all');
+  // A finding to show open in Memory: the Research tab's, or the one asked for.
+  const [note, setNote] = useState<number | undefined>(firstNote);
   // Asked again for a tab while the window is open (its Files from a message's Show, say): that tab shows.
   const asked = useRef(req);
   useEffect(() => {
@@ -609,7 +615,8 @@ export function SpacePage({ id, tab: first, part: firstPart, share, dir, req, pa
     setTab(first);
     // The Memory tab opens on the chip asked for, else All.
     setPart(firstPart ?? 'all');
-  }, [req, first, firstPart]);
+    setNote(firstNote);
+  }, [req, first, firstPart, firstNote]);
   // Opened to share it (from the search box, the guide or an agent): the Share dialog opens over it, once (on its page,
   // the address then forgets it, so a reload does not ask again).
   const shared = useRef(false);
@@ -619,6 +626,26 @@ export function SpacePage({ id, tab: first, part: firstPart, share, dir, req, pa
     openShareDialog(view);
     if (page) go(projectHref(id, first, { part: firstPart, dir }), true);
   }, [share, !!view]);
+  // A project gets its Research tab as soon as it has research (a run in its folder, a finding, an evaluation): the list
+  // is read again when the page opens and when runs, evaluations or findings change, until it has.
+  const hasResearch = !!view?.research;
+  const looked = useRef<number | null>(null);
+  const lookAgain = () => {
+    if (hasResearch || looked.current) return;
+    looked.current = window.setTimeout(() => {
+      looked.current = null;
+      loadSpaces();
+    }, 1000);
+  };
+  useEffect(() => {
+    lookAgain();
+    return () => {
+      if (looked.current) window.clearTimeout(looked.current);
+      looked.current = null;
+    };
+  }, [id, hasResearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  useFeatureEvent('experiments', lookAgain);
+  useFeatureEvent('memory', lookAgain);
   const [data, setData] = useState<{ space: Space; sessions: string[]; memoryKey?: string } | null>(null);
   const [gone, setGone] = useState(false);
   const memory = useSpaceMemory(id, (data?.space ?? view)?.folder, data?.memoryKey);
@@ -658,9 +685,16 @@ export function SpacePage({ id, tab: first, part: firstPart, share, dir, req, pa
   const saved = (next: Space) => setData((d) => ({ space: next, sessions: d?.sessions ?? [] }));
   const to = (t: SpaceTab) => {
     setTab(t);
-    if (t === 'memory') setPart('all');
+    if (t === 'memory') (setPart('all'), setNote(undefined));
     // On its page the address says which tab is open (in its place, so Back leaves the project rather than stepping through its tabs).
     if (page) go(projectHref(id, t), true);
+  };
+  /** A finding (or all of them) in Memory, from the Research tab. */
+  const showFinding = (n?: number) => {
+    setTab('memory');
+    setPart('findings');
+    setNote(n);
+    if (page) go(projectHref(id, 'memory', { part: 'findings' }), true);
   };
   return (
     <>
@@ -677,14 +711,16 @@ export function SpacePage({ id, tab: first, part: firstPart, share, dir, req, pa
         // scrolls as a whole, edge to edge (it keeps its own margins, so its rows of chips can run to the screen's edges).
         <div className="min-h-0 flex-1 pb-[var(--safe-bottom)]">
           <div className="h-full sm:px-6 sm:pt-4 sm:pb-3">
-            <ProjectMemory s={s} view={view} memory={memory} part={part} onPart={setPart} onTab={to} />
+            <ProjectMemory s={s} view={view} memory={memory} part={part} onPart={setPart} onTab={to} open={note} />
           </div>
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto pb-[var(--safe-bottom)]">
           {/* On a wide page its cards keep the window's width, in the middle, as the Projects page's do. */}
           <div className="mx-auto max-w-[1120px] px-3 py-5 sm:px-6 sm:py-6">
-            {tab === 'skills' ? (
+            {tab === 'research' ? (
+              <ResearchTab s={s} onFinding={showFinding} />
+            ) : tab === 'skills' ? (
               <SpaceSkillsTab s={s} />
             ) : tab === 'agents' ? (
               <AgentsBoard space={s} />

@@ -61,7 +61,7 @@ export function ProjectDialogHost() {
             </div>
           }
         >
-          <SpacePage key={at.n} id={at.id} tab={at.tab} part={at.part} share={at.share} dir={at.dir} req={at.req} />
+          <SpacePage key={at.n} id={at.id} tab={at.tab} part={at.part} share={at.share} dir={at.dir} note={at.note} req={at.req} />
         </Suspense>
       </div>
     </div>,

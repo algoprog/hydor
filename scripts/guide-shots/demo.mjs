@@ -547,6 +547,8 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     ['darkmode', blog, 6 * DAY, 'Give the blog a dark mode that follows the system setting.', 'Done: the colours follow your system, with a switch in the footer to override it.', 'Dark mode for the blog'],
     ['search', shop, 5 * HOUR, 'Product search is slow with more than 1,000 products. Make it faster.', 'Search now uses an index on the product names: 40 ms instead of 1.2 s for 5,000 products.', 'Faster product search'],
     ['applepay', shop, 2 * DAY, 'Add Apple Pay to the checkout.', 'Apple Pay shows on supported devices, through the payment provider you already use. The tests pass.', 'Apple Pay at checkout'],
+    ['pretrain', path.join(home, 'code/retriever'), 2 * HOUR, 'Pretrain the 88M model for long queries, and tell me when the dev nDCG@10 is past the baseline by 0.02.', 'The run is queued on the full mix. I will report the dev score when it ends.', 'Pretraining for long queries'],
+    ['ablation', path.join(home, 'code/retriever'), 5 * HOUR, 'Run the length-penalty ablation on the 38 M passages that have a query.', 'I need that subset first: it is not on this computer.', 'Length-penalty ablation'],
     ['brief', tasks, 12 * HOUR, 'Morning brief: the weather in Portland, my calendar and the news I follow, in five lines.', 'Cloudy, 8 °C, rain after 4 pm. Two meetings: design review at 10, dentist at 3.', 'Morning brief'],
   ];
   for (const [name, cwd, ago, ask, answer, title] of plain) {
@@ -1077,6 +1079,9 @@ export async function seedApi(api, home, now, s) {
   // categories) once their runs are submitted. The GPUs the page shows are made up (overrides, run.mjs).
   const retriever = path.join(home, 'code/retriever');
   const evaluationId = await retrieverEvaluation(api, home, now, retriever);
+  // The retriever is a project of its own (its Research tab), with the two sessions that work in it (researchData).
+  const retrieverSpace = await space({ name: 'Dense retriever', color: 'blue', description: 'Dense retrieval for long queries', folder: retriever });
+  for (const name of ['pretrain', 'ablation']) if (s[name] && retrieverSpace) await api('PATCH', `/api/sessions/${encodeURIComponent(s[name].key)}/extra`, { space: retrieverSpace });
   // One run's command, for `sh -c`: awk prints a header line, then 40 steps of training curves (deterministic for a
   // seed), then the test scores. `base`, `seed` and `lr` are shell words; a sweep passes `{lr}` and `{batch}` instead.
   const train = (base, seed, lr) =>
@@ -1181,7 +1186,7 @@ export async function seedApi(api, home, now, s) {
 
   // The start page as it opens for someone new: the model on Automatic (the tiers pick it).
   await api('PUT', '/api/start', { agent: 'claude', runs: { claude: { model: 'auto', effort: 'high' } }, assistant: 'general', task: true });
-  return { spaces: { thesis, garden, taxes, shop: shopSpace }, evaluationId };
+  return { spaces: { thesis, garden, taxes, shop: shopSpace, retriever: retrieverSpace }, evaluationId };
 }
 
 /**
@@ -1253,6 +1258,104 @@ export function wikiData(db, spaces, now) {
     ['Split Library use into Library use and services and Funding and governance; moved 3 articles', `areas:${new Date(now - 20 * MIN).toISOString().slice(0, 10)}`, now - 20 * MIN, ['wiki/funding-sources.md', 'wiki/volunteers-and-friends-groups.md', 'wiki/library-boards-and-town-budgets.md'], 0, null],
   ];
   for (const [document, file, at, articles, notes, error] of rows) add.run(spaces.thesis, 'demo', document, file, at, JSON.stringify(articles), notes, error);
+}
+
+// ---- the retriever's Research tab ---------------------------------------------------------------------
+
+/**
+ * What the Dense retriever project's Research tab shows beside its runs, evaluation and evolution: three findings (two
+ * held, one did not) written as the app keeps them, a week of the evaluation's earlier scores, so its chart climbs in steps
+ * (the scores the demo's runs make come at the end of it, now), and what the hard negatives experiment's page shows (attemptsData).
+ * What waits for Alex there (a question, a goal that reached its score,
+ * a goal that needs them) lives in the server's memory, which the demo cannot write into, so `researchWaiting` answers it.
+ */
+export function researchData(db, home, now, evaluation) {
+  const retriever = path.join(home, 'code/retriever');
+  const finding = (at, verdict, statement, learned, evidence) => {
+    const data = { verdict, statement, ...(learned ? { learned } : {}), evidence };
+    const text = `${verdict[0].toUpperCase()}${verdict.slice(1)}: ${statement}${learned ? ` — ${learned}` : ''}`;
+    db.prepare("insert into memory_entries (scope, scope_key, kind, text, status, created_at, updated_at, source, finding) values ('repo', ?, 'finding', ?, 'active', ?, ?, 'agent', ?)").run(retriever, text, at, at, JSON.stringify(data));
+  };
+  finding(now - 7 * HOUR, 'supported', 'Hard negatives from BM25 raise nDCG@10 on long queries', '+0.019 over 3 seeds, on the dev queries.', [{ kind: 'file', ref: 'rank.py' }]);
+  finding(now - 22 * HOUR, 'refuted', 'A cross-encoder over the top 50 is fast enough', '910 ms for a query against a 200 ms budget.', [{ kind: 'file', ref: 'rank.py' }]);
+  finding(now - 3 * DAY, 'supported', 'A gentle length penalty on very long passages helps', 'It kept 0.447 on the dev queries.', [{ kind: 'file', ref: 'rank.py' }]);
+  const seeds = attemptsData(db, home, now);
+  // What the experiment itself showed, with its runs as the evidence (older than the three above).
+  if (seeds.length) finding(now - 4 * DAY, 'supported', 'BM25 hard negatives beat in-batch negatives on the dev queries', 'Higher nDCG@10 in every one of the three seeds.', seeds.map((ref) => ({ kind: 'run', ref })));
+  if (evaluation) {
+    const seal = JSON.parse(db.prepare('select seal from exp_evals where id = ?').get(evaluation)?.seal ?? '{"n":1}').n;
+    // [days ago, mean, what it measured (shown on the chart's steps), failed]
+    const earlier = [
+      [7.6, 0.4035],
+      [7.1, 0.4182, 'BM25 hard negatives'],
+      [6.4, 0.4094],
+      [5.5, 0.4263, 'longer passages'],
+      [5.0, 0.4139, null, true],
+      [4.2, 0.4208],
+      [3.4, 0.4331, 'title boost on the log of BM25'],
+      [2.6, 0.4287],
+      [2.1, 0.4126, null, true],
+      [1.6, 0.4398, 'exact words counted'],
+      [1.0, 0.4474, 'length penalty earlier'],
+      [0.5, 0.4421],
+    ];
+    const put = db.prepare("insert into exp_scores (id, eval, seal, kind, status, info, created_at, ended_at) values (?, ?, ?, 'score', ?, ?, ?, ?)");
+    earlier.forEach(([days, mean, branch, failed], i) => {
+      const values = [mean - 0.0012, mean, mean + 0.0012];
+      const info = { folder: retriever, runs: [], seeds: [1, 2, 3], values: failed ? [] : values, ...(failed ? { why: 'The command failed with exit code 1', printed: [] } : { mean, std: 0.0012 }), ...(branch ? { branch } : {}), by: { who: 'you' } };
+      const at = now - days * DAY;
+      put.run(`demo-earlier-${i}`, evaluation, seal, failed ? 'failed' : 'done', JSON.stringify(info), at, at + 4 * MIN);
+    });
+  }
+}
+
+/**
+ * The hard negatives experiment's history, from over a week ago: the first seed took four attempts (out of memory, a
+ * crash, one stopped by hand), a run put aside, two starred runs and a note an agent wrote. The ids of its three runs.
+ */
+function attemptsData(db, home, now) {
+  const row = db.prepare("select id, spec, info from exp_runs where grp = 'dense-retriever-hardneg' and name = ?");
+  const seeds = [1, 2, 3].map((n) => row.get(`hard negatives · seed ${n}`)).filter(Boolean);
+  if (seeds.length !== 3) return [];
+  const mark = (r, more) => db.prepare('update exp_runs set info = ? where id = ?').run(JSON.stringify({ ...JSON.parse(r.info ?? '{}'), ...more }), r.id);
+  const spec = JSON.parse(seeds[0].spec);
+  const add = db.prepare('insert into exp_runs (id, status, why, name, grp, cwd, place, created_at, started_at, ended_at, spec, info) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const old = (id, status, why, daysAgo, info, job = spec) => {
+    const at = now - daysAgo * DAY;
+    add.run(id, status, why, job.name, job.group, job.cwd, 'local', at, at + 1000, at + 40 * MIN, JSON.stringify(job), JSON.stringify(info));
+  };
+  const wrong = "KeyError: 'negatives'";
+  old('rdemoatt1', 'failed', 'It ran out of memory on GPU 0: it had reached 23.6 of 24 GB', 11, { exitCode: 1 });
+  old('rdemoatt2', 'failed', 'Its command ended with exit code 1', 10.5, { from: 'rdemoatt1', exitCode: 1, firstError: { line: 12, text: wrong, lines: ['Traceback (most recent call last):', '  File "train.py", line 88, in <module>', wrong], from: 10, offset: 0 } });
+  old('rdemoatt3', 'stopped', 'Stopped by you', 10, { from: 'rdemoatt2' });
+  // Put aside: another learning rate, so another job (no attempt of the others).
+  old('rdemoarch', 'failed', 'Its command ended with exit code 2', 12, { exitCode: 2, archivedAt: now - 9 * DAY }, { ...spec, name: 'hard negatives · a first try', command: `${spec.command} # lr 1e-3` });
+  mark(seeds[0], { from: 'rdemoatt3', starredAt: now - DAY });
+  mark(seeds[1], { note: 'The tokenizer bug was still in this one: do not compare its MRR.', noteBy: 'agent' });
+  mark(seeds[2], { starredAt: now - DAY });
+  return seeds.map((r) => r.id);
+}
+
+/**
+ * What waits for Alex on the Dense retriever's Research tab, as the brief gives it (shared/project-research.ts): a question
+ * with two choices, a goal that reached its score while the evaluation's final test has not run, and a goal that needs them.
+ * `evaluation`: the evaluation the real brief names first.
+ */
+export function researchWaiting(s, evaluation, now) {
+  if (!s.pretrain || !s.ablation) return [];
+  return [
+    {
+      kind: 'ask',
+      id: 'approval:demo-data',
+      at: now - 2 * HOUR,
+      session: { key: s.pretrain.key, title: 'Pretraining for long queries' },
+      title: 'Which training data for the 88M model?',
+      approval: 'demo-data',
+      question: { id: 'q', choices: [{ label: 'Full mix', description: 'about 14 GPU h' }, { label: 'Complement mix', description: '9 GPU h' }] },
+    },
+    ...(evaluation ? [{ kind: 'final', id: `final:${evaluation.id}`, at: now - 9 * HOUR, evaluation: { id: evaluation.id, name: evaluation.name }, goal: { key: s.pretrain.key, title: 'Beat the baseline by 0.02' } }] : []),
+    { kind: 'goal', id: 'goal:ablation', at: now - 40 * MIN, session: { key: s.ablation.key, title: 'Length-penalty ablation' }, status: 'needs-you', title: 'Keep the gain on queries over 12 words', reason: 'It needs the 38 M passages that have a query: that subset is not on this computer.' },
+  ];
 }
 
 // ---- a goal at work (the Goals picture) ----------------------------------------------------------------
@@ -2206,4 +2309,99 @@ export async function blogSessions(ctx) {
   }
   for (const x of Object.values(out)) await api('PATCH', `/api/sessions/${encodeURIComponent(x.key)}/extra`, { assistant: x.assistant }).catch(() => {});
   return out;
+}
+
+/**
+ * What the blog post on research with agents shows besides the demo's retriever (its project, its evaluation, its
+ * evolution and its experiments, made by seedApi, evolveData and researchData): five findings in place of the three of
+ * researchData, two of them recent enough to be among the Research tab's news, with their evidence in the runs and scores
+ * the demo made. Only that post's shots call it, so the guide's pictures show what they did. It waits for the
+ * experiments' runs and the evaluation's scores to end, then writes the findings straight into the database (no agent
+ * runs here). Returns { researchProject, evaluation, evolution }.
+ */
+export async function blogResearch(ctx) {
+  const { home, db, api } = ctx;
+  const retriever = path.join(home, 'code/retriever');
+  const ids = (await api('GET', '/api/experiments/evaluations')).evaluations ?? [];
+  const evaluation = ids.find((e) => e.cwd === retriever)?.id ?? ids[0]?.id;
+  const pause = () => new Promise((r) => setTimeout(r, 500));
+  for (let i = 0; i < 240 && (await api('GET', '/api/experiments/runs?status=queued,waiting,starting,running&limit=100')).runs.length; i++) await pause();
+  // The scores the demo's own runs make: not the week of earlier ones researchData writes, which are there from the start.
+  const ended = async () => ((await api('GET', `/api/experiments/evaluations/${evaluation}`)).scores ?? []).filter((s) => (s.status === 'done' || s.status === 'failed') && !s.id.startsWith('demo-earlier-'));
+  let scores = [];
+  for (let i = 0; i < 240; i++) {
+    scores = await ended();
+    if (scores.length >= 4) break;
+    await pause();
+  }
+  // The score the retriever's page leads with is the gain: one more score of the BM25 hard negatives, taken last.
+  {
+    let { score } = await api('POST', `/api/experiments/evaluations/${evaluation}/scores`, { folder: path.join(retriever, '.worktrees', 'bm25-hard-negatives') });
+    for (let i = 0; i < 120 && (score.status === 'waiting' || score.status === 'running'); i++) {
+      await pause();
+      ({ score } = await api('GET', `/api/experiments/evaluations/scores/${score.id}`));
+    }
+    scores = await ended();
+  }
+  const project = (await api('GET', '/api/projects')).spaces.find((p) => p.name === 'Dense retriever')?.id;
+  const runs = (await api('GET', '/api/experiments/runs?limit=100')).runs ?? [];
+  const run = (group, seed) => runs.find((r) => r.group === group && r.seed === seed);
+  const label = (r, text) => (r ? { kind: 'run', ref: r.id, label: text } : null);
+  const hard = [1, 2, 3].map((s) => label(run('dense-retriever-hardneg', s), `hard negatives · seed ${s}`));
+  const base = [1, 2, 3].map((s) => label(run('dense-retriever-inbatch', s), `in-batch · seed ${s}`));
+  const scoreOf = (branch, text) => {
+    const s = scores.find((x) => String(x.folder ?? x.cwd ?? '').endsWith(branch));
+    return s ? { kind: 'score', ref: `${evaluation}/${s.id}`, label: text } : null;
+  };
+  const commit = String(git(retriever, ['rev-parse', 'main'], home)).trim();
+  const found = [
+    {
+      verdict: 'supported',
+      statement: 'Hard negatives mined with BM25 raise dev nDCG@10 over in-batch negatives alone',
+      learned: '+0.019 over 3 seeds, beyond the noise of the seeds; the gain is in long queries.',
+      evidence: [scoreOf('bm25-hard-negatives', 'bm25-hard-negatives, scored'), hard[0], base[0]],
+      ago: 7 * HOUR,
+    },
+    {
+      verdict: 'unclear',
+      statement: 'Passages of up to 256 tokens beat the 128-token ones',
+      learned: 'The score moved by less than the spread of its 3 seeds, so it says neither way; tried on one training length only.',
+      evidence: [scoreOf('longer-passages', 'longer-passages, scored')],
+      ago: 2 * DAY + 5 * HOUR,
+    },
+    {
+      verdict: 'refuted',
+      statement: 'A curriculum from short to long queries helps the retriever on long queries',
+      learned: 'No gain: the runs sat inside the spread of the seeds, and the dev set has too few long queries to tell.',
+      evidence: [{ kind: 'file', ref: 'train/curriculum.py', label: 'the curriculum' }],
+      ago: 3 * DAY,
+    },
+    {
+      verdict: 'refuted',
+      statement: 'A flat bonus for three or more exact word matches improves the reranking',
+      learned: 'It lowered the score in its try and was dropped; a bonus that grows with the matches, capped, did better.',
+      evidence: [{ kind: 'commit', ref: commit, label: 'the search it came from' }, { kind: 'file', ref: 'rank.py', label: 'rank.py' }],
+      ago: 22 * HOUR,
+    },
+    {
+      verdict: 'open',
+      statement: 'Mining the hard negatives with the model itself, refreshed as it trains, beats mining them with BM25',
+      learned: 'Not tried yet. A paper has done it (ANCE), so the question is whether it pays at this size.',
+      evidence: [{ kind: 'paper', ref: 'https://arxiv.org/abs/2007.00808', label: 'ANCE, Xiong et al.' }],
+      ago: 5 * HOUR,
+    },
+  ];
+  db.prepare("delete from memory_entries where scope = 'repo' and scope_key = ? and kind = 'finding'").run(retriever);
+  const add = db.prepare('insert into memory_entries (scope, scope_key, kind, text, status, created_at, updated_at, session, source, finding) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const hist = db.prepare('insert into memory_history (entry, at, action, before, after, why, session, turn, source) values (?, ?, ?, null, ?, null, null, null, ?)');
+  const now = Date.now();
+  for (const f of found) {
+    const { ago, ...data } = f;
+    data.evidence = data.evidence.filter(Boolean);
+    const text = `${{ supported: 'Supported', refuted: 'Refuted', unclear: 'Unclear', open: 'Open' }[data.verdict]}: ${data.statement} — ${data.learned}`;
+    const at = now - ago;
+    const r = add.run('repo', retriever, 'finding', text, 'active', at, at, null, 'agent', JSON.stringify(data));
+    hist.run(Number(r.lastInsertRowid), at, 'added', text, 'agent');
+  }
+  return { researchProject: project, evaluation, evolution: EVOLUTION };
 }

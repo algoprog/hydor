@@ -109,7 +109,7 @@ function QueueRow({ s, m, n, sent, onEdit }: { s: SessionSummary; m: QueuedMessa
               <span className="inline-flex items-center gap-1.5">
                 <FlaskConical size={13} className="shrink-0 text-accent" />
                 <span>
-                  <ExperimentNoticeLabel />
+                  <ExperimentNoticeLabel wrong={notice.wrong} />
                 </span>
               </span>
             ) : reply ? (

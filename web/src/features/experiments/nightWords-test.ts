@@ -12,9 +12,14 @@ assert.equal(hoursWords(hours, 'm:lab'), 'in that machine’s night hours');
 assert.equal(stopNote(hours, 'local'), '', 'let finish: nothing more to say');
 assert.equal(stopNote({ ...hours, nightEnds: 'stop' }, 'local'), 'A run still going at 07:00 is stopped, and starts from the beginning the next night.');
 assert.equal(stopNote({ ...hours, nightEnds: 'stop' }, 'm:lab'), '', 'another machine has its own settings');
+assert.equal(stopNote({ ...hours, nightEnds: 'stop' }, 'local', false), 'A run still going at 07:00 is stopped, and starts from the beginning the next night, unless it says how to carry on.');
+assert.equal(stopNote({ ...hours, nightEnds: 'stop' }, 'local', true), 'A run still going at 07:00 is stopped, and carries on from its checkpoint the next night.');
 
 const plain = 'Waits for the night (from 23:00)';
 const again = 'The night ended: it starts again tonight';
+const carry = 'Stopped at the end of the night: it carries on from its checkpoint tonight';
+assert.equal(nightStatus(carry), 'Waits for the night');
+assert.ok(waitsForNight(carry) && !saidByStatus(carry));
 assert.equal(nightStatus(plain), plain);
 assert.equal(nightStatus(again), 'Waits for the night');
 assert.ok(saidByStatus(plain) && !saidByStatus(again) && !saidByStatus(undefined));

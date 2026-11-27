@@ -1,4 +1,4 @@
-// Make a table: the runs picked (or an experiment's finished runs) as rows, by experiment or by one setting; the
+// Make a table: the runs picked (or an experiment's finished runs) as rows, by experiment, command or setting; the
 // metrics as columns, each with which way is better; the baseline and the test. It shows as you choose; then Copy
 // LaTeX, Copy Markdown, Download CSV, or Put it in a LaTeX document you keep (in place of the table it made
 // before there, else before \end{document}). A table is kept when you copy or place it, so the pre-submission check
@@ -218,7 +218,8 @@ export function TableDialog({ start, onClose }: { start: TableStart | null; onCl
     if (!group || start?.runs || start?.table) return;
     setChosen([]);
     api<{ runs: RunRecord[] }>(`/api/experiments/runs?group=${encodeURIComponent(group)}&status=done&limit=1000`)
-      .then((r) => setGroupRuns(r.runs))
+      // A table of an experiment leaves its archived runs out (server/experiments/records.ts runsOfSpec).
+      .then((r) => setGroupRuns(r.runs.filter((x) => !x.archivedAt)))
       .catch(() => setGroupRuns([]));
   }, [group, start]);
   const pool = start?.runs ?? groupRuns;
@@ -347,6 +348,7 @@ export function TableDialog({ start, onClose }: { start: TableStart | null; onCl
               <span className="mb-1 block text-fg-2">Rows</span>
               <select value={rows} onChange={(e) => setRows(e.target.value)} className={cx(inputCls, 'h-9 text-[13px]')}>
                 <option value="group">A row per experiment</option>
+                <option value="command">A row per command</option>
                 {settings.map((s) => (
                   <option key={s} value={`param:${s}`}>
                     {`A row per value of ${s}`}

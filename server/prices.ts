@@ -9,7 +9,8 @@ import type { DB } from './db.ts';
 import { kvGet, kvSet } from './db.ts';
 import { catalog } from './models/openrouter.ts';
 
-const SOURCE = process.env.PRICES_URL ?? 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
+/** Where the table comes from (read at each fetch; '' for nowhere). */
+const source = () => process.env.PRICES_URL ?? 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 const CACHE = path.join(config.dataDir, 'model-prices.json');
 const DAY = 86400_000;
 
@@ -21,6 +22,8 @@ interface Rate {
 
 let table: Map<string, Rate> | null = null;
 let fetching: Promise<void> | null = null;
+/** A fetch of the table failed since the app started: nothing waits for it again. */
+let unreachable = false;
 const OR_CACHE = path.join(config.dataDir, 'openrouter-prices.json');
 let router: Record<string, ModelPrice> | undefined;
 let routerAt = 0;
@@ -73,8 +76,9 @@ function ensureTable(): Map<string, Rate> {
       return Infinity;
     }
   })();
-  if (SOURCE && age > DAY && !fetching) {
-    fetching = fetch(SOURCE, { signal: AbortSignal.timeout(20_000) })
+  const from = source();
+  if (from && age > DAY && !fetching) {
+    fetching = fetch(from, { signal: AbortSignal.timeout(20_000) })
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const text = await r.text();
@@ -85,6 +89,7 @@ function ensureTable(): Map<string, Rate> {
         }
       })
       .catch(() => {
+        unreachable = true;
         // Offline or blocked: try again in an hour, keep what we have.
         try {
           fs.utimesSync(CACHE, new Date(), new Date(Date.now() - DAY + 3600_000));
@@ -138,6 +143,22 @@ export function rateFor(db: DB, model: string | null | undefined): (ModelPrice &
     if (r) return { input: r.input, output: r.output, cacheRead: r.cacheRead, source: 'table' };
   }
   return null;
+}
+
+/**
+ * Waits for the rates these models need when none have been read yet (the first use on a computer fetches them in the
+ * background), so that a first answer says what a later one would. Offline, it waits for one try only.
+ */
+export async function ratesReady(db: DB, models: (string | null | undefined)[]): Promise<void> {
+  const own = priceOverrides(db);
+  const keys = models
+    .map((m) => String(m ?? '').trim())
+    .filter((m) => !own[m])
+    .map((m) => m.toLowerCase().replace(/\[.*\]$/, ''))
+    .filter((k) => !UNPRICED.has(k));
+  const routed = keys.filter((k) => k.startsWith('openrouter/'));
+  if (routed.some((k) => !router?.[k])) await refreshOpenRouterPrices();
+  if (keys.length > routed.length && !ensureTable().size && !unreachable) await fetching;
 }
 
 /** Dollars for these tokens; null when the model has no known price. */

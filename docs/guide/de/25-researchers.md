@@ -249,7 +249,7 @@ Agenten in deinen Sitzungen beherrschen diese Handwerke ebenfalls, durch Skills,
 
 ## Die Arbeit deines Labors ausführen
 
-Drei fertige Apps unter **Labor** auf der Seite [Apps](/apps) helfen bei der täglichen Arbeit eines Labors: Daten annotieren und ein Modell mit deinen Annotationen prüfen, eine Idee an deinem eigenen Code von den Hypothesen bis zum Bericht testen und die Einstellungen eines Modells optimieren. Der Sprint und der Sweep führen ihre Jobs in [Experimenten](/guide/experiments) aus, deshalb braucht es dafür einen Computer (oder einen Cluster) mit GPUs.
+Drei fertige Apps unter **Labor** auf der Seite [Apps](/apps) helfen bei der täglichen Arbeit eines Labors: Daten annotieren und ein Modell mit deinen Annotationen prüfen, eine Idee an deinem eigenen Code von den Hypothesen bis zum Bericht testen und die Einstellungen eines Modells optimieren. Der Sprint und der Sweep führen ihre Jobs in [Experimenten](/guide/experiments) aus, deshalb braucht es dafür einen Computer (oder einen Cluster) mit GPUs. Im Tab **Forschung** eines Projekts siehst du, was diese Apps und deine anderen Agenten über Nacht gemacht haben, was dich braucht und wie sich der Score entwickelt hat (siehe [Forschung](/guide/projects#research)).
 
 ### Anmerkungs-Workbench
 

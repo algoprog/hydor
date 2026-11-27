@@ -21,6 +21,7 @@ import type { PortalItemView, PortalView, ProjectShare } from '../../shared/shar
 import type { TimelineItem } from '../../shared/types.ts';
 import { Zip } from '../documents/zip.ts';
 import { openDb } from '../db.ts';
+import { insertRun } from '../experiments/records.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { pages } from '../pages/index.ts';
 import { putAsset } from '../pages/assets.ts';
@@ -174,6 +175,13 @@ const ids = view.items.map((x) => x.id).sort();
 ok(JSON.stringify(ids) === JSON.stringify([chapter.id, paper.id, budget.id, tracker.id].sort()), 'its documents alone: not another project’s, not an app’s screen');
 ok(view.sessions.length === 1 && view.sessions[0].key === 'claude:s1', 'its sessions, not Confidential ones or another project’s');
 ok(view.runs.length === 0, 'no runs yet');
+// Its experiments' runs show; the runs that score evaluations (a final test's among them) do not.
+insertRun(db, { id: 'rshare0001', status: 'done', spec: { command: 'x', cwd: tmp, project: thesis.id, name: 'a real run' } });
+insertRun(db, { id: 'rshare0002', status: 'done', spec: { command: 'x', cwd: tmp, project: thesis.id, name: 'a final test', tags: ['evaluation'], env: { HYDOR_EVALUATION: 'e1', HYDOR_EVAL_KIND: 'final' } } });
+const ran = ((await req('GET', M, undefined, from('198.51.100.7'))).json() as PortalView).runs.map((x) => x.name);
+ok(ran.length === 1 && ran[0] === 'a real run', `the project's runs, not its scores: ${ran.join(', ')}`);
+insertRun(db, { id: 'rshare0003', status: 'failed', spec: { command: 'y', cwd: tmp, project: thesis.id, name: 'put aside' }, info: { archivedAt: Date.now() } });
+ok(((await req('GET', M, undefined, from('198.51.100.7'))).json() as PortalView).runs.every((x) => x.name !== 'put aside'), 'nor an archived one');
 ok(view.reading.length === 2 && view.reading.some((p) => p.title === 'Dense Passage Retrieval' && p.link === 'https://doi.org/10.18653/v1/2020.emnlp-main.550' && p.authors === 'Karpukhin, Oguz' && p.year === '2020'), 'the reading list: its papers, linked by DOI');
 ok(view.reading.some((p) => p.title === 'ColBERT' && p.link === 'https://arxiv.org/abs/2004.12832'), 'by arXiv id, and by the project’s id');
 ok(!JSON.stringify(view).includes('private thoughts') && !JSON.stringify(view).includes('/home/owner'), 'never a paper’s notes or files');

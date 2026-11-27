@@ -19,7 +19,7 @@ import type { BackgroundTask, ServerEvent } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT } from '../config.ts';
 import { openDb } from '../db.ts';
-import { insertRun, updateRun } from '../experiments/records.ts';
+import { insertRun, markRun, updateRun } from '../experiments/records.ts';
 import type { Deps, SpawnInfo } from '../features/types.ts';
 import { INTERNAL_HEADER, internalHeaders } from '../internal.ts';
 import { createAccessToken } from '../machines.ts';
@@ -568,6 +568,11 @@ test('runs of Experiments, waiting, running and ended', async () => {
   l = await listed();
   assert.equal(l.ended.find((x) => x.id === 'run:r-one')!.state, 'cancelled');
   assert.equal(l.ended.find((x) => x.id === 'run:r-two')!.state, 'failed');
+  // An archived run leaves Finished, and comes back with it.
+  markRun(db, 'r-two', { archived: true });
+  assert.equal((await listed()).ended.some((x) => x.id === 'run:r-two'), false);
+  markRun(db, 'r-two', { archived: false });
+  assert.equal((await listed()).ended.some((x) => x.id === 'run:r-two'), true);
 });
 
 test('the project a folder is in: the innermost, never the home folder’s or a root’s, nor a group’s', () => {

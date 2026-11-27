@@ -206,6 +206,8 @@ export function sbatchScript(o: { run: Pick<RunRecord, 'id' | 'name' | 'gpus' | 
   if (o.cluster.account) lines.push(`#SBATCH --account=${o.cluster.account}`);
   lines.push('', `# Hydor's run ${r.id}.`);
   if (o.cluster.setup?.trim()) lines.push(o.cluster.setup.trim());
+  // The warning before a stop (scancel --signal=INT --full) reaches the command, and this script waits for it to leave.
+  lines.push("trap ':' INT");
   lines.push(`cd -- ${o.cwd ? rq(o.cwd) : q(o.dir)} || { echo 1 > ${q(`${o.dir}/exit`)}; exit 1; }`);
   for (const [k, v] of Object.entries(o.env)) if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) lines.push(`export ${k}=${q(v)}`);
   lines.push(`bash ${q(`${o.dir}/command.sh`)}`, 'code=$?', `echo $code > ${q(`${o.dir}/exit`)}`, 'exit $code', '');
@@ -218,6 +220,63 @@ export function parseSbatch(out: string): string | null {
   return m ? m[1] : null;
 }
 
+/** A time as SLURM writes it, in the cluster's own zone (`zone` as `date +%z` gives it: "+0100"), in ms; undefined for none ("N/A"). */
+export function slurmTime(text: string | undefined, zone?: string): number | undefined {
+  const t = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/.exec((text ?? '').trim())?.[0];
+  if (!t) return undefined;
+  const z = /^([+-]\d\d)(\d\d)$/.exec((zone ?? '').trim());
+  const at = Date.parse(z ? `${t}${z[1]}:${z[2]}` : t);
+  return Number.isFinite(at) ? at : undefined;
+}
+
+/** The plain words for what a cluster refuses at once, by what its own line says: the first to match. */
+const REFUSALS: [RegExp, string][] = [
+  [/violates accounting|submit limit|MaxSubmit|job limit/i, 'It is over a limit of your account or queue there: wait for one of your jobs to end, or ask for less'],
+  [/node configuration (is )?not available/i, 'No node of the cluster has what it asks for: ask for fewer GPUs, processors or memory, or another partition'],
+  [/invalid partition|partition not (valid|available)/i, 'The cluster has no partition by that name, or you may not use it: check Partition'],
+  [/time limit/i, 'It asks for more time than the cluster allows there: give it fewer hours, or another partition'],
+  [/account|association|qos/i, 'The cluster did not accept the account: check the cluster’s Account in Where runs go'],
+  [/memory/i, 'It asks for more memory than the cluster allows there: ask for less'],
+  [/generic resource|gres|gpu/i, 'The cluster cannot give it those GPUs: check GPUs and Partition'],
+  [/processor|cpu|node count/i, 'It asks for more processors than the cluster allows there: ask for fewer'],
+];
+
+/** A time limit in hours as a reason says it: 4, 2.5, and a minute as 0.017 rather than 0.016666666666666666. */
+export const hoursSaid = (h: number) => String(h >= 1 ? Math.round(h * 100) / 100 : Number(h.toPrecision(2)));
+
+/** What `sbatch --test-only` said (its output, then "@@<exit code>"): why the cluster refuses the job, or when it would start. */
+export function parseTestOnly(out: string): { refused?: string; startsAbout?: number } {
+  const code = /^@@(\d+)\s*$/m.exec(out);
+  // No answer in time (or SSH failed): the job is sent as it is.
+  if (!code) return {};
+  const lines = out
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('@@'));
+  const zone = lines[0] && /^[+-]\d{4}$/.test(lines[0]) ? lines.shift() : undefined;
+  const text = lines.join('\n');
+  if (code[1] === '0') {
+    const at = slurmTime(/to start at (\S+)/.exec(text)?.[1], zone);
+    return at !== undefined ? { startsAbout: at } : {};
+  }
+  // An sbatch without the option, or a cluster that cannot answer just now: that is no refusal.
+  if (/(unrecognized|unknown|invalid) option|socket timed out|unable to contact|connection (refused|timed out)|temporarily unavailable|command not found/i.test(text)) return {};
+  const said = lines.find((l) => REFUSALS.some(([re]) => re.test(l))) ?? lines.find((l) => /error|fail/i.test(l));
+  if (!said) return {};
+  const plain = REFUSALS.find(([re]) => re.test(said))?.[1] ?? 'The cluster did not accept it';
+  return { refused: `${plain}. The cluster said: “${said.slice(0, 300)}”` };
+}
+
+/** The words for --test-only's start: on a real cluster it was days late for jobs that started within seconds, so it is a guess. */
+export const guessWords = (when: string) => `The cluster’s cautious guess to start it is ${when}; it often starts much sooner`;
+
+/** Asks the cluster about a job before it is sent (its script written to the run's folder there), waiting 20 seconds at most. */
+export async function testOnly(host: string, dir: string, script: string): Promise<{ refused?: string; startsAbout?: number }> {
+  const file = q(`${dir}/job.sbatch`);
+  const r = await runSsh(host, `cat > ${file} && { date +%z; sbatch --test-only ${file} 2>&1; echo "@@$?"; }`, { input: script, timeoutMs: 20_000 });
+  return parseTestOnly(r.out);
+}
+
 export interface SlurmState {
   state: string;
   reason?: string;
@@ -225,15 +284,17 @@ export interface SlurmState {
   nodes?: string;
   exitCode?: number;
   signal?: number;
+  /** When it started, or is expected to (squeue's %S). */
+  start?: string;
 }
 
-/** squeue -h -o '%i|%T|%r|%M|%N': each job still in the queue, by id. */
+/** squeue -h -o '%i|%T|%r|%M|%N|%S': each job still in the queue, by id. */
 export function parseSqueue(out: string): Map<string, SlurmState> {
   const m = new Map<string, SlurmState>();
   for (const l of out.split('\n')) {
     const f = l.trim().split('|');
     if (f.length < 2 || !/^\d+/.test(f[0])) continue;
-    m.set(f[0].replace(/_.*$/, ''), { state: f[1], reason: f[2] && f[2] !== 'None' ? f[2] : undefined, elapsed: f[3], nodes: f[4] || undefined });
+    m.set(f[0].replace(/_.*$/, ''), { state: f[1], reason: f[2] && f[2] !== 'None' ? f[2] : undefined, elapsed: f[3], nodes: f[4] || undefined, ...(f[5] && f[5] !== 'N/A' ? { start: f[5] } : {}) });
   }
   return m;
 }
@@ -269,15 +330,26 @@ export function reasonWords(reason?: string): string {
   return hit ? `${hit[1]} (${r})` : r ? `SLURM says: ${r}` : 'in the cluster’s queue';
 }
 
-/** A final SLURM state as a run's status, and why in words. */
-export function endOfSlurm(s: SlurmState): { status: 'done' | 'failed' | 'stopped'; why?: string } {
+/** sacct's job line, as parseSacct reads it, said out of memory when one of its steps was (the job's own line may only say FAILED). */
+export function sacctState(out: string): SlurmState | null {
+  const s = parseSacct(out);
+  return s && /^(FAILED|CANCELLED)/i.test(s.state) && /^\s*OUT_OF_ME/m.test(out) ? { ...s, state: 'OUT_OF_MEMORY' } : s;
+}
+
+/** The endings that say more than the command's exit code does. */
+export const slurmTells = (state: string) => /^(TIMEOUT|OUT_OF_MEMORY|PREEMPTED|NODE_FAIL|CANCELLED|DEADLINE)/i.test(state);
+
+/** A final SLURM state as a run's status, and why in words, with what to do about it (`r`: what the run asked for). */
+export function endOfSlurm(s: SlurmState, r: Pick<RunRecord, 'hours' | 'memGb' | 'resume'> = {}): { status: 'done' | 'failed' | 'stopped'; why?: string; preempted?: boolean } {
   const st = s.state.toUpperCase();
   if (st === 'COMPLETED' && !s.exitCode) return { status: 'done' };
-  if (st.startsWith('CANCELLED')) return { status: 'stopped', why: 'It was cancelled in the cluster’s queue' };
-  if (st === 'TIMEOUT') return { status: 'failed', why: 'It ran out of the time it asked for (hours)' };
-  if (st === 'OUT_OF_MEMORY') return { status: 'failed', why: 'It ran out of memory (the cluster stopped it): ask for more with memGb' };
+  if (st.startsWith('CANCELLED')) return { status: 'stopped', why: 'It was cancelled in the cluster’s queue: if that was not you, ask who runs the cluster, then run it again' };
+  const more = r.resume ? 'give it more hours, or run it again to carry on from its checkpoint' : 'give it more hours, or a way to carry on';
+  if (st === 'TIMEOUT' || st === 'DEADLINE') return { status: 'failed', why: `It reached the cluster’s time limit${r.hours ? ` of ${hoursSaid(r.hours)} h` : ''}: ${more}` };
+  if (st === 'OUT_OF_MEMORY')
+    return { status: 'failed', why: `The cluster stopped it for memory: ${r.memGb ? `it asked for ${Math.ceil(r.memGb)} GB` : 'it asked for no amount, so it had the cluster’s default'}. Give it more memory, or use a smaller batch` };
   if (st === 'NODE_FAIL') return { status: 'failed', why: 'The node it ran on failed' };
-  if (st === 'PREEMPTED') return { status: 'failed', why: 'A job with a higher priority took its place (preempted)' };
+  if (st === 'PREEMPTED') return { status: 'failed', why: `The cluster took its place back (preempted): ${r.resume ? 'run it again to carry on from its checkpoint' : 'run it again, or give it a way to carry on'}`, preempted: true };
   return { status: 'failed', why: `It ended as ${st.toLowerCase()}${s.exitCode ? `, with exit code ${s.exitCode}` : ''}` };
 }
 

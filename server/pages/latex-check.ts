@@ -31,7 +31,7 @@ import { serviceKey } from '../connections/vault.ts';
 import { spaceById } from '../spaces/index.ts';
 import { normalizeTex, TEX_MAIN, texFileText, texPlain, type TexDoc, type TexIssue } from '../../shared/latex.ts';
 import { CHECK_GROUPS, LEVEL_LABEL, VENUES, venueSummary, venueWith, detectVenue, type CheckEdit, type CheckFinding, type CheckState, type Venue } from '../../shared/latex-submit.ts';
-import type { ResultsTable, RunRecord } from '../../shared/experiments.ts';
+import { isTrialRun, type ResultsTable, type RunRecord } from '../../shared/experiments.ts';
 import { openFile } from './filemodel.ts';
 import { compileTex, readTex, texFolderOk, texPdfTool, type TexResult } from './latex.ts';
 import { citedAsPreprint, differences, entryArxiv, entryDoi, entryFrom, Lookup, type PaperRecord } from './latex-lookup.ts';
@@ -1230,7 +1230,8 @@ async function checkMarked(c: Ctx, src: TexSource, t: Tabular) {
 /** The finished runs the paper's numbers may come from: its project's, and those started in its folders. */
 async function runsFor(db: DB, input: CheckInput): Promise<{ runs: RunRecord[]; where: string }> {
   const out = new Map<string, RunRecord>();
-  const add = (list: RunRecord[]) => list.forEach((r) => out.set(r.id, r));
+  // A trial's numbers are no result.
+  const add = (list: RunRecord[]) => list.forEach((r) => isTrialRun(r) || out.set(r.id, r));
   const space = input.project ? spaceById(db, input.project) : null;
   try {
     if (space) {

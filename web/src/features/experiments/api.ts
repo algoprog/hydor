@@ -3,10 +3,11 @@
 // one is), which metrics matter most and so come first, durations, metrics in a line, and the run's address. Changes
 // come through the app's socket ({ t: 'feature', id: 'experiments' }): the page reloads what changed.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ExperimentGroup, ExperimentsSettings, MetricSeries, QueueNow, RunRecord, RunStatus } from '@shared/experiments';
+import { progressOf, type ExperimentGroup, type ExperimentsSettings, type MetricSeries, type QueueNow, type RunRecord, type RunStatus } from '@shared/experiments';
 import { metricScore, rankMetrics } from '@shared/metric-rank';
 import { api, enc } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
+import { useExperimentMarks } from './marksStore';
 import { nightStatus, waitsForNight } from './nightWords';
 
 export type { RunRecord };
@@ -44,15 +45,16 @@ export function took(ms: number): string {
   return `${Math.floor(h / 24)} days ${h % 24} h`;
 }
 
-/** What a waiting run waits for: a GPU, a slot (a run without a GPU ends first), the cluster's queue, the night, or something else. */
-export type WaitKind = 'gpu' | 'slot' | 'cluster' | 'night' | 'other';
+/** What a waiting run waits for: you (it is held), a GPU, a slot (a run without a GPU ends first), the cluster's queue, the night, or something else. */
+export type WaitKind = 'you' | 'gpu' | 'slot' | 'cluster' | 'night' | 'other';
 export function waitKind(r: Pick<RunRecord, 'why' | 'clusterJob'>): WaitKind {
   const why = r.why ?? '';
-  // The server's words for each (queue.ts, gpus.ts), as patterns so they are not taken for the page's own words.
+  // The server's words for each (budget.ts, queue.ts, gpus.ts), as patterns so they are not taken for the page's own words.
+  if (/^Waits for you: /.test(why)) return 'you';
   if (r.clusterJob || /^In the cluster/.test(why)) return 'cluster';
   if (waitsForNight(why)) return 'night';
   if (/^Waiting for one of your runs without a GPU/.test(why)) return 'slot';
-  if (/^Waiting for (1 GPU|\d+ GPUs)/.test(why) || /nvidia-smi/.test(why)) return 'gpu';
+  if (/^Waiting for (1 GPU|\d+ GPUs)/.test(why) || /^Waiting behind “/.test(why) || /nvidia-smi/.test(why)) return 'gpu';
   return 'other';
 }
 
@@ -64,7 +66,7 @@ export function statusWords(r: RunRecord, now = Date.now()): string {
     case 'waiting': {
       const k = waitKind(r);
       if (k === 'night') return nightStatus(r.why);
-      return k === 'gpu' ? 'Waiting for a GPU' : k === 'slot' ? 'Waiting for a run to end' : k === 'cluster' ? 'In the cluster’s queue' : 'Waiting';
+      return k === 'you' ? 'Waits for you' : k === 'gpu' ? 'Waiting for a GPU' : k === 'slot' ? 'Waiting for a run to end' : k === 'cluster' ? 'In the cluster’s queue' : 'Waiting';
     }
     case 'starting':
       return 'Starting';
@@ -88,14 +90,8 @@ export function endedWords(r: RunRecord, now = Date.now()): string {
   return `${statusWords(r, now)} after ${ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} s` : took(ms)}`;
 }
 
-/** How far a running run is (a whole percent) and, when it has gone long enough to tell, how long is left (ms). */
-export function progressOf(r: RunRecord): { pct: number; left?: number } | null {
-  const p = r.metrics?.progress;
-  if (r.status !== 'running' || !p || !(p.done > 0) || !(p.done < p.total)) return null;
-  const elapsed = p.at - (r.startedAt ?? p.at);
-  const left = elapsed >= 60_000 && p.done / p.total >= 0.01 ? (elapsed * (p.total - p.done)) / p.done : undefined;
-  return { pct: Math.round((p.done / p.total) * 100), left };
-}
+// How far a running run is and how long is left: shared with the server, whose queue says when a waiting run may start.
+export { progressOf };
 
 /** "about 41 min left", "less than a minute left". */
 export const leftWords = (ms: number) => (ms < 60_000 ? 'less than a minute left' : `about ${took(ms)} left`);
@@ -186,6 +182,11 @@ export function useRuns(everywhere = true): { runs: RunRecord[] | null; reload: 
       .catch(() => {});
   }, []);
   useEffect(load, [load]);
+  // A star, note or archiving here: other machines' runs too, at once.
+  const marked = useExperimentMarks((s) => s.n);
+  useEffect(() => {
+    if (marked) load();
+  }, [marked]); // eslint-disable-line react-hooks/exhaustive-deps
   useFeatureEvent('experiments', () => {
     if (timer.current) return;
     timer.current = window.setTimeout(() => {
@@ -391,12 +392,19 @@ export function useGroups(): { groups: Map<string, ExperimentGroup>; reload: () 
     },
     [],
   );
-  useFeatureEvent('experiments', () => {
+  const later = () => {
     if (timer.current) return;
     timer.current = window.setTimeout(() => {
       timer.current = null;
       load();
     }, 2000);
-  });
+  };
+  useFeatureEvent('experiments', later);
+  // A finding recorded or changed: the column says what the newest one found.
+  useFeatureEvent('memory', later);
+  const marked = useExperimentMarks((s) => s.n);
+  useEffect(() => {
+    if (marked) load();
+  }, [marked]); // eslint-disable-line react-hooks/exhaustive-deps
   return { groups, reload: load };
 }

@@ -2,18 +2,24 @@
 // experiment; More options folds the rest (hyperparameters, seed, priority, a metrics file, what to tell you, the agent on
 // call and its rules, a cluster's needs). As a sweep: the command with {name} placeholders and values for each
 // hyperparameter, every combination or a random sample, and an early stop. Run again opens it filled in. Start says
-// whether it goes when a GPU is free or waits for tonight (always the former when the dialog opens).
-import { useEffect, useMemo, useState } from 'react';
+// whether it goes when a GPU is free or waits for tonight (always the former when the dialog opens). Try it first
+// (on this computer) runs the command for 90 seconds and says whether it runs, what memory it used and how long the
+// whole run should take; Use these fills them in. A run keeps the code as it is when it is queued: Run again of a run
+// whose folder has changed since asks which code, its own (picked) or the folder's now; Run again of a run cut short
+// that says how to carry on asks which too, from its checkpoint or over (carrying on always runs its own code).
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Plus, X } from 'lucide-react';
-import type { ClusterSpec, ExperimentsSettings, RunRecord, WatchKind } from '@shared/experiments';
+import { GRACE, isTrialRun, TRY_SECONDS, type ClusterSpec, type ExperimentsSettings, type RunRecord, type TrialAnswer, type WatchKind } from '@shared/experiments';
 import type { MachineView } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { machineId } from '../../lib/machine';
 import { useApp } from '../../lib/store';
+import { tr } from '../../i18n/runtime';
 import { FolderPicker } from '../../components/FolderPicker';
-import { Button, cx, Dialog, IconButton, inputCls, Segmented } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, Segmented, Switch, Throbber } from '../../components/ui';
 import { loadSettings } from './api';
 import { StartChoice, type StartAt } from './StartChoice';
+import { fill, trialLines } from './tryWords';
 
 const DEFAULT_RULES =
   'Read the log and the code. If a fix is clear and safe, run it again with experiment_run (from the last checkpoint if there is one), changing as little as possible. Never delete files or checkpoints. Then tell the user in a few lines what happened and what you did.';
@@ -36,6 +42,20 @@ function Field({ label, hint, children, className }: { label: string; hint?: Rea
       {hint && <span className="mt-1 block leading-relaxed text-fg-3">{hint}</span>}
     </label>
   );
+}
+
+/** A box as tall as its text, from two lines to eight, then it scrolls (the two ends are its classes, in lines). */
+function Lines({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    // The border is not part of scrollHeight.
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+  }, [props.value]);
+  // 18px: the padding above and below, and the border.
+  return <textarea ref={ref} rows={2} spellCheck={false} {...props} className={cx(inputCls, 'h-auto max-h-[calc(8lh+18px)] min-h-[calc(2lh+18px)] py-2 font-mono text-[12.5px] leading-relaxed', className)} />;
 }
 
 /** "lr=0.1" lines as settings; numbers as numbers. */
@@ -84,6 +104,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
   const [where, setWhere] = useState('local');
   const [gpus, setGpus] = useState('1');
   const [mem, setMem] = useState('');
+  const [alone, setAlone] = useState(false);
   const [name, setName] = useState('');
   const [group, setGroup] = useState('');
   const [startAt, setStartAt] = useState<StartAt>('free');
@@ -95,6 +116,10 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
   const [metricsFile, setMetricsFile] = useState('');
   const [scoresFile, setScoresFile] = useState('');
   const [hours, setHours] = useState('');
+  const [resume, setResume] = useState('');
+  const [grace, setGrace] = useState('');
+  // Run again, of a run that was cut short and says how to carry on: from its checkpoint, or over.
+  const [carryOn, setCarryOn] = useState(false);
   const [cpus, setCpus] = useState('');
   const [memGb, setMemGb] = useState('');
   const [partition, setPartition] = useState('');
@@ -116,12 +141,32 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
   const [hasGpus, setHasGpus] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Try it first: the trial going or answered, and what it was of (an answer of another command is not shown).
+  const [trial, setTrial] = useState<{ of: string; answer?: TrialAnswer; error?: string; starting?: boolean } | null>(null);
+  const [peak, setPeak] = useState<number | null>(null);
+  // Run again: whether the folder differs from the run's own code (and its own can be put back), and which was picked.
+  const [ownCode, setOwnCode] = useState<{ of: string; differs: boolean; own: boolean } | null>(null);
+  const [code, setCode] = useState<'own' | 'now'>('own');
+  // Whether the folder is in git, so that a run queued now keeps its code.
+  const [inGit, setInGit] = useState<{ cwd: string; git: boolean } | null>(null);
+  const trialBox = useRef<HTMLDivElement>(null);
+  /** The trial still going, to stop it when the window closes. */
+  const going = useRef<string | null>(null);
+  const shown = useRef(open);
+  shown.current = open;
 
   // Filled in as it opens: from the run it runs again, else the folder used last.
   useEffect(() => {
     if (!open) return;
     setError(null);
     setStartAt('free');
+    setTrial(null);
+    setCode('own');
+    setOwnCode(null);
+    if (from && !from.machine && !from.remote)
+      api<{ differs: boolean; own: boolean }>(`/api/experiments/runs/${from.id}/code`)
+        .then((r) => setOwnCode({ of: from.id, ...r }))
+        .catch(() => {});
     loadSettings()
       .then(setNight)
       .catch(() => setNight(null));
@@ -150,7 +195,10 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
     setWhere(f ? (f.remote ? `m:${f.remote.machine}` : (f.where ?? 'local')) : 'local');
     if (f) setGpus(String(f.gpus ?? 0));
     setMem(f?.gpuMemGb ? String(f.gpuMemGb) : '');
-    setName(f?.name ?? '');
+    setAlone(!!f?.alone);
+    // A trial run again is the real run: not named as a trial, and told of as usual.
+    const was = f && isTrialRun(f) ? undefined : f;
+    setName(was?.name ?? '');
     setGroup(f ? (f.group ?? '') : (inGroup ?? ''));
     setSettings(settingsText(f?.params));
     setSeed(f?.seed !== undefined ? String(f.seed) : '');
@@ -158,11 +206,15 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
     setMetricsFile(f?.metricsFile ?? '');
     setScoresFile(f?.scoresFile ?? '');
     setHours(f?.hours ? String(f.hours) : '');
+    setResume(f?.resume ?? '');
+    setGrace(f?.grace ? String(f.grace) : '');
+    // A stopped (or lost) run was cut short: it carries on unless you say. A failed one starts over unless you say.
+    setCarryOn(!!f?.resume && (f.status === 'stopped' || f.status === 'lost'));
     setCpus(f?.cpus ? String(f.cpus) : '');
     setMemGb(f?.memGb ? String(f.memGb) : '');
     setPartition(f?.partition ?? '');
-    setTellDone(f?.notify?.done !== false);
-    setTellFailed(f?.notify?.failed !== false);
+    setTellDone(was?.notify?.done !== false);
+    setTellFailed(was?.notify?.failed !== false);
     setWhen(f?.notify?.when ? { on: true, metric: f.notify.when.metric, op: f.notify.when.op, value: String(f.notify.when.value) } : { on: false, metric: '', op: '>', value: '' });
     setOnCall(f?.onCall?.on ? (f.onCall.act === 'agent' ? 'agent' : 'tell') : 'off');
     setWatch(f?.onCall?.watch ?? WATCH.map((w) => w.id));
@@ -173,12 +225,15 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
     setMaxRuns('');
     setStopMetric('');
     // The options worth seeing again are open when the run had them.
-    setMore(!!f && !!(f.seed !== undefined || f.onCall?.on || f.metricsFile || f.notify?.when || f.hours));
+    setMore(!!f && !!(f.seed !== undefined || f.onCall?.on || f.metricsFile || f.notify?.when || f.hours || f.alone || f.resume || f.grace));
   }, [open, from, asSweep, inGroup, defaultCwd]);
 
   const place = where.startsWith('c:') ? clusters.find((c) => `c:${c.id}` === where) : null;
   const local = where === 'local';
   const nGpus = Number(gpus) || 0;
+  // Offered when the run it starts from was cut short and the field below still says how to carry on.
+  const canCarry = mode === 'one' && !!from?.resume && !!resume.trim() && (from.status === 'stopped' || from.status === 'failed' || from.status === 'lost');
+  const carrying = canCarry && carryOn;
   const combos = useMemo(() => {
     const filled = params.filter((p) => p.name.trim() && readValues(p.values).length);
     if (!filled.length) return 0;
@@ -186,10 +241,30 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
     return sampling === 'random' && Number(maxRuns) > 0 ? Math.min(total, Number(maxRuns)) : total;
   }, [params, sampling, maxRuns]);
 
+  // Its own code goes with its own folder on this computer.
+  const askCode = !!from && ownCode?.of === from.id && ownCode.differs && ownCode.own && local && cwd.trim() === from.cwd;
+  const runsOwn = carrying || (askCode && code === 'own');
+  useEffect(() => {
+    if (!open || startAt !== 'night' || !local || !cwd.trim()) return;
+    let live = true;
+    const t = window.setTimeout(() => {
+      api<{ git: boolean }>(`/api/experiments/code?cwd=${encodeURIComponent(cwd.trim())}`)
+        .then((r) => live && setInGit({ cwd: cwd.trim(), git: r.git }))
+        .catch(() => {});
+    }, 300);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [open, startAt, local, cwd]);
+  const keepsNow = startAt === 'night' && local && !runsOwn && from?.code !== 'now' && inGit?.cwd === cwd.trim() && inGit.git;
+
   const body = (): Record<string, unknown> => {
     // Always said, so a night run run again starts now unless Tonight is picked. A cluster has its own queue.
     const b: Record<string, unknown> = { command: command.trim(), cwd: cwd.trim(), where, gpus: nGpus, when: startAt === 'night' && !where.startsWith('c:') ? 'night' : 'now' };
     if (nGpus && mem) b.gpuMemGb = Number(mem);
+    // Always said, so a run run again can give up the GPU it had to itself.
+    b.alone = alone && nGpus > 0 && !where.startsWith('c:');
     if (name.trim() && mode === 'one') b.name = name.trim();
     if (group.trim()) b.group = group.trim();
     const s = readSettings(settings);
@@ -199,6 +274,13 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
     if (metricsFile.trim()) b.metricsFile = metricsFile.trim();
     if (scoresFile.trim()) b.scoresFile = scoresFile.trim();
     if (hours.trim()) b.hours = Number(hours);
+    // Always said, so a run run again can drop them.
+    b.resume = resume.trim();
+    b.grace = grace.trim() ? Number(grace) : '';
+    if (carrying) {
+      b.carryOn = true;
+      if (from?.machine) b.continues = from.id;
+    }
     if (place?.kind === 'slurm') {
       if (cpus.trim()) b.cpus = Number(cpus);
       if (memGb.trim()) b.memGb = Number(memGb);
@@ -215,7 +297,86 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
     return b;
   };
 
+  // What it is asked of: the command, its folder and what fills it.
+  const trying = JSON.stringify([command.trim(), cwd.trim(), mode, nGpus, mode === 'sweep' ? params : settings, seed.trim()]);
+  const canTry = local && !from?.machine;
+  const answer = trial?.answer;
+  const trialGoing = !!trial?.starting || (!!answer && !answer.over);
+  going.current = answer && !answer.over ? answer.id : null;
+
+  const stopRunning = (id: string) => void post(`/api/experiments/runs/${id}/stop`, {}).catch(() => {});
+  const tryIt = async () => {
+    setError(null);
+    setTrial({ of: trying, starting: true });
+    // A sweep tries its first combination.
+    const values =
+      mode === 'sweep' ? Object.fromEntries(params.filter((p) => p.name.trim() && readValues(p.values).length).map((p) => [p.name.trim(), readValues(p.values)[0]])) : readSettings(settings);
+    try {
+      const r = await post<{ trial: TrialAnswer }>('/api/experiments/try', {
+        command: command.trim(),
+        cwd: cwd.trim(),
+        gpus: nGpus,
+        ...(nGpus && mem ? { gpuMemGb: Number(mem) } : {}),
+        ...(seed.trim() ? { seed: Number(seed) } : {}),
+        ...(Object.keys(values).length ? { params: values } : {}),
+        ...(from?.env ? { env: from.env } : {}),
+      });
+      if (!shown.current) return stopRunning(r.trial.id);
+      setTrial({ of: trying, answer: r.trial });
+    } catch (e) {
+      setTrial({ of: trying, error: (e as Error).message });
+    }
+  };
+  // The trial is looked at every two seconds while it goes.
+  const watching = answer && !answer.over ? answer.id : null;
+  useEffect(() => {
+    if (!watching) return;
+    const t = window.setInterval(() => {
+      api<{ trial: TrialAnswer }>(`/api/experiments/try/${watching}`)
+        .then((r) => setTrial((x) => (x?.answer?.id === watching ? { ...x, answer: r.trial } : x)))
+        .catch((e) => setTrial((x) => (x?.answer?.id === watching ? { of: x.of, error: (e as Error).message } : x)));
+    }, 2000);
+    return () => window.clearInterval(t);
+  }, [watching]);
+  // Closing the window stops a trial still going.
+  useEffect(() => {
+    if (!open && going.current) {
+      stopRunning(going.current);
+      setTrial(null);
+    }
+  }, [open]);
+  useEffect(() => () => void (going.current && stopRunning(going.current)), []);
+  useEffect(() => {
+    if (trial) trialBox.current?.scrollIntoView({ block: 'nearest' });
+  }, [!!trial, answer?.over]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // What this command held last time, offered in "Free memory each".
+  useEffect(() => {
+    setPeak(null);
+    if (!open || !canTry || !nGpus || !command.trim() || !cwd.trim()) return;
+    let live = true;
+    const t = window.setTimeout(() => {
+      api<{ peakGb?: number }>(`/api/experiments/last-peak?command=${encodeURIComponent(command.trim())}&cwd=${encodeURIComponent(cwd.trim())}`)
+        .then((r) => live && setPeak(r.peakGb ?? null))
+        .catch(() => {});
+    }, 400);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [open, canTry, nGpus, command, cwd]);
+
+  const useThese = () => {
+    if (answer?.ask?.gpuMemGb) setMem(String(answer.ask.gpuMemGb));
+    if (answer?.ask?.hours) {
+      setHours(String(answer.ask.hours));
+      setMore(true);
+    }
+  };
+
   const start = async () => {
+    // A trial still going holds a GPU the run may need.
+    if (going.current) stopRunning(going.current);
     setBusy(true);
     setError(null);
     try {
@@ -224,7 +385,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
         const r = await post<{ sweep: { group: string } }>('/api/experiments/sweeps', body());
         onStarted({ group: r.sweep.group });
       } else if (from && !from.machine) {
-        const r = await post<{ run: RunRecord }>(`/api/experiments/runs/${from.id}/again`, body());
+        const r = await post<{ run: RunRecord }>(`/api/experiments/runs/${from.id}/again`, { ...body(), ...(askCode && !carrying ? { code } : {}) });
         onStarted({ run: r.run });
       } else {
         const r = await post<{ run: RunRecord }>('/api/experiments/jobs', body());
@@ -251,6 +412,11 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
+          {canTry && (
+            <Button variant="ghost" onClick={tryIt} disabled={busy || trialGoing || !command.trim() || !cwd.trim() || (mode === 'sweep' && !combos)}>
+              Try it first
+            </Button>
+          )}
           <Button variant="primary" onClick={start} disabled={busy || !ready}>
             {busy ? 'Starting…' : mode === 'sweep' ? (combos ? `Start ${combos} runs` : 'Start') : 'Start'}
           </Button>
@@ -280,15 +446,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
             )
           }
         >
-          <textarea
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            rows={2}
-            autoFocus={!from}
-            spellCheck={false}
-            placeholder={mode === 'sweep' ? 'python train.py --lr {lr} --batch {batch}' : 'python train.py --lr 3e-4'}
-            className={cx(inputCls, 'h-auto min-h-[64px] py-2 font-mono text-[12.5px] leading-relaxed')}
-          />
+          <Lines value={command} onChange={(e) => setCommand(e.target.value)} autoFocus={!from} placeholder={mode === 'sweep' ? 'python train.py --lr {lr} --batch {batch}' : 'python train.py --lr 3e-4'} />
         </Field>
         <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
           <div>
@@ -317,7 +475,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
           </Field>
           {nGpus > 0 && place?.kind !== 'slurm' ? (
             <Field label="Free memory each (GB)" hint={mem ? undefined : 'Empty: a GPU nobody uses.'}>
-              <input value={mem} onChange={(e) => setMem(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" placeholder="Any free GPU" className={cx(inputCls, 'tnum')} />
+              <input value={mem} onChange={(e) => setMem(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" placeholder={peak ? fill(tr('It peaked at {0} GB last time'), Math.round(peak * 10) / 10) : 'Any free GPU'} className={cx(inputCls, 'tnum')} />
             </Field>
           ) : (
             <div />
@@ -326,7 +484,52 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
         {where.startsWith('c:') ? (
           startAt === 'night' && <p className="leading-relaxed text-fg-3">A cluster has its own queue: its runs cannot wait for tonight.</p>
         ) : (
-          <StartChoice value={startAt} onChange={setStartAt} night={night} where={where} />
+          <div>
+            <StartChoice value={startAt} onChange={setStartAt} night={night} where={where} carries={!!resume.trim()} />
+            {keepsNow && <p className="mt-1 text-[12px] leading-relaxed text-fg-3">It runs the code as it is now, even if the folder changes before tonight.</p>}
+          </div>
+        )}
+        {canCarry && (
+          <div>
+            <span className="mb-1 block text-fg-2">Checkpoint</span>
+            <Segmented
+              size="sm"
+              value={carryOn ? 'carry' : 'over'}
+              onChange={(v) => setCarryOn(v === 'carry')}
+              options={[
+                { value: 'carry', label: 'Carry on from where it stopped' },
+                { value: 'over', label: 'Start over' },
+              ]}
+            />
+            {carrying && (
+              <p className="mt-1 text-[12px] leading-relaxed break-words text-fg-3">
+                <span>It runs the command to carry on:</span>{' '}
+                <code translate="no" className="font-mono break-all">
+                  {resume.trim()}
+                </code>
+              </p>
+            )}
+            {/* Carrying on runs the code the run ran, so there is no choice of code to make. */}
+            {carrying && ownCode?.of === from?.id && ownCode?.differs && (
+              <p className="mt-1 text-[12px] leading-relaxed text-fg-3">
+                {ownCode.own ? 'The folder has changed since: it still runs the code it ran with.' : 'Its own code cannot be put back, so it cannot carry on: start over.'}
+              </p>
+            )}
+          </div>
+        )}
+        {askCode && !carrying && (
+          <div>
+            <span className="mb-1 block text-fg-2">Code</span>
+            <Segmented
+              size="sm"
+              value={code}
+              onChange={setCode}
+              options={[
+                { value: 'own', label: 'Its own code' },
+                { value: 'now', label: 'The folder as it is now' },
+              ]}
+            />
+          </div>
         )}
         <div className="grid gap-3 sm:grid-cols-2">
           {mode === 'one' && (
@@ -415,7 +618,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
           <div className="space-y-3.5">
             {mode === 'one' && (
               <Field label="Hyperparameters" hint="One per line, name=value. --name value in the command are read by themselves; {name} in the command takes the value.">
-                <textarea value={settings} onChange={(e) => setSettings(e.target.value)} rows={2} spellCheck={false} placeholder="lr=3e-4" className={cx(inputCls, 'h-auto py-2 font-mono text-[12.5px]')} />
+                <Lines value={settings} onChange={(e) => setSettings(e.target.value)} placeholder="lr=3e-4" />
               </Field>
             )}
             <div className="grid grid-cols-3 gap-3">
@@ -429,6 +632,24 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
                 <input value={hours} onChange={(e) => setHours(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" className={cx(inputCls, 'tnum')} />
               </Field>
             </div>
+            <div className="space-y-2">
+              <Field label="To carry on after a stop" hint="The command that goes on from its last checkpoint. Night runs and runs lost in a restart use it instead of starting over.">
+                <textarea value={resume} onChange={(e) => setResume(e.target.value)} rows={2} spellCheck={false} placeholder="python train.py --resume outputs/last.pt" className={cx(inputCls, 'h-auto min-h-[64px] py-2 font-mono text-[12.5px] leading-relaxed')} />
+              </Field>
+              <label className="flex flex-wrap items-center gap-2 text-fg-2">
+                Warn it this many seconds before a stop
+                <input value={grace} onChange={(e) => setGrace(e.target.value.replace(/\D/g, '').slice(0, 3))} inputMode="numeric" placeholder={String(GRACE.default)} className={cx(inputCls.replace('w-full', ''), 'tnum h-8 w-16 text-[13px]')} />
+              </label>
+            </div>
+            {nGpus > 0 && !where.startsWith('c:') && (
+              <div className="flex items-start gap-2.5">
+                <Switch on={alone} onChange={setAlone} label="A GPU to itself" className="mt-px" />
+                <div className="min-w-0">
+                  <div className="text-fg-2">A GPU to itself</div>
+                  <p className="leading-relaxed text-fg-3">No other run of yours goes on its GPUs while it runs.</p>
+                </div>
+              </div>
+            )}
             {place?.kind === 'slurm' && (
               <div className="grid grid-cols-3 gap-3">
                 <Field label="Processors">
@@ -515,6 +736,46 @@ export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, on
                 </>
               )}
             </div>
+          </div>
+        )}
+        {trial && (trialGoing || trial.of === trying) && (
+          <div ref={trialBox} aria-live="polite" className="rounded-xl border border-line bg-bg-1 px-3 py-2.5">
+            {trialGoing ? (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <Throbber />
+                <span className="min-w-0 flex-1">
+                  {answer && answer.status !== 'running' && answer.status !== 'starting' ? 'Waiting for its turn to try it…' : fill(tr('Trying it for {0} seconds…'), answer?.seconds ?? TRY_SECONDS.default)}
+                </span>
+                {answer && (
+                  <Button size="sm" variant="ghost" onClick={() => stopRunning(answer.id)}>
+                    Stop
+                  </Button>
+                )}
+                {answer?.why && answer.status !== 'running' && <p className="basis-full leading-relaxed text-fg-3">{answer.why}</p>}
+              </div>
+            ) : trial.error ? (
+              <p className="leading-relaxed text-err">{trial.error}</p>
+            ) : answer ? (
+              <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                <div className="min-w-0 flex-1 basis-[240px] space-y-1 leading-relaxed">
+                  {trialLines(answer).map((l, i) => (
+                    <p key={i} className={cx(answer.ok === false && 'text-err')}>
+                      {l}
+                    </p>
+                  ))}
+                  {answer.ok === false && (
+                    <pre translate="no" className="max-h-40 overflow-auto rounded-lg bg-[var(--term-bg)] px-2.5 py-1.5 font-mono text-[11.5px] whitespace-pre-wrap text-[var(--term-fg)] [overflow-wrap:anywhere]">
+                      {answer.firstError?.text ?? answer.why}
+                    </pre>
+                  )}
+                </div>
+                {answer.ask && (
+                  <Button size="sm" variant="secondary" onClick={useThese}>
+                    Use these
+                  </Button>
+                )}
+              </div>
+            ) : null}
           </div>
         )}
         {error && <p className="rounded-lg bg-err/10 px-3 py-2 leading-relaxed text-err">{error}</p>}

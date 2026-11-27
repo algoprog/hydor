@@ -13,7 +13,8 @@ const markOf = (p: Ctx['look']['p'], s: RunStatus) =>
 const nameOf = (r: RunRecord) => r.name || r.command.replace(/\s+/g, ' ');
 
 async function findRun(ctx: Ctx, given: string | undefined): Promise<RunRecord> {
-  const { runs } = await ctx.conn.api<{ runs: RunRecord[] }>('GET', '/api/experiments/runs?limit=1000');
+  // A run that is named may be an archived one; the list to pick from leaves those out.
+  const { runs } = await ctx.conn.api<{ runs: RunRecord[] }>('GET', `/api/experiments/runs?limit=1000${given ? '' : '&archived=0'}`);
   return choose(ctx, runs, given, {
     id: (r) => r.id,
     names: (r) => [r.name, r.command],
@@ -45,14 +46,16 @@ export const experiments: Area = {
         status: { type: 'string', value: '<status>', desc: 'Only these (comma-separated), or active', values: ['active', ...STATUSES] },
         group: { type: 'string', value: '<experiment>', desc: 'Only an experiment’s runs' },
         query: { type: 'string', value: '<words>', desc: 'Words in the name, command or id' },
+        archived: { type: 'boolean', desc: 'The archived runs too' },
       },
-      summary: 'Runs, newest first',
+      summary: 'Runs, newest first (without the archived ones)',
       examples: ['hydor experiments', 'hydor experiments --status active', 'hydor experiments --group bm25-sweep -n 50'],
       async run(ctx, _a, v) {
         const q = new URLSearchParams({ limit: String(ctx.o.limit ?? 25) });
         if (str(v, 'status')) q.set('status', str(v, 'status')!);
         if (str(v, 'group')) q.set('group', str(v, 'group')!);
         if (str(v, 'query')) q.set('q', str(v, 'query')!);
+        if (!flag(v, 'archived')) q.set('archived', '0');
         const r = await ctx.conn.api<{ runs: RunRecord[] }>('GET', `/api/experiments/runs?${q}`);
         if (ctx.o.json) return ctx.json(r);
         if (!r.runs.length) return ctx.out('No runs.');

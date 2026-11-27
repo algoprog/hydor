@@ -5,6 +5,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, FlaskConical, Lock, MoreHorizontal, Pencil, Play, Sprout, Trash2 } from 'lucide-react';
 import { TEST_READABLE, type EvalRestored, type EvalScore, type Evaluation } from '@shared/evaluations';
+import { tr } from '../../i18n/runtime';
 import { ApiError, del, post, put } from '../../lib/api';
 import { folderName } from '../../lib/folderNames';
 import { go, sessionPath } from '../../lib/nav';
@@ -32,6 +33,7 @@ import {
   standing,
   toneClass,
 } from './evalWords';
+import { askDelete, runFilesOf } from './DeleteRuns';
 import { ChangesDialog, FinalDialog, FolderDialog, type ChangesAsk } from './EvaluationDialogs';
 import type { EditorSection } from './EvaluationEditor';
 import { evolutionPath, useEvolutions, type ListedEvolution } from './evolveApi';
@@ -150,12 +152,24 @@ function Page({ id, marked, onBack, onEdit, onOpenRun, onMark, onDeleted, versio
     }
   };
   const remove = async () => {
-    const n = data.scores.length + data.finals.length;
-    const body = n === 0 ? 'It has no scores yet. The files in its folder stay.' : n === 1 ? 'Its score and its runs go. The files in its folder stay.' : `Its ${n} scores and their runs go. The files in its folder stay.`;
-    if (!(await confirm({ title: `Delete ${ev.name}?`, body, confirm: 'Delete', danger: true }))) return;
     try {
-      await del(evalUrl(id));
-      onDeleted();
+      // Its scores, evolutions' tries among them, and what their runs wrote.
+      const files = await runFilesOf(`evaluation=${encodeURIComponent(id)}`);
+      const n = data.scores.length + data.finals.length;
+      if (!n && !files.count) {
+        if (!(await confirm({ title: `Delete ${ev.name}?`, body: 'It has no scores yet. The files in its folder stay.', confirm: 'Delete', danger: true }))) return;
+        await del(evalUrl(id));
+        return onDeleted();
+      }
+      askDelete({
+        title: `Delete ${ev.name}?`,
+        lead: n === 1 ? tr('Its score goes with its runs.') : n ? tr('Its {0} scores go with their runs.').replace('{0}', String(n)) : tr('Its scores go with their runs.'),
+        many: true,
+        files,
+        stays: tr('What they wrote in the project’s folder stays.'),
+        remove: (keep) => del<{ kept?: string }>(`${evalUrl(id)}${keep ? '?files=keep' : ''}`),
+        done: onDeleted,
+      });
     } catch (e) {
       toastError(e);
     }
@@ -717,7 +731,16 @@ function ScoreMenu({ s, data, old, onOpenRun, reload, confirm }: RowProps) {
                 <MenuItem
                   danger
                   onClick={act(async () => {
-                    if (await confirm({ title: 'Delete this score?', body: 'It and the records of its runs go.', confirm: 'Delete', danger: true })) await del(scoreUrl(s.id));
+                    const files = await runFilesOf(`score=${encodeURIComponent(s.id)}`);
+                    askDelete({
+                      title: 'Delete this score?',
+                      lead: tr('The score goes with its runs.'),
+                      many: true,
+                      files,
+                      stays: tr('What they wrote in the project’s folder stays.'),
+                      remove: (keep) => del<{ kept?: string }>(`${scoreUrl(s.id)}${keep ? '?files=keep' : ''}`),
+                      done: () => void reload(),
+                    });
                   })}
                 >
                   Delete

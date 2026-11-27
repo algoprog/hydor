@@ -1,8 +1,10 @@
-// One experiment (the group its runs share): its category, title and description at the top, with counts and a menu
-// to change them, and under it three tabs: its runs as a table (find, filter, choose columns), their charts (pick
-// which runs are on them, each keeping its colour while shown) and how its hyperparameters go with a metric.
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CheckSquare, ListFilter, MoreHorizontal, Pencil, Plus, Search, SlidersHorizontal, Sparkles, Table2, Waypoints, X } from 'lucide-react';
+// One experiment (the group its runs share): its category, title and description at the top, what was found, counts
+// and a menu to change them, and under it three tabs: its runs as a table (find, filter, choose columns), their charts
+// (pick which runs are on them, each keeping its colour while shown) and how its hyperparameters go with a metric.
+// Attempts that failed and were started again fold under the run that took their place, and archived runs are left out,
+// until the Filter menu asks for them.
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Archive, ArchiveRestore, ArrowLeft, CheckSquare, ListFilter, MoreHorizontal, Pencil, Plus, Search, SlidersHorizontal, Sparkles, Table2, Waypoints, X } from 'lucide-react';
 import type { ExperimentGroup, RunRecord } from '@shared/experiments';
 import { betterOf } from '@shared/experiments';
 import { post, put } from '../../lib/api';
@@ -10,6 +12,10 @@ import { ago } from '../../lib/format';
 import { toast, toastError } from '../../lib/store';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuLabel, MenuSep, Popover, Tabs, Throbber } from '../../components/ui';
 import { isActive, useSeries, type ExperimentTab } from './api';
+import { ExperimentFindings } from './Findings';
+import { markMany, markRun } from './marksApi';
+import { useExperimentMarks } from './marksStore';
+import { bringBack, chartedRuns, countWords, standingsOf, starredFirst, tableRows } from './runList';
 import { differingParams, keyMetricOf, MAX_SHOWN, queueOrder, RUN_COLORS, runKey, valueOf } from './analysis';
 import { ChartsPanel, type PanelRun } from './ChartsPanel';
 import { Params } from './Params';
@@ -72,10 +78,11 @@ function fillSlots(keys: string[], prev: Record<string, number>): Record<string,
   return out;
 }
 
-/** At first: the first 8 runs in the queue's order that have curves, else the first 8. */
+/** At first: the starred runs, then the first in the queue's order that have curves (else any), 8 in all. */
 function defaultKeys(runs: RunRecord[]): string[] {
   const curves = runs.filter((r) => (r.metrics?.repeated?.length ?? 0) > 0);
-  return (curves.length ? curves : runs).slice(0, MAX_SHOWN).map(runKey);
+  const pick = starredFirst([...new Set([...runs.filter((r) => r.starredAt), ...(curves.length ? curves : runs)])]);
+  return pick.slice(0, MAX_SHOWN).map(runKey);
 }
 
 /** Which runs show on the charts and which colour each has; kept for the experiment on this device. */
@@ -83,15 +90,17 @@ function useShown(group: string, runs: RunRecord[]) {
   const [stored, setStored] = useState<Shown | null>(() => readJson(shownKey(group), isShown));
   const auto = useRef<Record<string, number>>({});
   // With nothing stored the first runs show; which ones is worked out once the runs are there, and kept (so it does not shift as runs come and go) until you pick others.
-  const first = useRef<string[] | null>(null);
+  const first = useRef<{ stars: string; keys: string[] } | null>(null);
   const state = useMemo<Shown>(() => {
     const live = new Set(runs.map(runKey));
     if (stored) {
       const keys = stored.keys.filter((k) => live.has(k)).slice(0, MAX_SHOWN);
       return { keys, slots: fillSlots(keys, stored.slots) };
     }
-    if (!first.current && runs.length) first.current = defaultKeys(runs);
-    const keys = (first.current ?? []).filter((k) => live.has(k));
+    // A star given or taken away picks them anew: the starred ones show first.
+    const stars = runs.filter((r) => r.starredAt).map(runKey).sort().join();
+    if (runs.length && (!first.current || first.current.stars !== stars || !first.current.keys.some((k) => live.has(k)))) first.current = { stars, keys: defaultKeys(runs) };
+    const keys = (first.current?.keys ?? []).filter((k) => live.has(k));
     const slots = fillSlots(keys, auto.current);
     auto.current = slots;
     return { keys, slots };
@@ -194,10 +203,13 @@ const STATUS: { id: Status; label: string; test: (r: RunRecord) => boolean }[] =
   { id: 'stopped', label: 'Stopped', test: (r) => r.status === 'stopped' },
 ];
 
-function RunsTab({ group, runs, ordered, placeOf, picked, onPick, onPickMany, onOpenRun, colorOf }: {
+function RunsTab({ group, runs, earlierToo, onEarlierToo, placeOf, picked, onPick, onPickMany, onOpenRun, colorOf }: {
   group: string;
+  /** All of its runs, archived and earlier attempts too. */
   runs: RunRecord[];
-  ordered: RunRecord[];
+  /** Earlier attempts show as rows of their own (the charts and Hyperparameters take them too). */
+  earlierToo: boolean;
+  onEarlierToo: (on: boolean) => void;
   placeOf: (r: RunRecord) => { id: string; name: string };
   picked: Set<string>;
   onPick: (r: RunRecord) => void;
@@ -208,11 +220,15 @@ function RunsTab({ group, runs, ordered, placeOf, picked, onPick, onPickMany, on
   const [find, setFind] = useState('');
   const [status, setStatus] = useState<Status>('all');
   const [where, setWhere] = useState('all');
+  const [starred, setStarred] = useState(false);
+  const [archived, setArchived] = useState(false);
   const [menu, setMenu] = useState(false);
   const [sort, setSort] = useState<RunsSort>(() => SORTS.get(group) ?? null);
   const [custom, setCustom] = useState<RunsColumns | null>(() => readJson(colsKey(group), isColumns));
   const filterRef = useRef<HTMLButtonElement>(null);
 
+  const ordered = useMemo(() => starredFirst(queueOrder(runs)), [runs]);
+  const stand = useMemo(() => standingsOf(ordered), [ordered]);
   const places = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of runs) {
@@ -221,13 +237,13 @@ function RunsTab({ group, runs, ordered, placeOf, picked, onPick, onPickMany, on
     }
     return [...m.entries()];
   }, [runs, placeOf]);
-  const columns = useMemo(() => custom ?? defaultColumns(runs), [custom, runs]);
-  const filtered = !!find.trim() || status !== 'all' || where !== 'all';
-  const shown = useMemo(() => {
+  const columns = useMemo(() => custom ?? defaultColumns(stand.rows.length ? stand.rows : runs), [custom, stand, runs]);
+  const filtered = !!find.trim() || status !== 'all' || where !== 'all' || starred || earlierToo || archived;
+  const table = useMemo(() => {
     const words = find.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const st = STATUS.find((s) => s.id === status)!;
-    return ordered.filter((r) => st.test(r) && (where === 'all' || placeOf(r).id === where) && words.every((w) => [r.name, r.command, r.id, ...(r.tags ?? [])].some((x) => x?.toLowerCase().includes(w))));
-  }, [ordered, find, status, where, placeOf]);
+    return tableRows(ordered, stand, { starred, earlierToo, archived }, (r) => st.test(r) && (where === 'all' || placeOf(r).id === where), words);
+  }, [ordered, stand, find, status, where, starred, earlierToo, archived, placeOf]);
 
   const changeColumns = (c: RunsColumns | null) => {
     setCustom(c);
@@ -237,6 +253,7 @@ function RunsTab({ group, runs, ordered, placeOf, picked, onPick, onPickMany, on
     setSort(s);
     SORTS.set(group, s);
   };
+  const none = !stand.rows.length && stand.archived.length && !archived ? 'Every run is archived: Filter → Archived shows them.' : archived && !stand.archived.length ? 'No run is archived.' : undefined;
 
   return (
     <div className="px-5 py-3">
@@ -269,6 +286,21 @@ function RunsTab({ group, runs, ordered, placeOf, picked, onPick, onPickMany, on
               ))}
             </>
           )}
+          <MenuSep />
+          <MenuLabel>Show</MenuLabel>
+          <MenuItem checked={starred} onClick={() => setStarred((x) => !x)}>
+            Starred
+          </MenuItem>
+          {(stand.folded.length > 0 || earlierToo) && (
+            <MenuItem checked={earlierToo} hint={String(stand.folded.length)} onClick={() => onEarlierToo(!earlierToo)}>
+              Earlier attempts too
+            </MenuItem>
+          )}
+          {(stand.archived.length > 0 || archived) && (
+            <MenuItem checked={archived} hint={String(stand.archived.length)} onClick={() => setArchived((x) => !x)}>
+              Archived
+            </MenuItem>
+          )}
         </Popover>
         <ColumnsMenu runs={runs} columns={columns} onChange={changeColumns} onReset={() => changeColumns(null)} />
         {filtered && (
@@ -278,15 +310,20 @@ function RunsTab({ group, runs, ordered, placeOf, picked, onPick, onPickMany, on
               setFind('');
               setStatus('all');
               setWhere('all');
+              setStarred(false);
+              setArchived(false);
+              onEarlierToo(false);
             }}
             className="flex h-8 items-center gap-1 rounded-lg px-2 text-[12.5px] text-accent hover:bg-accent-soft"
           >
-            <X size={13} /> {`${shown.length} shown`}
+            <X size={13} /> {`${table.rows.length} shown`}
           </button>
         )}
       </div>
       <RunsTable
-        runs={shown}
+        runs={table.rows}
+        earlier={table.earlier}
+        unfolded={table.open}
         columns={columns}
         where={places.length > 1 ? (r) => placeOf(r).name : undefined}
         colorOf={colorOf}
@@ -296,6 +333,9 @@ function RunsTab({ group, runs, ordered, placeOf, picked, onPick, onPickMany, on
         onOpen={onOpenRun}
         sort={sort}
         onSort={changeSort}
+        onStar={(r) => void markRun(r, { starred: !r.starredAt }).catch(toastError)}
+        onBringBack={archived ? (r) => void markMany(bringBack(runs, [r]), { archived: false }).catch(toastError) : undefined}
+        empty={none}
       />
     </div>
   );
@@ -442,14 +482,30 @@ export function ExperimentView(props: {
 
 function Experiment(props: Parameters<typeof ExperimentView>[0]) {
   const { group, runs, loading, info, categories, tab, onTab, placeOf, picked, onPick, onPickMany, onOpenRun, onNewRun, onTable, onCompare, wide, onBack } = props;
-  const ordered = useMemo(() => queueOrder(runs), [runs]);
+  const [earlierToo, setEarlierToo] = useState(false);
+  const stand = useMemo(() => standingsOf(runs), [runs]);
+  // What the charts, Hyperparameters and the menu are of: no archived runs, and no earlier attempts unless asked for.
+  const base = useMemo(() => chartedRuns(runs, stand, earlierToo), [runs, stand, earlierToo]);
+  const ordered = useMemo(() => starredFirst(queueOrder(base)), [base]);
   const shown = useShown(group, ordered);
+  // Archived, and no run made since: a new run brings it back.
+  const archivedAt = info?.archivedAt && !runs.some((r) => !r.machine && r.createdAt > info.archivedAt!) ? info.archivedAt : undefined;
+  const going = runs.some(isActive);
+  const archive = async (on: boolean) => {
+    try {
+      await put('/api/experiments/groups', { name: group, archived: on });
+      useExperimentMarks.getState().changed();
+      toast(on ? 'Archived: “Archived” at the bottom of the list brings it back' : 'Brought back');
+    } catch (e) {
+      toastError(e);
+    }
+  };
   const menuRef = useRef<HTMLButtonElement>(null);
   const [menu, setMenu] = useState(false);
   const [edit, setEdit] = useState(false);
   const [writing, setWriting] = useState(false);
 
-  const hasParams = runs.length >= 2 && differingParams(runs).length > 0;
+  const hasParams = base.length >= 2 && differingParams(base).length > 0;
   const at: ExperimentTab = tab === 'params' && !hasParams ? 'runs' : tab;
 
   const pickTab = (t: ExperimentTab) => {
@@ -459,14 +515,7 @@ function Experiment(props: Parameters<typeof ExperimentView>[0]) {
     onTab(t);
   };
 
-  const n = (f: (r: RunRecord) => boolean) => runs.filter(f).length;
-  const counts = [
-    `${runs.length} ${runs.length === 1 ? 'run' : 'runs'}`,
-    n((r) => r.status === 'running' || r.status === 'starting') ? `${n((r) => r.status === 'running' || r.status === 'starting')} running` : '',
-    n((r) => r.status === 'queued' || r.status === 'waiting') ? `${n((r) => r.status === 'queued' || r.status === 'waiting')} waiting` : '',
-    n((r) => r.status === 'done') ? `${n((r) => r.status === 'done')} done` : '',
-    n((r) => r.status === 'failed' || r.status === 'lost') ? `${n((r) => r.status === 'failed' || r.status === 'lost')} failed` : '',
-  ];
+  const counts = countWords(stand);
   const lastAt = runs.reduce((t, r) => Math.max(t, r.createdAt, r.startedAt ?? 0, r.endedAt ?? 0), 0);
   if (lastAt) counts.push(`last run ${ago(lastAt)}`);
 
@@ -504,7 +553,7 @@ function Experiment(props: Parameters<typeof ExperimentView>[0]) {
       setWriting(false);
     }
   };
-  const canTable = !!group && runs.some((r) => r.status === 'done' && !r.machine);
+  const canTable = !!group && base.some((r) => r.status === 'done' && !r.machine);
 
   return (
     <div className="min-w-0">
@@ -560,12 +609,26 @@ function Experiment(props: Parameters<typeof ExperimentView>[0]) {
                 </MenuItem>
               </>
             )}
-            <MenuItem icon={<SlidersHorizontal size={14} />} disabled={runs.length < 2} onClick={act(() => onCompare([...runs].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6)))}>
+            <MenuItem icon={<SlidersHorizontal size={14} />} disabled={base.length < 2} onClick={act(() => onCompare([...base].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6)))}>
               Compare the latest 6
             </MenuItem>
-            <MenuItem icon={<CheckSquare size={14} />} onClick={act(() => onPickMany(runs, true))}>
+            <MenuItem icon={<CheckSquare size={14} />} disabled={!base.length} onClick={act(() => onPickMany(base, true))}>
               Pick them all
             </MenuItem>
+            {group !== '' && (
+              <>
+                <MenuSep />
+                {archivedAt ? (
+                  <MenuItem icon={<ArchiveRestore size={14} />} onClick={act(() => void archive(false))}>
+                    Bring back
+                  </MenuItem>
+                ) : (
+                  <MenuItem icon={<Archive size={14} />} disabled={going} hint={going ? 'Stop its runs first' : undefined} onClick={act(() => void archive(true))}>
+                    Archive this experiment
+                  </MenuItem>
+                )}
+              </>
+            )}
           </Popover>
         </div>
         {description && (
@@ -580,7 +643,24 @@ function Experiment(props: Parameters<typeof ExperimentView>[0]) {
             )}
           </div>
         )}
-        <p className={cx('mt-1.5 min-h-[18px] text-[12px] text-fg-3', onBack && 'pl-8')}>{loading ? '' : counts.filter(Boolean).join(' · ')}</p>
+        {archivedAt && (
+          <p className={cx('mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-fg-2', onBack && 'pl-8')}>
+            <span>This experiment is archived: it is out of the list.</span>
+            <Button size="sm" variant="secondary" icon={<ArchiveRestore size={13} />} onClick={() => void archive(false)}>
+              Bring back
+            </Button>
+          </p>
+        )}
+        {!loading && <ExperimentFindings group={group} runs={runs} className={onBack ? 'pl-8' : undefined} />}
+        <p className={cx('mt-1.5 min-h-[18px] text-[12px] text-fg-3', onBack && 'pl-8')}>
+          {!loading &&
+            counts.filter(Boolean).map((c, i) => (
+              <Fragment key={i}>
+                {i > 0 && (i === 1 && stand.folded.length ? ' ' : ' · ')}
+                <span>{c}</span>
+              </Fragment>
+            ))}
+        </p>
       </div>
 
       <div className="mt-2 border-b border-line px-5">
@@ -589,7 +669,7 @@ function Experiment(props: Parameters<typeof ExperimentView>[0]) {
           value={at}
           onChange={pickTab}
           options={[
-            { value: 'runs', label: 'Runs', count: runs.length },
+            { value: 'runs', label: 'Runs', count: stand.rows.length },
             { value: 'charts', label: 'Charts' },
             ...(hasParams ? [{ value: 'params' as const, label: 'Hyperparameters' }] : []),
           ]}
@@ -601,9 +681,9 @@ function Experiment(props: Parameters<typeof ExperimentView>[0]) {
           <Throbber />
         </div>
       )}
-      {!loading && at === 'runs' && <RunsTab group={group} runs={runs} ordered={ordered} placeOf={placeOf} picked={picked} onPick={onPick} onPickMany={onPickMany} onOpenRun={onOpenRun} colorOf={shown.colorOf} />}
-      {!loading && at === 'charts' && <ChartsTab runs={runs} ordered={ordered} picked={picked} shown={shown} wide={wide} />}
-      {!loading && at === 'params' && <Params runs={runs} onOpenRun={onOpenRun} onTable={onTable} canTable={canTable} onCompare={onCompare} />}
+      {!loading && at === 'runs' && <RunsTab group={group} runs={runs} earlierToo={earlierToo} onEarlierToo={setEarlierToo} placeOf={placeOf} picked={picked} onPick={onPick} onPickMany={onPickMany} onOpenRun={onOpenRun} colorOf={shown.colorOf} />}
+      {!loading && at === 'charts' && <ChartsTab runs={base} ordered={ordered} picked={picked} shown={shown} wide={wide} />}
+      {!loading && at === 'params' && <Params runs={base} onOpenRun={onOpenRun} onTable={onTable} canTable={canTable} onCompare={onCompare} />}
 
       <EditInfo group={group} info={info} categories={categories} open={edit} onClose={() => setEdit(false)} />
     </div>

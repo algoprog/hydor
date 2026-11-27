@@ -31,6 +31,7 @@ type Rule = [methods: string, path: RegExp, level: Level, why?: string];
 const YOUR_TOOLS = 'Use your own tools for that (files, commands, git): they ask the user as the session’s permissions say.';
 const CAP = 'This changes a spending cap: how much may be spent before the work stops.';
 const PERMISSIONS = 'This changes what the agent may do without asking you.';
+const AGENT_HOURS = 'This changes the limit on the GPU hours agents’ runs may use in seven days.';
 const TOOL_STATES = 'This changes which of a connected account’s tools agents may use, and which wait for your OK in the Outbox first.';
 const APP_MAIL = 'This lets a web app send mail from your account, in your name, to addresses the app chooses (or changes which account, how many a day, or whether it sends while it is being made, so that trying it out mails real people). A link in its mail opens only for someone who has opened the app from Hydor.';
 
@@ -45,8 +46,12 @@ const RULES: Rule[] = [
   ['W', /^\/api\/experiments\/evaluations\/[^/]+\/seal$/, 'refuse', 'Only the person seals an evaluation; propose one with evaluation_propose.'],
   ['W', /^\/api\/experiments\/evaluations\/[^/]+\/baseline$/, 'refuse', 'Only the person sets the baseline: tell them which score you would use.'],
   ['*', /^\/api\/experiments\/evaluations\/[^/]+\/final$/, 'refuse', 'Only the person runs the final test and reads its numbers.'],
+  ['*', /^\/api\/experiments\/runs\/[^/]+\/let-run$/, 'refuse', 'Only the person lets a held run go past the limit on agents’ GPU hours: tell them it waits (its page has Let it run).'],
+  ['*', /^\/api\/experiments\/evolutions\/[^/]+\/let-run$/, 'refuse', 'Only the person lets a held search go past the limit on agents’ GPU hours: tell them it waits (its page has Let it run).'],
   // Evolve: agents read; starting one, pausing, resuming, stopping and taking the best ask each time (below).
   ['DELETE', /^\/api\/experiments\/evolutions\//, 'refuse', 'Only the person deletes an evolution: its candidates, their scores and its worktrees go with it.'],
+  // What the person has looked at and what they put off is theirs: an agent reading the brief must not mark it seen.
+  ['POST', /^\/api\/projects\/[^/]+\/research\/(seen|later)$/, 'refuse', 'Only the person marks the Research tab as looked at, or puts a final test off: read the brief with GET /api/projects/:id/research and tell them what needs them.'],
   ['*', /^\/api\/auth\//, 'refuse', 'The password and signing in are the user’s alone (Settings → App → Password).'],
   ['*', /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)(\/|$)/, 'refuse', YOUR_TOOLS],
   ['*', /^\/api\/pdf\//, 'refuse', 'Use your PDF tools for that: pdf_look and pdf_form to see a PDF and its form, pdf_fill, pdf_write and pdf_pages to change it.'],
@@ -148,7 +153,7 @@ const RULES: Rule[] = [
   // Bringing an earlier version of a picture, video or sound back: the one shown now is kept, but it shows at once.
   ['POST', /^\/api\/media\/[^/]+\/versions\/[^/]+\/restore$/, 'always'],
   ['W', /^\/api\/(tasks|apps\/[^/]+\/(runs|batches)|apps\/runs\/[^/]+\/ask|apps\/[^/]+\/run|automations\/(test-run|runs\/[^/]+\/rerun)|opinion\/[^/]+|arena\/[^/]+\/winner)(\/|$)/, 'always', 'This starts agent work that may cost.'],
-  ['POST', /^\/api\/experiments\/(jobs|sweeps|runs\/[^/]+\/again)$/, 'always', 'This starts jobs on this computer (its GPUs), another machine or a cluster. Agents in sessions use experiment_run and experiment_sweep.'],
+  ['POST', /^\/api\/experiments\/(jobs|sweeps|try|runs\/[^/]+\/again)$/, 'always', 'This starts jobs on this computer (its GPUs), another machine or a cluster. Agents in sessions use experiment_run, experiment_try and experiment_sweep.'],
   ['POST', /^\/api\/experiments\/(tables\/preview|clusters\/check)$/, 'free'],
   ['POST', /^\/api\/experiments\/evaluations\/[^/]+\/scores$/, 'always', 'This starts jobs on this computer (its GPUs). Agents in sessions use evaluation_score.'],
   ['POST', /^\/api\/experiments\/evaluations\/[^/]+\/restore$/, 'always', 'This writes the sealed copies over the files that changed in that folder: what is in them now is lost.'],
@@ -181,6 +186,7 @@ function askedFor(path: string, body: Json): { level: Level; why: string } | nul
   const s = /^\/api\/sessions\/[^/]+(\/[^/]+)$/.exec(path);
   if (s?.[1] === '/config' && body.mode !== undefined) return { level: 'ask', why: PERMISSIONS };
   if (s?.[1] === '/extra' && body.capUsd !== undefined) return { level: 'ask', why: CAP };
+  if (path === '/api/experiments/settings' && body.agentGpuHours !== undefined) return { level: 'ask', why: AGENT_HOURS };
   // A connected account's tools On, Ask first or Off: the user's say over what goes out without their OK.
   if (/^\/api\/connections\/[^/]+$/.test(path) && !/^\/api\/connections\/(catalog|secrets|requests|session|flows)$/.test(path) && body.tools !== undefined) return { level: 'ask', why: TOOL_STATES };
   // A web app's mail goes out in the user's name: allowing it, and which account and how many, is theirs to say, on a card, every time.

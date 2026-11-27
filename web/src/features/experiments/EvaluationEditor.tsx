@@ -188,7 +188,8 @@ function summaryOf(id: EditorSection, f: Form): { text: string; own?: boolean } 
   return { text: f.hours.trim() ? `${tr(words)}, ${tr(`at most ${f.hours.trim()} h`)}` : words, own: !!f.hours.trim() };
 }
 
-export function EvaluationEditor({ open, evaluation, section, onClose, onSaved }: { open: boolean; evaluation?: Evaluation; section?: EditorSection; onClose: () => void; onSaved: (evaluation: Evaluation) => void }) {
+/** `folder`: where a new evaluation starts (a project's folder), in place of the one used last. */
+export function EvaluationEditor({ open, evaluation, section, folder: start, onClose, onSaved }: { open: boolean; evaluation?: Evaluation; section?: EditorSection; folder?: string; onClose: () => void; onSaved: (evaluation: Evaluation) => void }) {
   const home = useApp((s) => s.boot?.home) ?? '';
   const defaultCwd = useApp((s) => s.boot?.defaultCwd) ?? home;
   const wide = useMediaQuery('(min-width: 640px)');
@@ -202,7 +203,7 @@ export function EvaluationEditor({ open, evaluation, section, onClose, onSaved }
   // Filled in as it opens.
   useEffect(() => {
     if (!open) return;
-    const f = formOf(evaluation, localStorage.getItem(LAST_CWD) ?? defaultCwd);
+    const f = formOf(evaluation, start ?? localStorage.getItem(LAST_CWD) ?? defaultCwd);
     setForm(f);
     setFirst(f);
     setAt(section ?? 'what');

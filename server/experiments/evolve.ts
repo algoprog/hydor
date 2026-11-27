@@ -24,8 +24,9 @@ import { helper } from '../helper.ts';
 import { ChangedError, deleteScore, getEvaluation, getScore, mustEvaluation, protectsPath, startScore, STOPPED_WHILE_STARTING, stopScore, waitScore } from './evaluations.ts';
 import { files as runFiles } from './local.ts';
 import { clock, morningAlso, nightAt, nightWhy, nightZone, type NightWork } from './night.ts';
-import { settingsOf, tick } from './queue.ts';
-import { getRun, RUNS_ROOT, tables } from './records.ts';
+import { holds, letRun, refuseAtCeiling } from './budget.ts';
+import { cleanJob, depsOf, ended as runEnded, settingsOf, tick } from './queue.ts';
+import { getRun, keepRunFiles, listRuns, RUNS_ROOT, tables } from './records.ts';
 
 /** The limits of a spec, and the rules of the search (a test reads them). */
 export const EVOLVE = {
@@ -124,6 +125,8 @@ interface Inner {
   since?: number;
   /** The hash of the start's files. */
   startHash: string;
+  /** Every score it waits for is held at the limit on agents' GPU hours (the reason): its time stands still meanwhile. */
+  held?: string;
   /** A night evolution: whether it was night when last looked, and when it was last counted running in the night. */
   night?: boolean;
   seen?: number;
@@ -192,7 +195,7 @@ function lookAtNight(d: Deps, id: string): boolean {
   const changed = r.inner.night !== night;
   const counted = r.inner.seen !== undefined;
   countNight(r);
-  if (night && r.evo.status === 'running') r.inner.seen = use.now();
+  if (night && r.evo.status === 'running' && !r.inner.held) r.inner.seen = use.now();
   r.inner.night = night;
   if (changed || counted || r.inner.seen !== undefined) store(d.db, r);
   if (changed) tellSoon(d, id);
@@ -216,7 +219,64 @@ function watchItsNight(d: Deps, id: string): () => void {
 
 function view(db: DB, r: Rec): Evolution {
   const going = r.evo.status === 'starting' || r.evo.status === 'running';
-  return { ...r.evo, activeMs: activeNow(r), ...(r.evo.when && going && !isNight(db) ? { waits: nightWhy({}, settingsOf(db)) } : {}) };
+  const waits = !going ? undefined : r.inner.held ? r.inner.held : r.evo.when && !isNight(db) ? nightWhy({}, settingsOf(db)) : undefined;
+  return { ...r.evo, activeMs: activeNow(r), ...(waits ? { waits } : {}) };
+}
+
+// ---- held at the limit on agents' GPU hours ------------------------------------------------------------------------
+
+/**
+ * Looks whether every score an evolution waits for is held (budget.ts): it then holds still, its time not counted, and
+ * says why in its runs' words; once one of them has its turn it goes on.
+ */
+function lookAtHold(d: Deps, id: string) {
+  const openRuns = () => listRuns(d.db, { status: ACTIVE, limit: 5000 }).filter((x) => x.evolution === id);
+  // A score put in line as you let the search go has its turn too. (Done first: each looks here again.)
+  if (load(d.db, id)?.evo.letRun) for (const x of openRuns()) if (x.held) letRun(d, x.id);
+  const r = load(d.db, id);
+  if (!r) return;
+  const open = openRuns();
+  const held = open.length && open.every((x) => x.held) ? open[0].why : undefined;
+  if (held === r.inner.held) return;
+  if (held && !r.inner.held) {
+    if (r.evo.when) countNight(r);
+    else r.evo.activeMs = activeNow(r);
+    r.inner.since = undefined;
+  }
+  if (!held && r.evo.status === 'running' && !r.evo.when) r.inner.since = use.now();
+  r.inner.held = held;
+  store(d.db, r);
+  tellSoon(d, id);
+}
+
+let watchingHolds = false;
+/** Follows the runs of searches as they are held, given their turn and ended. */
+function watchHolds() {
+  if (watchingHolds) return;
+  watchingHolds = true;
+  const look = (run: string) => {
+    const d = depsOf();
+    const id = d ? getRun(d.db, run)?.evolution : undefined;
+    if (!d || !id) return;
+    try {
+      lookAtHold(d, id);
+    } catch (e) {
+      console.error(`[experiments] evolution ${id}:`, (e as Error)?.message ?? e);
+    }
+  };
+  holds.on('changed', look);
+  runEnded.on('ended', look);
+}
+
+/** Lets a search go on beyond the limit on agents' GPU hours: the scores it waits for, and all it asks for from now. The person's alone. */
+export function letEvolutionRun(d: Deps, id: string): Evolution {
+  const r = load(d.db, id);
+  if (!r) throw new HttpError(404, 'There is no such evolution');
+  if (r.evo.status === 'done' || r.evo.status === 'stopped' || r.evo.status === 'failed') return view(d.db, r);
+  patch(d, id, (x) => void (x.evo.letRun ??= Date.now()));
+  for (const run of listRuns(d.db, { status: ACTIVE, limit: 5000 }).filter((x) => x.evolution === id)) letRun(d, run.id);
+  lookAtHold(d, id);
+  return mustEvolution(d.db, id);
 }
 
 /** Changes an evolution as it is now, at once (nothing else runs between reading and writing). */
@@ -236,8 +296,8 @@ function setStatus(r: Rec, status: Evolution['status']) {
     else r.evo.activeMs = activeNow(r);
     r.inner.since = undefined;
   }
-  // A night evolution's time is counted by lookAtNight instead.
-  if (status === 'running' && r.evo.status !== 'running' && !r.evo.when) r.inner.since = use.now();
+  // A night evolution's time is counted by lookAtNight instead; one that is held starts counting when it is let go.
+  if (status === 'running' && r.evo.status !== 'running' && !r.evo.when && !r.inner.held) r.inner.since = use.now();
   r.evo.status = status;
 }
 
@@ -500,9 +560,16 @@ export async function checkEvolveSpec(db: DB, b: Record<string, any>): Promise<C
 
 // ---- starting -----------------------------------------------------------------------------------------------------
 
+/** Refuses an agent's start or resume of an evolution while the ceiling on agents' GPU hours is reached and its scores take a GPU here. */
+export async function refuseEvolutionAtCeiling(db: DB, ev: Evaluation, from: string) {
+  refuseAtCeiling(db, await cleanJob(db, { command: ev.command, cwd: from, gpus: ev.gpus, where: ev.where }));
+}
+
 /** Starts an evolution: checked now; its slots are made and its start scored from here on, as the page shows. */
 export async function startEvolution(d: Deps, b: Record<string, any>, by: Evolution['by']): Promise<Evolution> {
   const c = await checkEvolveSpec(d.db, b);
+  // An agent's does not start at the ceiling on agents' GPU hours (its scores are not held one by one).
+  if (by.who === 'agent') await refuseEvolutionAtCeiling(d.db, c.ev, c.spec.from ?? c.ev.cwd);
   evolveTables(d.db);
   const id = newId('v');
   const islands = c.spec.candidates < EVOLVE.manyCandidates ? 2 : 3;
@@ -546,6 +613,7 @@ const slotTop = (id: string, i: number) => real(slotDir(id, i));
 
 /** Makes the slots and scores the start with all the evaluation's seeds; then the search begins. */
 async function launch(d: Deps, id: string) {
+  watchHolds();
   const entry = liveEntry(id);
   const signal = entry.abort.signal;
   entry.done = (async () => {
@@ -563,7 +631,7 @@ async function launch(d: Deps, id: string) {
       if (score?.status === 'failed' && score.why === STOPPED_WHILE_STARTING) score = null;
       if (!score) {
         await resetSlot(r, 0);
-        score = await startScore(d, ev.id, { kind: 'score', folder: slotTop(id, 0), ...(r.evo.when ? { when: r.evo.when } : {}), by: { who: 'evolve', evolution: id, candidate: 'start' } });
+        score = await startScore(d, ev.id, { kind: 'score', folder: slotTop(id, 0), ...(r.evo.when ? { when: r.evo.when } : {}), by: { who: 'evolve', evolution: id, candidate: 'start' }, projectSession: r.evo.by.session, agent: r.evo.by.who === 'agent', letRun: !!load(d.db, id)?.evo.letRun });
         tellSoon(d, id);
       }
       score = await settled(d, score.id, signal);
@@ -1097,7 +1165,7 @@ async function score(d: Deps, id: string, cid: string, slot: number, signal: Abo
       await resetSlot(r, slot, filesOf(r, cid));
       // Stopped meanwhile: its lane ends it.
       if (signal.aborted) return;
-      s = await startScore(d, ev.id, { kind: 'score', folder: slotTop(id, slot), ...(full ? {} : { seeds: [ev.seeds[0]] }), ...(r.evo.when ? { when: r.evo.when } : {}), by: { who: 'evolve', evolution: id, candidate: cid } });
+      s = await startScore(d, ev.id, { kind: 'score', folder: slotTop(id, slot), ...(full ? {} : { seeds: [ev.seeds[0]] }), ...(r.evo.when ? { when: r.evo.when } : {}), by: { who: 'evolve', evolution: id, candidate: cid }, projectSession: load(d.db, id)?.evo.by.session, agent: r.evo.by.who === 'agent', letRun: !!load(d.db, id)?.evo.letRun });
     } catch (e) {
       if (e instanceof ChangedError) {
         finish(d, id, cid, { status: 'failed', why: e.message });
@@ -1289,6 +1357,7 @@ async function lane(d: Deps, id: string, slot: number, signal: AbortSignal) {
 
 /** Runs the slots' work until it is over, paused or stopped. */
 function drive(d: Deps, id: string) {
+  watchHolds();
   if (live.has(id)) return;
   const entry = liveEntry(id);
   const signal = entry.abort.signal;
@@ -1376,9 +1445,11 @@ export async function resumeEvolutions(d: Deps): Promise<void> {
     if (row.status === 'running')
       patch(d, row.id, (r) => {
         if (r.evo.when) r.inner.seen = undefined;
-        else r.inner.since = use.now();
+        else r.inner.since = r.inner.held ? undefined : use.now();
       });
     drive(d, row.id);
+    // What its runs did while nothing listened here (held or given their turn).
+    lookAtHold(d, row.id);
   }
 }
 
@@ -1528,8 +1599,14 @@ export async function takeBest(d: Deps, id: string, candidate?: string): Promise
 
 // ---- deleting -----------------------------------------------------------------------------------------------------
 
-/** Stops it, then removes its slots, its candidates' files, its scores and their runs' records. */
-export async function deleteEvolution(d: Deps, id: string): Promise<void> {
+/** Every run of the scores an evolution asked for (what deleting it deletes). */
+export const runsOfEvolution = (db: DB, id: string): string[] => scoresOf(db, id).flatMap((s) => getScore(db, s.id)?.runs ?? []);
+
+/**
+ * Stops it, then removes its slots, its candidates' files, its scores and their runs' records.
+ * `keepFiles`: what its runs wrote into their own folders is moved aside first; where, when anything was.
+ */
+export async function deleteEvolution(d: Deps, id: string, o: { keepFiles?: boolean } = {}): Promise<string | undefined> {
   const r = load(d.db, id);
   if (!r) throw new HttpError(404, 'There is no such evolution');
   await stopEvolution(d, id, 'It was deleted');
@@ -1546,6 +1623,8 @@ export async function deleteEvolution(d: Deps, id: string): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
   if (going().length) throw new HttpError(409, 'Its runs are still stopping: try again in a moment');
+  // All moved before any is deleted, so a move that fails deletes nothing.
+  const kept = o.keepFiles ? keepRunFiles(runsOfEvolution(d.db, id)) : undefined;
   for (const s of scores) {
     const score = getScore(d.db, s.id);
     if (!score) continue;
@@ -1562,4 +1641,5 @@ export async function deleteEvolution(d: Deps, id: string): Promise<void> {
     d.db.prepare('delete from exp_evolutions where id = ?').run(id);
   })();
   tellSoon(d, id);
+  return kept;
 }

@@ -8,10 +8,12 @@
 // and the routes and the latex_check tool. Build and run in the worktree, with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/latex-check-test.ts
 //   DATA_DIR=/tmp/hydor-test-latex-check node dist/dev/latex-check-test.js
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
+import { APP_ROOT } from '../config.ts';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { normalizeTex, type TexDoc } from '../../shared/latex.ts';
@@ -396,6 +398,11 @@ const PAPER = (body: string, pre = '\\documentclass[11pt]{article}\n\\usepackage
   const unearned = (await says(md, aTable))!.detail!;
   const turned = german(unearned);
   ok(!!turned && !/significance|Experiments worked/.test(turned) && /Neu berechnet \(Tabelle tmq3x9b2c4\)\./.test(turned), `the finding translates sentence by sentence (${unearned} -> ${turned})`);
+  // And its title, one number or several, is among what the extractor collects for the dictionaries.
+  const listed = path.join(tmp, 'strings.json');
+  execFileSync(process.execPath, [path.join(APP_ROOT, 'scripts/i18n-extract.mjs'), '--list', listed], { stdio: 'pipe' });
+  const collected = Object.keys(JSON.parse(fs.readFileSync(listed, 'utf8')));
+  for (const s of ['A number in the table at line {0} is not what its runs give now', '{0} numbers in the table at line {1} are not what its runs give now']) ok(collected.includes(s), `the extractor finds “${s}”`);
   useRecords({ recomputeTable: () => null, listRuns: () => [] });
   const st2 = await check(d, 'other');
   ok(has(st2, 'numbers:gone:tmq3x9a1f2')?.level === 'info' && has(st2, 'numbers:noruns')?.level === 'info', 'no runs: said as information, never as an error');

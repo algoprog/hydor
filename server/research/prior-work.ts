@@ -653,6 +653,12 @@ function noteOf(a: PriorAsk, f: Found, o: { byWords: boolean; ownWords: boolean 
     .join(' ');
 }
 
+/** Said when some of the papers given are preprints: what one claims has not been refereed. */
+export const preprintNote = (closest: PriorPaper[]): string => {
+  const n = closest.filter((p) => p.preprint).length;
+  return n ? ` ${n === 1 ? 'One of the papers given is a preprint' : `${n} of the papers given are preprints`} (preprint: true): not refereed, so a result one claims is a claim, not an established result.` : '';
+};
+
 const authorsLine = (list: string[]) => (list.length > 3 ? `${list.slice(0, 3).join(', ')} et al.` : list.join(', '));
 
 const paperOf = (c: Candidate, relation: PriorRelation, same: string, differs: string): PriorPaper => ({
@@ -660,6 +666,7 @@ const paperOf = (c: Candidate, relation: PriorRelation, same: string, differs: s
   authors: authorsLine(c.authors),
   ...(c.year ? { year: c.year } : {}),
   ...(c.venue ? { venue: clip(c.venue, 120) } : {}),
+  ...(c.venue && provisional(c.venue) ? { preprint: true as const } : {}),
   url: c.url,
   relation,
   same,
@@ -711,7 +718,10 @@ export async function priorWork(input: PriorAsk, deps: PriorDeps): Promise<Prior
   const searched = { queries: found.queries.length ? found.queries : written.queries, sources: found.sources as string[], candidates: candidates.length };
   const note = noteOf(a, found, { byWords: by === 'words' && candidates.length > 0, ownWords: !written.model });
   const nearest = pickJudged(candidates, scores, written.name);
-  const unjudged = (summary: string): PriorWork => ({ verdict: 'unjudged', summary, closest: nearest.slice(0, limit).map((c) => paperOf(c, 'unjudged', '', '')), searched, note });
+  const unjudged = (summary: string): PriorWork => {
+    const closest = nearest.slice(0, limit).map((c) => paperOf(c, 'unjudged', '', ''));
+    return { verdict: 'unjudged', summary, closest, searched, note: note + preprintNote(closest) };
+  };
   if (!candidates.length) return unjudged(found.sources.length ? UNJUDGED.nothing : UNJUDGED.silent);
 
   const j = await judge(a, nearest, deps, left);
@@ -728,7 +738,7 @@ export async function priorWork(input: PriorAsk, deps: PriorDeps): Promise<Prior
     .slice(0, limit);
   const all = [...j.judged.values()];
   const verdict: PriorVerdict = all.some((x) => x.relation === 'same') ? 'known' : all.some((x) => x.relation === 'overlaps') ? 'partly' : 'new';
-  return { verdict, summary: j.summary, closest, searched, note };
+  return { verdict, summary: j.summary, closest, searched, note: note + preprintNote(closest) };
 }
 
 // ---- what it reaches out with here -------------------------------------------------------------------------------
@@ -805,7 +815,7 @@ export function priorWorkTool(step: boolean): RunTool {
     description: [
       'Checks whether a research idea or result has been done before. Use it before pursuing a research idea, and again before calling a result new.',
       'It writes several searches that would find the idea under other names, searches arXiv, OpenAlex and Semantic Scholar, ranks what it finds against the idea and has a model compare the nearest papers with it. It takes up to two minutes.',
-      'Gives JSON: { verdict: "known" (a paper already does it), "partly" (the nearest overlap its main part), "new" (none found does it) or "unjudged" (no verdict could be given: the summary says why), summary, closest: [{ title, authors, year, venue, url, relation: same|overlaps|related|unjudged, same, differs }] (at most 8, by relation, and among those of one relation the much-cited first), searched: { queries, sources, candidates }, note }.',
+      'Gives JSON: { verdict: "known" (a paper already does it), "partly" (the nearest overlap its main part), "new" (none found does it) or "unjudged" (no verdict could be given: the summary says why), summary, closest: [{ title, authors, year, venue, preprint?: true (only a preprint of it was found: not refereed, so say that what it claims is a claim), url, relation: same|overlaps|related|unjudged, same, differs }] (at most 8, by relation, and among those of one relation the much-cited first), searched: { queries, sources, candidates }, note }.',
       'Finding nothing is not proof that it is new.',
     ].join(' '),
     inputSchema: {

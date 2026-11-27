@@ -123,7 +123,7 @@ When the project's folder is a Git repository, the end of the menu offers **New 
 
 ## A project's details
 
-Open them as described in [Open a project's details](#open-a-projects-details). Their tabs are **Overview**, **Files**, **Memory**, **Skills**, **Agents** and **Settings**. **Memory** and **Skills** have a count, except on a phone, where the tabs leave their counts out. On a phone (or in a narrow window), the tabs that do not fit are under **More** at the end of the row: tap it for a menu of them. While one of them is open, its name shows there in place of **More**. Each tab shows at once.
+Open them as described in [Open a project's details](#open-a-projects-details). Their tabs are **Overview**, **Files**, **Memory**, **Research** (only in a project that has research in it: see below), **Skills**, **Agents** and **Settings**. **Memory** and **Skills** have a count, except on a phone, where the tabs leave their counts out. On a phone (or in a narrow window), the tabs that do not fit are under **More** at the end of the row: tap it for a menu of them. While one of them is open, its name shows there in place of **More**. Each tab shows at once.
 
 ### The project's menu
 
@@ -175,6 +175,23 @@ What the project remembers, in one list: its notes, its wiki's articles, its doc
 - **Wiki**: the articles and sources of the project's wiki memory, to read. Agents write it; you read it here. The **⋯** menu has its jobs and **Wiki updates…** (see [Wiki memory](/guide/wiki-memory#a-projects-memory-tab)).
 - **Documents**: the project's own documents, which only its sessions search, and the folders it keeps up to date. See [Give a project documents of its own](#give-a-project-documents-of-its-own). New and changed documents also update the project's notes and wiki while Wiki memory and **Learn from new documents** are on (see [Learn from new documents](/guide/wiki-memory#learn-from-new-documents)). A project with more documents than its wiki reads (100 at first) has the wiki read the pinned ones, the ones agents used most and the newest, up to that number, and the chip says so: "Its wiki reads 100 of its 240 documents: the pinned, the most used and the newest. Agents search all of them." Click a document and turn on **Read into wiki memory** to pin it (see [When a project has too many documents](/guide/wiki-memory#when-a-project-has-too-many-documents)).
 - **Findings**: what the project tried and what came of it, dead ends included, each with its verdict and evidence (see [Findings](/guide/memory#findings-what-was-tried-and-what-came-of-it)).
+
+### Research
+
+A project that has research in it has this tab, after **Memory**, as soon as it has some (trials of a command do not count): runs of [Experiments](/guide/experiments) started in its folder or under it, a [finding](/guide/memory#findings-what-was-tried-and-what-came-of-it) of the project, or an [evaluation](/guide/experiments#evaluations-keeping-score-the-same-way) in its folder (an evolution belongs to its evaluation). It is one morning brief of what your agents did and what needs you, top to bottom. It refreshes by itself while you look, when runs change and every half minute.
+
+- **Waiting for you**: cards, at most three, then **N more**; with nothing, "Nothing is waiting for you." What holds runs back (runs held at your limit on agents' GPU hours, then sealed files that differ) comes first, then the rest, newest first.
+  - **Runs held at your [limit on agents' GPU hours](/guide/experiments#what-agents-may-use-gpu-hours)**: "3 runs wait: agents have used the 100 GPU hours you allow in seven days", with **Let them run** (those runs, beyond the limit) and **Change the limit…**. A search held at that limit has a card of its own, with **Let it run** (the whole search) and **Open it**.
+  - A question, approval or form an agent in the project asked: the question, when it was asked and in which session. A question with a few single choices shows them as buttons that answer it at once; **Answer in the session** opens the session for anything else.
+  - A goal that waits for you (its checks to agree, something only you can give, a pause, a question): **Answer in the session** or **Open the session**.
+  - **The sealed files of an evaluation differ**: how many files, with **See what changed** (the evaluation's own list of changes, where you can put them back or seal again).
+  - **Measure the baseline of an evaluation** that has none: **Measure the baseline** puts its runs in line, as on the evaluation's page; **Open it** shows the evaluation.
+  - **Run the final test?** when a goal reached its score and the evaluation's final test has not run since: **Run the final test…** asks as the evaluation's page does before anything starts; **Not yet** hides the card until the evaluation has a new best score. Agents never run the final test or see its numbers.
+  - **A search the app paused** (an evolution, with its reason): **Resume** carries on, **Open it** shows the search.
+- **Since you last looked**, with when that was at the right; on a first visit, **The last seven days**. Newest first, six lines, then **Show N more**, under the days' names when it spans more than one day. Findings recorded since (with their verdict as in Memory; click one to read it there), the runs that ended since (one line for each experiment, named by its title when it has one; and one more, with **Look at the runs**, when several failed for the same reason: "4 runs ran out of memory with batches of 4096, the same setting each time"), searches that tried more versions, rounds a goal finished and a new best score. A failed run that was started again by an attempt that then finished needs no look: its experiment's line says "2 failed and were started again", and it is not among the failures. Archived runs are left out here and in the rest of the tab. What is new stays marked for this visit; your next visit starts from now.
+- **Where it stands**, for each evaluation of the project (chips switch between them, the one scored last first): how its best stands to the baseline, in the evaluation's own words, and whether the final test ran, then a chart of every score over time: a point for each score, the best so far as a stepped line, the baseline dashed, failed scores as small red marks at the bottom, each step named by what was measured (the commit's title, else the branch; on a phone only the best now). Click a point to see that score. A step is named only when its name has room, and a long name is cut. Under it: **Best**, **Baseline**, **Scores** and **Findings** (click it to open them in Memory). A project with no evaluation shows "This project has no way of keeping score yet", with **New evaluation…** (the evaluation editor, for this folder) and **Ask an agent to set one up** (a new session in the project with the request written, not sent).
+- **Running and waiting**, with a link to **Experiments**: the project's runs that go (how far, and about how long is left where the app knows it) and wait (for a GPU, a free slot, the cluster's queue or the night; "starts about 14:20" where the app can tell), searches and goals at work. More than four lines fold into counts such as "9 runs wait for a GPU".
+- **This week**: GPU hours of the project's runs in the last seven days (GPUs times hours run), and what its sessions' models cost at API prices, with how many sessions. When you [limit agents' GPU hours](/guide/experiments#what-agents-may-use-gpu-hours), the hours shown are instead what all agents' runs on this computer used of that limit ("61 of 100 GPU hours"), with a thin bar.
 
 ### Skills
 
@@ -504,6 +521,8 @@ The knowledge tools never bring up another project's documents, not even when an
 - "Which of my projects came from Claude Code or Codex?"
 - "Open the Projects page and sort my projects by most sessions."
 - "Which of my projects has had no session for a month?"
+- "What needs me in my Dense retriever project?"
+- "What happened in my Dense retriever project since I last looked?"
 - "Don't make a project for ~/code/scratch by itself."
 - "Copy ~/Downloads/contract.pdf into my Taxes 2026 project, and have it work with ~/Documents/Receipts too."
 - "Group my Thesis and Reading notes projects into one called Everything for the thesis."

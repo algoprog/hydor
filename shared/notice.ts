@@ -22,10 +22,11 @@ export function noticeLine(n: { kind: NotifyEvent['kind']; body?: string }): { s
 
 /**
  * A notice as a system notification: the session's name as the title, the status first in the body. `tr` puts
- * the app's own words of it in the user's language: the status (a question's "Needs your approval"), and what
- * went wrong; a reply stays as the agent wrote it.
+ * the app's own words of it in the user's language: the status (a question's "Needs your approval"), what
+ * went wrong, and a notice that is the app's own words whole (ownWords); a reply stays as the agent wrote it.
  */
 export function noticeText(n: NotifyEvent, tr: (s: string) => string = (s) => s): { title: string; body: string } {
   const { status, detail } = noticeLine(n);
-  return { title: shortTitle(n.title || 'Hydor'), body: detail ? `${tr(status)} · ${n.kind === 'failed' ? tr(detail) : detail}` : tr(status) };
+  const title = n.ownWords ? tr(n.title) : n.title;
+  return { title: shortTitle(title || 'Hydor'), body: detail ? `${tr(status)} · ${n.kind === 'failed' || n.ownWords ? tr(detail) : detail}` : tr(status) };
 }

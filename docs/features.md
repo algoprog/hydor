@@ -611,7 +611,7 @@ agents that speak ACP and take MCP servers.
   sessions), the search box (Ctrl+K), or a link in a notification or an agent's answer. Page and window have a band in
   the project's colour (its mark, its name, what it is about or its folder, New session and a ⋯ menu: Open its folder in
   Files, Show in Finder, Only its sessions in the sidebar, Share with people, Delete the project) and the tabs under it:
-  Overview, Files, Memory, Skills, Agents and Settings (on a phone the tabs that do not fit are under More at the row's
+  Overview, Files, Memory, Research (only in a project with research in it: runs in its folder, a finding or an evaluation), Skills, Agents and Settings (on a phone the tabs that do not fit are under More at the row's
   end, and the window fills the screen). Esc, ✕ or a click outside closes the window, and so does going to another page,
   such as opening a document from Files; deleting the project from its page goes back to the Projects page. Its Overview has,
   while the project has jobs running or queued or servers left running, a Jobs card at the top (up to six of them, three
@@ -621,7 +621,19 @@ agents that speak ACP and take MCP servers.
   what every session in it gets (its folder, guidelines, memory as a line of notes, articles and documents, skills and
   assistant), who it is shared with, and a group's projects too; its Memory tab is one list of its notes, its wiki's articles and sources and its documents, newest first (the project's profile pinned at the top), with a search over all three at once (`GET /api/projects/:id/memory/search`: words, and meaning when search by meaning is on; it looks only in that project, and a note search inside a project now covers only that project's notes, which it could miss before), Add (a note, files, a folder kept up to date), a ⋯ menu (the wiki's jobs and Wiki updates…, Ask an agent to check the wiki, add a source or adopt a plan, Read the documents again, Open the wiki's folder, Memory settings, Deleted notes), chips All, Notes, Wiki and Documents with their counts (Notes: You said so, Not checked yet, Topics, Ends soon; Wiki: its areas, Sources, Plans; Documents: the folders it reads), and a pane that opens a note, a topic, an article or a document in place (`?part=notes`, `?part=wiki`, `?part=documents`; the old Knowledge and LLM Wiki addresses open it); on a phone the whole tab scrolls, its rows of chips are one line each that scrolls sideways (fading at an edge with more), titles take two lines, and an opened item goes back to the list where it was; files dropped anywhere on it join the project's documents; its Settings tab sets its name,
   colour, guidelines, the assistant its sessions start as (one tap among them), its Wiki memory switch, the most documents its wiki reads, whether its sessions also search the shared knowledge and whether other projects can search it (each saved at once) and its group, saved from a bar
-  that shows once something changed. Its Files tab holds everything of the project that is a file or was kept in it
+  that shows once something changed.
+  Its Research tab is one morning brief, read in one call (`GET /api/projects/:id/research`, which agents read for "what needs me in this project?"):
+  Waiting for you (up to three cards, then N more: runs held at your limit on agents' GPU hours come first, with Let them run and Change the limit…; a question an agent asked, with its single choices as buttons that answer it in place,
+  or Answer in the session; a goal that waits; an evaluation's sealed files that differ, with See what changed; an evaluation with no baseline,
+  with Measure the baseline; Run the final test? after a goal reached its score, with the evaluation's own dialog and Not yet until a new best;
+  a search the app paused, with Resume), Since you last looked (findings, runs that ended, each experiment named by its title, with failures that share a reason and a setting,
+  searches, goal rounds and new best scores, six lines then Show N more, under day names; on a first visit the part is headed The last seven days; the next visit
+  starts from when the page was shown: `POST …/research/seen`), Where it stands (a chip for each evaluation, a chart of every score over time
+  with the best so far stepped, the baseline dashed and failed scores marked, and four facts: Best, Baseline, Scores, Findings; no evaluation
+  offers New evaluation… and an agent to set one up), Running and waiting (how far and how long is left, what waits and why or when it should start, folded into counts
+  past four lines; trials of a command are left out, as are archived runs, and a failure started again by an attempt that
+  finished is said as that rather than as a failure to look at) and This week (GPU hours, or with a limit on agents' GPU hours what all agents used of it, with a thin bar; what the sessions' models cost, how many sessions). It refreshes when runs change and every 30 s.
+  Its Files tab holds everything of the project that is a file or was kept in it
   (**Files in a project** below). Its Skills tab lists every skill its
   sessions get, each with a switch for the project alone (On here, Off here; Follow Settings goes back): its own
   skills, written there, copied from the library to change for the project alone, or proposed by an agent working
@@ -1782,35 +1794,75 @@ agents that speak ACP and take MCP servers.
   that cannot be read stops the run at once, saying how to give it another way; the venue, the limit and tone, and the
   figures' template start from your last answers.
 - **Experiments** (**Experiments** on the rail, `/experiments`): jobs wait for a GPU with enough free memory on any of your machines (or a
-  SLURM cluster's queue over SSH), run in tmux and are kept as records: the commit and its changes, hyperparameters,
+  SLURM cluster's queue over SSH). Jobs that say how much GPU memory they need share a card when it fits (a switch in
+  **Where runs go**; a run can also have **A GPU to itself**); a run that has waited long for GPUs is not overtaken by
+  later ones; and a waiting run says why, naming other programs that hold memory, and about when it may start. Agents are
+  held to GPU hours (GPUs times hours): the approval card says what a run or sweep may use (from its time limit, else its
+  last run); an agent can ask once for a plan's budget (experiment_budget), within which its runs start without a card;
+  and **Where runs go** takes a limit on all agents' runs in seven days, past which their new runs are held until you
+  **Let it run** or there is room again (your own runs are never held), in full-access sessions too; a search or a goal's score already going is held there as well. They run
+  in tmux and are kept as records: the commit and its changes, hyperparameters,
   seed, environment, log and metrics (what it prints again and again drawn as curves, the most telling first; what it
   prints once kept as values), and how far a run has got with about how long is left. The page has a column at the left
   (the queue, this computer's GPUs, **Find an experiment**, and the experiments by category) and an **Overview**:
   **Running now**, **Experiments** as cards and the **Latest runs**. Every experiment has a **title, a short
   description and a category**, written by the helper model soon after its first run (and again when it has twice
   the runs), by an agent that starts runs (experiment_describe) or by you (**Edit the title and description**), and
-  found by the search box and **Find an experiment**. An experiment's page has three tabs: **Runs**, a table with a
+  found by the search box and **Find an experiment**. A run that failed or was stopped and was started again shares
+  one row with the later run ("4th attempt"; a tap unfolds the earlier ones), and a run's page says which attempt it is
+  and links either way. Runs can be **starred** (the ones that count, first in the table and on the charts), given a
+  **note** (yours or an agent's, experiment_note), and **archived**, one or many at once or a whole experiment, which
+  takes them out of the table, charts and counts and deletes nothing. The ticked runs can be starred, archived,
+  stopped or deleted together. An experiment's page shows the project's **findings** whose evidence names its runs or
+  tables, with their verdicts (the column shows the newest one), or offers **Ask an agent to write it** when runs are
+  done and none does. An experiment's page has three tabs: **Runs**, a table with a
   column per metric and per hyperparameter you choose (sortable, with the best of each column in bold, **Find a run**,
   **Filter**, **Columns**); **Charts**, a chart per metric over steps in sections (dev, train, Metrics, Other), up
   to 8 runs at once each keeping its colour, with **Smoothing**, a choice of X axis, a log scale, **Ignore
   outliers**, a drag to zoom and a bigger view with the numbers; and **Hyperparameters**, the best run, parallel
   coordinates, **Which hyperparameters matter** (ρ and η, a correlation, not proof) and each hyperparameter against a
   metric. A run's page has **Overview** (key metrics with their curves, hyperparameters, values, details, code,
-  command, environment and what happened), **Charts** and **Log**. **Compare** puts the picked runs' metrics,
+  command, environment and what happened), **Charts** and **Log**. Runs on this computer record what they used over
+  time (GPU memory and use, processor and memory, under **System** on Charts) and the most of it. **Try it first** (in
+  New run, or experiment_try for agents) runs a command for 90 seconds and says whether it runs, what memory it used
+  and how long the whole run should take; the memory is remembered for the same command. A failed run shows where it
+  first went wrong, with a link to that line of the log, says it ran out of memory only when it did (with what the GPU
+  held), and **Ask an agent why** looks into it, changing nothing. **Compare** puts the picked runs' metrics,
   hyperparameters (**Only what differs**) and charts side by side. An agent on call wakes on NaN, out of memory, a
-  stall, a crash or divergence, and tells you or acts within your rules. A session whose agent started runs hears of
-  those that end close together in one message, the numbers that matter most first, shown as one row. The files a
+  stall, a crash or divergence, and tells you or acts within your rules; without it you are still told of a run that has
+  printed nothing for half an hour or whose loss is NaN, and a session that asked hears of NaN, stalls and divergence. A session whose agent started runs hears of
+  those that end close together in one message, the numbers that matter most first, shown as one row. A run in a
+  git repository keeps its code as it is when it is queued (the commit, the changes not committed, the files git does
+  not track that its command names, and other untracked code and settings; what the command writes and data such as
+  .csv or .pt files are not code): if the folder's code has changed by the time it starts, it runs from a copy of that
+  code with data and outputs linked to the originals, what it creates there comes back to the folder, never over
+  anything, and the copy is removed but for what could not move (**Run as** shows a command pointed at the copy). **Run again** offers its own code or the folder's, **Open its code**
+  shows it, and an agent may ask for the folder as it is at the start instead (`code: "now"`). The files a
   run's command names that git does not track are kept with it, so it can be run again. Each run can write its
   per-example scores to a folder of its own (`$HYDOR_RUN_DIR/scores.jsonl`), as the runs of a sweep do, for paired
   tests. Sweep hyperparameters (every combination or a
-  random sample, losing runs stopped early; a sweep is one experiment, and its notice opens its Hyperparameters tab),
+  random sample, losing runs stopped early; a sweep is one experiment, and its notice opens its Hyperparameters tab; the early stop works for a sweep sent to
+  another of your machines too),
   and make **results tables** (mean ± std over seeds, the best in bold, paired or Welch tests with Holm's correction as
-  daggers, a double dagger where worse, and a note instead where the seeds barely change a number) as LaTeX, Markdown
+  daggers, a double dagger where worse, and a note instead where the seeds barely change a number; a row per
+  experiment, per command or per value of a hyperparameter) as LaTeX, Markdown
   or CSV, or straight into a LaTeX document you kept. A run or a sweep can wait for the night (**Start: Tonight**, or
   an agent's `when: "night"`): it starts only in this computer's night hours and after every other waiting run, and is
-  let finish, or stopped to start again, when the night ends. In the morning one notice says what was done, what failed
-  and what still waits, and opens that night's runs. Agents use it with experiment_run,
-  experiment_sweep, experiment_list, experiment_get, experiment_stop, experiment_table and experiment_describe. The
+  let finish, or stopped to start again, when the night ends. A stop the app decides on (a time limit, the night's
+  end, an early stop) **warns the run first**: it gets Ctrl-C and 30 seconds (5 to 600, your choice) to save a
+  checkpoint and leave before the hard stop, and `HYDOR_GRACE_SECONDS` says how long. A run can give **the command to
+  carry on** (**To carry on after a stop**, or an agent's `resume`): a night run stopped at the night's end goes on
+  from its checkpoint the next night, a run lost in a restart (or preempted on a cluster) is started again with it, as
+  a new attempt, twice at most, and **Run again** offers **Carry on from where it stopped**. In the morning one notice
+  says what was done, what failed and what still waits, and opens that night's runs. A run for a **SLURM** cluster is
+  checked before it is sent (`sbatch --test-only`): a refusal says why in plain words at once, and while it waits you
+  see why, and when the cluster guesses or expects it to start. A **plain SSH** machine keeps a run's time limit too, a run's metrics and scores
+  files are read on the cluster, and out of time, out of memory, preempted or cancelled are said with what to do.
+  Deleting a run (or an evaluation, a score or an evolution) says
+  what its runs wrote into their own run folders, and offers to keep those files when they are over 100 MB. A run
+  belongs to the project of the session that started it, else of its folder. Agents use it with experiment_run,
+  experiment_try, experiment_sweep, experiment_list, experiment_get, experiment_stop, experiment_table, experiment_describe and experiment_note (an agent that starts a failed run again
+  says which one, experiment_run's replaces, and experiment_list leaves archived runs out unless asked). The
   first time you open the page, a short tour for people new to it explains what an experiment and a run are and lights
   each part in turn (New run, the queue and GPUs, experiments by category, following a run live, comparing runs and
   results tables, letting an agent do the work); **Show me around** starts it again.

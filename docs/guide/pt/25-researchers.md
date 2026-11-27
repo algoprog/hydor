@@ -249,7 +249,7 @@ Os agentes das suas sessões também conhecem esses ofícios, por meio de habili
 
 ## Execute o trabalho do seu laboratório
 
-Três apps prontos, em **Laboratório** na página [Apps](/apps), ajudam no trabalho diário de um laboratório: classificar dados e conferir um modelo com base nos seus rótulos, testar uma ideia no seu próprio código, das hipóteses até um relatório, e ajustar as configurações de um modelo. O sprint e a varredura executam seus trabalhos em [Experimentos](/guide/experiments), então precisam que ele tenha um computador (ou um cluster) com GPUs.
+Três apps prontos, em **Laboratório** na página [Apps](/apps), ajudam no trabalho diário de um laboratório: classificar dados e conferir um modelo com base nos seus rótulos, testar uma ideia no seu próprio código, das hipóteses até um relatório, e ajustar as configurações de um modelo. O sprint e a varredura executam seus trabalhos em [Experimentos](/guide/experiments), então precisam que ele tenha um computador (ou um cluster) com GPUs. A aba **Pesquisa** de um projeto é onde você vê o que esses apps e seus outros agentes fizeram durante a noite, o que precisa de você e como a pontuação mudou (veja [Pesquisa](/guide/projects#research)).
 
 ### Bancada de anotação
 

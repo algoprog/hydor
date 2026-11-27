@@ -249,7 +249,7 @@ Agents in your sessions know these crafts too, from skills that come with Hydor 
 
 ## Run your lab's work
 
-Three ready-made apps, under **Lab** on the [Apps](/apps) page, help with a lab's daily work: labelling data and checking a model against your labels, testing an idea on your own code from hypotheses to a report, and tuning a model's settings. The sprint and the sweep run their jobs in [Experiments](/guide/experiments), so they need it to have a computer (or a cluster) with GPUs.
+Three ready-made apps, under **Lab** on the [Apps](/apps) page, help with a lab's daily work: labelling data and checking a model against your labels, testing an idea on your own code from hypotheses to a report, and tuning a model's settings. The sprint and the sweep run their jobs in [Experiments](/guide/experiments), so they need it to have a computer (or a cluster) with GPUs. A project's **Research** tab is where you see what they and your other agents did overnight, what needs you and how the score moved (see [Research](/guide/projects#research)).
 
 ### Annotation workbench
 

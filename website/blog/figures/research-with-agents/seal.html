@@ -1,0 +1,30 @@
+<figure class="fig" data-fig="research-with-agents-seal">
+<div class="fig-stage rw-seal">
+<div class="rw-head"><span class="rw-eg">An example evaluation: dev queries, nDCG@10</span><span class="rw-state" data-state><i></i><em>Sealed</em></span></div>
+<ul class="rw-files" aria-label="The sealed files">
+<li data-f="eval"><span class="rw-ico" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14"><rect x="3" y="7" width="10" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><b>eval.py</b><span class="rw-what">the scorer</span><code class="rw-code" data-code>score = ndcg(run, qrels, k=10)</code><em class="rw-mark" data-mark>as sealed</em></li>
+<li data-f="qrels"><span class="rw-ico" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14"><rect x="3" y="7" width="10" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><b>qrels.tsv</b><span class="rw-what">the judgements</span><code class="rw-code">q12  0  d481  1</code><em class="rw-mark">as sealed</em></li>
+<li data-f="dev"><span class="rw-ico" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14"><rect x="3" y="7" width="10" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><b>dev.jsonl</b><span class="rw-what">the dev queries</span><code class="rw-code">{"id": "q12", "text": "…"}</code><em class="rw-mark">as sealed</em></li>
+</ul>
+<div class="rw-tile" data-tile>
+<div class="rw-tile-ok" data-ok>
+<span class="rw-cap">Latest score</span>
+<b class="rw-big">0.4129 <small>± 0.0024</small></b>
+<p>The same as the baseline, within the noise <span class="rw-dim">· 3 seeds</span></p>
+</div>
+<div class="rw-tile-no" data-no hidden>
+<span class="rw-cap">Latest score</span>
+<b class="rw-big rw-big-no" data-no-title>No score: 1 sealed file differs</b>
+<p data-no-text>eval.py is marked Changed. Scores wait until it is back.</p>
+</div>
+</div>
+<p class="rw-readout" aria-live="polite" data-read></p>
+</div>
+<div class="fig-controls" role="group" aria-label="What happens to the scorer">
+<button class="fig-btn" type="button" data-act="edit">An agent edits eval.py</button>
+<button class="fig-btn" type="button" data-act="back" hidden>Put it back</button>
+<button class="fig-btn" type="button" data-act="reseal" hidden>Seal again…</button>
+<button class="fig-btn" type="button" data-act="reset" hidden>Start over</button>
+</div>
+<figcaption>An example with made-up numbers, not a real run. Press the first button: an agent changes the scorer so that it reports whatever it likes. The app gives no score while a sealed file differs, so the number cannot be moved by moving the scorer. <b>Put it back</b> restores the sealed file and the score. <b>Seal again…</b> accepts the edit, and then the earlier scores and the baseline no longer count.</figcaption>
+</figure>

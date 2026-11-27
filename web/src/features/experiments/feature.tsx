@@ -78,7 +78,7 @@ function RunCard({ item, sessionKey }: { item: ToolItem; sessionKey: string }) {
         {run && <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', statusTone(run.status))} />}
         <span className="truncate" title={run?.why}>
           {run ? statusWords(run) : 'In line'}
-          {run?.why && !saidByStatus(run.why) && (run.status === 'waiting' || run.status === 'failed') ? `: ${run.why}` : ''}
+          {run?.why && !saidByStatus(run.why) && (run.status === 'waiting' || run.status === 'failed') ? <>{': '}{run.why.replace(/^Waits for you: /, '')}</> : ''}
         </span>
       </div>
       {m && (
@@ -354,7 +354,9 @@ export const experimentsFeature: WebFeature = {
     experiment_get: { Row: StepRow, step: (t) => ({ category: 'read', verb: going(t) ? 'Reading' : 'Read', title: `the run ${arg(t, 'id') ?? ''}`.trim() }) },
     experiment_stop: { Row: StepRow, step: (t) => ({ verb: going(t) ? 'Stopping' : 'Stopped', title: `the run ${arg(t, 'id') ?? ''}`.trim() }) },
     experiment_describe: { Row: StepRow, step: (t) => ({ verb: going(t) ? 'Describing' : 'Described', title: arg(t, 'group') ? `the experiment ${arg(t, 'group')}` : 'an experiment' }) },
+    experiment_note: { Row: StepRow, step: (t) => ({ verb: going(t) ? 'Noting' : 'Noted', title: `something about the run ${arg(t, 'id') ?? ''}`.trim() }) },
     experiment_wait: { Row: StepRow, step: (t) => ({ verb: going(t) ? 'Waiting for' : 'Waited for', title: 'runs to end' }) },
+    experiment_budget: { Row: StepRow, step: (t) => (arg(t, 'why') ? { verb: going(t) ? 'Asking for' : 'Asked for', title: 'GPU hours for its runs' } : { category: 'read', verb: going(t) ? 'Reading' : 'Read', title: 'its budget of GPU hours' }) },
     evaluation_score: { place: 'answer', Row: ScoreCard, step: (t) => ({ verb: going(t) ? 'Scoring with' : 'Scored with', title: 'an evaluation' }) },
     evaluation_propose: { place: 'answer', Row: ProposalCard, step: (t) => ({ verb: going(t) ? 'Proposing' : 'Proposed', title: arg(t, 'name') ? `the evaluation ${arg(t, 'name')}` : 'an evaluation' }) },
     evaluation_get: { Row: StepRow, step: (t) => ({ category: 'read', verb: going(t) ? 'Reading' : 'Read', title: arg(t, 'score') ? 'a score' : 'the evaluations' }) },

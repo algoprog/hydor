@@ -1,9 +1,11 @@
 // Runs as a table, as Weights & Biases' runs table is: a row per run with its name and status, a column per metric
 // (its last value, the best in the column in bold) and per hyperparameter, how long it ran and when it started. A
 // header click sorts; the box at the left picks runs; the name stays in view when the table is scrolled sideways.
-// The Columns menu chooses which metrics and hyperparameters show.
-import { useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Columns3, Search } from 'lucide-react';
+// A star at the left of a name marks the runs that count, a note shows under it, and a run that stands for several
+// attempts has a chip that unfolds the earlier ones under it. The Columns menu chooses which metrics and
+// hyperparameters show.
+import { Fragment, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, ArchiveRestore, ChevronDown, ChevronRight, Columns3, Search, Star } from 'lucide-react';
 import type { RunRecord } from '@shared/experiments';
 import { betterOf } from '@shared/experiments';
 import { LOCALE } from '../../i18n/locale';
@@ -11,6 +13,7 @@ import { timeAgo } from '../../lib/format';
 import { Button, cx, inputCls, MenuItem, MenuLabel, MenuSep, Popover } from '../../components/ui';
 import { metricsLine, metricsOf, num, progressOf, rankMetrics, statusTone, statusWords, took } from './api';
 import { allParams, differingParams, paramsOf, paramText, runKey, runtimeOf, tableMetricsOf, tableParamsOf } from './analysis';
+import { attemptChip, endedFew } from './runList';
 
 /** The columns a runs table shows besides its fixed ones: metrics (each run's last value) and hyperparameters. */
 export interface RunsColumns {
@@ -84,9 +87,40 @@ export function RunsTable(props: {
   onSort: (s: RunsSort) => void;
   /** Rows before "Show N more" (50 unless given). */
   limit?: number;
+  /** Taps on a row's star; without it there are no stars. */
+  onStar?: (r: RunRecord) => void;
+  /** The earlier attempts folded under a row, by the row's key. */
+  earlier?: Map<string, RunRecord[]>;
+  /** Rows unfolded whatever was tapped (what was looked for is under them). */
+  unfolded?: Set<string>;
+  /** A Bring back button on each run (the archived ones). */
+  onBringBack?: (r: RunRecord) => void;
+  /** What to say when there is no run to show. */
+  empty?: string;
 }) {
-  const { runs, columns, experiment, summary, where, colorOf, picked, onPick, onPickAll, onOpen, sort, onSort } = props;
+  const { runs, columns, experiment, summary, where, colorOf, picked, onPick, onPickAll, onOpen, sort, onSort, onStar, earlier, unfolded, onBringBack } = props;
   const [all, setAll] = useState(false);
+  const [opened, setOpened] = useState<Set<string>>(new Set());
+  const toggle = (k: string, on: boolean) =>
+    setOpened((s) => {
+      const n = new Set(s);
+      if (on) n.add(k);
+      else n.delete(k);
+      return n;
+    });
+  // A row found by an earlier attempt starts unfolded, and folds when its chip is tapped.
+  const [shut, setShut] = useState<Set<string>>(new Set());
+  const isOpen = (k: string) => (unfolded?.has(k) ? !shut.has(k) : opened.has(k));
+  const flip = (k: string) => {
+    if (unfolded?.has(k))
+      setShut((s) => {
+        const n = new Set(s);
+        if (n.has(k)) n.delete(k);
+        else n.add(k);
+        return n;
+      });
+    else toggle(k, !opened.has(k));
+  };
   const limit = props.limit ?? 50;
 
   const metrics = summary ? [] : columns.metrics;
@@ -158,6 +192,172 @@ export function RunsTable(props: {
   const cellBg = (p: boolean) => (p ? 'bg-accent-soft' : 'bg-panel group-hover:bg-bg-1');
   const colSpan = nRun + (summary ? 1 : metrics.length) + params.length + 2 + 1;
 
+  const line = (r: RunRecord, o: { child?: boolean; before?: number; open?: boolean }) => {
+    const k = runKey(r);
+    const p = picked.has(k);
+    const prog = progressOf(r);
+    const color = colorOf?.(r);
+    const exp = experiment?.(r);
+    const cell = cx('border-b border-line px-3 py-2 align-top', cellBg(p));
+    const started = r.startedAt;
+    // Under the name: the chip of the attempts it stands for, why an earlier one ended, its note.
+    const chip = !o.child && (r.attempt ?? 1) > 1 ? attemptChip(r.attempt!) : null;
+    const why = o.child ? endedFew(r) : null;
+    const under = !!(chip || why || r.note || onBringBack);
+    const chipClass = 'inline-flex shrink-0 items-center gap-0.5 rounded-full bg-bg-2 px-2 text-[11px] leading-[20px] text-fg-2';
+    return (
+      <tr onClick={() => onOpen(r)} className="group cursor-pointer">
+        <td className={cx('border-b border-line align-top sm:sticky sm:left-0 sm:z-[1]', cellBg(p))} onClick={(e) => e.stopPropagation()}>
+          <label className="flex h-9 w-9 cursor-pointer items-center justify-center">
+            <input type="checkbox" checked={p} onChange={() => onPick(r)} aria-label="Pick this run" className="accent-[var(--accent)]" />
+          </label>
+        </td>
+        <td className={cx(cell, 'sticky left-0 z-[1] sm:left-9', onStar && '!pl-1.5')}>
+          <div className={cx('flex items-start gap-1.5', o.child && 'pl-4')}>
+            {onStar && (
+              <button
+                type="button"
+                aria-pressed={!!r.starredAt}
+                aria-label={r.starredAt ? 'Take the star off this run' : 'Star this run'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStar(r);
+                }}
+                className={cx('-my-1 flex h-7 w-6 shrink-0 items-center justify-center rounded-md hover:bg-bg-2', r.starredAt ? 'text-warn' : 'text-fg-3/60')}
+              >
+                <Star size={14} fill={r.starredAt ? 'currentColor' : 'none'} />
+              </button>
+            )}
+            <div className="w-max max-w-[180px] min-w-0 sm:max-w-[300px]">
+              <span className="flex min-w-0 items-center gap-2">
+                {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />}
+                {/* Whole pixels high: with a fraction, a phone drew no line under the pinned names of a two-line row. */}
+                <button type="button" translate="no" title={r.name ?? r.id} className={cx('min-w-0 truncate text-left leading-[20px]', o.child ? 'text-fg-2' : 'font-medium text-fg')}>
+                  {r.name ?? r.id}
+                </button>
+                {/* Files an evaluation protects differed when it started: which ones is on the run's page. */}
+                {r.sealed?.some((s) => !s.ok) && (
+                  <span role="img" aria-label="Sealed files had changed when it started" title="Sealed files had changed when it started" className="flex shrink-0 text-warn">
+                    <AlertTriangle size={13} />
+                  </span>
+                )}
+              </span>
+              {under && (
+                // w-0 with min-w-full: this line never makes the column wider than the names do.
+                <span className="mt-0.5 flex w-0 min-w-full items-start gap-1.5 text-[12px] leading-[20px] text-fg-3">
+                  {chip &&
+                    (o.before ? (
+                      <button
+                        type="button"
+                        aria-expanded={o.open}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          flip(k);
+                        }}
+                        className={cx(chipClass, 'hover:bg-bg-3')}
+                      >
+                        <span>{chip}</span>
+                        {o.open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      </button>
+                    ) : (
+                      <span className={chipClass}>{chip}</span>
+                    ))}
+                  {onBringBack && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onBringBack(r);
+                      }}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md px-1 text-accent hover:bg-accent-soft"
+                    >
+                      <ArchiveRestore size={12} /> <span>Bring back</span>
+                    </button>
+                  )}
+                  {why && (
+                    <span className="min-w-0 truncate" title={why.own}>
+                      <span>{why.words}</span>
+                      {why.own && (
+                        <>
+                          {': '}
+                          <span translate="no">{why.own}</span>
+                        </>
+                      )}
+                    </span>
+                  )}
+                  {r.note && (
+                    // Two lines, the ellipsis at the end of the second (the table itself keeps its cells on one).
+                    <span className="line-clamp-2 min-w-0 flex-1 break-words whitespace-normal text-fg-2" title={r.note}>
+                      {r.noteBy === 'agent' && (
+                        <>
+                          <span className="text-fg-3">Agent:</span>{' '}
+                        </>
+                      )}
+                      <span translate="no">{r.note}</span>
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+          </div>
+        </td>
+        <td className={cell} title={r.why}>
+          <span className="inline-flex items-center gap-1.5 text-fg-2">
+            <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', statusTone(r.status))} />
+            <span>{statusLabel(r)}</span>
+            {prog && <span className="tnum">{prog.pct}%</span>}
+          </span>
+        </td>
+        {experiment && (
+          <td className={cell}>
+            {exp ? (
+              <span translate="no" title={exp} className="block max-w-[220px] truncate text-fg-2">
+                {exp}
+              </span>
+            ) : (
+              <span className="text-fg-3">–</span>
+            )}
+          </td>
+        )}
+        {where && (
+          <td className={cell}>
+            <span className="text-fg-2">{where(r) ?? '–'}</span>
+          </td>
+        )}
+        {summary && (
+          <td className={cell}>
+            <span translate="no" className="tnum block max-w-[300px] truncate text-fg-2">
+              {metricsLine(r) || '–'}
+            </span>
+          </td>
+        )}
+        {metrics.map((m) => {
+          const v = r.metrics?.last?.[m];
+          const isBest = finite(v) && bests[m] === v;
+          return (
+            <td key={m} className={cx(cell, 'tnum text-right', isBest ? 'font-semibold text-fg' : 'text-fg-2')} title={isBest ? 'The best of these runs' : undefined}>
+              {finite(v) ? num(v) : '–'}
+            </td>
+          );
+        })}
+        {params.map((pk) => {
+          const t = paramText(paramsOf(r)[pk]);
+          return (
+            <td key={pk} className={cell}>
+              <span translate="no" title={t} className="block max-w-[180px] truncate font-mono text-[12px] text-fg-2">
+                {t}
+              </span>
+            </td>
+          );
+        })}
+        <td className={cx(cell, 'tnum text-right text-fg-2')}>{runtimeWords(r)}</td>
+        <td className={cx(cell, 'tnum text-right text-fg-2')} title={started ? new Date(started).toLocaleString(LOCALE, FULL_DATE) : undefined}>
+          {started ? timeAgo(started) : '–'}
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-panel">
       <table className="w-max min-w-full border-separate border-spacing-0 text-[12.5px] whitespace-nowrap">
@@ -219,95 +419,21 @@ export function RunsTable(props: {
           </tr>
         </thead>
         <tbody>
-          {shown.map((r) => {
-            const k = runKey(r);
-            const p = picked.has(k);
-            const prog = progressOf(r);
-            const color = colorOf?.(r);
-            const exp = experiment?.(r);
-            const cell = cx('border-b border-line px-3 py-2', cellBg(p));
-            const started = r.startedAt;
+          {shown.map((row) => {
+            const rowKey = runKey(row);
+            const before = earlier?.get(rowKey) ?? [];
+            const open = before.length > 0 && isOpen(rowKey);
             return (
-              <tr key={k} onClick={() => onOpen(r)} className="group cursor-pointer">
-                <td className={cx('border-b border-line sm:sticky sm:left-0 sm:z-[1]', cellBg(p))} onClick={(e) => e.stopPropagation()}>
-                  <label className="flex h-9 w-9 cursor-pointer items-center justify-center">
-                    <input type="checkbox" checked={p} onChange={() => onPick(r)} aria-label="Pick this run" className="accent-[var(--accent)]" />
-                  </label>
-                </td>
-                <td className={cx(cell, 'sticky left-0 z-[1] sm:left-9')}>
-                  <span className="flex items-center gap-2">
-                    {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />}
-                    <button type="button" translate="no" title={r.name ?? r.id} className="max-w-[180px] truncate text-left font-medium text-fg sm:max-w-[300px]">
-                      {r.name ?? r.id}
-                    </button>
-                    {/* Files an evaluation protects differed when it started: which ones is on the run's page. */}
-                    {r.sealed?.some((s) => !s.ok) && (
-                      <span role="img" aria-label="Sealed files had changed when it started" title="Sealed files had changed when it started" className="flex shrink-0 text-warn">
-                        <AlertTriangle size={13} />
-                      </span>
-                    )}
-                  </span>
-                </td>
-                <td className={cell} title={r.why}>
-                  <span className="inline-flex items-center gap-1.5 text-fg-2">
-                    <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', statusTone(r.status))} />
-                    <span>{statusLabel(r)}</span>
-                    {prog && <span className="tnum">{prog.pct}%</span>}
-                  </span>
-                </td>
-                {experiment && (
-                  <td className={cell}>
-                    {exp ? (
-                      <span translate="no" title={exp} className="block max-w-[220px] truncate text-fg-2">
-                        {exp}
-                      </span>
-                    ) : (
-                      <span className="text-fg-3">–</span>
-                    )}
-                  </td>
-                )}
-                {where && (
-                  <td className={cell}>
-                    <span className="text-fg-2">{where(r) ?? '–'}</span>
-                  </td>
-                )}
-                {summary && (
-                  <td className={cell}>
-                    <span translate="no" className="tnum block max-w-[300px] truncate text-fg-2">
-                      {metricsLine(r) || '–'}
-                    </span>
-                  </td>
-                )}
-                {metrics.map((m) => {
-                  const v = r.metrics?.last?.[m];
-                  const isBest = finite(v) && bests[m] === v;
-                  return (
-                    <td key={m} className={cx(cell, 'tnum text-right', isBest ? 'font-semibold text-fg' : 'text-fg-2')} title={isBest ? 'The best of these runs' : undefined}>
-                      {finite(v) ? num(v) : '–'}
-                    </td>
-                  );
-                })}
-                {params.map((pk) => {
-                  const t = paramText(paramsOf(r)[pk]);
-                  return (
-                    <td key={pk} className={cell}>
-                      <span translate="no" title={t} className="block max-w-[180px] truncate font-mono text-[12px] text-fg-2">
-                        {t}
-                      </span>
-                    </td>
-                  );
-                })}
-                <td className={cx(cell, 'tnum text-right text-fg-2')}>{runtimeWords(r)}</td>
-                <td className={cx(cell, 'tnum text-right text-fg-2')} title={started ? new Date(started).toLocaleString(LOCALE, FULL_DATE) : undefined}>
-                  {started ? timeAgo(started) : '–'}
-                </td>
-              </tr>
+              <Fragment key={rowKey}>
+                {line(row, { before: before.length, open })}
+                {open && before.map((e) => <Fragment key={runKey(e)}>{line(e, { child: true })}</Fragment>)}
+              </Fragment>
             );
           })}
           {!shown.length && (
             <tr>
               <td colSpan={colSpan} className="px-3 py-6 text-center text-[13px] text-fg-3">
-                No run is like that.
+                {props.empty ?? 'No run is like that.'}
               </td>
             </tr>
           )}

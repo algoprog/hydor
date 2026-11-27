@@ -249,7 +249,7 @@ Les agents de vos sessions connaissent aussi ces savoir-faire, grâce à des com
 
 ## Exécuter le travail de votre laboratoire
 
-Trois apps prêtes à l’emploi, sous **Labo** sur la page [Apps](/apps), aident au travail quotidien d’un laboratoire : étiqueter des données et vérifier un modèle par rapport à vos étiquettes, tester une idée sur votre propre code, des hypothèses jusqu’à un rapport, et régler les paramètres d’un modèle. Le sprint et le balayage exécutent leurs tâches dans [Expériences](/guide/experiments) : il leur faut donc une machine (ou un cluster) équipée de GPU.
+Trois apps prêtes à l’emploi, sous **Labo** sur la page [Apps](/apps), aident au travail quotidien d’un laboratoire : étiqueter des données et vérifier un modèle par rapport à vos étiquettes, tester une idée sur votre propre code, des hypothèses jusqu’à un rapport, et régler les paramètres d’un modèle. Le sprint et le balayage exécutent leurs tâches dans [Expériences](/guide/experiments) : il leur faut donc une machine (ou un cluster) équipée de GPU. L’onglet **Recherche** d’un projet vous montre ce que ces applications et vos autres agents ont fait pendant la nuit, ce qui attend votre intervention et comment le score a évolué (voir [Recherche](/guide/projects#research)).
 
 ### Atelier d’annotation
 

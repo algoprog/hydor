@@ -51,8 +51,13 @@ export interface Evolution extends EvolveSpec {
   activeMs: number;
   /** What "Take the best" made last. */
   taken?: { branch: string; commit: string; at: number; candidate: string };
-  /** Worked out as it is read, never kept: a night evolution holding still by day, in the words a night run waits with. */
+  /**
+   * Worked out as it is read, never kept: why it holds still, in the words its runs wait with (every score it waits for
+   * is held at the limit on agents' GPU hours, or a night evolution by day).
+   */
   waits?: string;
+  /** You let it go on beyond the limit on agents' GPU hours (when): its scores' runs are no longer held. */
+  letRun?: number;
   by: { who: 'you' | 'agent'; session?: string };
 }
 

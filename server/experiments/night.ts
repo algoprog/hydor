@@ -18,6 +18,10 @@ export const clock = { now: () => Date.now() };
 
 /** Why a night run stopped at the night's end waits, until the next night. */
 export const NIGHT_AGAIN = 'The night ended: it starts again tonight';
+/** The same for a run that says how to carry on: it goes on from its checkpoint. */
+export const NIGHT_CARRY = 'Stopped at the end of the night: it carries on from its checkpoint tonight';
+/** Whether a run's reason (or why it is being stopped) is that its night ended and it waits for the next. */
+export const isNightAgain = (why: string | undefined): why is string => why === NIGHT_AGAIN || why === NIGHT_CARRY;
 /** Why a night run waits in the night itself while an ordinary run waits. */
 export const NIGHT_BEHIND = 'Its turn comes after your other waiting runs: it is a night run';
 const NIGHT_UNSET = 'Waits for the night: none is set. Give Night two different times in Where runs go';
@@ -65,7 +69,7 @@ export function nightAt(at: number, h: Hours, tz?: string): string | null {
 /** Why a night run waits by day: when it will start. */
 export function nightWhy(r: Pick<RunRecord, 'why'>, h: Hours): string {
   if (h.nightFrom === h.nightTo) return NIGHT_UNSET;
-  return r.why === NIGHT_AGAIN ? NIGHT_AGAIN : `Waits for the night (from ${h.nightFrom})`;
+  return isNightAgain(r.why) ? r.why : `Waits for the night (from ${h.nightFrom})`;
 }
 
 /** When a night run asked for now will start, for an agent and its approval card. `machine`: sent to that machine. */
@@ -78,15 +82,24 @@ export function tonightWords(h: Hours, machine?: string): string {
 /** The time zone the night's hours are read in: the person's, as their browser reported it (the tests leave it unset: this computer's). */
 export const nightZone = (db: DB): string | undefined => kvGet(db, 'user.tz') || undefined;
 
+/** Which code a night run will run: kept when it was queued; the folder's when it starts, as asked; or not kept (no git). */
+export type NightCode = 'kept' | 'now' | 'folder';
+
+const NIGHT_CODE: Record<NightCode, string> = {
+  kept: 'It runs the code as it is now, even if files in the folder change before it starts.',
+  now: 'As you asked (code: "now"), it runs the code as its folder has it when it starts, so leave that folder and its branch as they should run.',
+  folder: 'No code was kept (the folder is not in git): it runs the folder as it is when it starts, so leave it as it should run.',
+};
+
 /**
- * For an agent, beside when a night run will start: how long until then, whose clock the hours are on, and that it
- * runs the code its folder has when it starts (nothing is fixed when it is queued). Empty when there is no night.
+ * For an agent, beside when a night run will start: how long until then, whose clock the hours are on, and which code
+ * it will run. Empty when there is no night.
  */
-export function tonightMore(h: Hours, o: { tz?: string; at?: number } = {}): string {
+export function tonightMore(h: Hours, o: { tz?: string; at?: number; code?: NightCode } = {}): string {
   if (h.nightFrom === h.nightTo) return '';
   const at = o.at ?? clock.now();
   const zone = o.tz ? `The hours are in ${o.tz} time. ` : '';
-  const code = 'It runs the code as its folder has it when it starts, so leave that folder and its branch as they should run.';
+  const code = NIGHT_CODE[o.code ?? 'kept'];
   if (nightAt(at, h, o.tz)) return `${zone}It is night now, so it starts as soon as nothing else waits. ${code}`;
   const left = (minutesOf(h.nightFrom) - wall(at, o.tz).now + 1440) % 1440;
   const about = left >= 90 ? `${Math.round(left / 60)} hours` : left >= 60 ? 'an hour' : `${Math.max(1, left)} minutes`;
@@ -157,6 +170,8 @@ export interface Morning {
   stopped: number;
   running: number;
   waiting: number;
+  /** Held at the limit on agents' GPU hours: they wait for you, not for a night. */
+  held?: number;
 }
 
 /** "Last night: 5 runs done, 1 failed, 2 still wait for tonight". The first part says what is counted: runs. */
@@ -168,6 +183,7 @@ export function morningWords(n: Morning): string {
   if (n.stopped) parts.push(`${count(n.stopped)} stopped`);
   if (n.running) parts.push(`${count(n.running)} still running`);
   if (n.waiting) parts.push(`${count(n.waiting)} still ${n.waiting === 1 ? 'waits' : 'wait'} for tonight`);
+  if (n.held) parts.push(`${count(n.held)} ${n.held === 1 ? 'waits' : 'wait'} for you`);
   return `Last night: ${parts.join(', ')}`;
 }
 
@@ -183,10 +199,13 @@ export const morningAlso: { of: (db: DB, since: number) => NightWork[] } = { of:
 function tellMorning(d: Deps, { night, since }: Watch, stopping: boolean): void {
   // One you stopped, or one stopped before it started, is not news. Nor are scores: they are not experiments.
   const runs = (r: RunRecord) => isNightHere(r) && !isScoringRun(r);
-  const ended = listRuns(d.db, { night, limit: 5000 }).filter((r) => runs(r) && !ACTIVE.includes(r.status) && (r.endedAt ?? 0) >= since && (r.status !== 'stopped' || (!!r.startedAt && r.why !== 'Stopped by you')));
+  // One the app took up again by itself is not news: the run that took its place is.
+  const ended = listRuns(d.db, { night, limit: 5000 }).filter((r) => runs(r) && !r.restartedAs && !ACTIVE.includes(r.status) && (r.endedAt ?? 0) >= since && (r.status !== 'stopped' || (!!r.startedAt && r.why !== 'Stopped by you')));
   const open = listRuns(d.db, { status: ACTIVE, limit: 5000 }).filter(runs);
-  const waiting = open.filter((r) => stopping || r.status === 'queued' || r.status === 'waiting').length;
-  const ofRuns = ended.length > 0 || waiting > 0;
+  // One held at the limit on agents' GPU hours does not wait for tonight: it waits for the person.
+  const held = open.filter((r) => r.held).length;
+  const waiting = open.filter((r) => !r.held && (stopping || r.status === 'queued' || r.status === 'waiting')).length;
+  const ofRuns = ended.length > 0 || waiting > 0 || held > 0;
   let also: NightWork[] = [];
   try {
     also = morningAlso.of(d.db, since);
@@ -199,14 +218,17 @@ function tellMorning(d: Deps, { night, since }: Watch, stopping: boolean): void 
     done: ended.filter((r) => r.status === 'done').length,
     failed: ended.filter((r) => r.status === 'failed' || r.status === 'lost').length,
     stopped: ended.filter((r) => r.status === 'stopped').length,
-    running: open.length - waiting,
+    running: open.length - waiting - held,
     waiting,
+    held,
   };
   d.sessions.emit('notify', {
     key: 'experiments:night',
     kind: n.failed && !n.done ? 'failed' : 'done',
     title: 'Experiments',
     body: [...(ofRuns ? [morningWords(n)] : []), ...also.map((x) => x.line)].join('. '),
+    // So a phone's and the system's notification say it in the user's language, as the toast does.
+    ownWords: true,
     agent: 'claude',
     at: Date.now(),
     url: ofRuns ? `/experiments?night=${night}` : also[0].url,

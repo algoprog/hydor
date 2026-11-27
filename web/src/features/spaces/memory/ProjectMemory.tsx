@@ -75,7 +75,8 @@ function Blank({ icon, title, children, action }: { icon?: React.ReactNode; titl
   );
 }
 
-export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Space; memory: SpaceMemory; part: ProjectPart; onPart: (p: ProjectPart) => void; onTab: (t: ProjectTab) => void; view?: SpaceView }) {
+/** `open`: a note (a finding) to show open, as the Research tab asks for it. */
+export function ProjectMemory({ s, memory, part, onPart, onTab, view, open }: { s: Space; memory: SpaceMemory; part: ProjectPart; onPart: (p: ProjectPart) => void; onTab: (t: ProjectTab) => void; view?: SpaceView; open?: number }) {
   const home = useApp((x) => x.boot?.home);
   const wide = useMediaQuery('(min-width: 640px)');
   const spaces = useSpaces();
@@ -220,6 +221,9 @@ export function ProjectMemory({ s, memory, part, onPart, onTab, view }: { s: Spa
     setSel(key);
   };
   const openWiki = (path: string) => select(`w:${path}`);
+  useEffect(() => {
+    if (open) select(`n:${open}`);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   /** After a note went (or a document): the next row opens on a computer, the list shows on a phone. */
   const gone = (key: string) => {
     const i = rows.findIndex((r) => r.key === key);

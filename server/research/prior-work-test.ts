@@ -29,7 +29,7 @@ process.env.HYDOR_EMBED = 'off';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-prior-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 vaultTables(db);
-const deps = { db, app: { get: () => {} } } as unknown as Deps;
+const deps = { db, app: { get: () => {}, post: () => {} } } as unknown as Deps;
 registerFeatures([research], deps);
 const ctx: RunCtx = { runId: 'r', key: 'claude:prior', agent: 'claude', cwd: tmp, deps };
 
@@ -284,6 +284,9 @@ test('a whole check: every search on each source, the papers once, the nearest f
   assert.match(asked.find((u) => u.includes('/works?search='))!, /per-page=20/);
   assert.match(r.note, /^Finding nothing is not proof that it is new: this looked at titles and abstracts on arXiv, OpenAlex and Semantic Scholar/);
   assert.match(r.note, /ordered by the words/);
+  // A paper found only as a preprint is marked, and the note says how many are: one published elsewhere is not.
+  assert.deepEqual(r.closest.map((p) => p.preprint ?? false), [false, false, true]);
+  assert.match(r.note, /One of the papers given is a preprint \(preprint: true\): not refereed, so a result one claims is a claim, not an established result\.$/);
   const judged = model.at(-1)!;
   assert.equal(judged.strong, true, 'the stronger helper judges');
   assert.equal(titlesIn(judged.prompt)[0].title, SAME.title, 'the nearest is first');

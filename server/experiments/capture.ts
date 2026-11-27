@@ -60,8 +60,8 @@ export interface GitRecord {
   cut?: boolean;
 }
 
-/** The repository's state in the shell's folder (nothing when it is not in one). */
-export async function captureGit(sh: Shell): Promise<GitRecord> {
+/** The repository's state in the shell's folder (nothing when it is not in one); `patch: false` leaves the patch out. */
+export async function captureGit(sh: Shell, o: { patch?: boolean } = {}): Promise<GitRecord> {
   const head = await sh(`git rev-parse HEAD 2>/dev/null || exit 3; echo @@; git rev-parse --abbrev-ref HEAD 2>/dev/null; echo @@; git status --porcelain --untracked-files=normal 2>/dev/null | head -c 400000`, { timeoutMs: 20_000 });
   if (head.code !== 0) return {};
   const [commit, branch, status] = head.out.split('@@\n');
@@ -69,7 +69,7 @@ export async function captureGit(sh: Shell): Promise<GitRecord> {
   const changed = lines.filter((l) => !l.startsWith('??'));
   const rec: GitRecord = { commit: commit?.trim() || undefined, branch: branch?.trim() || undefined, dirty: changed.length > 0, untracked: lines.length - changed.length };
   if (rec.branch === 'HEAD') rec.branch = undefined;
-  if (rec.dirty) {
+  if (rec.dirty && o.patch !== false) {
     const diff = await sh(`git diff HEAD --no-color --no-ext-diff 2>/dev/null | head -c ${MAX_PATCH + 1}`, { timeoutMs: 30_000 });
     if (diff.out) {
       rec.cut = diff.out.length > MAX_PATCH;
@@ -83,19 +83,26 @@ export async function captureGit(sh: Shell): Promise<GitRecord> {
 export const KEEP_FILE = 1024 * 1024;
 export const KEEP_ALL = 5 * 1024 * 1024;
 
-/**
- * The words of a whole command, as a shell splits them (quotes, backslashes), whatever joins its parts. What it only
- * writes to (after > or >>) and its comments are left out.
- */
-export function commandWords(command: string): string[] {
-  const out: string[] = [];
+/** A word of a command: where a redirection writes (after > or >>), and whether it starts a command of its own. */
+interface Word {
+  word: string;
+  target: boolean;
+  first: boolean;
+}
+
+/** The words of a whole command, as a shell splits them (quotes, backslashes), whatever joins its parts; no comments. */
+function readCommand(command: string): Word[] {
+  const out: Word[] = [];
   let cur = '';
   let has = false;
   let quote: string | null = null;
   let target = false;
+  let first = true;
   const end = () => {
     if (!has) return;
-    if (!target) out.push(cur);
+    out.push({ word: cur, target, first });
+    // What a redirection writes to starts no command (&> log python …).
+    if (!target) first = false;
     target = false;
     cur = '';
     has = false;
@@ -120,8 +127,11 @@ export function commandWords(command: string): string[] {
     } else if (c === '>') {
       end();
       target = true;
-    } else if (/[\s;|&()<]/.test(c)) end();
-    else {
+    } else if (/[\s;|&()<]/.test(c)) {
+      end();
+      // A new command starts after these (but "2>&1" and ">|" are part of the redirection).
+      if (/[\n;|&()]/.test(c) && !target) first = true;
+    } else {
       cur += c;
       has = true;
     }
@@ -130,12 +140,58 @@ export function commandWords(command: string): string[] {
   return out;
 }
 
-const inside = (p: string, dir: string) => {
+/**
+ * The words of a whole command, as a shell splits them. What it only writes to (after > or >>) and its comments are
+ * left out.
+ */
+export function commandWords(command: string): string[] {
+  return readCommand(command)
+    .filter((w) => !w.target)
+    .map((w) => w.word);
+}
+
+/** A flag whose value the command writes to: -o…, --out…, --save…, --log…, and their kin. */
+const OUTPUT_FLAG = /^(-o[\w.-]*|--(?:out|save|log|result|dump|report|write|pred|export|checkpoint|ckpt)[\w.-]*)(?:=(.*))?$/s;
+
+/**
+ * The words a command names as what it writes: the target of a redirection (>, >>, 2>, &>), what tee is given, and
+ * the value of an output flag, as the next word or after "=".
+ */
+export function commandOutputs(command: string): string[] {
+  const out: string[] = [];
+  let tee = false;
+  let flag = false;
+  let program = false;
+  for (const { word, target, first } of readCommand(command)) {
+    if (target) {
+      out.push(word);
+      continue;
+    }
+    if (first) tee = flag = program = false;
+    // The program of this command, after any NAME=value before it.
+    if (!program && !/^[A-Za-z_]\w*=/.test(word)) {
+      program = true;
+      tee = /(^|\/)tee$/.test(word);
+      if (tee) continue;
+    }
+    const isFlag = word.startsWith('-');
+    if ((tee || flag) && !isFlag) out.push(word);
+    flag = false;
+    const m = OUTPUT_FLAG.exec(word);
+    if (m) {
+      if (m[2] !== undefined) out.push(m[2]);
+      else flag = true;
+    }
+  }
+  return out.filter(Boolean);
+}
+
+export const inside = (p: string, dir: string) => {
   const rel = path.relative(dir, p);
   return !!rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
 };
 
-const real = (p: string) => {
+export const real = (p: string) => {
   try {
     return fs.realpathSync(p);
   } catch {
@@ -150,7 +206,7 @@ const SETTINGS_FILE = /\.(env|ini|ya?ml|toml|cfg|conf|json|properties)$/i;
 const GUESSED = new Set(['a password or key', 'a key or token', 'a card number']);
 
 /** Whether a file looks like it holds a key or a password (by its names, as written and where a link leads, or its text): never kept. */
-function secretFile(names: string[], text: string): boolean {
+export function secretFile(names: string[], text: string): boolean {
   if (names.some((n) => isSecret(n) || SECRET_NAME.test(path.basename(n)))) return true;
   const what = secretIn(text);
   // A settings file with a password in it counts too; a long number or a random-looking id alone does not.
@@ -158,13 +214,13 @@ function secretFile(names: string[], text: string): boolean {
 }
 
 /** The app's own data (its database, keys, runs' folders). */
-const appData = () => [...new Set([config.dataDir, path.dirname(UPLOADS)].map((d) => real(path.resolve(d))))];
+export const appData = () => [...new Set([config.dataDir, path.dirname(UPLOADS)].map((d) => real(path.resolve(d))))];
 
 /** The system's folders, whose files are not the person's own work. */
 const SYSTEM_DIRS = /^(\/(usr|bin|sbin|lib|lib32|lib64|libx32|opt|nix|etc|proc|sys|dev|System|Library|private\/etc)|[a-z]:[\\/](Program Files( \(x86\))?|ProgramData|Windows))([\\/]|$)/i;
 
 /** Whether a file is the system's or a package's: a system folder, node_modules, site-packages, a Python environment's programs. */
-function packageFile(file: string): boolean {
+export function packageFile(file: string): boolean {
   if (SYSTEM_DIRS.test(file)) return true;
   const parts = file.split(/[\\/]/);
   if (parts.some((x) => x === 'node_modules' || x === 'site-packages' || x === 'dist-packages')) return true;
@@ -242,7 +298,7 @@ async function outsideToKeep(sh: Shell, root: string, files: Outside[]): Promise
 }
 
 /** A base name not taken yet: name.py, then name-2.py… */
-function freeName(dir: string, base: string, taken: Set<string>): string {
+export function freeName(dir: string, base: string, taken: Set<string>): string {
   const ext = path.extname(base);
   const stem = base.slice(0, base.length - ext.length);
   let name = base;
@@ -251,18 +307,42 @@ function freeName(dir: string, base: string, taken: Set<string>): string {
   return name;
 }
 
+/** A file a command names that git does not have, before the limits: how the record lists it, where it really is. */
+export interface Named {
+  /** Under the folder it runs in: its path there; outside it: the word as the command gave it. */
+  listed: string;
+  at: string;
+  /** The names that say whether it is a secret. */
+  names: string[];
+  outside: boolean;
+  /** Outside the folder: the base name it is kept under. */
+  base: string;
+}
+
+/** A file as it would be kept: its bytes, or that it is too large; null when it is never kept (a secret) or cannot be read. */
+export function readToKeep(names: string[], at: string): { data: Buffer; size: number; mtimeMs: number; mode: number } | { data: null; size: number; mtimeMs: number; mode: number } | null {
+  try {
+    const st = fs.statSync(at);
+    const seen = { size: st.size, mtimeMs: st.mtimeMs, mode: st.mode & 0o777 };
+    // Its name first: a large file that is a secret by its name is not even listed.
+    if (secretFile(names, '')) return null;
+    if (st.size > KEEP_FILE) return { data: null, ...seen };
+    const data = fs.readFileSync(at);
+    if (!data.includes(0) && secretFile(names, data.toString('utf8'))) return null;
+    return { data, ...seen };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The files a command names (its words that are files) that git does not have: those under the folder it runs in that
- * are not tracked, or ignored, copied under `into` at the same relative paths; and the person's own files outside it
- * (an absolute path, one with .., ~; outsideToKeep says which), copied under `into`/outside/ by their names and listed
- * as the command gave them. So the run can be reproduced (with `into` null, only listed). Those over the limits are
- * listed in `notKept`. A file that looks like it holds a secret is left alone, as is a link that leads out of the
- * folder. Nothing outside a git repository.
+ * are not tracked, or ignored, and the person's own files outside it (an absolute path, one with .., ~; outsideToKeep
+ * says which). A link that leads out of the folder is left alone. Nothing outside a git repository.
  */
-export async function keepUntracked(sh: Shell, command: string, cwd: string, into: string | null): Promise<{ kept: string[]; notKept: string[] }> {
-  const none = { kept: [], notKept: [] };
+export async function untrackedNamed(sh: Shell, command: string, cwd: string): Promise<Named[]> {
   const repo = await sh('git rev-parse --is-inside-work-tree 2>/dev/null', { timeoutMs: 10_000 });
-  if (repo.out.trim() !== 'true') return none;
+  if (repo.out.trim() !== 'true') return [];
   const here = path.resolve(cwd);
   const root = real(here);
   const found = new Map<string, string>();
@@ -283,45 +363,51 @@ export async function keepUntracked(sh: Shell, command: string, cwd: string, int
       } catch {}
     }
   }
-  const kept: string[] = [];
-  const notKept: string[] = [];
-  let total = 0;
-  const keep = (listed: string, names: string[], at: string, to: () => string) => {
-    try {
-      const size = fs.statSync(at).size;
-      // Its name first: a large file that is a secret by its name is not even listed.
-      if (secretFile(names, '')) return;
-      if (size > KEEP_FILE || total + size > KEEP_ALL) {
-        notKept.push(listed);
-        return;
-      }
-      const data = fs.readFileSync(at);
-      if (!data.includes(0) && secretFile(names, data.toString('utf8'))) return;
-      if (into) {
-        const file = to();
-        fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-        fs.writeFileSync(file, data, { mode: 0o600 });
-      }
-      kept.push(listed);
-      total += size;
-    } catch {}
-  };
+  const out: Named[] = [];
   if (found.size) {
     const ls = await sh(`git --literal-pathspecs ls-files -z -- ${[...found.keys()].map(q).join(' ')}`, { timeoutMs: 20_000 });
-    if (ls.code !== 0) return none;
+    if (ls.code !== 0) return [];
     const tracked = new Set(ls.out.split('\0'));
     // In a folder the app made to work in (a worktree, a project's), being under the app's data says nothing: its name does.
     const own = appData().some((d) => inside(root, d));
     for (const [rel, at] of found) {
       if (tracked.has(rel)) continue;
       const names = [rel, path.relative(root, at)].map((n) => (own ? `/${n}` : path.join(root, n)));
-      keep(rel, names, at, () => path.join(into!, rel));
+      out.push({ listed: rel, at, names, outside: false, base: path.basename(rel) });
     }
   }
+  for (const f of await outsideToKeep(sh, root, [...away.values()])) out.push({ listed: f.word, at: f.at, names: f.names, outside: true, base: path.basename(f.abs) });
+  return out;
+}
+
+/**
+ * Copies the files a command names that git does not have (untrackedNamed) under `into`: those of the folder at the
+ * same relative paths, those outside it under `into`/outside/ by their names. So the run can be reproduced (with `into`
+ * null, only listed). Those over the limits are listed in `notKept`. A file that looks like it holds a secret is left
+ * alone.
+ */
+export async function keepUntracked(sh: Shell, command: string, cwd: string, into: string | null): Promise<{ kept: string[]; notKept: string[] }> {
+  const kept: string[] = [];
+  const notKept: string[] = [];
   const taken = new Set<string>();
-  for (const f of await outsideToKeep(sh, root, [...away.values()])) {
-    const dir = path.join(into ?? '', 'outside');
-    keep(f.word, f.names, f.at, () => path.join(dir, freeName(dir, path.basename(f.abs), taken)));
+  let total = 0;
+  for (const f of await untrackedNamed(sh, command, cwd)) {
+    const got = readToKeep(f.names, f.at);
+    if (!got) continue;
+    if (!got.data || total + got.size > KEEP_ALL) {
+      notKept.push(f.listed);
+      continue;
+    }
+    try {
+      if (into) {
+        const dir = path.join(into, 'outside');
+        const file = f.outside ? path.join(dir, freeName(dir, f.base, taken)) : path.join(into, f.listed);
+        fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(file, got.data, { mode: 0o600 });
+      }
+      kept.push(f.listed);
+      total += got.size;
+    } catch {}
   }
   return { kept, notKept };
 }

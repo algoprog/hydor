@@ -28,7 +28,7 @@ process.env.HYDOR_EMBED = 'off';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-oeis-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 vaultTables(db);
-const deps = { db, app: { get: () => {} } } as unknown as Deps;
+const deps = { db, app: { get: () => {}, post: () => {} } } as unknown as Deps;
 registerFeatures([confidential, research], deps);
 const ctx: RunCtx = { runId: 'r1', key: 'claude:oeis', agent: 'claude', cwd: tmp, deps };
 

@@ -8,7 +8,7 @@ import { config } from '../config.ts';
 import type { Deps } from '../features/types.ts';
 import { isInternal } from '../internal.ts';
 import { getEvaluation, mustEvaluation } from './evaluations.ts';
-import { candidateDetail, candidatesOf, deleteEvolution, listEvolutions, mustEvolution, pauseEvolution, resumeEvolution, startEvolution, stopEvolution, takeBest } from './evolve.ts';
+import { candidateDetail, candidatesOf, deleteEvolution, letEvolutionRun, listEvolutions, mustEvolution, pauseEvolution, refuseEvolutionAtCeiling, resumeEvolution, startEvolution, stopEvolution, takeBest } from './evolve.ts';
 import { suggestEvolveFiles } from './evolve-suggest.ts';
 import { okId } from './records.ts';
 
@@ -59,7 +59,20 @@ export function evolveRoutes(d: Deps) {
   });
   app.get('/api/experiments/evolutions/:id/candidates/:cid', async (req) => ({ candidate: await candidateDetail(d.db, param(req, 'id'), param(req, 'cid')) }));
   app.post('/api/experiments/evolutions/:id/pause', async (req) => ({ evolution: pauseEvolution(d, param(req, 'id')) }));
-  app.post('/api/experiments/evolutions/:id/resume', async (req) => ({ evolution: resumeEvolution(d, param(req, 'id')) }));
+  app.post('/api/experiments/evolutions/:id/resume', async (req) => {
+    const id = param(req, 'id');
+    // An agent does not set a search going again past the ceiling on agents' GPU hours, unless you let it run beyond.
+    if (isInternal(req)) {
+      const e = mustEvolution(d.db, id);
+      const ev = getEvaluation(d.db, e.evaluation);
+      if (ev && !e.letRun) await refuseEvolutionAtCeiling(d.db, ev, e.from ?? ev.cwd);
+    }
+    return { evolution: resumeEvolution(d, id) };
+  });
+  app.post('/api/experiments/evolutions/:id/let-run', async (req) => {
+    if (isInternal(req)) throw new HttpError(403, 'Only the person lets a held search go: tell them it waits (its page has Let it run)');
+    return { evolution: letEvolutionRun(d, param(req, 'id')) };
+  });
   app.post('/api/experiments/evolutions/:id/stop', async (req) => ({ evolution: await stopEvolution(d, param(req, 'id'), isInternal(req) ? 'Stopped by an agent' : 'Stopped by you') }));
   app.post('/api/experiments/evolutions/:id/take', async (req) => {
     const c = B(req).candidate;
@@ -68,7 +81,7 @@ export function evolveRoutes(d: Deps) {
   });
   app.delete('/api/experiments/evolutions/:id', async (req) => {
     if (isInternal(req)) throw new HttpError(403, 'Only the person deletes an evolution');
-    await deleteEvolution(d, param(req, 'id'));
-    return { ok: true };
+    const kept = await deleteEvolution(d, param(req, 'id'), { keepFiles: (req.query as { files?: string }).files === 'keep' });
+    return { ok: true, ...(kept ? { kept } : {}) };
   });
 }

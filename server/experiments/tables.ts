@@ -1,5 +1,5 @@
-// Results tables: runs picked (or every finished run of an experiment) as rows, by experiment or by one setting's
-// value; the runs of a row are seeds, averaged (mean ± std, n). Each column is a metric: the best row in bold, and
+// Results tables: runs picked (or every finished run of an experiment) as rows, by experiment, by command or by one
+// setting's value; the runs of a row are seeds, averaged (mean ± std, n). Each column is a metric: the best row in bold, and
 // each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired
 // over seeds when the rows share seeds, else Welch's t-test), Holm-corrected across the rows, a dagger on the
 // cells that are significantly better and a double dagger on those significantly worse. Seeds that barely change a
@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { identicalNote, seedsFlatNote, TABLE_MARK, type ResultsCell, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord } from '../../shared/experiments.ts';
+import { commandLabels, seedless } from './commands.ts';
 import { looseObject } from './metrics.ts';
 import { holm, mean, pairedBootstrap, pairedT, std, welch } from './stats.ts';
 
@@ -80,10 +81,11 @@ interface Row {
   runs: RunRecord[];
 }
 
-/** The rows: by experiment (in the order they first come) or by a setting's value (numbers in order). */
+/** The rows: by experiment or by command (in the order they first come) or by a setting's value (numbers in order). */
 function rowsOf(spec: ResultsTableSpec, runs: RunRecord[]): Row[] {
   const by = spec.rows && spec.rows.startsWith('param:') ? spec.rows.slice(6) : null;
-  const keyOf = (r: RunRecord) => (by ? (r.params?.[by] === undefined ? '—' : String(r.params[by])) : r.group || 'Other runs');
+  const byCommand = spec.rows === 'command';
+  const keyOf = (r: RunRecord) => (byCommand ? seedless(r, seedOf(r)) : by ? (r.params?.[by] === undefined ? '—' : String(r.params[by])) : r.group || 'Other runs');
   const rows = new Map<string, Row>();
   for (const r of runs) {
     const k = keyOf(r);
@@ -92,6 +94,10 @@ function rowsOf(spec: ResultsTableSpec, runs: RunRecord[]): Row[] {
     row.runs.push(r);
   }
   const list = [...rows.values()];
+  if (byCommand) {
+    const labels = commandLabels(list.map((x) => x.key));
+    list.forEach((x, i) => (x.label = spec.labels?.[x.key] ?? labels[i]));
+  }
   if (by) {
     const num = list.every((x) => x.key === '—' || Number.isFinite(Number(x.key)));
     list.sort((a, b) => (num ? Number(a.key) - Number(b.key) : a.key.localeCompare(b.key)));
@@ -189,8 +195,10 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
     const have = [...new Set(runs.flatMap((r) => Object.keys(r.params ?? {})))].sort();
     notes.push(`No run has a setting called “${by}”, so all ${runs.length} runs are one row and its spread is over runs, not seeds. ${have.length ? `Their settings are: ${have.join(', ')}.` : 'They have no settings: make rows by experiment, or start the runs with settings (params).'}`);
   }
-  const base = rows.find((r) => r.key === spec.baseline) ?? rows[0];
-  if (spec.baseline && base && base.key !== spec.baseline) notes.push(`There is no row “${spec.baseline}”: the first row is the baseline.`);
+  // A row by command is long to write out: it may be named by its label too.
+  const asked = rows.find((r) => r.key === spec.baseline) ?? (spec.rows === 'command' ? rows.find((r) => r.label === spec.baseline) : undefined);
+  const base = asked ?? rows[0];
+  if (spec.baseline && base && !asked) notes.push(`There is no row “${spec.baseline}”: the first row is the baseline.`);
   const alpha = spec.alpha && spec.alpha > 0 && spec.alpha < 1 ? spec.alpha : 0.05;
   const tests: string[] = [];
   /** The comparisons left untested because the seeds barely change the number. */
@@ -259,7 +267,7 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
   };
   const words = describe(table, base?.label, alpha);
   if (words.dagger) table.footnote = words.dagger;
-  // In what is copied out too, as a comment that does not show: one line, so the marker stays near its tabular.
+  // In what is copied out too (a comment in LaTeX, small print in Markdown): one line, so the marker stays near its tabular.
   const comment = [seedsNote, ...identical].filter(Boolean).join('. ').replace(/\s+/g, ' ');
   table.latex = latexOf(table, words, comment);
   table.markdown = markdownOf(table, words, comment);
@@ -332,7 +340,9 @@ function latexOf(t: ResultsTable, words: { cells: string; dagger?: string }, com
   );
   const caption = [t.spec.caption?.trim(), words.cells, words.dagger].filter(Boolean).join(' ');
   const head = [by ? texEscape(by) : 'Method', ...cols.map((c) => `${texEscape(colLabel(c))} ${c.better === 'min' ? '$\\downarrow$' : '$\\uparrow$'}`)].join(' & ');
-  const body = t.rows.map((r) => [texEscape(r.label), ...r.cells.map((x, ci) => cellText(x, digits[ci], 'tex'))].join(' & ') + ' \\\\');
+  // In a command's name, LaTeX would join the two hyphens of --flag into a dash.
+  const name = (s: string) => (t.spec.rows === 'command' ? texEscape(s).replace(/-(?=-)/g, '-{}') : texEscape(s));
+  const body = t.rows.map((r) => [name(r.label), ...r.cells.map((x, ci) => cellText(x, digits[ci], 'tex'))].join(' & ') + ' \\\\');
   return [
     '\\begin{table}[t]',
     '\\centering',
@@ -368,7 +378,8 @@ function markdownOf(t: ResultsTable, words: { cells: string; dagger?: string }, 
   ];
   const foot = [t.spec.caption?.trim(), words.cells, words.dagger].filter(Boolean).join(' ');
   const shown = foot ? `${lines.join('\n')}\n\n${foot}` : lines.join('\n');
-  return comment ? `${shown}\n\n<!-- ${comment.replace(/--+/g, '—')} -->` : shown;
+  // The notes as small print, their words as they are (an HTML comment cannot hold the "--" of a flag).
+  return comment ? `${shown}\n\n<sub>${comment.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</sub>` : shown;
 }
 
 function csvOf(t: ResultsTable): string {

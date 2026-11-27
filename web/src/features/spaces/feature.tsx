@@ -36,7 +36,7 @@ function ProjectPage() {
           </div>
         }
       >
-        <SpacePage key={at.id} id={at.id} tab={at.tab} part={at.part} share={at.share} dir={at.dir} req={req} page />
+        <SpacePage key={at.id} id={at.id} tab={at.tab} part={at.part} share={at.share} dir={at.dir} note={at.note} req={req} page />
       </Suspense>
     </div>
   );

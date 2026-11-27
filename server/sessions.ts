@@ -3823,6 +3823,8 @@ export class SessionManager extends EventEmitter {
     }
     this.db.prepare('delete from sessions where key = ?').run(key);
     this.db.prepare('delete from app_sessions where key = ?').run(key);
+    // Its budget of GPU hours for experiments ends with it (server/experiments/budget.ts).
+    this.db.prepare('delete from kv where k = ?').run(`experiments_budget:${key}`);
     clearCheckpointStatus(this.db, key);
     // Sessions it continued from, or into, no longer point at it.
     for (const k of (this.db.prepare('select key from app_sessions where handoff_to = ? or handoff_from = ?').all(key, key) as { key: string }[]).map((r) => r.key)) {

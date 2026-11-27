@@ -5,7 +5,7 @@ import { machineBase, machineId, splitMachinePath } from './machine';
 import { useUI } from './store';
 
 /** The tabs of a project's details (its page or its window), and the parts of its Memory tab. */
-export type ProjectTab = 'overview' | 'files' | 'memory' | 'skills' | 'agents' | 'settings';
+export type ProjectTab = 'overview' | 'files' | 'memory' | 'research' | 'skills' | 'agents' | 'settings';
 export type ProjectPart = 'all' | 'notes' | 'wiki' | 'documents' | 'findings';
 
 /**
@@ -14,13 +14,14 @@ export type ProjectPart = 'all' | 'notes' | 'wiki' | 'documents' | 'findings';
  * the tab it opened on, the chip of its Memory (none: All), whether it opened to share it. `n` counts the openings, so one opened
  * again (on another tab, say) starts afresh.
  */
-export const useProjectWindow = create<{ at: { id: string; tab: ProjectTab; part?: ProjectPart; share?: boolean; dir?: string; n: number; req: number } | null }>(() => ({ at: null }));
+export const useProjectWindow = create<{ at: { id: string; tab: ProjectTab; part?: ProjectPart; share?: boolean; dir?: string; note?: number; n: number; req: number } | null }>(() => ({ at: null }));
 
 /** Windows opened so far (each a fresh one: `n`), and every ask to show one (`req`: a tab asked for again shows). */
 let opens = 0;
 let asks = 0;
 
-type ProjectOpts = { part?: ProjectPart; share?: boolean; dir?: string };
+/** `note`: a note of its Memory (a finding) to show open. */
+type ProjectOpts = { part?: ProjectPart; share?: boolean; dir?: string; note?: number };
 
 /** The page shown now, without the machine's part of the address. */
 const here = () => location.pathname.slice(machineBase.length);
@@ -34,6 +35,7 @@ export function projectHref(id: string, tab: ProjectTab = 'overview', opts?: Pro
   if (tab === 'memory' && opts?.part && opts.part !== 'all') q.set('part', opts.part);
   if (opts?.share) q.set('share', '1');
   if (tab === 'files' && opts?.dir) q.set('dir', opts.dir);
+  if (tab === 'memory' && opts?.note) q.set('note', String(opts.note));
   const s = q.toString();
   return `/projects/${encodeURIComponent(id)}${tab === 'overview' ? '' : `/${tab}`}${s ? `?${s}` : ''}`;
 }
@@ -42,7 +44,7 @@ export function projectHref(id: string, tab: ProjectTab = 'overview', opts?: Pro
 function openWindow(id: string, tab: ProjectTab, opts?: ProjectOpts) {
   useProjectWindow.setState((s) => {
     const same = s.at?.id === id && tab === 'files' && s.at.tab === 'files';
-    return { at: { id, tab, part: opts?.part, share: opts?.share, dir: opts?.dir, n: same && s.at ? s.at.n : ++opens, req: ++asks } };
+    return { at: { id, tab, part: opts?.part, share: opts?.share, dir: opts?.dir, note: opts?.note, n: same && s.at ? s.at.n : ++opens, req: ++asks } };
   });
 }
 
@@ -65,14 +67,14 @@ export function closeProject() {
   else if (projectAddress(here())?.id) go('/projects');
 }
 
-const PROJECT_TABS = ['overview', 'files', 'memory', 'skills', 'agents', 'settings'];
+const PROJECT_TABS = ['overview', 'files', 'memory', 'research', 'skills', 'agents', 'settings'];
 
 /**
  * What an address of a project's page (`/projects/<id>[/<tab>][?part=…&share=1&dir=…]`) means: the project and the tab
  * it shows, or no id for the Projects page (`/projects`). Null for any other address. The Library tab is Files now, and
  * the old Knowledge and LLM Wiki tabs are parts of Memory.
  */
-export function projectAddress(path: string): { id?: string; tab: ProjectTab; part?: ProjectPart; share?: boolean; dir?: string } | null {
+export function projectAddress(path: string): { id?: string; tab: ProjectTab; part?: ProjectPart; share?: boolean; dir?: string; note?: number } | null {
   const m = /^\/projects(?:\/([^/?#]+)(?:\/([^/?#]+))?)?\/?(?:\?([^#]*))?(?:#.*)?$/.exec(path);
   if (!m) return null;
   if (!m[1]) return { tab: 'overview' };
@@ -90,7 +92,8 @@ export function projectAddress(path: string): { id?: string; tab: ProjectTab; pa
   else if (t === 'wiki') part = 'wiki';
   else if (t === 'memory') part = ['notes', 'wiki', 'documents', 'findings'].includes(q.get('part') ?? '') ? (q.get('part') as ProjectPart) : undefined;
   const tab: ProjectTab = t === 'knowledge' || t === 'wiki' ? 'memory' : PROJECT_TABS.includes(t ?? '') ? (t as ProjectTab) : 'overview';
-  return { id, tab, part, share: q.get('share') === '1' || undefined, dir: q.get('dir') || undefined };
+  const note = tab === 'memory' && /^\d+$/.test(q.get('note') ?? '') ? Number(q.get('note')) : undefined;
+  return { id, tab, part, share: q.get('share') === '1' || undefined, dir: q.get('dir') || undefined, ...(note ? { note } : {}) };
 }
 
 /**
@@ -103,7 +106,7 @@ export function go(path: string, replace = false) {
     // An old address of a page (the Library's, a space's…), and a kept thing's own page (/pages/<id>, whose arrow leads
     // back to its project's Files), give way to the project's page; from a session or any other page, its window opens over it.
     if (/^\/(spaces|library|pages)(\/|$)/.test(here())) replace = true;
-    else if (!inProjects()) return openWindow(project.id, project.tab, { part: project.part, share: project.share, dir: project.dir });
+    else if (!inProjects()) return openWindow(project.id, project.tab, { part: project.part, share: project.share, dir: project.dir, note: project.note });
   }
   // Going anywhere else from the project's window (New session, a session, a document from its Files) leaves it, even
   // when the page under it is that place already.

@@ -13,6 +13,8 @@ export interface PriorPaper {
   authors: string;
   year?: number;
   venue?: string;
+  /** Only a preprint was found (arXiv, a paper server, an upload): not refereed, so what it claims is a claim. */
+  preprint?: true;
   /** From the source's own record, never from a model. */
   url: string;
   relation: PriorRelation;

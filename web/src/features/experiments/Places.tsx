@@ -11,7 +11,8 @@ import { machineId } from '../../lib/machine';
 import { trIn } from '../../i18n/runtime';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
-import { Button, cx, Dialog, inputCls, Segmented, Throbber } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, Segmented, Switch, Throbber } from '../../components/ui';
+import { AgentHoursLimit } from './AgentHours';
 import { loadSettings } from './api';
 
 function ClusterForm({ onAdded, onCancel }: { onAdded: (c: ClusterSpec) => void; onCancel: () => void }) {
@@ -125,6 +126,9 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
   const [machines, setMachines] = useState<MachineView[]>([]);
   const [queue, setQueue] = useState<QueueNow | null>(null);
   const [slots, setSlots] = useState('');
+  const [share, setShare] = useState<boolean | null>(null);
+  // The limit on agents' GPU hours; undefined until read (a machine running an older Hydor has none).
+  const [agentHours, setAgentHours] = useState<number | null | undefined>(undefined);
   const [night, setNight] = useState<Pick<ExperimentsSettings, 'nightFrom' | 'nightTo' | 'nightEnds'> | null>(null);
   // A time typed is saved a moment after the last key, or on leaving the box: half a time is not a night.
   const hours = useRef<{ patch: Partial<ExperimentsSettings>; timer?: number }>({ patch: {} });
@@ -146,9 +150,14 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
       .then(setQueue)
       .catch(() => {});
     setNight(null);
+    setShare(null);
+    setAgentHours(undefined);
     loadSettings()
       .then((s) => {
         setSlots(String(s.cpuSlots));
+        // A machine running an older Hydor has no such setting: nothing to show then.
+        setShare(s.shareGpus ?? null);
+        setAgentHours(s.agentGpuHours);
         setNight({ nightFrom: s.nightFrom, nightTo: s.nightTo, nightEnds: s.nightEnds });
       })
       .catch(() => {});
@@ -176,6 +185,10 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
     if (!Number.isInteger(n) || n < 1 || n > 64) return;
     await put('/api/experiments/settings', { cpuSlots: n }).catch(toastError);
   };
+  const saveShare = (v: boolean) => {
+    setShare(v);
+    put('/api/experiments/settings', { shareGpus: v }).catch(toastError);
+  };
   const check = async (c: ClusterSpec) => {
     setChecking(c.id);
     try {
@@ -197,7 +210,7 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
   };
   const gpuNames = [...new Set(queue?.gpus.map((g) => g.name.replace('NVIDIA ', '')) ?? [])];
   return (
-    <Dialog open={open} onClose={onClose} title="Where runs go" width={620}>
+    <Dialog open={open} onClose={onClose} title="Where runs go" width={620} part="experiments">
       <div className="space-y-5 text-[13px]">
         <section className="space-y-2">
           <h3 className="text-[13px] font-semibold">{machineId ? 'This machine' : 'This computer'}</h3>
@@ -207,6 +220,18 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
             <input value={slots} onChange={(e) => saveSlots(e.target.value.replace(/\D/g, '').slice(0, 2))} inputMode="numeric" className={cx(inputCls.replace('w-full', ''), 'tnum h-8 w-14 text-[13px]')} />
             at once
           </label>
+          {share !== null && (
+            <div className="flex items-start gap-2.5">
+              <Switch on={share} onChange={saveShare} label="Runs share a GPU when their memory fits" className="mt-px" />
+              <div className="min-w-0">
+                <div className="text-fg-2">Runs share a GPU when their memory fits</div>
+                <p className="leading-relaxed text-fg-3">
+                  {share ? 'A run that says how much memory it needs may go on a GPU beside others. One that does not gets a GPU to itself.' : 'Each GPU takes one of your runs at a time.'}
+                </p>
+              </div>
+            </div>
+          )}
+          {agentHours !== undefined && <AgentHoursLimit value={agentHours} />}
           {night && (
             <>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-fg-2">
@@ -235,7 +260,7 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
               <p className="leading-relaxed text-fg-3">
                 {night.nightFrom === night.nightTo
                   ? 'From and to are the same: there is no night, and night runs wait until you set one.'
-                  : 'A night run starts only in these hours, after your other waiting runs. One stopped at the end starts again from the beginning.'}
+                  : 'A night run starts only in these hours, after your other waiting runs. One stopped at the end starts again from the beginning, unless it says how to carry on.'}
               </p>
             </>
           )}

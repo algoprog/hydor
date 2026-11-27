@@ -30,7 +30,7 @@ import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
 import { clock as nightClock, NIGHT_AGAIN } from './night.ts';
 import { cleanJob, forgetNotices, setSettings, submit, tick, useDeps } from './queue.ts';
-import { getRun, listRuns } from './records.ts';
+import { getRun, listRuns, runFolder } from './records.ts';
 import { experimentTools, SPAWN_NOTE } from './tools.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -639,7 +639,14 @@ test('stop ends it at once, and deleting removes its worktrees, files, scores an
     .get('start')!
     .flatMap((s) => getScore(db, s)!.runs);
   assert.equal((await call('DELETE', `/api/experiments/evolutions/${e.id}`, undefined, true)).status, 403, 'not an agent’s');
-  assert.equal((await call('DELETE', `/api/experiments/evolutions/${e.id}`)).status, 200);
+  // What its runs wrote into their folders is said before it is deleted, and can be kept.
+  fs.writeFileSync(path.join(runFolder(runs[0]), 'model.pt'), 'weights');
+  assert.ok((await call('GET', `/api/experiments/run-files?evolution=${e.id}`)).body.folderFiles.names.includes('model.pt'));
+  const gone = await call('DELETE', `/api/experiments/evolutions/${e.id}?files=keep`);
+  assert.equal(gone.status, 200);
+  assert.equal(fs.readFileSync(path.join(process.env.DATA_DIR!, 'kept-runs', runs[0], 'model.pt'), 'utf8'), 'weights');
+  assert.ok(gone.body.kept.startsWith(path.join(process.env.DATA_DIR!, 'kept-runs')));
+  fs.rmSync(path.join(process.env.DATA_DIR!, 'kept-runs'), { recursive: true, force: true });
   assert.ok(!fs.existsSync(path.join(EVOLVE_ROOT, e.id)));
   assert.ok(!gitIn(repo, 'worktree', 'list').includes(path.join(EVOLVE_ROOT, e.id)));
   assert.equal(scoresBy(e.id).size, 0);
@@ -721,7 +728,7 @@ test('evolve_start asks as experiment_run does, says what it will change, and st
 test('every route is in the guide’s API topic', () => {
   const api = fs.readFileSync(path.join(process.cwd(), 'docs', 'guide', '90-api.md'), 'utf8');
   const routes = [...fs.readFileSync(path.join(process.cwd(), 'server', 'experiments', 'evolve-routes.ts'), 'utf8').matchAll(/app\.(get|post|put|patch|delete)\(\s*'(\/api\/[^']+)'/g)].map((m) => `${m[1].toUpperCase()} ${m[2]}`);
-  assert.equal(routes.length, 10);
+  assert.equal(routes.length, 11);
   for (const r of routes) assert.ok(api.includes(`\`${r}\``), r);
 });
 
@@ -918,7 +925,8 @@ test('a night evolution holds still by day, works at night, and goes on from whe
   await until(() => endedOf(e.id) >= 6 || inHand(e.id).some((c) => c.status === 'checking'), 60_000, '#5 and #6');
   assert.equal((await call('POST', `/api/experiments/evolutions/${e.id}/stop`, {})).body.evolution.status, 'stopped');
   await until(() => inHand(e.id).length === 0, 20_000, 'what was in hand');
-  assert.ok([...scoresBy(e.id).values()].flat().every((s) => !['waiting', 'running'].includes(getScore(db, s)!.status)));
+  // Its scores stop a moment after its tries leave its hands: waited for, not looked at once.
+  await until(() => [...scoresBy(e.id).values()].flat().every((s) => !['waiting', 'running'].includes(getScore(db, s)!.status)), 20_000, 'its scores stopped');
   const other = await ordinaryNight('echo again');
   wallNow = at(7, 23);
   await until(() => runEnded(other.id), 20_000, 'the third night’s run');

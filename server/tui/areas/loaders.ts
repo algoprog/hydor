@@ -119,7 +119,7 @@ export const LOADERS: Record<ArgKind, Loader> = {
   key: async (c) => ((await c.get<{ secrets?: { name: string; domains: string[]; note: string }[] }>('/api/connections'))?.secrets ?? []).map((s) => [s.name, s.domains.join(', ') || s.note]),
   note: notes,
   experiment: async (c) =>
-    ((await c.get<{ runs?: { id: string; name?: string; command: string; status: string }[] }>('/api/experiments/runs?limit=40'))?.runs ?? []).map((r) => [
+    ((await c.get<{ runs?: { id: string; name?: string; command: string; status: string }[] }>('/api/experiments/runs?limit=40&archived=0'))?.runs ?? []).map((r) => [
       r.id,
       `${r.name || r.command.replace(/\s+/g, ' ').slice(0, 40)} · ${r.status}`,
     ]),

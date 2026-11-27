@@ -155,6 +155,8 @@ export interface ScoreHow {
   cwd: string;
   /** The most seconds to wait, the goal's own time limit counted in. */
   timeoutS: number;
+  /** The goal's own time left, in seconds: a wait made longer (its runs held) ends with it. */
+  mostS?: number;
   /** Pause and Stop: the score's runs are stopped. */
   signal: AbortSignal;
   /** A score started for this check before a restart cut its wait: waited for again, never started twice. */
@@ -226,16 +228,24 @@ export async function scoreCheck(d: Deps, c: GoalCheck, how: ScoreHow): Promise<
       }
     }
     how.started(s.id);
-    const end = t0 + how.timeoutS * 1000;
+    let end = t0 + how.timeoutS * 1000;
     let shown = '';
-    while ((s.status === 'waiting' || s.status === 'running') && Date.now() < end && !how.signal.aborted) {
+    let looked = Date.now();
+    while ((s.status === 'waiting' || s.status === 'running') && !how.signal.aborted) {
+      // Time its runs are all held at the limit on agents' GPU hours is not counted: it waits for the person. (Looked
+      // at in short steps, and counted before the time is looked at.)
+      const now = Date.now();
+      const open = s.runs.map((id) => getRun(d.db, id)).filter((r) => r && ACTIVE.includes(r.status));
+      if (open.length && open.every((r) => r!.held)) end = Math.min(t0 + (how.mostS ?? Infinity) * 1000, end + (now - looked));
+      looked = now;
+      if (now >= end) break;
       const p = progressOf(d.db, c, s, t0);
       const key = JSON.stringify({ ...p, since: 0 });
       if (key !== shown) {
         shown = key;
         how.progress(p);
       }
-      s = (await waitScore(d, s.id, Math.max(50, Math.min(5000, end - Date.now())), how.signal)) ?? s;
+      s = (await waitScore(d, s.id, Math.max(50, Math.min(1000, end - Date.now())), how.signal)) ?? s;
     }
     if (s.status === 'waiting' || s.status === 'running') {
       await stopScore(d, s.id).catch(() => {});

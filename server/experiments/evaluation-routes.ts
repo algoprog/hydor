@@ -94,8 +94,8 @@ export function evaluationRoutes(d: Deps) {
   });
   app.delete('/api/experiments/evaluations/:id', async (req) => {
     personOnly(req, 'Only the person deletes an evaluation');
-    await removeEvaluation(d, idOf(req));
-    return { ok: true };
+    const kept = await removeEvaluation(d, idOf(req), { keepFiles: Q(req).files === 'keep' });
+    return { ok: true, ...(kept ? { kept } : {}) };
   });
   app.post('/api/experiments/evaluations/:id/seal', async (req) => {
     personOnly(req, 'Only the person seals an evaluation: propose one with evaluation_propose');
@@ -142,7 +142,7 @@ export function evaluationRoutes(d: Deps) {
   });
   app.delete('/api/experiments/evaluations/scores/:id', async (req) => {
     personOnly(req, 'Only the person deletes a score');
-    deleteScore(d, scoreFor(req).id);
-    return { ok: true };
+    const kept = deleteScore(d, scoreFor(req).id, { keepFiles: Q(req).files === 'keep' });
+    return { ok: true, ...(kept ? { kept } : {}) };
   });
 }

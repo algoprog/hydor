@@ -3,15 +3,19 @@
 // another), following a log, sweeps, results tables (made, kept, worked out again, put into a LaTeX document of
 // the saved pages), and the runs of every machine for the list.
 import fs from 'node:fs';
-import { ACTIVE, betterOf, type MetricSeries, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord, type SweepSpec } from '../../shared/experiments.ts';
+import path from 'node:path';
+import { ACTIVE, betterOf, type MetricSeries, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunChain, type RunFiles, type RunRecord, type RunRef, type SweepSpec } from '../../shared/experiments.ts';
 import type { TexDoc } from '../../shared/latex.ts';
 import { HttpError } from '../auth.ts';
+import { config } from '../config.ts';
 import type { Deps } from '../features/types.ts';
 import { internalHeaders } from '../internal.ts';
 import { files } from './local.ts';
 import { readFrom, tailLines, tidyLog } from './metrics.ts';
-import { cleanJob, seriesNow, submit, type Place, placeOf } from './queue.ts';
-import { getRun, getRunWithEvents, getTable, listRuns, newId, runFolder, saveSweep, saveTable, workOut, type RunQuery, type RunInfo } from './records.ts';
+import { agentBaseEnv } from '../env.ts';
+import { codeReader, differences, enough, makeCopy, manifestOf, NoCopy, repoOf } from './code.ts';
+import { cleanJob, seriesNow, submit, takesCode, type Place, placeOf } from './queue.ts';
+import { getRun, getRunWithEvents, getTable, listRuns, newId, runFiles, runFolder, saveSweep, saveTable, systemSeriesOf, withAttempts, updateRun, workOut, type RunQuery, type RunInfo } from './records.ts';
 import { machinesRuns, remoteMachine } from './remote.ts';
 import { expandSweep, fillCommand, placeholders, settingsLine, type Value } from './sweeps.ts';
 import { insertTable } from './tables.ts';
@@ -22,6 +26,12 @@ export interface RunView {
   log: string;
   /** The log's size in bytes: following it asks for what comes after. */
   logSize: number;
+  /** What it used over time, minutes since it started on the x axis (this computer's runs; usage.ts). */
+  system?: MetricSeries;
+  /** An ended run: what its own folder holds besides the app's own files (deleting the run deletes them). */
+  folderFiles?: RunFiles;
+  /** Where it stands among the attempts at the same thing: the one before it and the one that took its place. */
+  chain?: RunChain;
 }
 
 const mustRun = (d: Deps, id: string): RunRecord => {
@@ -30,19 +40,39 @@ const mustRun = (d: Deps, id: string): RunRecord => {
   return r;
 };
 
+const refOf = (d: Deps, id: string): RunRef | undefined => {
+  const r = getRun(d.db, id);
+  return r ? { id: r.id, ...(r.name ? { name: r.name } : {}), status: r.status, ...(r.why ? { why: r.why } : {}), ...(r.exitCode !== undefined ? { exitCode: r.exitCode } : {}), ...(r.firstError ? { error: r.firstError.text.slice(0, 200) } : {}) } : undefined;
+};
+
+/** The attempts either side of a run that is in a chain. */
+function chainOf(d: Deps, r: RunRecord): { chain?: RunChain } {
+  if (!r.retryOf && !r.replacedBy) return {};
+  const previous = r.retryOf ? refOf(d, r.retryOf) : undefined;
+  const next = r.replacedBy ? refOf(d, r.replacedBy) : undefined;
+  return { chain: { attempt: r.attempt ?? 1, ...(previous ? { previous } : {}), ...(next ? { next } : {}) } };
+}
+
 /** One run as the page shows it; a copy of another machine's run is read there. */
 export async function runView(d: Deps, id: string, lines = 300): Promise<RunView> {
-  const r = mustRun(d, id);
+  const r = withAttempts(d.db, [mustRun(d, id)])[0];
   if (r.remote) {
     const m = remoteMachine(r.remote.machine);
-    if (!m) return { run: r, series: {}, log: '', logSize: 0 };
+    if (!m) return { run: r, series: {}, log: '', logSize: 0, ...chainOf(d, r) };
     const there = await m.call<RunView>('GET', `/api/experiments/runs/${r.remote.id}?lines=${lines}`, 15_000).catch((e) => {
       throw new HttpError(502, `${m.name} did not answer: ${(e as Error).message}`);
     });
-    return { ...there, run: { ...there.run, id: r.id, where: r.where, remote: r.remote, name: r.name, group: r.group } };
+    // Its files are that machine's: deleting the copy here leaves them.
+    const { folderFiles: _theirs, chain: _chain, ...view } = there;
+    // What was said of it here (its note, star, archiving) and its place among the attempts are this computer's.
+    const { note: _n, noteBy: _nb, starredAt: _s, archivedAt: _a, retryOf: _ro, replacedBy: _rb, attempt: _at, from: _f, ...run } = there.run;
+    const mine = Object.fromEntries((['note', 'noteBy', 'starredAt', 'archivedAt', 'retryOf', 'replacedBy', 'attempt', 'from'] as const).flatMap((k) => (r[k] === undefined ? [] : [[k, r[k]]])));
+    return { ...view, run: { ...run, ...mine, id: r.id, where: r.where, remote: r.remote, name: r.name, group: r.group }, ...chainOf(d, r) };
   }
   const t = lines > 0 ? tailLines(files(r.folder ?? runFolder(r.id)).log, Math.min(lines, 5000)) : { text: '', size: 0 };
-  return { run: r, series: seriesNow(d, r.id), log: t.text, logSize: t.size };
+  const system = systemSeriesOf(d.db, r.id);
+  const folderFiles = ACTIVE.includes(r.status) ? undefined : await runFiles([r.id]);
+  return { run: r, series: seriesNow(d, r.id), log: t.text, logSize: t.size, ...(Object.keys(system).length ? { system } : {}), ...(folderFiles ? { folderFiles } : {}), ...chainOf(d, r) };
 }
 
 /**
@@ -98,7 +128,7 @@ export async function patchOf(d: Deps, id: string): Promise<string | null> {
 
 /** The runs for the list: this computer's (and its copies of runs elsewhere), and with `everywhere` every connected machine's. */
 export async function runsList(d: Deps, q: RunQuery, everywhere: boolean): Promise<RunRecord[]> {
-  const mine = listRuns(d.db, q);
+  const mine = withAttempts(d.db, listRuns(d.db, q));
   // A night is this computer's (in the person's time zone as it knows it): another machine tells of its own.
   if (!everywhere || q.night) return mine;
   const params = new URLSearchParams();
@@ -109,6 +139,61 @@ export async function runsList(d: Deps, q: RunQuery, everywhere: boolean): Promi
   const copied = new Set(listRuns(d.db, { limit: 5000 }).flatMap((r) => (r.remote ? [r.remote.id] : [])));
   const others = await machinesRuns(params.toString(), copied);
   return [...mine, ...others].sort((a, b) => b.createdAt - a.createdAt).slice(0, q.limit ?? 200);
+}
+
+// ---- a run's code --------------------------------------------------------------------------------------------
+
+/** Whether a folder is in a git repository, so that a run queued from it keeps its code. */
+export async function keepsCode(cwd: string): Promise<{ git: boolean }> {
+  const dir = path.resolve(cwd.replace(/^~(?=$|\/)/, config.home));
+  return { git: !!cwd && fs.existsSync(dir) && !!(await repoOf(dir)) };
+}
+
+/**
+ * A run's own code against its folder now: whether they differ (and in which files), and whether its own can be put
+ * back, so that Run again can offer it.
+ */
+export async function codeStatus(d: Deps, id: string): Promise<{ own: boolean; differs: boolean; changed: string[] }> {
+  const none = { own: false, differs: false, changed: [] };
+  const r = mustRun(d, id);
+  if (r.remote || !takesCode({ where: r.where }) || !fs.existsSync(r.cwd)) return none;
+  const m = await manifestOf(r, r.folder ?? runFolder(r.id));
+  if (!m) return none;
+  const env = { ...agentBaseEnv(), ...r.env };
+  const changed = await differences(m, r.cwd, env);
+  const own = await enough(m, env).then(
+    () => true,
+    () => false,
+  );
+  return { own, differs: changed.length > 0, changed: changed.slice(0, 20) };
+}
+
+const making = new Map<string, Promise<{ dir: string }>>();
+
+/**
+ * The folder with a run's code, to look at: the copy it runs from while it goes; else one made from what was kept (under
+ * code-view/, beside what stayed of its copy, which is left as the run left it; made once, then used again).
+ */
+export function codeFolder(d: Deps, id: string): Promise<{ dir: string }> {
+  let p = making.get(id);
+  if (!p) {
+    p = (async () => {
+      const r = mustRun(d, id);
+      if (r.remote || !takesCode({ where: r.where })) throw new HttpError(400, 'Its code is kept only for a run on this computer (open it on the machine that ran it)');
+      if (r.status === 'queued' || r.status === 'waiting' || r.status === 'starting') throw new HttpError(409, 'It has not started yet');
+      for (const dir of [ACTIVE.includes(r.status) ? r.codeDir : undefined, r.codeView]) if (dir && fs.existsSync(dir)) return { dir };
+      const folder = r.folder ?? runFolder(r.id);
+      const m = await manifestOf(r, folder);
+      if (!m) throw new HttpError(404, 'No code of this run can be put together: its folder is not in git, or not all of it was kept');
+      const copy = await makeCopy(m, folder, { link: false, env: { ...agentBaseEnv(), ...r.env } }).catch((e) => {
+        throw e instanceof NoCopy ? new HttpError(409, `Its code could not be put together: ${e.message}`) : e;
+      });
+      updateRun(d.db, id, { info: { codeView: copy.cwd } });
+      return { dir: copy.cwd };
+    })().finally(() => making.delete(id));
+    making.set(id, p);
+  }
+  return p;
 }
 
 // ---- sweeps --------------------------------------------------------------------------------------------------
@@ -154,17 +239,20 @@ export async function startSweep(d: Deps, b: Record<string, any>, o: { cwd?: str
     const { params: _p, mode: _m, maxRuns: _x, earlyStop: _e, name: given, ...rest } = b;
     // A name given is a template, its {name} placeholders filled as the command's are.
     const name = typeof given === 'string' && given.trim() ? fillCommand(given.trim(), { ...(b.seed !== undefined ? { seed: b.seed } : {}), ...c }, false) : `${group} · ${settingsLine(c)}`;
-    specs.push(await cleanJob(d.db, { ...rest, command: fillCommand(command, c), params: c, group, name: name.slice(0, 120), sweep: id }, { cwd: o.cwd }));
+    const { seed: _swept, ...others } = c;
+    specs.push(await cleanJob(d.db, { ...rest, command: fillCommand(command, c), seedTemplate: fillCommand(command, others), params: c, group, name: name.slice(0, 120), sweep: id }, { cwd: o.cwd }));
   }
   saveSweep(d.db, sweep);
   const runs: RunRecord[] = [];
-  for (const s of specs) runs.push(await submit(d, s, { startedBy: o.startedBy }));
+  // Its runs come from one folder at one moment: read once for all of them.
+  const code = codeReader(specs.filter(takesCode));
+  for (const s of specs) runs.push(await submit(d, s, { startedBy: o.startedBy, code }));
   return { sweep, runs };
 }
 
 // ---- results tables ------------------------------------------------------------------------------------------------
 
-/** A table's spec as given, checked: at least one column, rows by experiment or by a setting, the test and its level. */
+/** A table's spec as given, checked: at least one column, rows by experiment, command or setting, the test and its level. */
 export function cleanTableSpec(b: Record<string, any>): ResultsTableSpec {
   const runs = Array.isArray(b.runs) ? [...new Set(b.runs.filter((x: unknown): x is string => typeof x === 'string' && /^[a-z0-9]{4,32}$/.test(x)))].slice(0, 2000) : undefined;
   const group = typeof b.group === 'string' && b.group.trim() ? b.group.trim().slice(0, 120) : undefined;
@@ -185,9 +273,11 @@ export function cleanTableSpec(b: Record<string, any>): ResultsTableSpec {
       };
     });
   if (!cols.length) throw new HttpError(400, 'columns: at least one metric, like [{ "metric": "accuracy", "better": "max" }]');
-  const rows = typeof b.rows === 'string' && /^param:[\w.@/-]{1,80}$/.test(b.rows) ? (b.rows as `param:${string}`) : 'group';
+  const rows = b.rows === 'command' ? 'command' : typeof b.rows === 'string' && /^param:[\w.@/-]{1,80}$/.test(b.rows) ? (b.rows as `param:${string}`) : 'group';
+  // A row by command has the command itself as its key.
+  const keyMost = rows === 'command' ? 20_000 : 120;
   const spec: ResultsTableSpec = { ...(runs?.length ? { runs } : { group }), rows, columns: cols };
-  if (typeof b.baseline === 'string' && b.baseline.trim()) spec.baseline = b.baseline.trim().slice(0, 120);
+  if (typeof b.baseline === 'string' && b.baseline.trim()) spec.baseline = b.baseline.trim().slice(0, keyMost);
   if (['welch', 'paired', 'bootstrap', 'none'].includes(b.test)) spec.test = b.test;
   if (Number(b.alpha) > 0 && Number(b.alpha) < 0.5) spec.alpha = Number(b.alpha);
   if (b.correction === 'none') spec.correction = 'none';
@@ -195,7 +285,7 @@ export function cleanTableSpec(b: Record<string, any>): ResultsTableSpec {
   if (b.labels && typeof b.labels === 'object') {
     const labels = Object.fromEntries(
       Object.entries(b.labels as Record<string, unknown>)
-        .filter(([k, v]) => k.length <= 120 && typeof v === 'string' && v.trim())
+        .filter(([k, v]) => k.length <= keyMost && typeof v === 'string' && v.trim())
         .map(([k, v]) => [k, String(v).trim().slice(0, 80)]),
     );
     if (Object.keys(labels).length) spec.labels = labels;

@@ -143,19 +143,25 @@ export function aliveLocal(id: string, folder: string): boolean {
   return c !== null && (c === '' || c.includes(folder) || c.includes(id));
 }
 
-/** Stops a run whole: Ctrl-C to its process group, TERM after 10 s, KILL after 20 s, then its tmux session goes. */
+/**
+ * Stops a run whole: Ctrl-C to its process group (the warning, which a program may take to save a checkpoint and
+ * leave), TERM after `graceMs`, KILL 10 s after that, then its tmux session goes. (On Windows the first signal ends
+ * it at once.)
+ */
 export async function stopLocal(id: string, folder: string, graceMs = 10_000): Promise<void> {
   const pid = pidOf(folder);
+  // Only the start that was stopped: a run started again under the same id (the next night) is left alone.
+  const same = () => pidOf(folder) === pid;
   const sig = (s: NodeJS.Signals) => {
-    if (pid && aliveLocal(id, folder)) killTree(pid, s);
+    if (pid && same() && aliveLocal(id, folder)) killTree(pid, s);
   };
   sig('SIGINT');
   const later = (ms: number, fn: () => void) => setTimeout(fn, ms).unref();
   later(graceMs, () => sig('SIGTERM'));
-  later(2 * graceMs, () => {
+  later(graceMs + 10_000, () => {
     sig('SIGKILL');
     void tmuxThere().then((t) => {
-      if (t) void tmux(['kill-session', '-t', `=${session(id)}`]);
+      if (t && (same() || pidOf(folder) === null)) void tmux(['kill-session', '-t', `=${session(id)}`]);
     });
   });
 }

@@ -4,7 +4,9 @@
 // that differ only in their seed are one line, with the mean and spread of their numbers. A run the session's agent has
 // read since it ended (experiment_get, experiment_wait) is left out. It starts with its head on a line of its own,
 // which the conversation draws as one quiet row (shared/experiments.ts experimentNoticeOf), and ends by saying who sent
-// it, as the goal loop's messages do.
+// it, as the goal loop's messages do. A run still going that looks wrong (nothing printed, NaN, a loss going up),
+// without the agent on call, is a line of its own in the same message, sent at once; a message with only such lines
+// has a head of its own.
 import type { RunRecord } from '../../shared/experiments.ts';
 import type { Deps } from '../features/types.ts';
 import { commandWords } from './capture.ts';
@@ -12,6 +14,8 @@ import { mean, std } from './stats.ts';
 import { seedOf } from './tables.ts';
 
 export const NOTICE_HEAD = '[Experiments · runs ended]';
+/** The head of a message that only tells of runs still going that look wrong. */
+export const WRONG_HEAD = '[Experiments · a run needs a look]';
 export const NOTICE_FOOT = '(This notice is from Experiments, not typed by the user. Nothing to answer unless it changes what you are doing.)';
 /** The most lines in one message. */
 const LINES = 20;
@@ -25,6 +29,8 @@ export interface Ending {
   /** Its line when it stands on its own. */
   line: string;
   at: number;
+  /** Not an end: a run still going that looks wrong, told at once. */
+  wrong?: true;
   /** The experiment it is listed under (the group), and that experiment's title when it has one. */
   group?: string;
   title?: string;
@@ -179,7 +185,7 @@ export function noticeText(entries: Ending[]): string {
     if (rows.length > shown.length) more.push(`${rows.length - shown.length} more ${group ? `in ${group}` : 'in no experiment'}`);
   }
   if (more.length) lines.push(`and ${more.join(', ')} (experiment_list lists them)`);
-  return [NOTICE_HEAD, ...lines, 'experiment_get reads a run’s record and the end of its log.', NOTICE_FOOT].join('\n');
+  return [entries.every((e) => e.wrong) ? WRONG_HEAD : NOTICE_HEAD, ...lines, 'experiment_get reads a run’s record and the end of its log.', NOTICE_FOOT].join('\n');
 }
 
 /** The box's message while it is still in the queue as it was written (not sent, removed or rewritten by the person). */
@@ -240,13 +246,18 @@ export function tellEnded(d: Deps, key: string, e: Ending): void {
   let box = boxes.get(key);
   if (!box) boxes.set(key, (box = { pending: [] }));
   box.pending.push(e);
+  // A run that looks wrong does not wait for others to end.
+  if (e.wrong && box.timer) {
+    clearTimeout(box.timer);
+    box.timer = undefined;
+  }
   if (box.sending || box.timer) return;
   box.timer = setTimeout(
     () => {
       box.timer = undefined;
       void flush(d, key);
     },
-    BUSY.has(s.live?.status ?? '') ? 0 : gather.ms,
+    e.wrong || BUSY.has(s.live?.status ?? '') ? 0 : gather.ms,
   );
   box.timer.unref?.();
 }

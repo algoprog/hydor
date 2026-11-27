@@ -8,7 +8,7 @@ import { tr } from '../../i18n/runtime';
 const AT_HOUR = /^Waits for the night \(from (\d\d:\d\d)\)$/;
 
 /** Whether a run's reason is that it waits for a night (the next one). */
-export const waitsForNight = (why: string | undefined) => /^(Waits for the night|The night ended)/.test(why ?? '');
+export const waitsForNight = (why: string | undefined) => /^(Waits for the night|The night ended|Stopped at the end of the night)/.test(why ?? '');
 
 /** Whether the status's own words already say all the reason does. */
 export const saidByStatus = (why: string | undefined) => AT_HOUR.test(why ?? '');
@@ -33,9 +33,20 @@ export function hoursWords(s: Pick<ExperimentsSettings, 'nightFrom' | 'nightTo'>
   return tr('between {0} and {1}').replace('{0}', s.nightFrom).replace('{1}', s.nightTo);
 }
 
-/** What Tonight also means when night runs are stopped at the night's end. */
-export const stopNote = (s: Pick<ExperimentsSettings, 'nightTo' | 'nightEnds'> | null, where: string): string =>
-  s?.nightEnds === 'stop' && where === 'local' ? tr('A run still going at {0} is stopped, and starts from the beginning the next night.').replace('{0}', s.nightTo) : '';
+/**
+ * What Tonight also means when night runs are stopped at the night's end. `carries`: whether the run says how to carry
+ * on (left out where a run cannot, as an evolution's).
+ */
+export const stopNote = (s: Pick<ExperimentsSettings, 'nightTo' | 'nightEnds'> | null, where: string, carries?: boolean): string => {
+  if (s?.nightEnds !== 'stop' || where !== 'local') return '';
+  const words =
+    carries === undefined
+      ? tr('A run still going at {0} is stopped, and starts from the beginning the next night.')
+      : carries
+        ? tr('A run still going at {0} is stopped, and carries on from its checkpoint the next night.')
+        : tr('A run still going at {0} is stopped, and starts from the beginning the next night, unless it says how to carry on.');
+  return words.replace('{0}', s.nightTo);
+};
 
 /** "1 waits for the night", "3 wait for the night". */
 export const nightCountWords = (n: number) => (n === 1 ? '1 waits for the night' : `${n} wait for the night`);

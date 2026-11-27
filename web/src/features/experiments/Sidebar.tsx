@@ -2,19 +2,27 @@
 // small meters, the box to find an experiment, and the experiments themselves (one entry for each group the runs
 // share, with its title, description and category) listed by category, the newest first. Above them, the evaluations,
 // each with its latest score. The sidebar shows on screens 1024px wide and up; the Overview shows the same pieces
-// itself on narrower ones. While an evolution works on an evaluation, its second line says so instead.
-import { useMemo } from 'react';
-import { Home as HomeIcon, Search, X } from 'lucide-react';
+// itself on narrower ones. While an evolution works on an evaluation, its second line says so instead. Archived
+// experiments are left out of the list, behind a quiet line at its bottom.
+import { useMemo, useState } from 'react';
+import { ArchiveRestore, ChevronDown, ChevronRight, Home as HomeIcon, Search, X } from 'lucide-react';
 import type { ExperimentGroup, GpuNow, QueueNow, RunRecord } from '@shared/experiments';
+import type { FindingVerdict } from '@shared/findings';
 import type { EvaluationListed } from '@shared/evaluations';
 import type { Evolution } from '@shared/evolve';
+import { AgentHoursLine } from './AgentHours';
+import { statusTone } from './api';
 import { entryLine, toneClass } from './evalWords';
 import { columnWords, waitsWords } from './evolveWords';
 import { countWaitingForNight, nightCountWords } from './nightWords';
 import { LOCALE } from '../../i18n/locale';
 import { timeAgo } from '../../lib/format';
+import { put } from '../../lib/api';
+import { toastError } from '../../lib/store';
 import { Meter } from '../../components/charts';
 import { cx, inputCls } from '../../components/ui';
+import { useExperimentMarks } from './marksStore';
+import { earlierWords, standingsOf } from './runList';
 
 /** One experiment as the page lists it: the group its runs share, what it is, and its runs counted. */
 export interface Entry {
@@ -26,8 +34,16 @@ export interface Entry {
   category: string;
   /** Its runs that are loaded (this computer's and other machines'), in the order they came. */
   runs: RunRecord[];
-  /** How many runs it has: the loaded ones, and the older of this computer's that are not loaded (the group's own count). */
+  /** How many runs show: of the loaded ones, and of the older of this computer's that are not loaded (the group's own count). Archived runs and earlier attempts apart. */
   total: number;
+  /** Earlier attempts folded under those. */
+  earlier: number;
+  /** The loaded runs that show. */
+  rows: RunRecord[];
+  /** What the newest finding that names its runs says. */
+  verdict?: FindingVerdict;
+  /** The experiment was archived (and no run made since). */
+  archivedAt?: number;
   going: number;
   waiting: number;
   /** When its latest run was made, started or ended. */
@@ -52,23 +68,35 @@ export function entriesOf(runs: RunRecord[], groups: Map<string, ExperimentGroup
     if (!by.has(k)) by.set(k, []);
     by.get(k)!.push(r);
   }
+  const named = (info: ExperimentGroup | undefined, group: string) => ({
+    group,
+    title: info?.title?.trim() || group,
+    description: info?.description?.trim() ?? '',
+    category: info?.category?.trim() ?? '',
+    ...(info?.verdict ? { verdict: info.verdict } : {}),
+  });
   const unloaded: Entry[] = [];
   for (const [group, info] of groups) {
     if (group && !by.has(group) && info.runs > 0) {
-      unloaded.push({ group, title: info.title?.trim() || group, description: info.description?.trim() ?? '', category: info.category?.trim() ?? '', runs: [], total: info.runs, going: 0, waiting: 0, lastAt: info.lastAt });
+      unloaded.push({ ...named(info, group), runs: [], rows: [], total: info.shown ?? info.runs, earlier: info.earlier ?? 0, ...(info.archivedAt ? { archivedAt: info.archivedAt } : {}), going: 0, waiting: 0, lastAt: info.lastAt });
     }
   }
   const loaded = [...by.entries()]
     .map(([group, rs]) => {
       const info = groups.get(group);
       const own = rs.filter((r) => !r.machine).length;
+      const stand = standingsOf(rs);
+      // More runs than are loaded: this computer's counts are the server's, other machines' are counted here.
+      const more = (info?.runs ?? 0) > own;
+      const there = (list: RunRecord[]) => list.filter((r) => r.machine).length;
+      const archivedAt = info?.archivedAt && !rs.some((r) => !r.machine && r.createdAt > info.archivedAt!) ? info.archivedAt : undefined;
       return {
-        group,
-        title: info?.title?.trim() || group,
-        description: info?.description?.trim() ?? '',
-        category: info?.category?.trim() ?? '',
+        ...named(info, group),
         runs: rs,
-        total: rs.length + Math.max(0, (info?.runs ?? 0) - own),
+        rows: stand.rows,
+        total: more ? (info!.shown ?? info!.runs) + there(stand.rows) : stand.rows.length,
+        earlier: more ? (info!.earlier ?? 0) + there(stand.folded) : stand.folded.length,
+        ...(archivedAt ? { archivedAt } : {}),
         going: rs.filter((r) => r.status === 'running' || r.status === 'starting').length,
         waiting: rs.filter((r) => r.status === 'queued' || r.status === 'waiting').length,
         lastAt: Math.max(...rs.map(lastOf)),
@@ -91,7 +119,10 @@ export function findEntries(entries: Entry[], text: string): Found[] {
       out.push(e);
       continue;
     }
+    // Archived runs are neither found nor counted.
+    const away = new Set(standingsOf(e.runs).archived);
     const n = e.runs.filter((r) => {
+      if (away.has(r)) return false;
       const t = [r.name, r.command, r.id].join('\n').toLowerCase();
       return words.every((w) => t.includes(w) || own.includes(w));
     }).length;
@@ -120,6 +151,9 @@ export function byCategory<T extends Entry>(entries: T[]): { blocks: { label: st
   if (rest) blocks.push({ label: null, items: rest.items });
   return { blocks, none };
 }
+
+/** The colour of an experiment's dot, as its runs' own: blue while one runs, amber when none runs and one waits. */
+export const activeTone = (e: Pick<Entry, 'going'>) => statusTone(e.going > 0 ? 'running' : 'waiting');
 
 /** What runs now and what waits, as a line: "1 running · 2 waiting · 2 wait for the night". */
 export function QueueLine({ runs }: { runs: RunRecord[] }) {
@@ -155,8 +189,10 @@ export function GpuMeters({ gpus, runs, onOpen, className }: { gpus: GpuNow[]; r
         const p = g.memTotal ? (g.memUsed / g.memTotal) * 100 : 0;
         // The run that holds it by its name (it may be one not listed any more).
         const holder = g.run ? runs.find((r) => r.id === g.run && !r.machine) : undefined;
+        // A shared GPU names each run on it.
+        const names = g.runs?.map((id) => runs.find((r) => r.id === id && !r.machine)?.name ?? id).join(', ');
         return (
-          <button key={g.index} type="button" disabled={!g.run} onClick={() => g.run && onOpen(g.run)} title={`${g.name} · ${g.util}% busy${g.run ? ` · ${holder ? (holder.name ?? holder.id) : 'one of your runs holds it'}` : ''}`} className="min-w-0 rounded text-left disabled:cursor-default">
+          <button key={g.index} type="button" disabled={!g.run} onClick={() => g.run && onOpen(g.run)} title={`${g.name} · ${g.util}% busy${g.run ? ` · ${names ?? (holder ? (holder.name ?? holder.id) : 'one of your runs holds it')}` : ''}`} className="min-w-0 rounded text-left disabled:cursor-default">
             <div className="mb-0.5 flex justify-between gap-2 text-[11px] text-fg-3">
               <span className={g.run ? 'font-medium text-fg-2' : ''}>GPU {g.index}</span>
               <span className="tnum whitespace-nowrap">
@@ -194,6 +230,63 @@ export function FindBox({ value, onChange, className }: { value: string; onChang
   );
 }
 
+/** The newest finding's verdict as a small word in its colour (an open one, not tested yet, says nothing here). */
+export function VerdictWord({ verdict }: { verdict?: FindingVerdict }) {
+  if (!verdict || verdict === 'open') return null;
+  // data-i18n: a finding's "supported", not software's ("findings::supported").
+  return verdict === 'supported' ? <span data-i18n="findings" className="text-ok">supported</span> : verdict === 'refuted' ? <span className="text-err">refuted</span> : <span className="text-warn">unclear</span>;
+}
+
+/** "9 runs", and beside it "+ 6 earlier attempts" when there are some. */
+export function RunCount({ e }: { e: Pick<Entry, 'total' | 'earlier'> }) {
+  return (
+    <>
+      <span>{runsWords(e.total)}</span>
+      {e.earlier > 0 && (
+        <>
+          {' '}
+          <span>{earlierWords(e.earlier)}</span>
+        </>
+      )}
+    </>
+  );
+}
+
+/** The archived experiments, behind a quiet line: each opens, or is brought back. */
+export function ArchivedExperiments({ entries, onOpen, className }: { entries: Entry[]; onOpen: (group: string) => void; className?: string }) {
+  const [shown, setShown] = useState(false);
+  if (!entries.length) return null;
+  const back = async (group: string) => {
+    try {
+      await put('/api/experiments/groups', { name: group, archived: false });
+      useExperimentMarks.getState().changed();
+    } catch (e) {
+      toastError(e);
+    }
+  };
+  return (
+    <div className={className}>
+      <button type="button" onClick={() => setShown((o) => !o)} aria-expanded={shown} className="flex min-h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] text-fg-3 hover:text-fg-2">
+        {shown ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        <span>{`Archived · ${entries.length}`}</span>
+      </button>
+      {shown &&
+        entries.map((e) => (
+          <div key={e.group} className="min-w-0 pb-1">
+            <button type="button" onClick={() => onOpen(e.group)} className="block w-full min-w-0 rounded-lg px-2.5 py-1 text-left hover:bg-bg-1">
+              <span translate="no" className="line-clamp-2 text-[13px] leading-snug break-words text-fg-2">
+                {e.title}
+              </span>
+            </button>
+            <button type="button" onClick={() => void back(e.group)} className="ml-1.5 flex min-h-7 items-center gap-1 rounded-md px-1 text-[12px] text-accent hover:bg-accent-soft">
+              <ArchiveRestore size={12} /> <span>Bring back</span>
+            </button>
+          </div>
+        ))}
+    </div>
+  );
+}
+
 /** An experiment in the list: its title, and under it how many runs and what is going (or when the last was). */
 function Item({ e, selected, onOpen }: { e: Found; selected: boolean; onOpen: () => void }) {
   const active = e.going + e.waiting > 0;
@@ -213,18 +306,24 @@ function Item({ e, selected, onOpen }: { e: Found; selected: boolean; onOpen: ()
           <span className="truncate">{`${e.viaRuns} ${e.viaRuns === 1 ? 'run matches' : 'runs match'}`}</span>
         ) : (
           <>
-            {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
-            <span className="truncate">
-              <span>{runsWords(e.total)}</span>
+            {active && <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', activeTone(e))} />}
+            <span className="min-w-0 break-words">
+              <RunCount e={e} />
               <span> · </span>
               {active ? (
                 <>
                   {e.going > 0 && <span>{`${e.going} running`}</span>}
                   {e.going > 0 && e.waiting > 0 && <span> · </span>}
-                  {e.waiting > 0 && <span>{`${e.waiting} waiting`}</span>}
+                  {e.waiting > 0 && <span className="whitespace-nowrap">{`${e.waiting} waiting`}</span>}
                 </>
               ) : (
                 <span title={fullDate(e.lastAt)}>{agoWords(e.lastAt)}</span>
+              )}
+              {e.verdict && e.verdict !== 'open' && (
+                <>
+                  <span> · </span>
+                  <VerdictWord verdict={e.verdict} />
+                </>
               )}
             </span>
           </>
@@ -269,7 +368,9 @@ const HEADING = 'truncate px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide
  * the Overview and on an evaluation (`evaluation`, its id).
  */
 export function Sidebar({ runs, entries, queue, q, onQ, current, onOverview, onOpen, onOpenRun, evaluations, scoring, evolving, evaluation, onOpenEvaluation }: { runs: RunRecord[] | null; entries: Entry[]; queue: QueueNow | null; q: string; onQ: (q: string) => void; current: string | null; onOverview: () => void; onOpen: (group: string) => void; onOpenRun: (id: string) => void; evaluations: EvaluationListed[]; scoring: Set<string>; evolving: Map<string, Evolution>; evaluation: string | null; onOpenEvaluation: (id: string) => void }) {
-  const found = useMemo(() => findEntries(entries, q), [entries, q]);
+  const listed = useMemo(() => entries.filter((e) => !e.archivedAt), [entries]);
+  const archived = useMemo(() => entries.filter((e) => e.archivedAt), [entries]);
+  const found = useMemo(() => findEntries(listed, q), [listed, q]);
   const { blocks, none } = useMemo(() => byCategory(found), [found]);
   const hasCategories = blocks.some((b) => b.label !== null);
   const onOverviewNow = current === null && !evaluation;
@@ -279,6 +380,7 @@ export function Sidebar({ runs, entries, queue, q, onQ, current, onOverview, onO
         <div data-intro="exp-queue" className="px-1 space-y-2.5">
           <QueueLine runs={runs ?? []} />
           {queue && <GpuMeters gpus={queue.gpus} runs={runs ?? []} onOpen={onOpenRun} />}
+          <AgentHoursLine queue={queue} />
         </div>
         <FindBox value={q} onChange={onQ} />
       </div>
@@ -337,6 +439,7 @@ export function Sidebar({ runs, entries, queue, q, onQ, current, onOverview, onO
             ))}
             {none && <Item e={none} selected={current === ''} onOpen={() => onOpen('')} />}
             {!found.length && q.trim() && <p className="px-2.5 py-3 text-[12.5px] text-fg-3">No experiment is like that.</p>}
+            <ArchivedExperiments entries={archived} onOpen={onOpen} className="mt-3" />
           </>
         )}
       </nav>

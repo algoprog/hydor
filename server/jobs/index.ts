@@ -11,7 +11,7 @@ import { config } from '../config.ts';
 import { files } from '../experiments/local.ts';
 import { runView } from '../experiments/api.ts';
 import { stopRun } from '../experiments/queue.ts';
-import { getRun, runFolder } from '../experiments/records.ts';
+import { awayIds, getRun, runFolder } from '../experiments/records.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { plain, readTail, readTaskLog, taskOutputPath } from '../tasklog.ts';
@@ -309,7 +309,11 @@ export function createJobs(o: JobsOptions = {}): Jobs {
     const servers = live.filter((e) => e.kind === 'server');
     const queued = [...mine.queued, ...seen.queued.map((s) => s.entry)].sort((a, b) => (a.startsAt ?? Infinity) - (b.startsAt ?? Infinity) || (a.queuedAt ?? 0) - (b.queuedAt ?? 0));
     const at = new Set([...live, ...queued].map((e) => e.id));
-    const ended = endedRows(d.db, now, limit, at).map((r) => ('job' in r ? registeredEntry(r.job, sessions) : r.entry));
+    // An experiment run that was archived leaves Finished with it.
+    const away = awayIds(d.db);
+    const ended = endedRows(d.db, now, limit, at)
+      .map((r) => ('job' in r ? registeredEntry(r.job, sessions) : r.entry))
+      .filter((e) => !(e.kind === 'experiment' && away.has(e.id.slice('run:'.length))));
     const allDoneAt = doneAt([...running, ...queued], now);
     const items = itemTags(d.db);
     const byFolder = folderProjects(allSpaces(d.db));

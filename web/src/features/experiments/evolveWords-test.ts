@@ -61,6 +61,13 @@ assert.deepEqual(W.stateLine(evo({ when: 'night', waits: none, failed: 0 }), 0).
 assert.deepEqual(W.stateLine(evo({ when: 'night', status: 'paused' }), 0), { tone: 'paused', parts: ['Paused'] });
 assert.equal(W.workedMs({ activeMs: 5000, status: 'running', waits }, 1000, 61_000), 5000);
 assert.equal(W.workedMs({ activeMs: 5000, status: 'running' }, 1000, 61_000), 65_000);
+// Held at the limit on agents' GPU hours: the held runs' own words, then the counts; it waits for you, not for a night.
+const held = 'Waits for you: agents have used 100 of 100 GPU hours in the last seven days';
+assert.deepEqual(W.stateLine(evo({ waits: held }), 60_000), { tone: 'waiting', parts: [held, '37 of 200 tried', '4 failed'] });
+assert.deepEqual(W.stateLine(evo({ waits: held, status: 'starting', tried: 0, failed: 0 }), 0), { tone: 'waiting', parts: [held] });
+assert.equal(W.waitsWords(evo({ waits: held })), 'Waits for you');
+assert.equal(W.heldSearch(evo({ waits: held })), true);
+assert.equal(W.heldSearch(evo({ waits: held, status: 'stopped' })), false);
 assert.deepEqual(W.stateLine(evo({ status: 'done', why: 'No new best in the last 40' }), 0).parts, ['Done: no new best in the last 40']);
 assert.deepEqual(W.stateLine(evo({ status: 'done', why: '200 tried' }), 0).parts, ['Done: all 200 tried']);
 assert.deepEqual(W.stateLine(evo({ status: 'done', why: 'Its 1 hour is up' }), 0).parts, ['Done: its time is up']);

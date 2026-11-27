@@ -34,16 +34,21 @@ const r2 = { id: 'r-bbbb22', command: 'python train.py', cwd: '/home/u/ir', stat
 const r3 = { id: 'r-cccc33', name: 'broken', command: 'python x.py', cwd: '/home/u/ir', status: 'failed', createdAt: Date.now() - 1_000_000 };
 
 test('experiments: the list with marks, filters sent along, --json as returned', async () => {
-  const t = fakeConn({ 'GET /api/experiments/runs?limit=25': { runs: [r2, r1, r3] }, 'GET /api/experiments/runs?limit=10&status=active&group=bm25-sweep&q=eval': { runs: [r2] } });
+  const t = fakeConn({ 'GET /api/experiments/runs?limit=25&archived=0': { runs: [r2, r1, r3] }, 'GET /api/experiments/runs?limit=25': { runs: [r2, r1, r3] }, 'GET /api/experiments/runs?limit=10&status=active&group=bm25-sweep&q=eval&archived=0': { runs: [r2] } });
   const r = await run(t.conn, ['experiments']);
   assert.match(r.out, /^ +ID +RUN +EXPERIMENT +STATE +WHEN$/m);
   assert.match(r.out, /^● +r-bbbb22 +python train\.py +running/m);
   assert.match(r.out, /^✓ +r-aaaa11 +bm25 baseline +bm25-sweep +done/m);
   assert.match(r.out, /^✗ +r-cccc33 +broken +failed/m);
   await run(t.conn, ['experiments', '--status', 'active', '--group', 'bm25-sweep', '--query', 'eval', '-n', '10']);
-  assert.equal(t.calls.at(-1)!.path, '/api/experiments/runs?limit=10&status=active&group=bm25-sweep&q=eval');
+  assert.equal(t.calls.at(-1)!.path, '/api/experiments/runs?limit=10&status=active&group=bm25-sweep&q=eval&archived=0');
+  // The archived runs are left out unless asked for.
+  await run(t.conn, ['experiments']);
+  assert.equal(t.calls.at(-1)!.path, '/api/experiments/runs?limit=25&archived=0');
+  await run(t.conn, ['experiments', '--archived']);
+  assert.equal(t.calls.at(-1)!.path, '/api/experiments/runs?limit=25');
   assert.deepEqual((await run(t.conn, ['experiments', '--json'])).json, [{ runs: [r2, r1, r3] }]);
-  assert.match((await run(fakeConn({ 'GET /api/experiments/runs?limit=25': { runs: [] } }).conn, ['experiments'])).out, /No runs\./);
+  assert.match((await run(fakeConn({ 'GET /api/experiments/runs?limit=25&archived=0': { runs: [] } }).conn, ['experiments'])).out, /No runs\./);
 });
 
 test('experiments show: fields, metrics, events; --log adds the log; names by id, name or command', async () => {

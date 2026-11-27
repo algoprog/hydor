@@ -9,7 +9,7 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { RunRecord } from '../../shared/experiments.ts';
+import { isTrialRun, type RunRecord } from '../../shared/experiments.ts';
 import type { Space } from '../../shared/spaces.ts';
 import { wallAt, zonedTime } from '../automations/schedule.ts';
 import type { DB } from '../db.ts';
@@ -63,7 +63,7 @@ export interface WorkLog {
 }
 
 /** Where runs come from (Experiments' records), so a test can stand in for them. */
-export const workLogSources: { runs: (db: DB) => RunRecord[] } = { runs: (db) => listRuns(db, { limit: 2000 }) };
+export const workLogSources: { runs: (db: DB) => RunRecord[] } = { runs: (db) => listRuns(db, { limit: 2000 }).filter((r) => !isTrialRun(r)) };
 
 const AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
 const CLIENTS: Record<string, string> = { 'claude-vscode': 'VS Code', vscode: 'VS Code', 'claude-desktop': 'Claude desktop', cli: 'terminal', exec: 'terminal', 'sdk-cli': 'another app', 'sdk-ts': 'another app', 'sdk-py': 'another app' };

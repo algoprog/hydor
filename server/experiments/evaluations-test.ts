@@ -25,6 +25,8 @@ import { internalHeaders } from '../internal.ts';
 import { allowedFolder, changesOf, check, cleanSpec, createEvaluation, getEvaluation, getScore, limits, listScores, resumeScores, rootFor, startScore, testReadable, updateEvaluation, verdictOf, waitScore } from './evaluations.ts';
 import { TEST_READABLE } from '../../shared/evaluations.ts';
 import { experiments } from './index.ts';
+import { setSessionExtra } from '../sessionExtra.ts';
+import { createSpace, deleteSpace } from '../spaces/index.ts';
 import { stopTmuxServer } from './local.ts';
 import { forgetNotices, setSettings, submit, tick, cleanJob, useDeps } from './queue.ts';
 import { getRun, listRuns } from './records.ts';
@@ -592,6 +594,37 @@ test('the final test is the person’s: its command reads the held-out folder, a
   assert.equal((await call('POST', '/api/experiments/tables/preview', { runs: [run], columns: ['acc'] }, true)).status, 403);
   assert.ok(!JSON.stringify((await call('POST', '/api/experiments/tables/preview', { group: `eval-${main.id}`, columns: ['acc'] }, true)).body).includes(run), 'a group’s table leaves it out');
   assert.equal((await call('POST', `/api/experiments/runs/${run}/again`, {})).status, 400, 'not run again on its own');
+});
+
+test('a score’s runs belong to the evaluation’s project wherever they run, or the one of the session behind them', async () => {
+  const mine = createSpace(db, { name: 'Scored', folder: repo }).id;
+  const other = createSpace(db, { name: 'Elsewhere', folder: foreign }).id;
+  const projects = (s: EvalScore) => [...new Set(s.runs.map((r) => getRun(db, r)!.project))];
+  assert.deepEqual(projects(await scoreNow(main.id, { folder: work })), [mine], 'a worktree of it is not in the project’s folder');
+  db.prepare("insert into app_sessions (key, agent, cwd, created_at, updated_at) values ('claude:evolves', 'claude', ?, 1, 1)").run(foreign);
+  setSessionExtra(db, 'claude:evolves', { space: other });
+  const evolved = await startScore(deps, main.id, { kind: 'score', folder: work, seeds: [1], by: { who: 'evolve', evolution: 'vnone', candidate: 'c1' }, projectSession: 'claude:evolves' });
+  assert.deepEqual(projects(await over(evolved.id)), [other], 'an evolution an agent started');
+  deleteSpace(db, mine);
+  deleteSpace(db, other);
+});
+
+test('deleting a score or an evaluation says what its runs wrote into their folders, and can keep it', async () => {
+  const ev = await createEvaluation(deps, { name: 'Doomed', cwd: repo, command: 'sh eval.sh {seed}; printf 12345 > "$HYDOR_RUN_DIR/model.bin"', metric: 'acc', better: 'higher', protect: ['eval.sh'], gpus: 0 });
+  const first = await scoreNow(ev.id);
+  const second = await scoreNow(ev.id);
+  assert.equal(first.status, 'done', first.why);
+  const files = (query: string, agent = false) => call('GET', `/api/experiments/run-files?${query}`, undefined, agent);
+  assert.deepEqual((await files(`score=${first.id}`)).body.folderFiles, { count: 3, bytes: 15, names: ['model.bin', 'model.bin', 'model.bin'] });
+  assert.equal((await files(`evaluation=${ev.id}`)).body.folderFiles.count, 6);
+  assert.equal((await files(`evaluation=${ev.id}`, true)).status, 403, 'the person’s alone, as deleting is');
+  assert.equal((await files('')).status, 400);
+  const root = path.join(process.env.DATA_DIR!, 'kept-runs');
+  assert.deepEqual((await call('DELETE', `/api/experiments/evaluations/scores/${first.id}?files=keep`)).body, { ok: true, kept: root });
+  for (const run of first.runs) assert.equal(fs.readFileSync(path.join(root, run, 'model.bin'), 'utf8'), '12345');
+  assert.deepEqual((await call('DELETE', `/api/experiments/evaluations/${ev.id}?files=keep`)).body, { ok: true, kept: root });
+  for (const run of second.runs) assert.ok(fs.existsSync(path.join(root, run, 'model.bin')) && getRun(db, run) === null);
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('what an agent may do through app_api: read, ask for a score, put files back; nothing else', () => {

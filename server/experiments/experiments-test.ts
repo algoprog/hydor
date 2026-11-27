@@ -11,12 +11,14 @@
 // and experiment_wait; the routes; the batch series route; experiments' titles, descriptions and categories (the
 // routes, the helper's writing with a stand-in model, when it happens by itself) and experiment_describe; runs that
 // wait for the night, with the clock set by the test (the hours, ordinary runs first, the night's end both ways, the
-// morning's notice, clusters and other machines, the tools).
+// morning's notice, clusters and other machines, the tools); runs that share a GPU when their memory fits, a GPU to
+// itself and the switch, a long wait not overtaken, about when a waiting run may start, other programs named, the
+// notice of a long wait and the default of runs without a GPU.
 // Build and run with a scratch data folder (no GPU is used):
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/experiments/experiments-test.ts
 //   DATA_DIR=/tmp/hydor-test-experiments CUDA_VISIBLE_DEVICES= node dist/dev/experiments-test.js
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -27,19 +29,21 @@ import { keyNumbers } from '../../shared/metric-rank.ts';
 import { gather, noticeText, sawEnded, tellEnded } from './notices.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
-import { openDb } from '../db.ts';
+import { kvSet, openDb } from '../db.ts';
 import { CONFIDENTIAL_EXTRA } from '../../shared/confidential.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { commandWords, captureGit, KEEP_FILE, keepUntracked, localShell, pythonOf } from './capture.ts';
-import { endOfSlurm, parseSacct, parseSbatch, parseSqueue, reasonWords, saveCluster, sbatchScript, setSsh, type Ssh } from './clusters.ts';
-import { chooseGpus, parseGpus, setGpuReader } from './gpus.ts';
+import { endOfSlurm, hoursSaid, parseSacct, parseSbatch, parseSqueue, parseTestOnly, reasonWords, saveCluster, sbatchScript, setSsh, slurmTime, type Ssh } from './clusters.ts';
+import { chooseGpus, marginOf, parseApps, parseGpus, roomOn, setGpuReader, type GpuApp } from './gpus.ts';
+import { endAbout, whenWords } from './forecast.ts';
+import { setUsageReader } from './usage.ts';
 import { describeGroup, enableExperimentDescriptions, firstObject, redactCommand, redactSetting, timing as describeTiming } from './describe.ts';
 import { experiments } from './index.ts';
-import { stopTmuxServer } from './local.ts';
+import { pidOf, stopTmuxServer } from './local.ts';
 import { MAX_METRICS, nanText, oomText, parseLine, Tracker } from './metrics.ts';
-import { cleanJob, endLine, forgetLive, forgetNotices, onCallBrief, repairEnded, setSettings, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
-import { clock, morningAlso, morningWords, NIGHT_AGAIN, NIGHT_BEHIND, nightAt, tonightMore } from './night.ts';
+import { cleanJob, defaultSlots, endLine, forgetLive, forgetNotices, onCallBrief, repairEnded, runAgain, setSettings, settingsOf, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
+import { clock, morningAlso, morningWords, NIGHT_AGAIN, NIGHT_BEHIND, NIGHT_CARRY, nightAt, tonightMore } from './night.ts';
 import { addEvent, getInfo, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveInfo, saveSeries, saveTable, seriesOf, updateRun, waitStarted, workOut } from './records.ts';
 import { useMachines } from './remote.ts';
 import { holm, lgamma, pairedBootstrap, pairedT, tTwoSided, welch } from './stats.ts';
@@ -47,7 +51,11 @@ import { earlyStop, expandSweep, fillCommand, paramsOf, placeholders, runFile, s
 import { insertTable, makeTable, parseScores } from './tables.ts';
 import { startSweep } from './api.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
+import { createSpace } from '../spaces/index.ts';
+import { wordsForLang } from '../language/index.ts';
+import { noticeText as phoneText } from '../../shared/notice.ts';
 import { experimentTools, SPAWN_NOTE } from './tools.ts';
+import { endedNews } from '../research/project.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -159,6 +167,8 @@ let gpus = [
   { index: 3, name: 'Test GPU', memUsed: 12_000, memTotal: 24_000, util: 50 },
 ];
 setGpuReader(async () => ({ gpus }));
+// Nor is nvidia-smi or /proc read for what the runs use (trial-test.ts checks the sampling).
+setUsageReader({ gpus: async () => [], apps: async () => [], processes: () => null, memory: () => null });
 
 // ---- statistics ----------------------------------------------------------------------------------------------
 
@@ -326,7 +336,7 @@ test('the queue: GPU jobs take free GPUs by priority, the rest wait with why; jo
   for (let i = 0; i < 4; i++) cpu.push(await job({ name: `cpu${i}`, gpus: 0 }));
   await until(() => getRun(db, high.id)!.status === 'running' && getRun(db, low.id)!.status === 'waiting', 20_000, 'the queue to choose');
   assert.deepEqual(getRun(db, high.id)!.gpuIds, [2], 'the higher priority took the free GPU');
-  assert.equal(getRun(db, low.id)!.why, 'Waiting for 1 GPU with 20 GB free: the most free now is 19.5 GB, on GPU 1; your other runs hold GPU 2');
+  assert.equal(getRun(db, low.id)!.why, 'Waiting for 1 GPU with 20 GB free: the most free now is 19.5 GB, on GPU 1; your other runs hold GPU 2. No telling when: those runs do not say how far they have to go');
   const slots = (await http.inject({ method: 'GET', url: '/api/experiments/settings' })).json().cpuSlots;
   const going = cpu.filter((r) => ['starting', 'running'].includes(getRun(db, r.id)!.status));
   assert.equal(going.length, Math.min(slots, 4), `${slots} jobs without a GPU at once`);
@@ -604,7 +614,7 @@ test('seeds that barely change a number are not tested over seeds, and the table
     assert.equal(t.footnote, undefined);
     assert.ok(!t.latex.includes('dagger') && !t.markdown.includes('†'));
     assert.ok(t.latex.includes(`% hydor:table tflat001\n% ${note}\n\\begin{tabular}`), t.latex);
-    assert.ok(t.markdown.endsWith(`<!-- ${note} -->`), t.markdown);
+    assert.ok(t.markdown.endsWith(`\n\n<sub>${note}</sub>`), t.markdown);
     // Put into a paper and made again, the comment stays one line under its marker.
     const placed = insertTable(insertTable('\\end{document}', t).text, t);
     assert.equal(placed.text.split(note).length, 2);
@@ -634,7 +644,7 @@ test('per-example scores the same on every example read as the same, and say so;
     assert.deepEqual([cell.p, cell.pAdj, cell.significant, cell.verdict], [null, null, false, 'same'], String(test));
     assert.deepEqual(t.notes, [note]);
     assert.ok(t.latex.includes(`% hydor:table tident01\n% ${note}\n\\begin{tabular}`), t.latex);
-    assert.ok(t.markdown.endsWith(`<!-- ${note} -->`), t.markdown);
+    assert.ok(t.markdown.endsWith(`\n\n<sub>${note}</sub>`), t.markdown);
     assert.match(t.csv, /\nbm25l,ranker = bm25l,[^\n]*,,,same\n/);
   }
   // The tool's answer gives each cell's verdict and p, never `significant`; the table kept still has it, for its marks.
@@ -915,7 +925,7 @@ test('SLURM: the batch script, and reading sbatch, squeue and sacct', () => {
   assert.deepEqual(q.get('12346'), { state: 'RUNNING', reason: undefined, elapsed: '1:02:03', nodes: 'gpu-node7' });
   assert.deepEqual(parseSacct('COMPLETED|0:0|00:10:00\nCOMPLETED|0:0|00:10:00\n'), { state: 'COMPLETED', exitCode: 0, elapsed: '00:10:00' });
   assert.deepEqual(parseSacct('CANCELLED by 1234|0:15|00:00:30\n'), { state: 'CANCELLED', exitCode: 0, signal: 15, elapsed: '00:00:30' });
-  assert.deepEqual(endOfSlurm({ state: 'TIMEOUT', exitCode: 0 }), { status: 'failed', why: 'It ran out of the time it asked for (hours)' });
+  assert.deepEqual(endOfSlurm({ state: 'TIMEOUT', exitCode: 0 }), { status: 'failed', why: 'It reached the cluster’s time limit: give it more hours, or a way to carry on' });
   assert.equal(endOfSlurm({ state: 'COMPLETED', exitCode: 0 }).status, 'done');
   assert.equal(endOfSlurm({ state: 'CANCELLED' }).status, 'stopped');
   assert.equal(reasonWords('Resources'), 'the cluster waits for the resources it asks for to be free (Resources)');
@@ -979,6 +989,12 @@ test('another machine: a job sent there is followed from here; its own runs are 
         there.set(r.id, r);
         return { run: r } as T;
       }
+      // Run again there: a new run, as that machine would make it.
+      if (method === 'POST' && /\/again$/.test(p)) {
+        const r = { ...(body as RunRecord), id: 'rlab0003', status: 'queued' as const, createdAt: Date.now(), name: 'train.py' };
+        there.set(r.id, r);
+        return { run: r } as T;
+      }
       const m = /^\/api\/experiments\/runs\/(\w+)(\/stop)?/.exec(p);
       if (m && m[2]) {
         there.set(m[1], { ...there.get(m[1])!, status: 'stopped', why: 'Stopped by you', endedAt: Date.now() });
@@ -1015,6 +1031,63 @@ test('another machine: a job sent there is followed from here; its own runs are 
   assert.ok(!all.some((x) => x.id === 'rlab0001'), 'a run copied here is listed once');
   await http.inject({ method: 'POST', url: `/api/experiments/runs/${r.id}/stop`, payload: {} });
   assert.equal(getRun(db, r.id)!.status, 'stopped');
+  // Carrying on is asked of that run there (Run again), so that machine runs it with that run's code; the command to
+  // carry on and the warning's seconds go with it.
+  const again = await runAgain(deps, r.id, { resume: 'python train.py --resume last.pt', grace: 90, carryOn: true });
+  const asked = calls.filter((x) => x.method === 'POST' && x.p === '/api/experiments/runs/rlab0001/again').at(-1)!.body as Record<string, unknown>;
+  assert.deepEqual([asked.resume, asked.grace, asked.carryOn, asked.command, asked.where], ['python train.py --resume last.pt', 90, true, 'python train.py', 'local']);
+  assert.deepEqual(again.remote, { machine: 'lab', id: 'rlab0003' });
+  // The same from that machine's own page, listed here: the jobs route says which of its runs it carries on.
+  await http.inject({ method: 'POST', url: '/api/experiments/jobs', payload: { command: 'python train.py', resume: 'python train.py --resume last.pt', cwd: '/data/code', where: 'm:lab', carryOn: true, continues: 'rlab0001' } });
+  assert.equal(calls.filter((x) => x.method === 'POST' && x.p === '/api/experiments/runs/rlab0001/again').length, 2);
+  for (const x of listRuns(db, { status: ['queued', 'waiting', 'starting', 'running'], limit: 100 })) if (x.remote) updateRun(db, x.id, { status: 'stopped', endedAt: Date.now() });
+  useMachines({
+    list: () => [],
+    get: () => {
+      throw new HttpError(404, 'no');
+    },
+  } as any);
+});
+
+test('a sweep on another machine is stopped early from here, by the metrics read as its runs are followed', async () => {
+  const there = new Map<string, RunRecord>();
+  const series = new Map<string, Record<string, [number, number][]>>();
+  const stops: { id: string; why?: string }[] = [];
+  let n = 0;
+  const lab = {
+    def: { name: 'Lab box' },
+    async call<T>(method: string, p: string, _t?: number, body?: unknown): Promise<T> {
+      if (method === 'POST' && p === '/api/experiments/jobs') {
+        const r = { ...(body as RunRecord), id: `rswept0${++n}`, status: 'queued' as const, createdAt: Date.now() };
+        there.set(r.id, r);
+        return { run: r } as T;
+      }
+      const m = /^\/api\/experiments\/runs\/(\w+)(\/stop)?/.exec(p)!;
+      if (m[2]) {
+        const why = (body as { why?: string }).why;
+        stops.push({ id: m[1], why });
+        there.set(m[1], { ...there.get(m[1])!, status: 'stopped', why: why ?? 'Stopped by you', endedAt: Date.now() });
+        return { run: there.get(m[1]) } as T;
+      }
+      return { run: there.get(m[1]), series: series.get(m[1]) ?? {}, log: '', logSize: 0 } as T;
+    },
+  };
+  useMachines({ list: () => [{ id: 'lab', name: 'Lab box', via: 'url', status: { state: 'online', waiting: 0, working: 0 } }], get: () => lab } as any);
+  const { runs } = await startSweep(deps, { group: 'far-sweep', command: 'python train.py --lr {lr}', params: { lr: [1, 2, 3, 4] }, cwd: '/data/code', where: 'm:lab', gpus: 1, earlyStop: { metric: 'val_loss', better: 'min' } });
+  // The last of them does worse than the others at every step.
+  runs.forEach((r, i) => {
+    const level = i === 3 ? 9 : 1 + i / 10;
+    series.set(r.remote!.id, { val_loss: [[1, level], [2, level], [3, level]] });
+    there.set(r.remote!.id, { ...there.get(r.remote!.id)!, status: 'running', startedAt: Date.now(), metrics: { last: { val_loss: level } } });
+  });
+  await until(() => getRun(db, runs[3].id)!.status === 'stopped', 10_000, 'the losing run to be stopped there');
+  assert.deepEqual(stops.map((x) => x.id), [runs[3].remote!.id], 'only the losing one');
+  assert.match(stops[0].why!, /^Stopped early: val_loss was 9 at step 3, worse than the median of the other 3 runs then/);
+  assert.match(getRun(db, runs[3].id)!.why!, /^Stopped early:/, 'the copy here says why');
+  assert.ok(runs.slice(0, 3).every((r) => getRun(db, r.id)!.status === 'running'));
+  // The others end there, so nothing is left for the queue to follow.
+  for (const r of runs.slice(0, 3)) there.set(r.remote!.id, { ...there.get(r.remote!.id)!, status: 'done', endedAt: Date.now() });
+  await until(() => runs.every((r) => getRun(db, r.id)!.status !== 'running'), 10_000, 'the rest to end');
   useMachines({
     list: () => [],
     get: () => {
@@ -1036,7 +1109,7 @@ test('the tools: JSON answers; a step runs without asking, Plan mode refuses, a 
   const step = ctxOf({ step: true, runId: 'flow-app1', key: 'acp:flow-app1', agent: 'acp' });
   assert.deepEqual(
     experimentTools(step).map((t) => t.name),
-    ['experiment_run', 'experiment_sweep', 'experiment_list', 'experiment_get', 'experiment_stop', 'experiment_table', 'experiment_describe', 'evaluation_get', 'evaluation_score', 'experiment_wait'],
+    ['experiment_run', 'experiment_try', 'experiment_sweep', 'experiment_list', 'experiment_get', 'experiment_stop', 'experiment_table', 'experiment_describe', 'experiment_note', 'evaluation_get', 'evaluation_score', 'experiment_wait'],
   );
   assert.ok(!experimentTools(ctxOf()).some((t) => t.name === 'experiment_wait'), 'waiting hours is for steps');
   const run = await call('experiment_run', { command: 'echo "f1=0.5"', gpus: 0, group: 'tools', report: true }, step);
@@ -1423,6 +1496,138 @@ test('the routes: a job’s mistakes in words, clusters added and refused, recor
   );
 });
 
+// ---- deleting a run, its project, and rows by command ----------------------------------------------------------------
+
+test('deleting a run: its view says what its own folder holds besides the app’s files; the delete drops that, or keeps it aside', async () => {
+  const command = 'cd "$HYDOR_RUN_DIR" && mkdir ckpt && truncate -s 150M ckpt/model.pt && head -c 2000 /dev/zero > scores.jsonl && printf x > notes.txt && printf yz > b.bin';
+  const made = async () => {
+    const r = await submit(deps, await cleanJob(db, { command, cwd: tmp, gpus: 0 }));
+    await until(ended(r.id), 20_000, 'it to end');
+    assert.equal(getRun(db, r.id)!.status, 'done', getRun(db, r.id)!.why);
+    return r.id;
+  };
+  const view = async (id: string) => (await http.inject({ method: 'GET', url: `/api/experiments/runs/${id}?lines=0` })).json();
+  const kept = await made();
+  // Not the log, the command, the wrapper, the exit code, the process id or the metrics.
+  assert.deepEqual((await view(kept)).folderFiles, { count: 4, bytes: 150 * 1024 * 1024 + 2003, names: ['ckpt/model.pt', 'scores.jsonl', 'b.bin'] });
+  assert.ok(fs.existsSync(path.join(runFolder(kept), 'log.txt')));
+  const said = (await http.inject({ method: 'DELETE', url: `/api/experiments/runs/${kept}?files=keep` })).json();
+  const to = path.join(process.env.DATA_DIR!, 'kept-runs', kept);
+  assert.deepEqual(said, { ok: true, kept: to });
+  assert.deepEqual(fs.readdirSync(to).sort(), ['b.bin', 'ckpt', 'notes.txt', 'scores.jsonl'], 'what the run wrote, and nothing of the app’s');
+  assert.equal(fs.statSync(path.join(to, 'ckpt', 'model.pt')).size, 150 * 1024 * 1024);
+  assert.equal(getRun(db, kept), null);
+  assert.ok(!fs.existsSync(runFolder(kept)));
+  const dropped = await made();
+  assert.deepEqual((await http.inject({ method: 'DELETE', url: `/api/experiments/runs/${dropped}` })).json(), { ok: true }, 'as before: deleted');
+  assert.ok(!fs.existsSync(runFolder(dropped)) && !fs.existsSync(path.join(process.env.DATA_DIR!, 'kept-runs', dropped)));
+  const bare = await submit(deps, await cleanJob(db, { command: 'echo nothing', cwd: tmp, gpus: 0 }));
+  assert.equal((await view(bare.id)).folderFiles, undefined, 'only once it has ended');
+  await until(ended(bare.id), 20_000, 'it to end');
+  assert.deepEqual((await view(bare.id)).folderFiles, { count: 0, bytes: 0, names: [] });
+  assert.deepEqual((await http.inject({ method: 'DELETE', url: `/api/experiments/runs/${bare.id}?files=keep` })).json(), { ok: true }, 'nothing to keep');
+  fs.rmSync(path.join(process.env.DATA_DIR!, 'kept-runs'), { recursive: true, force: true });
+});
+
+test('a run submitted without a project gets one: its session’s, else its folder’s; none from a confidential session', async () => {
+  const dirA = path.join(tmp, 'proj-a');
+  const dirB = path.join(tmp, 'proj-b');
+  const out = path.join(tmp, 'proj-none');
+  for (const d of [path.join(dirA, 'sub'), dirB, out]) fs.mkdirSync(d, { recursive: true });
+  const a = createSpace(db, { name: 'Project A', folder: dirA }).id;
+  const b = createSpace(db, { name: 'Project B', folder: dirB }).id;
+  const row = db.prepare('insert into app_sessions (key, agent, cwd, created_at, updated_at) values (?, ?, ?, 1, 1)');
+  row.run('claude:insideB', 'claude', out);
+  setSessionExtra(db, 'claude:insideB', { space: b });
+  row.run('claude:atB', 'claude', dirB);
+  row.run('claude:nowhere', 'claude', out);
+  row.run('claude:secret', 'claude', dirA);
+  setSessionExtra(db, 'claude:secret', { ...CONFIDENTIAL_EXTRA, space: a });
+  const ids: string[] = [];
+  const go = async (cwd: string, session?: string, more: Record<string, unknown> = {}) => {
+    const r = await submit(deps, await cleanJob(db, { command: 'true', cwd, gpus: 0, ...more }), { startedBy: session ? { session } : { page: true } });
+    ids.push(r.id);
+    return getRun(db, r.id)!.project;
+  };
+  assert.equal(await go(path.join(dirA, 'sub')), a, 'from the page: its folder’s');
+  assert.equal(await go(out), undefined);
+  assert.equal(await go(dirA, 'claude:insideB'), b, 'the session’s own project, wherever it runs');
+  assert.equal(await go(out, 'claude:atB'), b, 'else the project its folder is in');
+  assert.equal(await go(dirA, 'claude:nowhere'), a, 'else the run’s folder’s');
+  assert.equal(await go(dirA, 'claude:secret'), undefined, 'a confidential session’s runs stay out of a shared project');
+  assert.equal(await go(dirA, undefined, { project: b }), b, 'a project named is kept');
+  assert.ok(listRuns(db, { project: a }).length >= 2);
+  // A sweep, and a run again of one from before runs had projects.
+  const sweep = await startSweep(deps, { group: 'proj-sweep', command: 'true {k}', params: { k: [1, 2] }, cwd: out, gpus: 0 }, { startedBy: { session: 'claude:insideB' } });
+  assert.deepEqual(sweep.runs.map((r) => r.project), [b, b]);
+  insertRun(db, { id: 'rproj0old', status: 'done', spec: { command: 'true', cwd: dirA } });
+  const again = await http.inject({ method: 'POST', url: '/api/experiments/runs/rproj0old/again', payload: { gpus: 0 } });
+  assert.equal(again.json().run.project, a, again.body);
+  const tool = JSON.parse((await call('experiment_run', { command: 'true', cwd: out, gpus: 0 }, ctxOf({ step: true, runId: 'flow-p', key: 'claude:insideB' }))).text);
+  for (const id of [...ids, ...sweep.runs.map((r) => r.id), again.json().run.id, tool.id]) await until(ended(id), 20_000, 'them to end');
+});
+
+test('a results table with a row per command: the seed taken out, rows named by what tells them apart', async () => {
+  const mk = (n: number, command: string, seed: number | undefined, acc: number, more: Partial<RunRecord> = {}) => ({ id: `tcmd${String(n).padStart(4, '0')}`, status: 'done', createdAt: n, cwd: tmp, group: 'cmds', command, seed, metrics: { last: { acc } }, ...more }) as RunRecord;
+  const table = (runs: RunRecord[], o: Record<string, unknown> = {}) => makeTable({ rows: 'command', columns: [{ metric: 'acc', better: 'max' }], ...o }, runs, { id: 'tcmdrows', scores: () => null });
+  const got = (runs: RunRecord[], o: Record<string, unknown> = {}) => table(runs, o).rows.map((r) => [r.label, r.runs.length]);
+  // Two scripts with the same settings are two rows, which rows by a setting cannot tell apart.
+  assert.deepEqual(got([1, 2].flatMap((s) => [mk(s, `python bm25.py --k 1 --seed ${s}`, s, 0.5), mk(10 + s, `python splade.py --k 1 --seed ${s}`, s, 0.7)])), [['bm25.py', 2], ['splade.py', 2]]);
+  // However the seed is given.
+  for (const [a, b] of [
+    ['train.py --seed=1', 'train.py --seed=2'],
+    ['train.py seed=1', 'train.py seed=2'],
+    ['train.py --random_seed 1', 'train.py --random_seed 2'],
+    ['SEED=1 python train.py --out runs/seed1', 'SEED=2 python train.py --out runs/seed2'],
+    ['PYTHONHASHSEED=1 python train.py --data-seed 1', 'PYTHONHASHSEED=2 python train.py --data-seed 2'],
+    ['python train.py 1', 'python train.py 2'],
+  ])
+    assert.equal(table([mk(1, a, 1, 0.5), mk(2, b, 2, 0.6)]).rows.length, 1, a);
+  assert.equal(table([mk(1, 'python train.py --out runs/1', 1, 0.5, { seedTemplate: 'python train.py --out runs/{seed}' }), mk(2, 'python train.py --out runs/2', 2, 0.6, { seedTemplate: 'python train.py --out runs/{seed}' })]).rows.length, 1, 'where {seed} was');
+  // A setting that happens to equal the seed stays a setting.
+  const flags = [1, 2].flatMap((s) => [mk(s, `python train.py --lr 0.1 --k 1 --seed ${s}`, s, 0.5 + s / 100), mk(10 + s, `python train.py --lr 0.2 --k 1 --seed ${s}`, s, 0.7 + s / 50)]);
+  assert.deepEqual(got(flags), [['--lr 0.1', 2], ['--lr 0.2', 2]]);
+  assert.equal(table([mk(1, 'train.py --k 1 --seed 1', 1, 0.5), mk(2, 'train.py --k 2 --seed 2', 2, 0.6)]).rows.length, 2);
+  const t = table(flags, { baseline: '--lr 0.1' });
+  assert.equal(t.notes, undefined, 'a row may be the baseline by its name');
+  assert.deepEqual(t.rows.map((r) => r.key), ['python train.py --lr 0.1 --k 1', 'python train.py --lr 0.2 --k 1']);
+  assert.ok(t.latex.includes('-{}-lr 0.1 & '), t.latex);
+  assert.ok(t.markdown.includes('| --lr 0.1 | '), t.markdown);
+  // Nothing but a long argument apart: the command, cut.
+  const long = `python train.py data/${'x'.repeat(80)}`;
+  const cut = table([mk(1, `${long}/dev.tsv`, 1, 0.5), mk(2, `${long}/test.tsv`, 2, 0.6)]).rows.map((r) => r.label);
+  assert.ok(cut.every((l) => l.length <= 61) && new Set(cut).size === 2, cut.join(' | '));
+  assert.deepEqual(got([mk(1, 'python eval.py', 1, 0.5), mk(2, 'python eval.py --sparse', 1, 0.6)]), [['python eval.py', 1], ['--sparse', 1]]);
+  // A note about a flag keeps its two hyphens, in Markdown's small print as in LaTeX's comment.
+  const scores = () => new Map([['acc', new Map([['q1', 1], ['q2', 0]])]]);
+  const same = makeTable({ rows: 'command', columns: [{ metric: 'acc', better: 'max' }] }, [mk(1, 'python eval.py --split dev', 1, 0.5), mk(2, 'python eval.py --split test', 1, 0.5)], { id: 'tcmdnote', scores });
+  const note = '--split test, acc: identical to --split dev on every example';
+  assert.deepEqual(same.notes, [note]);
+  assert.ok(same.markdown.endsWith(`\n\n<sub>${note}</sub>`), same.markdown);
+  assert.ok(same.latex.includes(`\n% ${note}\n`), same.latex);
+  // The route and the tool take it; a run submitted with {seed} keeps it for the table, a sweep's too.
+  const sweep = await startSweep(deps, { group: 'cmd-sweep', command: 'echo acc=0.{seed} {k} at-{seed}', params: { k: [7], seed: [1, 2] }, cwd: tmp, gpus: 0 });
+  assert.deepEqual(sweep.runs.map((r) => r.seedTemplate), ['echo acc=0.{seed} 7 at-{seed}', 'echo acc=0.{seed} 7 at-{seed}']);
+  const plain = await submit(deps, await cleanJob(db, { command: 'echo acc=0.3', cwd: tmp, gpus: 0, group: 'cmd-sweep' }));
+  assert.equal(plain.seedTemplate, undefined);
+  for (const r of [...sweep.runs, plain]) await until(ended(r.id), 20_000, 'them to end');
+  const prev = (await http.inject({ method: 'POST', url: '/api/experiments/tables/preview', payload: { group: 'cmd-sweep', rows: 'command', columns: ['acc'] } })).json().table;
+  assert.equal(prev.spec.rows, 'command');
+  assert.deepEqual(prev.rows.map((r: { key: string; runs: string[] }) => [r.key, r.runs.length]), [['echo acc=0.{seed} 7 at-{seed}', 2], ['echo acc=0.3', 1]]);
+  const step = ctxOf({ step: true, runId: 'flow-cmd', key: 'acp:flow-cmd', agent: 'acp' });
+  const tool = experimentTools(step).find((x) => x.name === 'experiment_table')!;
+  assert.match(tool.description, /"command"/);
+  assert.equal(JSON.parse((await call('experiment_table', { group: 'cmd-sweep', rows: 'command', columns: ['acc'] }, step)).text).rows.length, 2);
+});
+
+test('experiment_get: a run that kept files says that none was left out', async () => {
+  insertRun(db, { id: 'rkeptall01', status: 'done', spec: { command: 'sh x.sh', cwd: tmp }, info: { kept: ['x.sh'], folder: path.join(tmp, 'gone') } });
+  insertRun(db, { id: 'rkeptnone1', status: 'done', spec: { command: 'true', cwd: tmp }, info: { folder: path.join(tmp, 'gone') } });
+  const get = async (id: string) => JSON.parse((await call('experiment_get', { id }, ctxOf())).text).run;
+  assert.deepEqual((await get('rkeptall01')).notKept, []);
+  assert.ok(!('notKept' in (await get('rkeptnone1'))), 'nothing named, nothing said');
+});
+
 // ---- the batch series, and what an experiment is -----------------------------------------------------------------------
 
 test('the series of many runs in one call: local runs, bad ids ignored, unknown ones left out', async () => {
@@ -1655,6 +1860,39 @@ test('an experiment’s info is written by itself: once for a new group, again o
   await until(() => [r1, r2, r3, r4, r5, own, own2, early, bad1, bad2, sec].every((r) => ended(r.id)()), 30_000, 'the runs');
 });
 
+test('attempts: Run again of a failed run and experiment_run’s replaces make a chain; a finished run run again is a repeat', async () => {
+  const step = ctxOf({ step: true, runId: 'flow-chain', key: 'acp:flow-chain', agent: 'acp' });
+  const run = async (a: Record<string, unknown>) => {
+    const out = await call('experiment_run', { gpus: 0, group: 'tried', ...a }, step);
+    assert.ok(!out.isError, out.text);
+    const id = JSON.parse(out.text).id as string;
+    await until(ended(id), 20_000, 'it to end');
+    return id;
+  };
+  const first = await run({ command: 'echo one; exit 3' });
+  // Run again (the page's route) keeps the run it came from.
+  const again = (await http.inject({ method: 'POST', url: `/api/experiments/runs/${first}/again`, payload: { command: 'echo two; exit 4' } })).json().run.id as string;
+  await until(ended(again), 20_000, 'it to end');
+  const third = await run({ command: 'echo "f1=0.5"', replaces: again });
+  assert.equal(getRun(db, third)!.from, again);
+  const listed = new Map((await http.inject({ method: 'GET', url: '/api/experiments/runs?group=tried' })).json().runs.map((r: RunRecord) => [r.id, r]));
+  assert.equal((listed.get(first) as RunRecord).replacedBy, again);
+  assert.equal((listed.get(third) as RunRecord).attempt, 3);
+  // The finished one run again: a repeat.
+  const repeat = await run({ again: third });
+  assert.equal(JSON.parse((await call('experiment_get', { id: repeat }, step)).text).run.retryOf, undefined);
+  assert.equal(JSON.parse((await call('experiment_get', { id: third }, step)).text).run.replacedBy, undefined);
+  // What cannot be another attempt is said, and nothing starts.
+  const before = listRuns(db, { group: 'tried' }).length;
+  for (const [replaces, said] of [[third, /repeat/], ['nope', /no run/]] as const) {
+    const out = await call('experiment_run', { command: 'true', gpus: 0, group: 'tried', replaces }, step);
+    assert.ok(out.isError && said.test(out.text), out.text);
+  }
+  const both = await call('experiment_run', { again: first, replaces: again }, step);
+  assert.ok(both.isError && /not both/.test(both.text), both.text);
+  assert.equal(listRuns(db, { group: 'tried' }).length, before);
+});
+
 test('experiment_describe: an agent’s title, description and category are kept as the agent’s; experiment_list tells each run’s experiment title', async () => {
   const none = await call('experiment_describe', { group: 'tools' }, ctxOf());
   assert.ok(none.isError && /at least one/.test(none.text));
@@ -1766,7 +2004,9 @@ test('night hours: the night an hour is in, across midnight; the settings and wh
   assert.equal(nightAt(utc(1, 15), h, 'Asia/Tokyo'), '2026-01-01', 'midnight in Tokyo, the 2nd there already: the night that began on the 1st');
   assert.equal(nightAt(utc(5, 4, 30), h, 'Not/AZone'), nightAt(utc(5, 4, 30), h), 'a zone that is none: this computer’s clock');
   // What an agent is told beside "It will start tonight…": how long, whose hours, which code.
-  assert.equal(tonightMore(h, { tz: 'America/New_York', at: utc(5, 19, 29) }), 'The hours are in America/New_York time. That is in about 9 hours. It runs the code as its folder has it when it starts, so leave that folder and its branch as they should run.');
+  assert.equal(tonightMore(h, { tz: 'America/New_York', at: utc(5, 19, 29) }), 'The hours are in America/New_York time. That is in about 9 hours. It runs the code as it is now, even if files in the folder change before it starts.');
+  assert.match(tonightMore(h, { at: utc(5, 19, 29), code: 'now' }), /As you asked \(code: "now"\), it runs the code as its folder has it when it starts/);
+  assert.match(tonightMore(h, { at: utc(5, 19, 29), code: 'folder' }), /No code was kept \(the folder is not in git\)/);
   assert.match(tonightMore(h, { tz: 'America/New_York', at: utc(5, 4, 30) }), /^The hours are in America\/New_York time\. It is night now, so it starts as soon as nothing else waits\./);
   assert.match(tonightMore(h, { tz: 'America/New_York', at: utc(5, 3, 20) }), /That is in about 40 minutes\./);
   assert.equal(tonightMore({ nightFrom: '03:00', nightTo: '03:00' }), '');
@@ -1876,6 +2116,10 @@ test('the night ends with "let running ones finish": it runs on; no "done" notic
   assert.equal(getRun(db, long.id)!.stopping, undefined);
   assert.equal(mornings().length, 1);
   assert.equal(mornings()[0].body, 'Last night: 1 run done, 1 failed, 1 still running');
+  // A phone's and the system's notification say it in the user's language, title and all, as the toast does.
+  const german = phoneText(mornings()[0], wordsForLang('de'));
+  assert.equal(german.title, 'Experimente');
+  assert.match(german.body, /Letzte Nacht: 1 Lauf fertig/);
   assert.equal(mornings()[0].title, 'Experiments');
   assert.equal(mornings()[0].url, '/experiments?night=2026-01-10');
   const of = (await http.inject({ method: 'GET', url: '/api/experiments/runs?night=2026-01-10&everywhere=1' })).json().runs as RunRecord[];
@@ -2143,6 +2387,954 @@ test('another machine keeps when, for its own night; one from before night runs 
   now = Date.now();
   clock.now = () => Date.now();
   setNight();
+});
+
+// ---- sharing a GPU, a long wait, and when a waiting run may start ------------------------------------------------------
+
+const card = (index: number, o: { memUsed?: number; memTotal?: number } = {}) => ({ index, name: 'Test GPU', memUsed: o.memUsed ?? 0, memTotal: o.memTotal ?? 24_576, util: 0 });
+let apps: GpuApp[] = [];
+/** So many empty 24 GB cards, the switch as it is to start with, the clock the real one. */
+function cards(n: number, o: Record<string, unknown> = {}) {
+  gpus = Array.from({ length: n }, (_, i) => card(i));
+  apps = [];
+  setGpuReader(async (ask) => ({ gpus, ...(ask?.apps ? { apps } : {}) }));
+  clock.now = () => Date.now();
+  setSettings(db, { cpuSlots: 4, shareGpus: true, ...o });
+  forgetNotices();
+  notices.length = 0;
+}
+const later = (ms: number) => {
+  clock.now = () => Date.now() + ms;
+};
+/** A run that goes on until the test opens its gate (or stops it). */
+const held = async (name: string, o: Record<string, unknown> = {}) => {
+  const g = gate();
+  const r = await job(g.command, { name, gpus: 1, ...o });
+  return { ...r, open: g.open };
+};
+const gpusOf = (r: RunRecord) => getRun(db, r.id)!.gpuIds;
+const running = (...rs: RunRecord[]) => until(() => rs.every((r) => status(r) === 'running'), 20_000, `${rs.map((r) => r.name).join(', ')} to run`);
+const waits = (r: RunRecord) => until(() => status(r) === 'waiting', 20_000, `${r.name} to wait`);
+/** Stops what is left, so the next test starts with nothing in line. */
+async function clearQueue() {
+  // One still being started is let get going first.
+  await steps();
+  await until(() => !listRuns(db, { status: ['queued', 'starting'], limit: 100 }).some((r) => !r.remote && (r.where ?? 'local') === 'local'), 20_000, 'nothing to be starting');
+  const left = listRuns(db, { status: ['queued', 'waiting', 'starting', 'running'], limit: 100 }).filter((r) => !r.remote && (r.where ?? 'local') === 'local');
+  // Those in line first, so none of them starts when a GPU comes free.
+  for (const r of [...left].sort((a, b) => Number(a.status !== 'waiting') - Number(b.status !== 'waiting'))) await stop(r);
+  await until(() => left.every((r) => ended(r.id)()), 40_000, 'the runs to stop');
+  clock.now = () => Date.now();
+}
+const NO_TELLING = '. No telling when: those runs do not say how far they have to go';
+
+test('room on a GPU: the margin, what was asked counts before it is taken, the empty GPU first and then the most room', () => {
+  assert.equal(marginOf(8192), 1024, '1 GB on a small card');
+  close(marginOf(24_576), 1228.8, 1e-9, '5% of a 24 GB card');
+  const seven = { id: 'a', ask: 7168 };
+  assert.ok(roomOn(card(0), 7, false, [seven, seven]) !== null, 'the third 7 GB run fits');
+  assert.equal(roomOn(card(0), 7, false, [seven, seven, seven]), null, 'the fourth does not');
+  assert.equal(roomOn(card(0, { memUsed: 0 }), 7, false, [{ id: 'a', ask: 20 * 1024 }]), null, 'asked for, not taken yet');
+  assert.equal(roomOn(card(0, { memUsed: 20_000 }), 7, false, [{ id: 'a', ask: 4096 }]), null, 'more is used than was asked');
+  // 24576 - 16000 used - 1228.8 margin = 7347.2 MiB left to share.
+  assert.ok(roomOn(card(0, { memUsed: 16_000 }), 7, false, [{ id: 'a', ask: 1024 }]) !== null);
+  assert.equal(roomOn(card(0, { memUsed: 16_200 }), 7, false, [{ id: 'a', ask: 1024 }]), null, 'only the margin keeps it out');
+  assert.ok(roomOn(card(0, { memUsed: 16_200 }), 7, false) !== null, 'a GPU with none of your runs: as before, no margin');
+  assert.equal(roomOn(card(0), undefined, false, [seven]), null, 'one that does not say takes no shared GPU');
+  assert.equal(roomOn(card(0), 2, true, [seven]), null, 'nor one that wants it to itself');
+  assert.equal(roomOn(card(0), 2, false, [{ id: 'a', ask: null }]), null, 'and nobody joins either');
+  const three = [card(0), card(1, { memUsed: 8192 }), card(2)];
+  const on = new Map([
+    [0, [{ id: 'a', ask: 2048 }]],
+    [2, [{ id: 'b', ask: 7168 }]],
+  ]);
+  assert.deepEqual(chooseGpus(three, 1, 7, new Set(), { on }), { ids: [1] }, 'the empty one, though another has more room');
+  assert.deepEqual(chooseGpus(three, 3, 7, new Set(), { on }), { ids: [1, 0, 2] }, 'then the most room left');
+  assert.deepEqual(
+    parseApps('0, GPU-aaa\n1, GPU-bbb\n', 'GPU-bbb, 41, 9216, /opt/tools/ollama\nGPU-aaa, 42, 100, python, with a comma\nGPU-aaa, 43, 5, gone\n', (pid) => (pid === 41 ? {} : pid === 42 ? { run: 'rabc1' } : null)),
+    [
+      { gpu: 1, name: '/opt/tools/ollama', mem: 9216 },
+      { gpu: 0, name: 'python,with a comma', mem: 100, run: 'rabc1' },
+    ],
+  );
+});
+
+test('three 7 GB runs share a 24 GB card and a fourth waits; what shared the card is recorded; it starts when one ends', async () => {
+  cards(1);
+  const a = await held('a', { gpuMemGb: 7 });
+  const b = await held('b', { gpuMemGb: 7 });
+  const c = await held('c', { gpuMemGb: 7 });
+  const d = await held('d', { gpuMemGb: 7 });
+  await running(a, b, c);
+  await waits(d);
+  assert.deepEqual([gpusOf(a), gpusOf(b), gpusOf(c)], [[0], [0], [0]]);
+  assert.equal(why(d), `Waiting for 1 GPU with 7 GB free: your other runs hold GPU 0${NO_TELLING}`);
+  assert.equal(getRun(db, a.id)!.shared, undefined);
+  assert.deepEqual(getRun(db, b.id)!.shared, [{ gpu: 0, runs: [a.id] }]);
+  assert.deepEqual(getRun(db, c.id)!.shared, [{ gpu: 0, runs: [a.id, b.id] }]);
+  const q = (await http.inject({ method: 'GET', url: '/api/experiments/queue' })).json();
+  assert.deepEqual([q.gpus[0].run, q.gpus[0].runs], [a.id, [a.id, b.id, c.id]]);
+  b.open();
+  await running(d);
+  assert.deepEqual(getRun(db, d.id)!.shared, [{ gpu: 0, runs: [a.id, c.id] }]);
+  assert.equal(getRun(db, d.id)!.startsAbout, undefined);
+  await clearQueue();
+});
+
+test('a run that does not say how much it needs gets an empty GPU and nobody joins it; alone; the empty GPU first', async () => {
+  cards(2);
+  const a = await held('small', { gpuMemGb: 7 });
+  const b = await held('unsaid');
+  await running(a, b);
+  assert.deepEqual([gpusOf(a), gpusOf(b)], [[0], [1]]);
+  const c = await held('more', { gpuMemGb: 7 });
+  const d = await held('much', { gpuMemGb: 12 });
+  await running(c);
+  await waits(d);
+  assert.deepEqual(gpusOf(c), [0], 'beside the one that said, never beside the one that did not');
+  await clearQueue();
+  const e = await held('one', { gpuMemGb: 2 });
+  const f = await held('two', { gpuMemGb: 2 });
+  await running(e, f);
+  assert.deepEqual([gpusOf(e), gpusOf(f)], [[0], [1]], 'an empty GPU before a shared one');
+  await clearQueue();
+  const solo = await held('solo', { gpuMemGb: 2, alone: true });
+  await running(solo);
+  const g = await held('beside', { gpuMemGb: 2 });
+  await running(g);
+  assert.deepEqual([gpusOf(solo), gpusOf(g)], [[0], [1]]);
+  const solo2 = await held('solo2', { gpuMemGb: 2, alone: true });
+  await waits(solo2);
+  assert.match(why(solo2)!, /^Waiting for 1 GPU with 2 GB free: your other runs hold GPUs 0 and 1/);
+  assert.equal(getRun(db, solo.id)!.alone, true);
+  await clearQueue();
+  // Run again keeps it, unless it is said otherwise.
+  const again = await runAgain(deps, solo.id);
+  const not = await runAgain(deps, solo.id, { alone: false });
+  assert.deepEqual([again.alone, not.alone], [true, undefined]);
+  await clearQueue();
+  const sweep = await startSweep(deps, { command: 'echo {a}', params: { a: [1] }, group: 'alone sweep', cwd: tmp, gpus: 1, alone: true });
+  assert.equal(sweep.runs[0].alone, true);
+  await clearQueue();
+  for (const name of ['experiment_run', 'experiment_sweep']) assert.equal((toolOf(name, ctxOf()).inputSchema as any).properties.alone.type, 'boolean', name);
+});
+
+test('with the switch off, one run of yours to a GPU, as before; the setting is on until turned off', async () => {
+  cards(1);
+  assert.equal(settingsOf(db).shareGpus, true);
+  const bad = await http.inject({ method: 'PUT', url: '/api/experiments/settings', payload: { shareGpus: 'no' } });
+  assert.equal(bad.statusCode, 400);
+  assert.equal((await http.inject({ method: 'PUT', url: '/api/experiments/settings', payload: { shareGpus: false } })).json().shareGpus, false);
+  const a = await held('a', { gpuMemGb: 7 });
+  const b = await held('b', { gpuMemGb: 7 });
+  await running(a);
+  await waits(b);
+  assert.equal(why(b), `Waiting for 1 GPU with 7 GB free: your other runs hold GPU 0${NO_TELLING}`);
+  setSettings(db, { shareGpus: true });
+  await running(b);
+  await clearQueue();
+});
+
+test('a run that has waited 20 minutes for 4 GPUs is not overtaken, unless the later one is sure to be gone first', async () => {
+  cards(4);
+  const a = await held('first');
+  await running(a);
+  const big = await held('big', { gpus: 4 });
+  await waits(big);
+  // Not long yet: a later one takes a free GPU, as before.
+  const early = await held('early');
+  await running(early);
+  await stop(early);
+  await until(ended(early.id), 20_000, 'the early one to stop');
+  later(2 * 3_600_000);
+  const b = await held('b');
+  const short = await held('short', { hours: 0.5 });
+  await steps();
+  assert.deepEqual([status(b), status(short)], ['waiting', 'waiting'], 'when it cannot be told when the 4 could be free, they wait');
+  assert.equal(why(b), `Waiting behind “big”, which needs 4 GPUs and has waited 2 h${NO_TELLING}`);
+  // The one holding a GPU says how long it takes: 5 hours from its start, 3 from "now".
+  updateRun(db, a.id, { spec: { hours: 5 } });
+  await running(short);
+  assert.equal(status(b), 'waiting', 'no time limit: it could still be there');
+  const long = await held('long', { hours: 4 });
+  await steps();
+  assert.equal(status(long), 'waiting', 'it would end after the 4 could be free');
+  assert.match(why(long)!, /^Waiting behind “big”, which needs 4 GPUs and has waited 2 h/);
+  // A run without a GPU is not held back; one with a higher priority goes first, as it always has.
+  const cpu = await job('echo cpu', { name: 'cpu' });
+  await until(ended(cpu.id), 20_000, 'the run without a GPU');
+  const urgent = await held('urgent', { priority: 5 });
+  await running(urgent);
+  for (const r of [b, long, short, urgent]) await stop(r);
+  a.open();
+  await running(big);
+  assert.deepEqual(gpusOf(big), [0, 1, 2, 3]);
+  await clearQueue();
+});
+
+test('what is kept for a long-waiting run stays kept through a moment when a card looks taken, then goes', async () => {
+  cards(2);
+  const a = await held('first');
+  await running(a);
+  const two = await held('two', { gpus: 2 });
+  await waits(two);
+  later(3_600_000);
+  const b = await held('b');
+  await waits(b);
+  assert.match(why(b)!, /^Waiting behind “two”/);
+  // The first ends, but its card still shows its memory for a moment: the other, free, one is not given away.
+  gpus = [card(0, { memUsed: 20_000 }), card(1)];
+  a.open();
+  await until(ended(a.id), 20_000, 'the first to end');
+  await steps();
+  assert.equal(status(b), 'waiting', 'kept through the moment');
+  // Held for good: two could never have both, so nothing is kept for it any more.
+  later(3_600_000 + 3 * 60_000);
+  await running(b);
+  await clearQueue();
+});
+
+test('a run behind one that was never enough GPUs of its own to have is not held: nothing is kept for it', async () => {
+  cards(2);
+  gpus = [card(0), card(1, { memUsed: 20_000 })];
+  const two = await held('two', { gpus: 2 });
+  await waits(two);
+  later(3_600_000);
+  const one = await held('one');
+  await running(one);
+  await clearQueue();
+});
+
+test('about when a waiting run may start: by progress, by a time limit, or no telling; once a minute at most', async () => {
+  assert.equal(endAbout({ status: 'running', startedAt: 1_000_000, hours: 1 }, 2_000_000), 4_600_000, 'its time limit');
+  assert.equal(endAbout({ status: 'running', startedAt: 0, metrics: { last: {}, progress: { done: 25, total: 100, at: 600_000 } } }, 700_000), 2_400_000, 'its progress, as the page counts it');
+  assert.equal(endAbout({ status: 'running', startedAt: 0 }, 5), Infinity);
+  const noon = Date.UTC(2026, 0, 5, 12);
+  assert.equal(whenWords(noon + 2 * 3_600_000 + 20 * 60_000, noon, 'UTC'), '14:20');
+  assert.equal(whenWords(noon + 2 * 3_600_000, noon, 'Asia/Tokyo'), '23:00', 'on the person’s clock');
+  assert.equal(whenWords(noon + 4 * 3_600_000, noon, 'Asia/Tokyo'), '01:00 tomorrow');
+  assert.equal(whenWords(noon + 3 * 24 * 3_600_000, noon, 'UTC'), '12:00 on Thursday');
+  assert.equal(whenWords(noon + 10 * 24 * 3_600_000, noon, 'UTC'), '12:00 on 15 January');
+
+  cards(1);
+  kvSet(db, 'user.tz', 'Asia/Tokyo');
+  const a = await held('trainer');
+  await running(a);
+  const b = await held('next');
+  await waits(b);
+  assert.equal(why(b), `Waiting for 1 GPU that is free: your other runs hold GPU 0${NO_TELLING}`);
+  assert.equal(getRun(db, b.id)!.startsAbout, undefined);
+  // A quarter done after ten minutes: thirty to go.
+  const at = Date.now();
+  updateRun(db, a.id, { startedAt: at - 600_000, metrics: { last: {}, progress: { done: 25, total: 100, at } } });
+  await steps();
+  assert.equal(getRun(db, b.id)!.startsAbout, undefined, 'worked out again at most once a minute');
+  later(61_000);
+  await steps();
+  const x = getRun(db, b.id)!;
+  close(x.startsAbout, at + 30 * 60_000, 1e-9, 'by its progress');
+  assert.equal(x.why, `Waiting for 1 GPU that is free: your other runs hold GPU 0. About ${whenWords(at + 30 * 60_000, clock.now(), 'Asia/Tokyo')}, when “trainer” should end`);
+  assert.equal(getRunWithEvents(db, b.id)!.events!.filter((e) => e.kind === 'waiting').length, 1);
+  // No progress, a time limit.
+  updateRun(db, a.id, { metrics: { last: {} }, spec: { hours: 2 } });
+  later(3 * 60_000);
+  await steps();
+  close(getRun(db, b.id)!.startsAbout, at - 600_000 + 2 * 3_600_000, 1e-9, 'by its time limit');
+  // The tools say it too.
+  const step = ctxOf({ step: true, runId: 'flow-share', key: 'acp:flow-share', agent: 'acp' });
+  const out = JSON.parse((await call('experiment_run', { command: 'echo hi', gpus: 1, name: 'asked', cwd: tmp }, step)).text);
+  assert.equal(out.status, 'waiting');
+  assert.ok(out.startsAbout === undefined && out.why.endsWith(NO_TELLING), `second in line, behind one that says nothing of its length: ${JSON.stringify(out)}`);
+  const got = JSON.parse((await call('experiment_get', { id: b.id }, step)).text);
+  assert.equal(got.run.startsAbout, getRun(db, b.id)!.startsAbout);
+  assert.ok(got.run.startsAbout);
+  await stop(b);
+  assert.equal(getRun(db, b.id)!.startsAbout, undefined, 'a stopped run waits for nothing');
+  await stop({ id: out.id } as RunRecord);
+  // A second in line behind one that says nothing of its length: only the first has a time.
+  const c = await held('third');
+  const e = await held('fourth');
+  await waits(c);
+  await waits(e);
+  assert.match(why(c)!, /\. About .*, when “trainer” should end$/);
+  assert.ok(why(e)!.endsWith(NO_TELLING), why(e));
+  const answer = JSON.parse((await call('experiment_run', { command: 'echo hi', gpus: 1, hours: 1, priority: 9, name: 'sure', cwd: tmp }, step)).text);
+  assert.ok(answer.status === 'waiting' && typeof answer.startsAbout === 'number', `first in line: ${JSON.stringify(answer)}`);
+  kvSet(db, 'user.tz', '');
+  await clearQueue();
+});
+
+test('a place among the runs without a GPU: where the number is set, and about when one comes free', async () => {
+  cards(1, { cpuSlots: 1 });
+  const a = await held('cpu one', { gpus: 0, hours: 1 });
+  await running(a);
+  const b = await held('cpu two', { gpus: 0 });
+  await waits(b);
+  const x = getRun(db, b.id)!;
+  close(x.startsAbout, getRun(db, a.id)!.startedAt! + 3_600_000, 1e-9);
+  assert.equal(x.why, `Waiting for one of your runs without a GPU to end (1 at most at once: Where runs go changes that). About ${whenWords(x.startsAbout!, Date.now())}, when “cpu one” should end`);
+  await clearQueue();
+});
+
+test('the reason names what is not yours: another program’s memory on a GPU, by its name alone', async () => {
+  cards(2);
+  gpus = [card(0), card(1, { memUsed: 9216 })];
+  apps = [{ gpu: 1, name: '/opt/tools/ollama serve', mem: 9216 }];
+  const a = await held('mine', { gpuMemGb: 14 });
+  await running(a);
+  const b = await held('wants', { gpuMemGb: 20 });
+  await waits(b);
+  assert.equal(why(b), `Waiting for 1 GPU with 20 GB free: the most free now is 15 GB, on GPU 1; another program (ollama) holds 9 GB on GPU 1; your other runs hold GPU 0${NO_TELLING}`);
+  await clearQueue();
+  // Beside a run of yours, only what is not that run's own is another program's.
+  const c = await held('shares', { gpuMemGb: 4, alone: false });
+  await running(c);
+  gpus = [card(0, { memUsed: 13_000 }), card(1, { memUsed: 24_000 })];
+  apps = [
+    { gpu: 0, name: 'python', mem: 3000, run: c.id },
+    { gpu: 0, name: 'python', mem: 10_000 },
+    { gpu: 1, name: 'python', mem: 12_000 },
+    { gpu: 1, name: 'llama-server', mem: 12_000 },
+  ];
+  const d = await held('more', { gpuMemGb: 12 });
+  await waits(d);
+  assert.match(why(d)!, /another program \(python\) holds 9\.7 GB on GPU 0; other programs \((python|llama-server) and more\) hold 23\.4 GB on GPU 1; your other runs hold GPU 0/);
+  await clearQueue();
+});
+
+test('a run that has waited 6 hours tells you, once', async () => {
+  cards(4);
+  const a = await held('first');
+  await running(a);
+  const big = await held('big', { gpus: 4 });
+  await waits(big);
+  later(5 * 3_600_000);
+  await steps();
+  assert.equal(noticesOf(big).length, 0);
+  later(6 * 3_600_000 + 60_000);
+  await steps(5);
+  assert.deepEqual(
+    noticesOf(big).map((n) => [n.body, n.url, n.kind]),
+    [['“big” has waited 6 hours for 4 GPUs', `/experiments/${big.id}`, 'waiting']],
+  );
+  assert.equal(getRun(db, big.id)!.waitTold, true);
+  await clearQueue();
+  // The runs of a sweep that all wait that long: told once.
+  cards(1);
+  const holds = await held('holds');
+  await running(holds);
+  const sweep = await startSweep(deps, { command: 'echo {a}', params: { a: [1, 2, 3] }, group: 'long sweep', cwd: tmp, gpus: 1 });
+  later(6 * 3_600_000 + 60_000);
+  await steps(5);
+  assert.ok(sweep.runs.every((r) => getRun(db, r.id)!.waitTold));
+  assert.equal(sweep.runs.flatMap((r) => noticesOf(r)).length, 1);
+  await clearQueue();
+});
+
+test('a night run waits for GPUs from when the night found it no room, not from when it was made', async () => {
+  cards(1);
+  setNight();
+  now = at(8, 14);
+  clock.now = () => now;
+  const r = await held('tonight', { when: 'night' });
+  await waits(r);
+  assert.equal(getRun(db, r.id)!.waitingSince, undefined);
+  const a = await held('day');
+  await running(a);
+  now = at(8, 23, 30);
+  await steps();
+  assert.match(why(r)!, /^Waiting for 1 GPU that is free: your other runs hold GPU 0/);
+  assert.equal(getRun(db, r.id)!.waitingSince, now);
+  now = at(9, 8);
+  await steps();
+  assert.equal(why(r), 'Waits for the night (from 23:00)');
+  assert.equal(getRun(db, r.id)!.waitingSince, undefined);
+  assert.equal(noticesOf(r).length, 0);
+  await clearQueue();
+});
+
+test('runs without a GPU at once: half the cores, from 1 to 16, unless you set it', () => {
+  assert.deepEqual([1, 2, 3, 8, 24, 32, 64, 192].map((n) => defaultSlots(n)), [1, 1, 1, 4, 12, 16, 16, 16]);
+  kvSet(db, 'experiments_settings', JSON.stringify({}));
+  assert.equal(settingsOf(db).cpuSlots, defaultSlots(os.cpus().length));
+  assert.equal(settingsOf(db).shareGpus, true);
+  kvSet(db, 'experiments_settings', JSON.stringify({ cpuSlots: 3 }));
+  assert.equal(settingsOf(db).cpuSlots, 3, 'a number you set stays');
+  setNight();
+});
+
+// ---- a stop warns first, a run carries on, and what a cluster says ---------------------------------------------------
+
+/** The settings and clock as an ordinary day has them, and no notices kept. */
+function ordinary() {
+  clock.now = () => Date.now();
+  setNight({ cpuSlots: 8 });
+  forgetNotices();
+  notices.length = 0;
+}
+const logOf = (r: RunRecord) => {
+  try {
+    return fs.readFileSync(path.join(runFolder(r.id), 'log.txt'), 'utf8');
+  } catch {
+    return '';
+  }
+};
+const eventsText = (r: RunRecord) => getRunWithEvents(db, r.id)!.events!.map((e) => e.text);
+/** A training that saves a checkpoint on Ctrl-C and leaves with exit code 0. */
+const SAVES = `trap 'echo saved; exit 0' INT; echo "grace=$HYDOR_GRACE_SECONDS"; echo ready; while true; do sleep 0.2; done`;
+/** The processes of a run here go at once, as when the computer restarts or tmux dies. */
+const killWhole = (r: RunRecord) => process.kill(-pidOf(runFolder(r.id))!, 'SIGKILL');
+
+test('a run that reaches its time limit is warned first: it saves and leaves, and is stopped, not done', async () => {
+  ordinary();
+  // (About 11 s: a busy computer has the script's trap in place well before.)
+  const r = await job(SAVES, { hours: 0.003 });
+  await until(ended(r.id), 30_000, 'it to stop');
+  const x = getRun(db, r.id)!;
+  assert.equal(x.status, 'stopped', x.why);
+  assert.equal(x.why, 'It reached its time limit of 0.003 h');
+  assert.equal(x.exitCode, 0);
+  assert.match(logOf(r), /grace=30[\s\S]*saved/);
+  assert.ok(eventsText(r).includes('Stopping: It reached its time limit of 0.003 h. Warned with Ctrl-C: it has 30 seconds to save a checkpoint and leave'), eventsText(r).join('\n'));
+  assert.ok(!eventsText(r).some((t) => /stopped hard/.test(t)));
+  assert.deepEqual([x.stopping, x.hardStopAt, x.restartedAs], [undefined, undefined, undefined], 'a time limit is not started again by itself');
+});
+
+test('one that does not leave within its grace is stopped hard; the person’s stop warns only a run that asked', async () => {
+  ordinary();
+  await assert.rejects(cleanJob(db, { command: 'true', cwd: tmp, grace: 2 }), /Seconds of warning before a stop: a number from 5 to 600/);
+  await assert.rejects(cleanJob(db, { command: 'true', cwd: tmp, grace: 700 }), /from 5 to 600/);
+  assert.equal((await cleanJob(db, { command: 'true', cwd: tmp, seed: 3, resume: 'train --seed {seed} --from last' })).resume, 'train --seed 3 --from last');
+  const stubborn = "trap '' INT; echo ready; sleep 60";
+  const r = await job(stubborn, { grace: 5 });
+  const plain = await job(SAVES);
+  await until(() => /ready/.test(logOf(r)) && /ready/.test(logOf(plain)), 20_000, 'them to be ready');
+  const from = Date.now();
+  await stop(r);
+  await stop(plain);
+  assert.ok(eventsText(r).includes('Stopping: Stopped by you. Warned with Ctrl-C: it has 5 seconds to save a checkpoint and leave'));
+  assert.ok(eventsText(plain).includes('Stopping: Stopped by you'), 'no grace asked: as before');
+  assert.equal(getRun(db, plain.id)!.hardStopAt, undefined);
+  await until(() => ended(r.id)() && ended(plain.id)(), 40_000, 'them to stop');
+  assert.ok(Date.now() - from >= 4500, 'it had its five seconds');
+  assert.equal(status(r), 'stopped');
+  assert.equal(why(r), 'Stopped by you');
+  assert.ok(eventsText(r).includes('It had not left 5 seconds after the warning, so it was stopped hard'), eventsText(r).join('\n'));
+  assert.equal(status(plain), 'stopped');
+});
+
+test('a night run that says how to carry on does so the next night, with its curves so far; one without starts over', async () => {
+  now = at(40, 23, 30);
+  nightTest({ nightEnds: 'stop' });
+  const g = gate('echo from-checkpoint; echo loss=1; ', 'echo acc=1');
+  const r = await nightJob(`trap 'echo saved; exit 0' INT; echo start; echo loss=2; while true; do sleep 0.2; done`, { resume: g.command, report: true });
+  await until(() => status(r) === 'running' && getRun(db, r.id)!.metrics?.last.loss === 2, 30_000, 'it to run and print');
+  now = at(41, 7, 30);
+  await until(() => status(r) === 'waiting', 40_000, 'it to be stopped and wait again');
+  let x = getRunWithEvents(db, r.id)!;
+  assert.equal(x.why, NIGHT_CARRY);
+  assert.equal(x.why, 'Stopped at the end of the night: it carries on from its checkpoint tonight');
+  assert.deepEqual([x.startedAt, x.stopping, x.hardStopAt, x.exitCode, x.carriesOn, x.ranResume], [undefined, undefined, undefined, undefined, true, undefined]);
+  assert.equal(x.metrics?.last.loss, 2, 'what it had is kept');
+  assert.ok(seriesOf(db, r.id).loss?.length, 'its curve too');
+  assert.ok(x.events!.some((e) => e.kind === 'waiting' && e.text === NIGHT_CARRY));
+  assert.ok(fs.readdirSync(runFolder(r.id)).some((f) => /^log-before-\d+\.txt$/.test(f)));
+  await steps();
+  assert.equal(why(r), NIGHT_CARRY, 'it keeps saying why by day');
+  now = at(41, 23);
+  await until(() => status(r) === 'running' && getRun(db, r.id)!.metrics?.last.loss === 1, 40_000, 'it to carry on');
+  assert.match(logOf(r), /from-checkpoint/);
+  assert.doesNotMatch(logOf(r), /^start$/m, 'not from the beginning');
+  assert.equal(getRun(db, r.id)!.ranResume, true);
+  assert.ok(eventsText(r).some((t) => t.endsWith('to carry on from its checkpoint')));
+  g.open();
+  await until(ended(r.id), 20_000, 'it to end');
+  assert.equal(status(r), 'done');
+  assert.deepEqual(seriesOf(db, r.id).loss.map((p) => p[1]), [2, 1], 'one curve over both nights');
+  now = at(42, 7);
+  await steps();
+});
+
+test('a run lost in a restart carries on as a new run that names it, twice at most; one that says nothing stays lost', async () => {
+  ordinary();
+  const lostOf = async (r: RunRecord) => {
+    await until(() => status(r) === 'running' && /up/.test(logOf(r)), 20_000, 'it to run');
+    forgetLive();
+    killWhole(r);
+    await until(ended(r.id), 30_000, 'it to be found lost');
+    const x = getRun(db, r.id)!;
+    assert.equal(x.status, 'lost', x.why);
+    return x;
+  };
+  const next = async (r: RunRecord) => {
+    await until(() => !!getRun(db, r.id)!.restartedAs, 10_000, 'it to be started again');
+    return getRun(db, getRun(db, r.id)!.restartedAs!)!;
+  };
+  const a = await job('echo up; sleep 60', { resume: 'echo up carried; sleep 60', group: 'lost-g', report: false });
+  const lostA = await lostOf(a);
+  const b = await next(a);
+  assert.deepEqual([b.from, b.carriesOn, b.autoResumes, b.group, b.command, b.resume], [a.id, true, 1, 'lost-g', a.command, a.resume]);
+  assert.match(lostA.why!, /went missing/);
+  assert.ok(eventsText(a).includes(`Started again to carry on from its checkpoint, as ${b.id}`));
+  assert.ok(eventsText(b).some((t) => t.startsWith(`Started again by the app to carry on from the checkpoint of ${a.id}: Its process went missing`)));
+  await lostOf(b);
+  const c = await next(b);
+  assert.equal(c.autoResumes, 2);
+  assert.match(logOf(c) || (await until(() => /up/.test(logOf(c)), 20_000, 'its log'), logOf(c)), /up carried/);
+  assert.equal(noticesOf(a).length + noticesOf(b).length, 0, 'nothing to tell while it goes on');
+  const waited = waitRuns(deps, { ids: [a.id] }, { hours: 0.05, key: 'lost-wait' });
+  await lostOf(c);
+  const w = await waited;
+  assert.deepEqual(w.runs.map((r) => r.id), [c.id], 'waiting for the first waits for what took its place');
+  await steps(5);
+  assert.equal(getRun(db, c.id)!.restartedAs, undefined, 'twice at most');
+  assert.equal(listRuns(db, { group: 'lost-g' }).length, 3);
+  assert.ok(noticesOf(c).some((n) => n.kind === 'failed'), 'told as before');
+  const listed = (await http.inject({ method: 'GET', url: '/api/experiments/runs?group=lost-g' })).json().runs as RunRecord[];
+  assert.deepEqual(listed.map((r) => [r.id, r.attempt, r.retryOf]).sort(), [[a.id, undefined, undefined], [b.id, 2, a.id], [c.id, 3, b.id]].sort(), 'attempts');
+  const plain = await job('echo up; sleep 60');
+  await lostOf(plain);
+  await steps(4);
+  assert.equal(getRun(db, plain.id)!.restartedAs, undefined);
+});
+
+test('Run again carries on from the checkpoint when asked, else starts over; it needs a command to carry on with', async () => {
+  ordinary();
+  const r = await job('echo from-the-start; exit 1', { resume: 'echo from-the-checkpoint' });
+  await until(ended(r.id), 20_000, 'it to fail');
+  const post = async (payload: Record<string, unknown>) => http.inject({ method: 'POST', url: `/api/experiments/runs/${r.id}/again`, payload });
+  const on = (await post({ resume: true })).json().run as RunRecord;
+  assert.deepEqual([on.from, on.carriesOn, on.resume], [r.id, true, 'echo from-the-checkpoint']);
+  const over = (await post({})).json().run as RunRecord;
+  assert.equal(over.carriesOn, undefined);
+  // The New run window says the command and the choice apart.
+  const edited = (await post({ command: 'echo from-the-start', resume: 'echo from-another', carryOn: true, grace: 60 })).json().run as RunRecord;
+  assert.deepEqual([edited.resume, edited.carriesOn, edited.grace], ['echo from-another', true, 60]);
+  const dropped = (await post({ resume: '', grace: '' })).json().run as RunRecord;
+  assert.deepEqual([dropped.resume, dropped.grace, dropped.carriesOn], [undefined, undefined, undefined]);
+  await until(() => [on, over, edited, dropped].every((x) => ended(x.id)()), 30_000, 'the new runs');
+  assert.match(logOf(on), /from-the-checkpoint/);
+  assert.equal(getRun(db, on.id)!.ranResume, true);
+  assert.match(logOf(over), /from-the-start/);
+  assert.equal(getRun(db, over.id)!.ranResume, undefined);
+  assert.match(logOf(edited), /from-another/);
+  const bare = await job('exit 1');
+  const no = await http.inject({ method: 'POST', url: `/api/experiments/runs/${bare.id}/again`, payload: { resume: true } });
+  assert.equal(no.statusCode, 400);
+  assert.match(no.json().error, /no command to carry on with/);
+  // The tools: resume and grace, shown on the card that asks; again with carryOn.
+  sessions.cards.length = 0;
+  sessions.mode = 'default';
+  sessions.answer = 'accept';
+  const made = JSON.parse((await call('experiment_run', { command: 'echo a; exit 1', gpus: 0, resume: 'echo b', grace: 45 }, ctxOf({ key: 'claude:carry' }))).text);
+  assert.match(sessions.cards.at(-1)!.detail!, /# to carry on after a stop: echo b/);
+  await until(ended(made.id), 20_000, 'it to end');
+  assert.deepEqual([getRun(db, made.id)!.resume, getRun(db, made.id)!.grace], ['echo b', 45]);
+  const again = JSON.parse((await call('experiment_run', { again: made.id, carryOn: true }, ctxOf({ key: 'claude:carry' }))).text);
+  assert.match(sessions.cards.at(-1)!.detail!, /^echo b\n/);
+  await until(ended(again.id), 20_000, 'it to end');
+  assert.match(logOf(getRun(db, again.id)!), /^b$/m);
+});
+
+// A stand-in for ssh that runs each script here, in a home of its own, with a tmux server of its own (or none).
+function localSsh(home: string, o: { tmux: boolean }): { ssh: Ssh; scripts: string[] } {
+  fs.mkdirSync(path.join(home, 'tmux'), { recursive: true, mode: 0o700 });
+  const scripts: string[] = [];
+  const ssh: Ssh = (_host, script, x) =>
+    new Promise((resolve) => {
+      scripts.push(script);
+      const run = o.tmux ? script : script.replace('if command -v tmux >/dev/null', 'if false');
+      const env = { PATH: process.env.PATH!, HOME: home, TMUX_TMPDIR: path.join(home, 'tmux'), CUDA_VISIBLE_DEVICES: '' };
+      const p = spawn('bash', ['-c', run], { cwd: home, env, stdio: [x?.input !== undefined ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
+      let out = '';
+      let err = '';
+      p.stdout!.on('data', (d) => (out += d));
+      p.stderr!.on('data', (d) => (err += d));
+      if (x?.input !== undefined) p.stdin!.end(x.input);
+      p.on('close', (code) => resolve({ code: code ?? 255, out, err }));
+    });
+  return { ssh, scripts };
+}
+
+for (const tmux of [true, false]) {
+  test(`a plain SSH machine (${tmux ? 'tmux' : 'no tmux'} there): its time limit with the warning, a metrics file read in pieces, scores, a finished run, a lost one`, async () => {
+    ordinary();
+    const home = path.join(tmp, `there-${tmux ? 'tmux' : 'nohup'}`);
+    const work = path.join(home, 'proj');
+    fs.mkdirSync(work, { recursive: true });
+    const there = localSsh(home, { tmux });
+    setSsh(there.ssh);
+    const c = saveCluster(db, { name: `Box ${tmux ? 'T' : 'N'}`, host: 'box', kind: 'ssh' });
+    const where = `c:${c.id}`;
+    const on = (command: string, o: Record<string, unknown> = {}) => job(command, { where, cwd: work, ...o });
+    try {
+      // The metrics file is not there at first, then grows, and is read from where the last look stopped.
+      const m = gate(`echo started; sleep 1.5; echo '{"step": 1, "loss": 3}' >> m.jsonl; echo '{"id": "a", "acc": 1}' > scores.jsonl; `, `echo '{"step": 2, "loss": 2}' >> m.jsonl`);
+      const r = await on(m.command, { metricsFile: 'm.jsonl', scoresFile: 'scores.jsonl' });
+      await until(() => getRun(db, r.id)!.metrics?.last.loss === 3, 30_000, 'the first line of the file');
+      m.open();
+      await until(ended(r.id), 30_000, 'it to end');
+      const x = getRun(db, r.id)!;
+      assert.equal(x.status, 'done', x.why);
+      assert.equal(x.metrics?.last.loss, 2);
+      assert.deepEqual(seriesOf(db, r.id).loss, [[1, 3], [2, 2]], 'each line once');
+      assert.equal(x.scores, true);
+      const reads = there.scripts.filter((s) => s.includes('m.jsonl'));
+      assert.ok(reads.every((s) => s.startsWith('tail -c')), 'read with the log’s new part, in one call');
+      assert.ok(reads.some((s) => /from=\d{2,};/.test(s)), 'from where the last look stopped, not whole');
+
+      // The time limit: warned, saves, leaves; stopped with the same reason as here.
+      const limited = await on(SAVES, { hours: 0.003, grace: 20 });
+      await until(ended(limited.id), 40_000, 'it to stop at its limit');
+      const l = getRun(db, limited.id)!;
+      assert.equal(l.status, 'stopped', `${l.why}\n${logOf(limited)}`);
+      assert.equal(l.why, 'It reached its time limit of 0.003 h');
+      assert.match(logOf(limited), /grace=20[\s\S]*saved/);
+      assert.ok(!eventsText(limited).some((t) => /stopped hard/.test(t)), eventsText(limited).join('\n'));
+
+      // Stubborn: stopped hard once its seconds are up.
+      const stubborn = await on("trap '' INT; echo ready; sleep 60", { grace: 5 });
+      await until(() => /ready/.test(logOf(stubborn)), 30_000, 'it to be ready');
+      await stop(stubborn);
+      await until(ended(stubborn.id), 40_000, 'it to be stopped hard');
+      assert.equal(status(stubborn), 'stopped');
+
+      // Its process gone with no exit code there (the machine restarted): once more, carrying on.
+      const cut = await on('echo up; sleep 60', { resume: 'echo carried-there' });
+      await until(() => /up/.test(logOf(cut)), 30_000, 'it to run');
+      const pid = Number(fs.readFileSync(path.join(getRun(db, cut.id)!.remoteDir!, 'pid'), 'utf8'));
+      process.kill(-pid, 'SIGKILL');
+      await until(() => !!getRun(db, cut.id)!.restartedAs, 30_000, 'it to be started again');
+      assert.equal(status(cut), 'lost');
+      const nxt = getRun(db, getRun(db, cut.id)!.restartedAs!)!;
+      await until(ended(nxt.id), 30_000, 'the carried run');
+      assert.equal(status(nxt), 'done', why(nxt));
+      assert.match(logOf(nxt), /carried-there/);
+      assert.equal(getRun(db, nxt.id)!.ranResume, true);
+    } finally {
+      if (tmux)
+        try {
+          execFileSync('tmux', ['kill-server'], { env: { PATH: process.env.PATH!, HOME: home, TMUX_TMPDIR: path.join(home, 'tmux') }, stdio: 'ignore' });
+        } catch {}
+    }
+  });
+}
+
+test('sbatch --test-only: what a refusal and a start time are read as, in the cluster’s own time zone', () => {
+  const at = slurmTime('2026-11-27T02:15:00', '+0100');
+  assert.equal(at, Date.UTC(2026, 10, 27, 1, 15));
+  assert.equal(slurmTime('N/A'), undefined);
+  assert.deepEqual(parseTestOnly('+0100\nsbatch: Job 77 to start at 2026-11-27T02:15:00 using 4 processors on nodes n1 in partition gpu\n@@0\n'), { startsAbout: at });
+  assert.deepEqual(parseTestOnly('+0000\nsbatch: unrecognized option \'--test-only\'\n@@1\n'), {});
+  assert.deepEqual(parseTestOnly('+0000\nsbatch: error: Socket timed out on send/recv operation\n@@1\n'), {});
+  assert.deepEqual(parseTestOnly(''), {});
+  assert.deepEqual(parseTestOnly('+0000\nallocation failure: Requested node configuration is not available\n@@1\n'), {
+    refused: 'No node of the cluster has what it asks for: ask for fewer GPUs, processors or memory, or another partition. The cluster said: “allocation failure: Requested node configuration is not available”',
+  });
+  const refused = (line: string) => parseTestOnly(`+0000\n${line}\n@@1\n`).refused!;
+  assert.match(refused('sbatch: error: invalid partition specified: nope'), /^The cluster has no partition by that name/);
+  assert.match(refused('sbatch: error: Batch job submission failed: Requested time limit is invalid (missing or exceeds some policy)'), /^It asks for more time/);
+  assert.match(refused('sbatch: error: Batch job submission failed: Invalid account or account/partition combination specified'), /^The cluster did not accept the account/);
+  assert.match(refused('sbatch: error: Memory specification can not be satisfied'), /^It asks for more memory/);
+  assert.match(refused('sbatch: error: Something new went wrong'), /^The cluster did not accept it\. The cluster said: “sbatch: error: Something new went wrong”$/);
+  // As a real cluster (SLURM 25.11) printed them, names made up.
+  assert.deepEqual(parseTestOnly('+0000\nsbatch: Job 2000001 to start at 2026-11-27T02:15:00 a using 1 processors on nodes cpu001 in partition cpu\n@@0\n'), { startsAbout: Date.UTC(2026, 10, 27, 2, 15) });
+  for (const [printed, said] of [
+    ['sbatch: error: invalid partition specified: nosuchpart\nallocation failure: Invalid partition name specified', 'The cluster has no partition by that name, or you may not use it: check Partition. The cluster said: “sbatch: error: invalid partition specified: nosuchpart”'],
+    ['allocation failure: Requested time limit is invalid (missing or exceeds some limit)', 'It asks for more time than the cluster allows there: give it fewer hours, or another partition. The cluster said: “allocation failure: Requested time limit is invalid (missing or exceeds some limit)”'],
+    ['allocation failure: Requested node configuration is not available', 'No node of the cluster has what it asks for: ask for fewer GPUs, processors or memory, or another partition. The cluster said: “allocation failure: Requested node configuration is not available”'],
+    ['allocation failure: Invalid account or account/partition combination specified', 'The cluster did not accept the account: check the cluster’s Account in Where runs go. The cluster said: “allocation failure: Invalid account or account/partition combination specified”'],
+    ['sbatch: error: ERROR: Requested GPU in non-GPU partition "cpu"\nallocation failure: Invalid generic resource (gres) specification', 'The cluster cannot give it those GPUs: check GPUs and Partition. The cluster said: “sbatch: error: ERROR: Requested GPU in non-GPU partition "cpu"”'],
+  ])
+    assert.equal(parseTestOnly(`+0000\n${printed}\n@@1\n`).refused, said);
+  assert.equal(hoursSaid(1 / 60), '0.017');
+  assert.deepEqual([4, 2.5, 0.003, 125].map(hoursSaid), ['4', '2.5', '0.003', '125']);
+});
+
+/** A stand-in SLURM: what sbatch --test-only says, and what squeue and sacct say of each job as the test sets it. */
+function slurm() {
+  const s = { testOnly: '' as string, testCode: 0, noAnswer: false, jobs: 0, phase: 'PENDING', reason: 'Priority', start: 'N/A', exit: '', acct: '', scripts: [] as string[], commands: [] as string[] };
+  const ssh: Ssh = async (_host, script, o) => {
+    s.scripts.push(script);
+    if (script.startsWith('mkdir -p')) return { code: 0, out: '/srv/u/runs/RID\n', err: '' };
+    if (script.startsWith('cat > ') && script.includes('command.sh')) {
+      s.commands.push(o!.input!.trim());
+      return { code: 0, out: '', err: '' };
+    }
+    if (script.includes('sbatch --test-only')) return s.noAnswer ? { code: 255, out: '', err: '' } : { code: 0, out: `+0000\n${s.testOnly}\n@@${s.testCode}\n`, err: '' };
+    if (script.includes('sbatch --parsable')) return { code: 0, out: `${++s.jobs}00\n`, err: '' };
+    if (script.startsWith('cd ') && script.includes('git rev-parse')) return { code: 3, out: '', err: '' };
+    if (script.startsWith('squeue')) {
+      const id = /-j (\d+)/.exec(script)![1];
+      const q = s.phase === 'GONE' ? '' : `${id}|${s.phase}|${s.phase === 'PENDING' ? s.reason : 'None'}|0:00|n1|${s.start}\n`;
+      return { code: 0, out: `${q}@@\n${s.exit}\n@@\n${s.acct}\n@@\n+0000\n`, err: '' };
+    }
+    return { code: 0, out: '', err: '' };
+  };
+  setSsh(ssh);
+  return s;
+}
+const iso = (ms: number) => new Date(ms).toISOString().slice(0, 19);
+
+test('SLURM: asked before: a refusal fails at once with nothing sent; a start time is kept and said; without the option it is sent as before', async () => {
+  ordinary();
+  const s = slurm();
+  const c = saveCluster(db, { name: 'Ask', host: 'ask', kind: 'slurm' });
+  const on = (o: Record<string, unknown> = {}) => job('python train.py', { where: `c:${c.id}`, cwd: '~/code', gpus: 1, ...o });
+  s.testOnly = 'sbatch: error: Batch job submission failed: Requested node configuration is not available';
+  s.testCode = 1;
+  const told = JSON.parse((await call('experiment_run', { command: 'python train.py', where: `c:${c.id}`, cwd: '~/code', gpus: 8 }, ctxOf({ key: 'claude:slurm' }))).text);
+  assert.equal(told.status, 'failed');
+  assert.match(told.why, /^No node of the cluster has what it asks for.*The cluster said: “sbatch: error: Batch job submission failed: Requested node configuration is not available”$/);
+  assert.equal(s.jobs, 0, 'nothing was sent');
+  assert.equal(getRun(db, told.id)!.clusterJob, undefined);
+  const swept = JSON.parse((await call('experiment_sweep', { command: 'python train.py --lr {lr}', params: { lr: [1, 2] }, group: 'refused-sweep', where: `c:${c.id}`, cwd: '~/code' }, ctxOf({ key: 'claude:slurm' }))).text);
+  assert.match(swept.refused, /^No node of the cluster/);
+  assert.equal(s.jobs, 0);
+
+  const start = Math.round(Date.now() / 1000) * 1000 + 3 * 3_600_000;
+  s.testOnly = `sbatch: Job 9 to start at ${iso(start)} using 4 processors on nodes n1 in partition gpu`;
+  s.testCode = 0;
+  const ok = JSON.parse((await call('experiment_run', { command: 'python train.py', where: `c:${c.id}`, cwd: '~/code' }, ctxOf({ key: 'claude:slurm' }))).text);
+  assert.equal(ok.status, 'waiting');
+  // The guess is said as one, and not kept as when it will start.
+  assert.equal(ok.startsAbout, undefined);
+  assert.match(ok.why, /^In the cluster’s queue\. The cluster’s cautious guess to start it is \d\d:\d\d.*; it often starts much sooner$/);
+  assert.deepEqual([getRun(db, ok.id)!.startsGuess, getRun(db, ok.id)!.startsAbout], [start, undefined]);
+  // While squeue has no estimate, its reason is said with the guess; no reason is not said twice.
+  await until(() => /Priority/.test(getRun(db, ok.id)!.why ?? ''), 30_000, 'squeue’s reason');
+  assert.match(why(ok)!, /^In the cluster’s queue: other jobs come first \(Priority\)\. The cluster’s cautious guess/);
+  s.reason = 'None';
+  await until(() => /^In the cluster’s queue\. The cluster’s/.test(getRun(db, ok.id)!.why ?? ''), 30_000, 'no reason');
+  s.reason = 'Priority';
+
+  // squeue's estimate: followed once it names one; kept while it moves by ten minutes or less.
+  s.start = iso(start);
+  await until(() => getRun(db, ok.id)!.startsAbout === start, 30_000, 'squeue’s estimate');
+  assert.match(why(ok)!, /^In the cluster’s queue: other jobs come first \(Priority\)\. It expects to start about \d\d:\d\d/);
+  s.start = iso(start + 5 * 60_000);
+  await sleep(900);
+  await tick();
+  assert.equal(getRun(db, ok.id)!.startsAbout, start);
+  s.start = iso(start + 3_600_000);
+  await until(() => getRun(db, ok.id)!.startsAbout === start + 3_600_000, 30_000, 'the new start');
+  s.phase = 'RUNNING';
+  await until(() => status(ok) === 'running', 30_000, 'it to run');
+  assert.equal(getRun(db, ok.id)!.startsAbout, undefined);
+  s.phase = 'GONE';
+  s.exit = '0';
+  s.acct = 'COMPLETED|0:0|00:00:05';
+  await until(ended(ok.id), 30_000, 'it to end');
+
+  s.phase = 'PENDING';
+  s.exit = '';
+  s.acct = '';
+  s.start = 'N/A';
+  s.testOnly = "sbatch: unrecognized option '--test-only'";
+  s.testCode = 1;
+  const old = await on();
+  await until(() => !!getRun(db, old.id)!.clusterJob, 30_000, 'it to be sent');
+  assert.equal(getRun(db, old.id)!.startsAbout, undefined);
+  s.noAnswer = true;
+  const slow = await on();
+  await until(() => !!getRun(db, slow.id)!.clusterJob, 30_000, 'it to be sent without an answer');
+  await stop(old);
+  await stop(slow);
+  s.phase = 'GONE';
+  s.acct = 'CANCELLED by 1|0:15|00:00:00';
+  await until(() => ended(old.id)() && ended(slow.id)(), 30_000, 'them to be cancelled');
+  assert.equal(why(old), 'Stopped by you');
+});
+
+test('SLURM: out of time, out of memory and preempted, said with what to do; a preempted run that can carry on is sent again', async () => {
+  ordinary();
+  const s = slurm();
+  const c = saveCluster(db, { name: 'Ends', host: 'ends', kind: 'slurm' });
+  const ending = async (acct: string, o: Record<string, unknown> = {}, exit = '') => {
+    s.phase = 'RUNNING';
+    s.exit = '';
+    s.acct = '';
+    const r = await job('python train.py', { where: `c:${c.id}`, cwd: '~/code', ...o });
+    await until(() => status(r) === 'running', 30_000, 'it to run');
+    s.phase = 'GONE';
+    s.acct = acct;
+    s.exit = exit;
+    await until(ended(r.id), 30_000, 'it to end');
+    return getRun(db, r.id)!;
+  };
+  let x = await ending('TIMEOUT|0:0|04:00:10', { hours: 4 });
+  assert.deepEqual([x.status, x.why], ['failed', 'It reached the cluster’s time limit of 4 h: give it more hours, or a way to carry on']);
+  // Its step was killed and the batch script wrote its exit code: sacct still says why.
+  x = await ending('FAILED|137:0|00:10:00\nOUT_OF_MEMORY|0:125|00:10:00', { memGb: 16 }, '137');
+  assert.deepEqual([x.status, x.why], ['failed', 'The cluster stopped it for memory: it asked for 16 GB. Give it more memory, or use a smaller batch']);
+  x = await ending('PREEMPTED|0:0|00:10:00');
+  assert.deepEqual([x.status, x.why, x.restartedAs], ['failed', 'The cluster took its place back (preempted): run it again, or give it a way to carry on', undefined]);
+  // A program that saved and left with 0 when its place was taken did not finish.
+  x = await ending('PREEMPTED|0:0|00:10:00', {}, '0');
+  assert.deepEqual([x.status, x.why], ['failed', 'The cluster took its place back (preempted): run it again, or give it a way to carry on']);
+  s.commands.length = 0;
+  x = await ending('PREEMPTED|0:0|00:10:00', { resume: 'python train.py --resume last.pt' });
+  assert.equal(x.why, 'The cluster took its place back (preempted): it was sent again to carry on from its checkpoint');
+  assert.ok(x.restartedAs);
+  s.phase = 'RUNNING';
+  s.acct = '';
+  await until(() => status(getRun(db, x.restartedAs!)!) === 'running', 30_000, 'it to be sent again');
+  assert.deepEqual(s.commands, ['python train.py', 'python train.py --resume last.pt']);
+  assert.equal(getRun(db, x.restartedAs!)!.ranResume, true);
+  s.phase = 'GONE';
+  s.acct = 'PREEMPTED|0:0|00:01:00';
+  await until(() => !!getRun(db, x.restartedAs!)!.restartedAs, 30_000, 'the second time');
+  const third = getRun(db, getRun(db, x.restartedAs!)!.restartedAs!)!;
+  s.phase = 'RUNNING';
+  s.acct = '';
+  await until(() => status(third) === 'running', 30_000, 'the third');
+  s.phase = 'GONE';
+  s.acct = 'PREEMPTED|0:0|00:01:00';
+  await until(ended(third.id), 30_000, 'it to end');
+  assert.deepEqual([getRun(db, third.id)!.restartedAs, why(third)], [undefined, 'The cluster took its place back (preempted): run it again to carry on from its checkpoint']);
+
+  // A warned stop of a running job: Ctrl-C to its programs, cancelled when its seconds are up.
+  s.phase = 'RUNNING';
+  s.acct = '';
+  const w = await job('python train.py', { where: `c:${c.id}`, cwd: '~/code', grace: 5 });
+  await until(() => status(w) === 'running', 30_000, 'it to run');
+  s.scripts.length = 0;
+  await stop(w);
+  assert.ok(s.scripts.some((x) => /^scancel --signal=INT --full \d+$/.test(x)), s.scripts.join('\n'));
+  assert.ok(!s.scripts.some((x) => /^scancel \d+$/.test(x)), 'not cancelled yet');
+  await until(() => s.scripts.some((x) => /^scancel \d+$/.test(x)), 20_000, 'the hard stop');
+  s.phase = 'GONE';
+  s.acct = 'CANCELLED by 1|0:15|00:00:30';
+  await until(ended(w.id), 30_000, 'it to end');
+  assert.deepEqual([status(w), why(w)], ['stopped', 'Stopped by you']);
+  assert.ok(eventsText(w).includes('It had not left 5 seconds after the warning, so it was stopped hard'), eventsText(w).join('\n'));
+  assert.equal(getRun(db, w.id)!.exitCode ?? undefined, undefined, 'no exit code of its own, so none is made up');
+
+  // As a real cluster showed it: COMPLETING for most of a minute after the command had left.
+  s.phase = 'RUNNING';
+  s.acct = '';
+  s.exit = '';
+  const quick = await job('python train.py', { where: `c:${c.id}`, cwd: '~/code', grace: 5 });
+  await until(() => status(quick) === 'running', 30_000, 'it to run');
+  s.scripts.length = 0;
+  await stop(quick);
+  // It saved and left at once: its exit code is there while SLURM still cleans up.
+  s.phase = 'COMPLETING';
+  s.exit = '0';
+  s.acct = 'COMPLETED|0:0|00:00:17';
+  await until(ended(quick.id), 30_000, 'it to end while COMPLETING');
+  assert.deepEqual([status(quick), getRun(db, quick.id)!.exitCode], ['stopped', 0]);
+  assert.ok(!s.scripts.some((x) => /^scancel \d+$/.test(x)), 'not cancelled once it had left');
+  assert.ok(!eventsText(quick).some((t) => /stopped hard/.test(t)));
+  // Stopped at the cluster's limit: no exit code, the accounting says so while COMPLETING; taken after one more look.
+  s.phase = 'RUNNING';
+  s.exit = '';
+  s.acct = '';
+  const late = await job('python train.py', { where: `c:${c.id}`, cwd: '~/code', hours: 1 / 60 });
+  await until(() => status(late) === 'running', 30_000, 'it to run');
+  s.phase = 'COMPLETING';
+  s.acct = 'TIMEOUT|0:0|00:01:07';
+  await until(ended(late.id), 30_000, 'the time limit');
+  assert.deepEqual([status(late), why(late), getRun(db, late.id)!.exitCode ?? undefined], ['failed', 'It reached the cluster’s time limit of 0.017 h: give it more hours, or a way to carry on', undefined]);
+});
+
+// ---- carrying on runs the same code ---------------------------------------------------------------------------------
+
+/** A git repository whose train.sh says which version of it runs, how it was started, and goes on until `go` is there. */
+function trainRepo(name: string) {
+  const dir = path.join(tmp, name);
+  fs.mkdirSync(dir);
+  const g = (...a: string[]) => execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=T', ...a], { cwd: dir, stdio: 'pipe' });
+  const version = (n: number) => fs.writeFileSync(path.join(dir, 'train.sh'), `echo "code=v${n} mode=\${1:-start}"\n[ "$1" = fail ] && exit 1\nwhile [ ! -f "$HYDOR_PROJECT_DIR/go" ]; do sleep 0.2; done\n`);
+  g('init', '-q', '-b', 'main');
+  version(1);
+  g('add', '.');
+  g('commit', '-q', '-m', 'first');
+  return { dir, version, go: () => fs.writeFileSync(path.join(dir, 'go'), ''), hold: () => fs.rmSync(path.join(dir, 'go'), { force: true }) };
+}
+const said = (r: RunRecord) => /^code=.*$/m.exec(logOf(r))?.[0];
+const saying = (r: RunRecord, what: string) => until(() => said(r) === what, 30_000, `${r.id} to say ${what} (it says ${said(r)})`);
+
+test('a night run that carries on runs the code it was running, whatever the folder holds by then', async () => {
+  // One queued as usual, and one queued to run "the folder as it is": from its first start on, its code stays.
+  for (const [i, code] of [undefined, 'now'].entries()) {
+    const repo = trainRepo(`carry-night-${i}`);
+    now = at(50 + 3 * i, 23, 30);
+    nightTest({ nightEnds: 'stop' });
+    const r = await job('sh train.sh', { cwd: repo.dir, when: 'night', resume: 'sh train.sh resume', ...(code ? { code } : {}) });
+    await saying(r, 'code=v1 mode=start');
+    repo.version(2);
+    now = at(51 + 3 * i, 7, 30);
+    await until(() => status(r) === 'waiting', 40_000, 'it to be stopped and wait again');
+    assert.equal(why(r), NIGHT_CARRY);
+    now = at(51 + 3 * i, 23);
+    await saying(r, 'code=v1 mode=resume');
+    const x = getRun(db, r.id)!;
+    assert.ok(x.codeDir, 'it runs from a copy of that code');
+    assert.deepEqual([x.ranResume, x.codeAt, x.codeChanged], [true, 'queued', ['train.sh']]);
+    repo.go();
+    await until(ended(r.id), 30_000, 'it to end');
+    assert.equal(status(r), 'done', why(r));
+    now = at(52 + 3 * i, 7);
+    await steps();
+  }
+});
+
+test('lost and started again, or run again to carry on: the same code, an attempt of the run before, counted as started again', async () => {
+  ordinary();
+  const repo = trainRepo('carry-lost');
+  const r = await job('sh train.sh', { cwd: repo.dir, resume: 'sh train.sh resume', group: 'carry-code' });
+  await saying(r, 'code=v1 mode=start');
+  repo.version(2);
+  forgetLive();
+  killWhole(r);
+  await until(() => !!getRun(db, r.id)!.restartedAs, 30_000, 'it to be started again');
+  const b = getRun(db, getRun(db, r.id)!.restartedAs!)!;
+  assert.deepEqual([b.from, b.codeFrom], [r.id, r.id]);
+  await saying(b, 'code=v1 mode=resume');
+  assert.ok(getRun(db, b.id)!.codeDir);
+  repo.version(3);
+  forgetLive();
+  killWhole(b);
+  await until(() => !!getRun(db, b.id)!.restartedAs, 30_000, 'it to be started once more');
+  const c = getRun(db, getRun(db, b.id)!.restartedAs!)!;
+  assert.equal(c.codeFrom, b.id);
+  await saying(c, 'code=v1 mode=resume');
+  // The page's chain shows them as attempts, and the tools say so beside the code's fields.
+  const view = (await http.inject({ method: 'GET', url: `/api/experiments/runs/${c.id}` })).json();
+  assert.deepEqual([view.chain.attempt, view.chain.previous.id], [3, b.id]);
+  const got = JSON.parse((await call('experiment_get', { id: c.id }, ctxOf())).text);
+  assert.deepEqual([got.run.resume, got.run.ranResume, got.run.carriesOn, got.run.autoResumes, got.run.codeFrom, got.run.retryOf, got.run.attempt], ['sh train.sh resume', true, true, 2, b.id, b.id, 3]);
+  repo.go();
+  await until(ended(c.id), 30_000, 'the third to end');
+  assert.equal(status(c), 'done', why(c));
+  const news = endedNews(db, listRuns(db, { group: 'carry-code' }), 0).find((n) => n.kind === 'runs')!;
+  assert.ok(news.kind === 'runs');
+  assert.deepEqual([news.total, news.done, news.failed, news.again, news.other], [3, 1, 0, 2, 0], '2 failed and were started again');
+
+  // Run again: to carry on is its own code; over, as asked.
+  repo.version(1);
+  repo.hold();
+  const f = await job('sh train.sh fail', { cwd: repo.dir, resume: 'sh train.sh resume' });
+  await until(ended(f.id), 30_000, 'it to fail');
+  repo.version(4);
+  const post = (payload: Record<string, unknown>) => http.inject({ method: 'POST', url: `/api/experiments/runs/${f.id}/again`, payload });
+  const refused = await post({ resume: true, code: 'now' });
+  assert.equal(refused.statusCode, 400);
+  assert.match(refused.json().error, /^Carrying on runs the code it ran with/);
+  const on = (await post({ resume: true })).json().run as RunRecord;
+  assert.equal(on.codeFrom, f.id);
+  await saying(on, 'code=v1 mode=resume');
+  const own = (await post({ code: 'own' })).json().run as RunRecord;
+  const over = (await post({ code: 'now' })).json().run as RunRecord;
+  await until(() => [own, over].every((x) => !!said(x)), 30_000, 'them to say');
+  assert.deepEqual([said(own), said(over)], ['code=v1 mode=fail', 'code=v4 mode=fail']);
+  const told = await call('experiment_run', { again: f.id, carryOn: true, code: 'now' }, ctxOf());
+  assert.match(told.text, /^Carrying on runs the code the run ran/);
+  const alone = await call('experiment_run', { command: 'sh train.sh', cwd: repo.dir, gpus: 0, resume: 'sh train.sh resume', carryOn: true }, ctxOf());
+  assert.match(alone.text, /^carryOn goes with again/);
+  repo.go();
+  await until(() => [on, own, over].every((x) => ended(x.id)()), 30_000, 'them to end');
 });
 
 // ---- run ------------------------------------------------------------------------------------------------------------------

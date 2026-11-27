@@ -4,13 +4,14 @@
 // charts and hyperparameters; ?e= alone is the runs without one), ?evaluation=<id> one evaluation (&score=<id> one of
 // its scores), ?evolution=<id> one evolution (&try=<id> one of its tries), /experiments/<id> one run. A wide screen has
 // a sidebar with the queue, the GPUs, the evaluations and the experiments by category; a narrow one stacks the views.
-// Ticked runs (by their key) stay ticked from view to view, in a bar at the bottom to compare them or make a table.
+// Ticked runs (by their key) stay ticked from view to view, in a bar at the bottom to compare them, make a table, or
+// star, archive, stop and delete them together.
 // ?night=<date> is the Overview with that night's runs first (the morning's notice opens it).
 // Addresses open things too, once: ?new=1 (or sweep, or evaluation), ?sweep=<id> (its experiment's Hyperparameters),
 // ?table=<id> (or new), ?places=1, ?cluster=new.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { FlaskConical, Gauge, MoreHorizontal, Plus, Server, Table2, Waypoints, X } from 'lucide-react';
+import { FlaskConical, Gauge, MoreHorizontal, Plus, Server, Table2, Waypoints } from 'lucide-react';
 import type { ClusterSpec, ResultsTable, RunRecord, SweepSpec } from '@shared/experiments';
 import type { Evaluation } from '@shared/evaluations';
 import { api, enc } from '../../lib/api';
@@ -24,6 +25,7 @@ import { experimentPath, type ExperimentTab, type RunTab, runPath, useGroups, us
 import { Compare } from './Compare';
 import { evaluationPath, useEvaluations } from './evalApi';
 import { EvaluationEditor, type EditorSection } from './EvaluationEditor';
+import { DeleteRunsDialog } from './DeleteRuns';
 import { EvaluationView } from './EvaluationView';
 import { evolutionPath, useEvolutions } from './evolveApi';
 import { EvolutionView } from './EvolutionView';
@@ -32,7 +34,10 @@ import { ExperimentView } from './Experiment';
 import { Home } from './Home';
 import { NewRun } from './NewRun';
 import { nightDay } from './nightWords';
+import { PickedBar } from './PickedBar';
 import { Places } from './Places';
+import { useExperimentMarks } from './marksStore';
+import { standingsOf } from './runList';
 import { RunView } from './RunView';
 import { entriesOf, Sidebar } from './Sidebar';
 import { TableDialog, TablesList, type TableStart } from './TableDialog';
@@ -72,6 +77,8 @@ export function ExperimentsPage() {
   const [find, setFind] = useState('');
   // An experiment's older runs, when it has more than the newest 500 loaded: by group, read when it is opened.
   const [older, setOlder] = useState<Record<string, RunRecord[]>>({});
+  // Goes up when runs are starred, noted or archived here: what was read of older runs is read again.
+  const marked = useExperimentMarks((s) => s.n);
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
 
@@ -167,7 +174,7 @@ export function ExperimentsPage() {
     return () => {
       live = false;
     };
-  }, [night]);
+  }, [night, marked]);
 
   // The loaded runs, and the older ones of the experiments and the night opened (those not loaded already).
   const pool = useMemo(() => {
@@ -222,7 +229,7 @@ export function ExperimentsPage() {
     return () => {
       live = false;
     };
-  }, [wantsOlder, experiment, expInfo?.runs, expInfo?.lastAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wantsOlder, experiment, expInfo?.runs, expInfo?.lastAt, marked]); // eslint-disable-line react-hooks/exhaustive-deps
   const expRuns = useMemo(() => {
     const more = experiment ? older[experiment] : undefined;
     if (!more?.length) return expLoaded;
@@ -234,7 +241,8 @@ export function ExperimentsPage() {
   const fromAddress = EXPERIMENT_TABS.find((t) => t === tabParam);
   let expTab: ExperimentTab = fromAddress ?? savedTab();
   // The Hyperparameters tab is there for 2 runs or more whose settings differ.
-  if (!fromAddress && expTab === 'params' && !(expRuns.length >= 2 && differingParams(expRuns).length)) expTab = 'runs';
+  const expRows = useMemo(() => standingsOf(expRuns).rows, [expRuns]);
+  if (!fromAddress && expTab === 'params' && !(expRows.length >= 2 && differingParams(expRows).length)) expTab = 'runs';
   const onExpTab = (t: ExperimentTab) => {
     try {
       localStorage.setItem(TAB_KEY, t);
@@ -428,25 +436,15 @@ export function ExperimentsPage() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {body}
           {picked.size > 0 && (
-            <div className="sticky bottom-0 z-10 flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-bg px-4 py-2.5 pb-[max(10px,var(--safe-bottom))]">
-              <span className="text-[13px] text-fg-2">{picked.size} picked</span>
-              <span className="flex-1" />
-              <Button size="sm" variant="secondary" disabled={pickedRuns.length < 2} onClick={() => setCompare(pickedRuns.slice(0, MOST_COMPARED))}>
-                Compare
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                disabled={!pickedRuns.length || remotePicked}
-                title={remotePicked ? 'Tables are made of this computer’s runs: open the other machine’s Experiments for its own' : undefined}
-                onClick={() => setTableStart({ runs: pickedRuns })}
-              >
-                Make a table
-              </Button>
-              <IconButton label="Pick none" size="sm" onClick={() => setPicked(new Set())}>
-                <X size={15} />
-              </IconButton>
-            </div>
+            <PickedBar
+              all={pool}
+              picked={pickedRuns}
+              count={picked.size}
+              remote={remotePicked}
+              onCompare={() => setCompare(pickedRuns.slice(0, MOST_COMPARED))}
+              onTable={() => setTableStart({ runs: pickedRuns })}
+              onClear={() => setPicked(new Set())}
+            />
           )}
         </div>
       </div>
@@ -482,6 +480,7 @@ export function ExperimentsPage() {
           setTableStart({ table: t });
         }}
       />
+      <DeleteRunsDialog />
       <Places open={!!places} adding={places?.adding} onClose={() => setPlaces(null)} />
       <PageTour id="experiments" steps={EXPERIMENTS_TOUR} ready={runs !== null} />
     </div>

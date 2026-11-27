@@ -7,7 +7,7 @@ import { hoursWords, stopNote } from './nightWords';
 
 export type StartAt = 'free' | 'night';
 
-export function StartChoice({ value, onChange, night, where, labelClass = 'mb-1' }: { value: StartAt; onChange: (v: StartAt) => void; night: ExperimentsSettings | null; where: string; labelClass?: string }) {
+export function StartChoice({ value, onChange, night, where, carries, labelClass = 'mb-1' }: { value: StartAt; onChange: (v: StartAt) => void; night: ExperimentsSettings | null; where: string; carries?: boolean; labelClass?: string }) {
   return (
     <div>
       {/* When it starts: not the button's "Start". */}
@@ -24,7 +24,7 @@ export function StartChoice({ value, onChange, night, where, labelClass = 'mb-1'
         />
         <span className="text-[12px] text-fg-3">{hoursWords(night, where)}</span>
       </div>
-      {value === 'night' && stopNote(night, where) && <p className="mt-1 leading-relaxed text-fg-3">{stopNote(night, where)}</p>}
+      {value === 'night' && stopNote(night, where, carries) && <p className="mt-1 leading-relaxed text-fg-3">{stopNote(night, where, carries)}</p>}
     </div>
   );
 }

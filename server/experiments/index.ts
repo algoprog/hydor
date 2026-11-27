@@ -6,20 +6,27 @@
 // evaluations.ts how a project keeps score (one sealed command and one number), evolve.ts the search that tries
 // many small changes to a few files and keeps the best by an evaluation's score.
 import type { FastifyRequest } from 'fastify';
-import { ACTIVE, type ExperimentGroup, type RunStatus } from '../../shared/experiments.ts';
+import { standingsOf } from '../../shared/experiment-attempts.ts';
+import { ACTIVE, type ExperimentGroup, type RunRecord, type RunStatus } from '../../shared/experiments.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { isInternal } from '../internal.ts';
-import { logAfter, makeTable, patchOf, putInLatex, runsList, runView, seriesFor, startSweep, cleanTableSpec } from './api.ts';
+import { memoryOn } from '../memory/store.ts';
+import { agentsUse, heldNow, letRun } from './budget.ts';
+import { codeFolder, codeStatus, keepsCode, logAfter, makeTable, patchOf, putInLatex, runsList, runView, seriesFor, startSweep, cleanTableSpec } from './api.ts';
 import { checkCluster, getCluster, listClusters, noteCheck, removeCluster, saveCluster } from './clusters.ts';
 import { cleanJob, queueNow, resume, runAgain, setSettings, settingsOf, stopRun, submit, tellRuns, useDeps } from './queue.ts';
 import { describeBackfill, describeGroup, enableExperimentDescriptions } from './describe.ts';
 import { evaluationRoutes } from './evaluation-routes.ts';
-import { resumeScores } from './evaluations.ts';
-import { resumeEvolutions } from './evolve.ts';
+import { getScore, resumeScores, runsOfEvaluation } from './evaluations.ts';
+import { resumeEvolutions, runsOfEvolution } from './evolve.ts';
 import { evolveRoutes } from './evolve-routes.ts';
-import { deleteInfo, deleteRun, deleteTable, getRun, getSweep, getTable, isFinalRun, listInfo, listRuns, listTables, okId, recomputeTable, saveInfo, saveTable, workOut } from './records.ts';
+import { archiveGroup, BULK_MAX, markRuns, patchRun } from './marks.ts';
+import { archivedGroups, awayIds, deleteInfo, deleteRun, deleteTable, getInfo, getRun, getSweep, getTable, isFinalRun, keepRunFiles, listInfo, listRuns, listTables, marked, okId, recomputeTable, runFiles, saveInfo, saveTable, workOut } from './records.ts';
+import { remoteMachine } from './remote.ts';
+import { findingsByExperiment } from './shown-findings.ts';
 import { experimentTools, SPAWN_NOTE } from './tools.ts';
+import { askGb, lastPeak, readTrial, startTrial } from './trial.ts';
 
 const P = (req: FastifyRequest) => req.params as Record<string, string>;
 const Q = (req: FastifyRequest) => req.query as Record<string, string | undefined>;
@@ -30,6 +37,9 @@ const runId = (req: FastifyRequest) => {
   if (!okId(id)) throw new HttpError(400, 'Bad run id');
   return id;
 };
+
+/** Who starts a run through the API: an agent (its app_api, or an agent on another machine) or the person. */
+const startedBy = (req: FastifyRequest) => (isInternal(req) || B(req).agent === true ? { agent: true } : { page: true });
 
 const statusesOf = (s: string | undefined): RunStatus[] | undefined => {
   if (!s) return undefined;
@@ -62,28 +72,125 @@ function routes(d: Deps) {
   app.get('/api/experiments/runs', async (req) => {
     const q = Q(req);
     const status = statusesOf(q.status);
-    // The runs that score evaluations are not experiments: they come when their group or tag is asked for, with
-    // evaluation=1, and in a list of what is running now.
-    const plain = !(q.group || q.tag === 'evaluation' || q.evaluation === '1' || (status?.length && status.every((s) => ACTIVE.includes(s))));
-    const runs = await runsList(d, { group: q.group, tag: q.tag, status, cwd: q.cwd, project: q.project, sweep: q.sweep, night: q.night, q: q.q, limit: Math.min(Number(q.limit) || 200, 1000), plain }, q.everywhere === '1');
+    // The runs that score evaluations are not experiments, nor are trials: they come when their group or tag is asked
+    // for, with evaluation=1, and in a list of what is running now.
+    const plain = !(q.group || q.tag === 'evaluation' || q.tag === 'try' || q.evaluation === '1' || (status?.length && status.every((s) => ACTIVE.includes(s))));
+    const limit = Math.min(Number(q.limit) || 200, 1000);
+    // ?archived=0 (the terminal's list): what was put aside is left out, and more are read so the limit still fills.
+    const left = q.archived === '0';
+    let runs = await runsList(d, { group: q.group, tag: q.tag, status, cwd: q.cwd, project: q.project, sweep: q.sweep, night: q.night, q: q.q, limit: left ? 5000 : limit, plain }, q.everywhere === '1');
+    if (left) {
+      const away = awayIds(d.db);
+      runs = runs.filter((r) => (r.machine ? !r.archivedAt : !away.has(r.id))).slice(0, limit);
+    }
     return { runs: isInternal(req) ? runs.filter((r) => !isFinalRun(r)) : runs };
   });
   app.get('/api/experiments/runs/:id', async (req) => runView(d, open(req), Q(req).log === '0' ? 0 : Math.min(Number(Q(req).lines ?? 300) || 0, 5000)));
   app.get('/api/experiments/runs/:id/log', async (req) => logAfter(d, open(req), Number(Q(req).from) || 0));
   app.get('/api/experiments/runs/:id/patch', async (req) => ({ patch: await patchOf(d, open(req)) }));
-  app.post('/api/experiments/jobs', async (req) => ({ run: await submit(d, await cleanJob(d.db, B(req)), { startedBy: { page: true } }) }));
-  app.post('/api/experiments/runs/:id/stop', async (req) => ({ run: await stopRun(d, open(req), typeof B(req).why === 'string' && B(req).why.trim() ? B(req).why.trim().slice(0, 200) : undefined) }));
-  app.post('/api/experiments/runs/:id/again', async (req) => ({ run: await runAgain(d, open(req), B(req), { page: true }) }));
+  // carryOn with continues: a run on another machine (continues: its id there) carried on from here, by its page's Run again.
+  app.post('/api/experiments/jobs', async (req) => {
+    const { carryOn, continues } = B(req);
+    const theirs = carryOn === true && typeof continues === 'string' && okId(continues) ? continues : undefined;
+    return { run: heldNow(d, await submit(d, await cleanJob(d.db, B(req)), { startedBy: startedBy(req), ...(theirs ? { carryOn: true, theirs } : {}) })) };
+  });
+  /** What agents' runs used in seven days against their ceiling, and how many it holds. */
+  app.get('/api/experiments/budget', async () => agentsUse(d.db));
+  app.post('/api/experiments/runs/:id/let-run', async (req) => {
+    if (isInternal(req)) throw new HttpError(403, 'Only the person lets a held run go: tell them it waits (its page has Let it run)');
+    const id = runId(req);
+    // A copy of a run another machine keeps: let go there.
+    const r = getRun(d.db, id);
+    if (r?.remote) {
+      const m = remoteMachine(r.remote.machine);
+      if (!m) throw new HttpError(502, 'Its machine is no longer in Settings → Machines');
+      await m.call('POST', `/api/experiments/runs/${r.remote.id}/let-run`, 20_000, {});
+      return { run: r };
+    }
+    return { run: letRun(d, id) };
+  });
+  // warn: another machine's Hydor passes on a stop its app decided (a sweep's early stop), which warns the run first.
+  app.post('/api/experiments/runs/:id/stop', async (req) => ({ run: await stopRun(d, open(req), typeof B(req).why === 'string' && B(req).why.trim() ? B(req).why.trim().slice(0, 200) : undefined, { app: B(req).warn === true }) }));
+  app.post('/api/experiments/runs/:id/again', async (req) => {
+    // code: "own", the code the run ran; "now" (or left out), the folder's as it is now.
+    const { code, ...changes } = B(req);
+    if (code !== undefined && code !== 'own' && code !== 'now') throw new HttpError(400, 'code: "own" (the code it ran) or "now" (the folder as it is now)');
+    // A training must not change code between its checkpoints: carrying on runs the code it ran.
+    if (code === 'now' && (changes.carryOn === true || changes.resume === true)) throw new HttpError(400, 'Carrying on runs the code it ran with: leave code out, or start over to run the folder as it is now');
+    return { run: heldNow(d, await runAgain(d, open(req), changes, startedBy(req), { own: code === 'own' })) };
+  });
+  app.get('/api/experiments/runs/:id/code', async (req) => codeStatus(d, open(req)));
+  app.post('/api/experiments/runs/:id/code', async (req) => codeFolder(d, open(req)));
+  app.get('/api/experiments/code', async (req) => keepsCode(Q(req).cwd ?? ''));
+  // Notes, stars and archiving. What the person puts aside stays theirs: a call from inside the app (an agent's) does not archive.
+  const theirs = (req: FastifyRequest) => {
+    if (isInternal(req) && B(req).archived !== undefined) throw new HttpError(403, 'Only the person archives runs and experiments, on the Experiments page');
+  };
+  app.patch('/api/experiments/runs/:id', async (req) => {
+    theirs(req);
+    return { run: patchRun(d, open(req), B(req), isInternal(req) ? 'agent' : 'user') };
+  });
+  app.post('/api/experiments/runs/bulk', async (req) => {
+    theirs(req);
+    const b = B(req);
+    const given: unknown[] = Array.isArray(b.ids) ? b.ids : [];
+    const ids = [...new Set(given.filter((x): x is string => typeof x === 'string' && okId(x)))];
+    if (!ids.length) throw new HttpError(400, 'ids: the runs’ ids');
+    if (ids.some((id) => hidden(req, id))) throw new HttpError(403, 'One of those runs is a final test: only the person reads it');
+    if (ids.length > BULK_MAX) throw new HttpError(400, `At most ${BULK_MAX} runs at once`);
+    if (b.starred === undefined && b.archived === undefined && b.stop !== true) throw new HttpError(400, 'What to do with them: starred, archived or stop');
+    // Stopped first: a run that ends at once can be archived by the same call.
+    let stopped = 0;
+    const failed: { id: string; error: string }[] = [];
+    if (b.stop === true)
+      for (const id of ids) {
+        const r = getRun(d.db, id);
+        if (!r || !ACTIVE.includes(r.status)) continue;
+        try {
+          await stopRun(d, id);
+          stopped++;
+        } catch (e) {
+          failed.push({ id, error: (e as Error).message });
+        }
+      }
+    const { runs, skipped } = markRuns(d, ids, { starred: b.starred, archived: b.archived });
+    return { runs, skipped, stopped, ...(failed.length ? { failed } : {}) };
+  });
   app.delete('/api/experiments/runs/:id', async (req) => {
     const id = open(req);
     const r = getRun(d.db, id);
     if (!r) throw new HttpError(404, 'There is no such run');
     if (ACTIVE.includes(r.status)) throw new HttpError(409, 'It has not ended: stop it first');
+    // ?files=keep: what it wrote into its own folder is moved aside first.
+    const kept = Q(req).files === 'keep' ? keepRunFiles([id]) : undefined;
     deleteRun(d.db, id);
     // The last run of an experiment goes: what was written of it goes too.
     if (r.group && !listRuns(d.db, { group: r.group, limit: 1 }).length) deleteInfo(d.db, r.group);
     tellRuns(d, [id]);
-    return { ok: true };
+    return { ok: true, ...(kept ? { kept } : {}) };
+  });
+  /** What the runs behind an evaluation, one of its scores or an evolution wrote into their own folders: what deleting it deletes. */
+  app.get('/api/experiments/run-files', async (req) => {
+    if (isInternal(req)) throw new HttpError(403, 'Only the person deletes evaluations, scores and evolutions');
+    const q = Q(req);
+    const named = q.runs?.split(',').filter(okId).slice(0, BULK_MAX);
+    const runs = q.evaluation ? runsOfEvaluation(d.db, q.evaluation) : q.score ? (getScore(d.db, q.score)?.runs ?? []) : q.evolution ? runsOfEvolution(d.db, q.evolution) : (named ?? null);
+    if (!runs) throw new HttpError(400, 'Which one: evaluation, score or evolution (its id), or runs (their ids)');
+    return { folderFiles: await runFiles(runs) };
+  });
+  // ---- trying a command first --------------------------------------------------------------------------------
+  app.post('/api/experiments/try', async (req) => {
+    const run = heldNow(d, await startTrial(d, B(req), { startedBy: startedBy(req) }));
+    return { trial: readTrial(d.db, run.id), run };
+  });
+  app.get('/api/experiments/try/:id', async (req) => ({ trial: readTrial(d.db, runId(req)) }));
+  /** The most GPU memory the last run of the same command here held, when one is known: what New run offers. */
+  app.get('/api/experiments/last-peak', async (req) => {
+    const q = Q(req);
+    const command = q.command?.trim() ?? '';
+    const cwd = q.cwd?.trim() ?? '';
+    const gb = command && cwd ? lastPeak(d.db, command, cwd) : undefined;
+    return gb ? { peakGb: gb, askGb: askGb(gb) } : {};
   });
   app.get('/api/experiments/queue', async () => queueNow(d));
   app.get('/api/experiments/settings', async () => settingsOf(d.db));
@@ -97,21 +204,45 @@ function routes(d: Deps) {
   });
   /** The experiments (groups) runs belong to, the latest first, with how many runs each has and what each is (title, description, category). */
   app.get('/api/experiments/groups', async (req) => {
-    const seen = new Map<string, { name: string; runs: number; done: number; lastAt: number }>();
-    for (const r of listRuns(d.db, { limit: 5000, plain: Q(req).evaluation !== '1' })) {
+    const seen = new Map<string, RunRecord[]>();
+    for (const r of marked(listRuns(d.db, { limit: 5000, plain: Q(req).evaluation !== '1' }))) {
       if (!r.group) continue;
-      const g = seen.get(r.group) ?? { name: r.group, runs: 0, done: 0, lastAt: r.createdAt };
-      g.runs++;
-      if (r.status === 'done') g.done++;
-      g.lastAt = Math.max(g.lastAt, r.createdAt);
-      seen.set(r.group, g);
+      const g = seen.get(r.group);
+      if (g) g.push(r);
+      else seen.set(r.group, [r]);
     }
     const info = listInfo(d.db);
-    const groups: ExperimentGroup[] = [...seen.values()].sort((a, b) => b.lastAt - a.lastAt).map((g) => {
-      const i = info.get(g.name);
-      return { ...g, ...(i?.title ? { title: i.title } : {}), ...(i?.description ? { description: i.description } : {}), ...(i?.category ? { category: i.category } : {}), ...(i?.by ? { by: i.by } : {}), ...(i?.at ? { at: i.at } : {}) };
+    const gone = archivedGroups(d.db);
+    const findings = findingsByExperiment(d.db);
+    const groups: ExperimentGroup[] = [...seen].map(([name, runs]) => {
+      const i = info.get(name);
+      const stand = standingsOf(runs);
+      const away = new Set(stand.archived.map((r) => r.id));
+      const verdict = findings.get(name)?.[0]?.verdict;
+      return {
+        name,
+        runs: runs.length,
+        done: runs.filter((r) => r.status === 'done' && !away.has(r.id)).length,
+        lastAt: runs.reduce((t, r) => Math.max(t, r.createdAt), 0),
+        shown: stand.rows.length,
+        earlier: stand.folded.length,
+        archived: stand.archived.length,
+        ...(gone.has(name) ? { archivedAt: gone.get(name) } : {}),
+        ...(verdict ? { verdict } : {}),
+        ...(i?.title ? { title: i.title } : {}),
+        ...(i?.description ? { description: i.description } : {}),
+        ...(i?.category ? { category: i.category } : {}),
+        ...(i?.by ? { by: i.by } : {}),
+        ...(i?.at ? { at: i.at } : {}),
+      };
     });
-    return { groups };
+    return { groups: groups.sort((a, b) => b.lastAt - a.lastAt) };
+  });
+  /** The findings whose evidence names a run or a results table of one experiment, the newest first. */
+  app.get('/api/experiments/findings', async (req) => {
+    const group = Q(req).group?.trim() ?? '';
+    if (!group) throw new HttpError(400, 'Which experiment: group');
+    return { findings: findingsByExperiment(d.db).get(group) ?? [], memory: memoryOn(d.db) };
   });
   /** Changes an experiment's title, description or category (the fields given replace the old ones, '' clears one); kept as the user's. */
   app.put('/api/experiments/groups', async (req) => {
@@ -123,6 +254,16 @@ function routes(d: Deps) {
       if (b[k] === undefined || b[k] === null) continue;
       if (typeof b[k] !== 'string') throw new HttpError(400, `${k} is text`);
       p[k] = b[k];
+    }
+    if (b.archived !== undefined) {
+      theirs(req);
+      if (typeof b.archived !== 'boolean') throw new HttpError(400, 'archived is true or false');
+      archiveGroup(d, name, b.archived);
+      // Archiving alone leaves what was written of it as it is, and who wrote it.
+      if (!Object.keys(p).length) {
+        const { runs: _runs, ...kept } = getInfo(d.db, name) ?? { name, runs: 0 };
+        return { group: { ...kept, ...(b.archived ? { archivedAt: archivedGroups(d.db).get(name) } : {}) } };
+      }
     }
     const { runs: _runs, ...group } = saveInfo(d.db, name, p, 'user');
     d.broadcast({ t: 'feature', id: 'experiments', data: { groups: [name] } });
@@ -140,8 +281,8 @@ function routes(d: Deps) {
 
   // ---- sweeps --------------------------------------------------------------------------------------------
   app.post('/api/experiments/sweeps', async (req) => {
-    const s = await startSweep(d, B(req), { startedBy: { page: true } });
-    return { sweep: s.sweep, runs: s.runs };
+    const s = await startSweep(d, B(req), { startedBy: startedBy(req) });
+    return { sweep: s.sweep, runs: s.runs.map((r) => heldNow(d, r)) };
   });
   app.get('/api/experiments/sweeps/:id', async (req) => {
     const sweep = getSweep(d.db, P(req).id);

@@ -1,6 +1,7 @@
 // The queue: a loop (every few seconds while anything waits or runs; quiet otherwise) that starts jobs by priority
-// then age when what they need is free (GPUs with enough free memory that no other run of yours holds; a place among
-// the jobs without a GPU), follows the runs (their output and metrics as they grow, their end), and watches them
+// then age when what they need is free (GPUs with enough free memory that no other run of yours holds, or with room
+// beside runs of yours that said what they need; a place among the jobs without a GPU), says when a waiting one may
+// start (forecast.ts) and keeps a long-waiting one from being overtaken for ever, follows the runs (their output and metrics as they grow, their end), and watches them
 // for the agent on call: NaN, out of memory, a stall, a crash or a dead process, divergence. On one it notes an
 // event and, as the job asked, tells you or starts an agent session with a brief. Runs on clusters go through their
 // queue over SSH; runs on another machine are kept there and followed from here. When a run ends it tells you (as
@@ -9,24 +10,30 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ACTIVE, betterOf, type ExperimentsSettings, type JobSpec, type QueueNow, type RunEvent, type RunRecord, type WatchKind } from '../../shared/experiments.ts';
+import { ACTIVE, betterOf, GRACE, isTrialRun, trySecondsOf, tryUpWhy, type ExperimentsSettings, type JobSpec, type MetricSeries, type QueueNow, type RunEvent, type RunRecord, type SweepSpec, type WatchKind } from '../../shared/experiments.ts';
 import type { Agent, NotifyEvent } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { agentBaseEnv } from '../env.ts';
+import { agentsUse, ceilingUse, holdable, holdRun, isAgentRun, reached, tellHeld } from './budget.ts';
 import type { Deps } from '../features/types.ts';
-import { pathDirs } from '../platform.ts';
+import { pathDirs, WIN } from '../platform.ts';
 import { startSettings } from '../startSettings.ts';
 import { captureEnvironment, captureGit, keepUntracked, localShell, q, type Shell } from './capture.ts';
-import { endOfSlurm, getCluster, listClusters, parseSacct, parseSbatch, parseSqueue, reasonWords, remoteDir, rq, runSsh, sbatchScript, slurmEnded, sshWhy } from './clusters.ts';
+import { bringBack, codeReader, copyKept, differences, enough, forCopy, identityOf, keepNewlyNamed, loadManifest, makeCopy, manifestOf, NoCopy, pruneCopy, ranAs, takeCode, underGit, type CodeReader, type Manifest } from './code.ts';
+import { endOfSlurm, getCluster, guessWords, hoursSaid, listClusters, parseSbatch, parseSqueue, reasonWords, remoteDir, rq, runSsh, sacctState, sbatchScript, slurmEnded, slurmTells, slurmTime, sshWhy, testOnly } from './clusters.ts';
 import { describeAfterSubmit } from './describe.ts';
 import { stampRun } from './evaluations.ts';
-import { chooseGpus, gpuList, gpusVia, readGpus, type GpuReading } from './gpus.ts';
+import { KILLED_WHY, memoryNearLimit, oomWords, scanLog } from './failures.ts';
+import { askOf, chooseGpus, gpuList, gpusVia, othersOn, readGpus, roomOn, type GpuReading, type Others } from './gpus.ts';
+import { endAbout, estimateWords, forecast, freeBy, gpuCountWords, NEXT_AFTER_MS, TELL_AFTER_MS, waitedWords, whenWords, type Forecast, type GpuState, type Holder, type Want } from './forecast.ts';
+import { projectFor } from './project.ts';
+import { endUsage, sampleRuns, startUsage } from './usage.ts';
 import { aliveLocal, exitOf, files, startLocal, stopLocal, wrapperScript } from './local.ts';
 import { nanText, oomText, parseLine, readFrom, tailLines, Tracker } from './metrics.ts';
-import { clock, clockTime, endedAtNight, morningDue, NIGHT_AGAIN, NIGHT_BEHIND, NIGHT_CLUSTER, nightAt, nightWhy, nightZone, watchNight } from './night.ts';
-import { addEvent, eventsOf, eventsSince, getInfo, getRun, getSweep, insertRun, isScoringRun, listRuns, listSweeps, listTables, newId, offsetsOf, resetRun, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
+import { clock, clockTime, endedAtNight, isNightAgain, morningDue, NIGHT_AGAIN, NIGHT_BEHIND, NIGHT_CARRY, NIGHT_CLUSTER, nightAt, nightWhy, nightZone, watchNight } from './night.ts';
+import { addEvent, eventsOf, eventsSince, getInfo, getRun, getSweep, insertRun, isScoringRun, listRuns, listSweeps, listTables, newId, offsetsOf, ranIn, resetRun, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
 import { repairRecord, repairRecordSoon } from './repair.ts';
 import { remoteMachine, type RemoteRun } from './remote.ts';
 import { fmt, spread, tellEnded } from './notices.ts';
@@ -54,7 +61,8 @@ ended.setMaxListeners(200);
 
 // ---- settings ----------------------------------------------------------------------------------------------
 
-const defaultSlots = () => Math.max(1, Math.min(4, Math.floor(os.cpus().length / 4)));
+/** Jobs without a GPU at once, unless set: half the processor's cores, from 1 to 16. */
+export const defaultSlots = (cores = os.cpus().length) => Math.max(1, Math.min(16, Math.floor(cores / 2)));
 
 /** The settings as saved: only those that were set, so a default that depends on the computer stays one. */
 function savedSettings(db: DB): Partial<ExperimentsSettings> {
@@ -73,6 +81,8 @@ export function settingsOf(db: DB): ExperimentsSettings {
     nightFrom: clockTime(s.nightFrom) ?? '23:00',
     nightTo: clockTime(s.nightTo) ?? '07:00',
     nightEnds: s.nightEnds === 'stop' ? 'stop' : 'finish',
+    shareGpus: s.shareGpus !== false,
+    agentGpuHours: typeof s.agentGpuHours === 'number' && s.agentGpuHours >= 0 ? s.agentGpuHours : null,
   };
 }
 
@@ -96,10 +106,23 @@ export function setSettings(db: DB, b: Partial<ExperimentsSettings>): Experiment
     if (b.nightEnds !== 'finish' && b.nightEnds !== 'stop') throw new HttpError(400, 'When the night ends: "finish" (let running ones finish) or "stop" (stop them and start them again the next night)');
     given.nightEnds = b.nightEnds;
   }
-  if (!Object.keys(given).length) throw new HttpError(400, 'Say what to change: cpuSlots, nightFrom, nightTo or nightEnds');
+  if (b.shareGpus !== undefined) {
+    if (typeof b.shareGpus !== 'boolean') throw new HttpError(400, 'Runs share a GPU when their memory fits: true or false');
+    given.shareGpus = b.shareGpus;
+  }
+  if (b.agentGpuHours !== undefined) given.agentGpuHours = agentLimit(b.agentGpuHours);
+  if (!Object.keys(given).length) throw new HttpError(400, 'Say what to change: cpuSlots, nightFrom, nightTo, nightEnds, shareGpus or agentGpuHours');
   kvSet(db, 'experiments_settings', JSON.stringify({ ...savedSettings(db), ...given }));
   wake();
   return settingsOf(db);
+}
+
+/** The ceiling on agents' GPU hours as given: a number, or null (or nothing) for no limit. */
+function agentLimit(v: unknown): number | null {
+  if (v === null || v === '') return null;
+  const n = typeof v === 'number' || typeof v === 'string' ? Number(v) : NaN;
+  if (!Number.isFinite(n) || n < 0 || n > 1_000_000) throw new HttpError(400, 'Agents’ runs in seven days: a number of GPU hours from 0, or nothing for no limit');
+  return Math.round(n * 100) / 100;
 }
 
 // ---- where a run goes ------------------------------------------------------------------------------------------
@@ -160,6 +183,10 @@ export async function cleanJob(db: DB, b: Record<string, any>, o: { cwd?: string
     if (place.kind === 'cluster') throw new HttpError(400, NIGHT_CLUSTER);
     spec.when = 'night';
   }
+  // Which code runs when the folder changes while it waits: as queued unless said otherwise.
+  const code = str(b.code, 20);
+  if (code && code !== 'queued' && code !== 'now') throw new HttpError(400, 'code: "queued" (the code as it is now, even if files change while it waits; the default) or "now" (the folder as it is when it starts)');
+  if (code === 'now') spec.code = 'now';
   const name = str(b.name, 120);
   if (name) spec.name = name;
   const group = str(b.group, 120);
@@ -168,12 +195,16 @@ export async function cleanJob(db: DB, b: Record<string, any>, o: { cwd?: string
   spec.gpus = gpus !== undefined ? Math.round(gpus) : place.kind === 'local' ? ((await hasGpus()) ? 1 : 0) : 0;
   const mem = num(b.gpuMemGb, 0, 1024, 'Free memory per GPU (GB)');
   if (mem) spec.gpuMemGb = mem;
+  if (b.alone === true) spec.alone = true;
   const cpus = num(b.cpus, 1, 1024, 'Processors');
   if (cpus) spec.cpus = Math.round(cpus);
   const memGb = num(b.memGb, 0, 100_000, 'Memory (GB)');
   if (memGb) spec.memGb = memGb;
   const hours = num(b.hours, 0, 24 * 60, 'Hours');
   if (hours) spec.hours = hours;
+  const grace = num(b.grace, GRACE.min, GRACE.max, 'Seconds of warning before a stop');
+  if (grace !== undefined) spec.grace = Math.round(grace);
+  if (typeof b.resume === 'string' && b.resume.trim().length > 20_000) throw new HttpError(400, 'The command to carry on is at most 20,000 characters: put a long script in a file and run that');
   const part = str(b.partition, 100);
   if (part) {
     if (!/^[\w.,:@+-]+$/.test(part)) throw new HttpError(400, 'The partition is one word, as SLURM writes it');
@@ -196,12 +227,18 @@ export async function cleanJob(db: DB, b: Record<string, any>, o: { cwd?: string
   if (seed !== undefined) spec.seed = Math.round(seed);
   // {name} placeholders filled from the settings and the seed: the record keeps the command as it runs.
   spec.command = fillCommand(command, { ...given, ...(spec.seed !== undefined ? { seed: spec.seed } : {}) });
+  const carry = typeof b.resume === 'string' ? b.resume.trim() : '';
+  if (carry) spec.resume = fillCommand(carry, { ...given, ...(spec.seed !== undefined ? { seed: spec.seed } : {}) });
+  // And, when it was written with {seed}, the command with that left in (or as whoever filled the seed in gives it).
+  const { seed: _seed, ...others } = given;
+  const template = command.includes('{seed}') ? fillCommand(command, others) : str(b.seedTemplate, 20_000);
   const params = { ...paramsOf(spec.command), ...given };
   if (Object.keys(params).length) spec.params = params;
   if (spec.seed === undefined) {
     const s = params.seed ?? params.random_seed;
     if (typeof s === 'number' && Number.isInteger(s)) spec.seed = s;
   }
+  if (spec.seed !== undefined && template.includes('{seed}') && fillCommand(template, { seed: spec.seed }) === spec.command) spec.seedTemplate = template;
   if (Array.isArray(b.tags)) {
     const tags = [...new Set(b.tags.map((t: unknown) => str(t, 40)).filter(Boolean))].slice(0, 20);
     if (tags.length) spec.tags = tags;
@@ -261,15 +298,94 @@ export function nameFor(spec: JobSpec): string {
   return script.slice(0, 60);
 }
 
-/** Puts a job in line (or sends it to its machine); the queue takes it from there. */
-export async function submit(d: Deps, spec: JobSpec, o: { startedBy?: RunInfo['startedBy']; from?: string } = {}): Promise<RunRecord> {
+// ---- the code, taken when it is queued -------------------------------------------------------------------------
+
+/** Runs whose code is being read: they do not start before it is. */
+const taking = new Map<string, Promise<void>>();
+/** Resolves when a run's code has been read. */
+export const codeTaken = (id: string): Promise<void> => taking.get(id) ?? Promise.resolve();
+/** Submitting waits this long for the code to be read before it answers; reading goes on. */
+const TAKE_WAIT_MS = 1500;
+
+/** Whether a run's code is kept when it is queued: this computer's, but not a score's or a trial's. */
+export const takesCode = (r: Pick<JobSpec, 'where' | 'tags' | 'env'>) => !WIN && placeOf(r.where).kind === 'local' && !isScoringRun(r) && !isTrialRun(r);
+
+/** What a run's record says of the code kept in its folder. */
+function recordOfCode(m: Manifest, folder: string): Partial<RunInfo> {
+  return {
+    commit: m.commit,
+    branch: m.branch,
+    dirty: m.dirty,
+    untracked: m.untracked,
+    patchPath: m.patch ? files(folder).patch : undefined,
+    kept: m.kept.length ? m.kept : undefined,
+    notKept: m.notKept.length ? m.notKept : undefined,
+  };
+}
+
+/** Reads the code of a run just put in line, into its folder. */
+function takeFor(d: Deps, id: string, spec: JobSpec, read: CodeReader): Promise<void> {
+  const folder = runFolder(id);
+  const p = (async () => {
+    try {
+      const m = await takeCode(read, spec, id, folder);
+      // Deleted meanwhile: nothing of it stays.
+      if (!getRun(d.db, id)) return fs.rmSync(folder, { recursive: true, force: true });
+      updateRun(d.db, id, { info: { codePending: undefined, ...(m ? { queuedCode: identityOf(m), ...recordOfCode(m, folder) } : {}) } });
+    } catch (e) {
+      updateRun(d.db, id, { info: { codePending: undefined } });
+      addEvent(d.db, id, { kind: 'note', text: `Its code could not be read when it was queued (${(e as Error).message}): it runs the folder as it is when it starts` });
+    }
+  })().finally(() => {
+    taking.delete(id);
+    tellRuns(d, [id]);
+    wake();
+  });
+  taking.set(id, p);
+  return p;
+}
+
+/**
+ * Puts a job in line (or sends it to its machine); the queue takes it from there. Every way of starting a run comes
+ * through here, so a run that names no project gets one here (project.ts). `projectFrom`: whose project it is, when
+ * that is not the starter's and the run's folder (a score runs in a copy or for an evolution a session started).
+ * `code`: reads the folder once for several runs (a sweep). `own`: the code kept of an earlier run, instead of the folder's.
+ */
+export async function submit(
+  d: Deps,
+  given: JobSpec,
+  o: {
+    startedBy?: RunInfo['startedBy'];
+    from?: string;
+    projectFrom?: { session?: string; folder?: string };
+    code?: CodeReader;
+    own?: { run: string; manifest: Manifest; folder: string };
+    evolution?: string;
+    letRun?: boolean;
+    /** Its first start runs `resume`, from a checkpoint; `autoResumes`: how often the app has started the chain again. */
+    carryOn?: boolean;
+    autoResumes?: number;
+    /** On another machine: the run there it carries on from, so that machine runs it with that run's code. */
+    theirs?: string;
+  } = {},
+): Promise<RunRecord> {
+  if (o.carryOn && !given.resume) throw new HttpError(400, 'It has no command to carry on with: give resume, or leave carrying on out');
+  const carries: Partial<RunInfo> = { ...(o.carryOn ? { carriesOn: true } : {}), ...(o.autoResumes ? { autoResumes: o.autoResumes } : {}) };
+  let read: Promise<void> | undefined;
   const id = newId('r');
-  const place = placeOf(spec.where);
+  const place = placeOf(given.where);
+  const project = projectFor(d.db, { given: given.project, session: o.projectFrom?.session ?? o.startedBy?.session, folder: o.projectFrom?.folder ?? given.cwd });
+  const { project: _p, ...rest } = given;
+  const spec: JobSpec = { ...rest, ...(project ? { project } : {}) };
   if (place.kind === 'machine') {
     const m = remoteMachine(place.id);
     if (!m) throw new HttpError(400, `There is no machine "${place.id}" in Settings → Machines`);
-    // Kept there (its agent on call and notices are that machine's); here a copy follows it.
-    const there = await m.call<{ run: RunRecord }>('POST', '/api/experiments/jobs', 30_000, { ...spec, where: 'local', report: false }).catch((e) => {
+    // Kept there (its agent on call and notices are that machine's); here a copy follows it. A project is this
+    // computer's: that machine gives the run one of its own.
+    // An agent's run counts as one there too, under that machine's ceiling. One carried on from a run there is asked of
+    // that run (Run again there), which gives it that run's code.
+    const job = { ...rest, where: 'local', report: false, ...(o.startedBy && isAgentRun(o) ? { agent: true } : {}), ...(o.carryOn && o.theirs ? { carryOn: true } : {}) };
+    const there = await m.call<{ run: RunRecord }>('POST', o.carryOn && o.theirs ? `/api/experiments/runs/${o.theirs}/again` : '/api/experiments/jobs', 30_000, job).catch((e) => {
       throw new HttpError(502, `${m.name} did not take it: ${(e as Error).message}`);
     });
     // A Hydor from before night runs would start it by day: it is stopped there, and said.
@@ -282,29 +398,112 @@ export async function submit(d: Deps, spec: JobSpec, o: { startedBy?: RunInfo['s
       spec: { ...spec, name: spec.name ?? there.run.name },
       status: there.run.status,
       why: there.run.why,
-      info: { remote: { machine: place.id, id: there.run.id }, ...(o.startedBy ? { startedBy: o.startedBy } : {}), ...(o.from ? { from: o.from } : {}) },
+      info: { remote: { machine: place.id, id: there.run.id }, ...(there.run.queuedCode ? { queuedCode: there.run.queuedCode } : {}), ...(o.startedBy ? { startedBy: o.startedBy } : {}), ...(o.from ? { from: o.from } : {}) },
     });
   } else {
-    insertRun(d.db, { id, spec: { ...spec, name: spec.name ?? nameFor(spec) }, status: 'queued', info: { folder: runFolder(id), ...(o.startedBy ? { startedBy: o.startedBy } : {}), ...(o.from ? { from: o.from } : {}) } });
-    addEvent(d.db, id, { kind: 'queued', text: `In line${place.kind === 'cluster' ? ` for ${getCluster(d.db, place.id)?.name ?? place.id}` : ''}` });
+    const folder = runFolder(id);
+    let own: Partial<RunInfo> | undefined;
+    if (o.own) {
+      copyKept(o.own.manifest, o.own.folder, folder);
+      own = { codeFrom: o.own.run, queuedCode: identityOf(o.own.manifest), ...recordOfCode(o.own.manifest, folder) };
+    }
+    const take = !o.own && takesCode(spec) && underGit(spec.cwd);
+    // A score of an evolution says which one; one you let run beyond the limit on agents' GPU hours is never held.
+    const evolved = { ...(o.evolution ? { evolution: o.evolution } : {}), ...(o.letRun ? { letRun: Date.now() } : {}) };
+    insertRun(d.db, { id, spec: { ...spec, name: spec.name ?? nameFor(spec) }, status: 'queued', info: { folder, ...(o.startedBy ? { startedBy: o.startedBy } : {}), ...(o.from ? { from: o.from } : {}), ...own, ...(take ? { codePending: true } : {}), ...evolved, ...carries } });
+    addEvent(d.db, id, { kind: 'queued', text: `In line${place.kind === 'cluster' ? ` for ${getCluster(d.db, place.id)?.name ?? place.id}` : ''}${o.own ? `, with the code of ${o.own.run}` : ''}` });
+    // Before the queue can look at it: it does not start until its code is read.
+    if (take) read = takeFor(d, id, spec, o.code ?? codeReader());
   }
   tellRuns(d, [id]);
   wake();
   // A new experiment (or one that has grown) gets its title and description written soon.
   describeAfterSubmit(d, spec.group);
+  if (read) {
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([read, new Promise<void>((resolve) => (timer = setTimeout(resolve, TAKE_WAIT_MS)))]);
+    clearTimeout(timer);
+  }
   return getRun(d.db, id)!;
 }
 
-/** Runs it again, as it was or with changes. */
-export async function runAgain(d: Deps, id: string, changes: Record<string, unknown> = {}, startedBy?: RunInfo['startedBy']): Promise<RunRecord> {
+/** Runs it again, as it was or with changes. `own`: with the code it ran, not the folder's as it is now. */
+export async function runAgain(d: Deps, id: string, changes: Record<string, unknown> = {}, startedBy?: RunInfo['startedBy'], o: { own?: boolean } = {}): Promise<RunRecord> {
   const r = getRun(d.db, id);
   if (!r) throw new HttpError(404, 'There is no such run');
   // A run of a score is not run again on its own: it would not count, and a final test is run from its evaluation.
   if (isScoringRun(r)) throw new HttpError(400, 'This run scored an evaluation: score it again from the evaluation');
   const base = specOf(r);
-  const spec = await cleanJob(d.db, { ...base, ...(r.remote ? { where: `m:${r.remote.machine}` } : {}), ...changes, sweep: undefined });
-  return submit(d, spec, { startedBy, from: r.id });
+  // Carry on from its checkpoint (carryOn, or resume: true), or from the beginning; resume as words changes the command that does it.
+  const { carryOn: asked, ...given } = changes;
+  let carryOn = asked === true;
+  if (typeof given.resume === 'boolean') {
+    carryOn = given.resume;
+    delete given.resume;
+  }
+  const job: Record<string, unknown> = { ...base, ...(r.remote ? { where: `m:${r.remote.machine}` } : {}), ...given, sweep: undefined };
+  // A trial run again is the real run: without what made it a trial, and told of as any run.
+  if (isTrialRun(r)) {
+    job.env = Object.fromEntries(Object.entries((job.env ?? {}) as Record<string, string>).filter(([k]) => !k.startsWith('HYDOR_TRY')));
+    job.tags = ((job.tags ?? []) as string[]).filter((t) => t !== 'try');
+    if (!changes.notify) delete job.notify;
+    if (String(job.name ?? '').startsWith('Try: ')) delete job.name;
+  }
+  // A training must not change code between its checkpoints: carrying on runs the code it ran, where it was kept.
+  const own = !!o.own || (carryOn && keptCode(r));
+  if (own) delete job.code;
+  const spec = await cleanJob(d.db, job);
+  if (!own) return submit(d, spec, { startedBy, from: r.id, carryOn, theirs: r.remote?.id });
+  const folder = r.folder ?? runFolder(r.id);
+  const manifest = !r.remote && takesCode({ where: r.where }) ? await manifestOf(r, folder) : null;
+  if (!manifest) throw new HttpError(400, carryOn ? 'Its own code was not kept, so it cannot carry on with it: start over, with the folder as it is now' : 'Its own code was not kept: run it again with the folder as it is now');
+  if (!takesCode(spec) || path.resolve(spec.cwd) !== path.resolve(r.cwd))
+    throw new HttpError(400, carryOn ? 'Carrying on runs its own code, which belongs to its folder on this computer: leave the folder and where it runs as they were, or start over' : 'Its own code belongs to its folder on this computer: leave the folder and where it runs as they were, or run the folder as it is now');
+  await enough(manifest).catch((e) => {
+    throw new HttpError(400, carryOn ? `Its own code cannot be put back as it was (${(e as Error).message}), so it cannot carry on with it: start over, with the folder as it is now` : `Its own code cannot be put back as it was (${(e as Error).message}): run it again with the folder as it is now`);
+  });
+  return submit(d, spec, { startedBy, from: r.id, own: { run: r.id, manifest, folder }, carryOn });
 }
+
+/** How many times in a chain the app starts a run again by itself: one lost, or one the cluster preempted. */
+const AUTO_AGAIN = 2;
+
+const cutOff = (r: RunRecord) => !!r.resume && !r.remote && !isTrialRun(r) && !isScoringRun(r) && (r.autoResumes ?? 0) < AUTO_AGAIN;
+
+/** Whether a run on this computer kept the code it ran (a git repository), so that one carrying on from it can run the same. */
+const keptCode = (r: RunRecord) => !r.remote && takesCode(r) && !!(r.commit || r.queuedCode);
+
+/**
+ * A run cut off through no fault of its own that says how to carry on is started again, as a new run that names it (so
+ * the two show as attempts at one thing), in line like any run, with the code it was running. It is the same person's or
+ * agent's run (the limit on agents' GPU hours holds it as it would have, and one you let run beyond it stays let).
+ * Its id, or null when it could not be started.
+ */
+async function takeUpAgain(d: Deps, r: RunRecord, why: string): Promise<string | null> {
+  try {
+    let own: { run: string; manifest: Manifest; folder: string } | undefined;
+    if (keptCode(r)) {
+      const folder = r.folder ?? runFolder(r.id);
+      const manifest = await manifestOf(r, folder);
+      if (!manifest) throw new Error('its code was not kept');
+      await enough(manifest);
+      own = { run: r.id, manifest, folder };
+    }
+    const { code: _folderAsItIs, ...spec } = specOf(r);
+    const next = await submit(d, spec, { startedBy: r.startedBy, from: r.id, carryOn: true, autoResumes: (r.autoResumes ?? 0) + 1, own, letRun: !!r.letRun });
+    updateRun(d.db, r.id, { info: { restartedAs: next.id } });
+    addEvent(d.db, r.id, { kind: 'note', text: `Started again to carry on from its checkpoint, as ${next.id}` });
+    addEvent(d.db, next.id, { kind: 'note', text: `Started again by the app to carry on from the checkpoint of ${r.id}: ${why}` });
+    return next.id;
+  } catch (e) {
+    addEvent(d.db, r.id, { kind: 'note', text: `It could not be started again to carry on: ${(e as Error).message}` });
+    return null;
+  }
+}
+
+/** Whether its next start carries on from a checkpoint, and the command a start of it runs. */
+const carriesOn = (r: Pick<RunRecord, 'resume' | 'carriesOn'>) => !!(r.carriesOn && r.resume);
+const commandOf = (r: Pick<RunRecord, 'command' | 'resume' | 'carriesOn'>) => (carriesOn(r) ? r.resume! : r.command);
 
 // ---- the loop ----------------------------------------------------------------------------------------------------
 
@@ -329,6 +528,12 @@ interface Live {
   goneAt: number;
   polledAt: number;
   judgedAt: number;
+  /** A warned stop whose seconds were up has been made hard. */
+  forced?: boolean;
+  /** SLURM: one more look was taken for the accounting to catch up with a job that left the queue. */
+  lagged?: boolean;
+  /** SLURM: the accounting had its end while it was still COMPLETING at the last look. */
+  closing?: boolean;
 }
 
 const live = new Map<string, Live>();
@@ -347,6 +552,35 @@ export function wake() {
   setImmediate(() => void tick());
 }
 
+let afterPass: (() => void)[] = [];
+
+/** Waits until the queue has looked once more (at most `ms`): what a run just put in line waits for is known then. */
+export function lookedAt(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    afterPass.push(() => {
+      clearTimeout(t);
+      resolve();
+    });
+    wake();
+  });
+}
+
+/**
+ * Waits (at most `ms`) until a cluster run has been sent to its cluster, or could not be: what the cluster refuses, and
+ * when it expects to start it, are known then.
+ */
+export async function sentToCluster(d: Deps, id: string, ms: number, signal?: AbortSignal): Promise<void> {
+  const until = Date.now() + ms;
+  for (;;) {
+    const r = getRun(d.db, id);
+    // (A run that waits and says why with no job yet could not reach the cluster: it is tried again later.)
+    if (!r || r.status !== 'queued' || Date.now() >= until || signal?.aborted) return;
+    wake();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+
 /** One pass now, awaited (the tests step the queue by hand). */
 export async function tick() {
   if (ticking) {
@@ -363,6 +597,7 @@ export async function tick() {
     console.error('[experiments]', (e as Error)?.message ?? e);
   } finally {
     ticking = false;
+    for (const done of afterPass.splice(0)) done();
   }
 }
 
@@ -390,6 +625,8 @@ async function pass() {
       console.error(`[experiments] ${r.id}:`, (e as Error)?.message ?? e);
     }
   }
+  // What those running here use (nothing is read when none runs); not waited for.
+  void sampleRuns(d.db, active);
   await startWaiting(d, night, settings);
 }
 
@@ -431,7 +668,7 @@ function liveOf(d: Deps, r: RunRecord): Live {
 /** A run's events since it last went back to wait at a night's end (all of them for any other run). */
 function eventsOfThisStart(db: DB, id: string): RunEvent[] {
   const all = eventsOf(db, id);
-  const back = all.map((e) => e.kind === 'waiting' && e.text === NIGHT_AGAIN).lastIndexOf(true);
+  const back = all.map((e) => e.kind === 'waiting' && isNightAgain(e.text)).lastIndexOf(true);
   return back < 0 ? all : all.slice(back + 1);
 }
 
@@ -474,7 +711,7 @@ function readLocal(r: RunRecord, L: Live, all = false) {
     consume(L, text, 'log');
   }
   if (r.metricsFile) {
-    const file = path.resolve(r.cwd, runFile(r, r.metricsFile, folder));
+    const file = path.resolve(ranIn(r), runFile(r, r.metricsFile, folder));
     for (let i = 0; i < (all ? 50 : 1); i++) {
       const { text, next } = readFrom(file, L.file);
       if (!text) break;
@@ -518,7 +755,12 @@ async function followLocal(d: Deps, r: RunRecord) {
   readLocal(r, L);
   await watch(d, r, L);
   // Its night ended and night runs are to be stopped then: unless it has just ended, or is stopping for something else.
-  if (r.nightStop && exitOf(folder) === null && !getRun(d.db, r.id)?.stopping) await stopRun(d, r.id, NIGHT_AGAIN);
+  if (r.nightStop && exitOf(folder) === null && !getRun(d.db, r.id)?.stopping) await stopRun(d, r.id, r.resume ? NIGHT_CARRY : NIGHT_AGAIN, { app: true });
+  // Its warning's seconds are long up and it still goes (the app restarted meanwhile, so nothing else stops it hard).
+  if (r.stopping && r.hardStopAt && !L.forced && Date.now() > r.hardStopAt + 12_000 && exitOf(folder) === null) {
+    L.forced = true;
+    await stopLocal(r.id, folder, 0);
+  }
   const code = exitOf(folder);
   if (code !== null) return finish(d, r, L, code);
   if (!aliveLocal(r.id, folder)) {
@@ -548,6 +790,13 @@ async function watch(d: Deps, r: RunRecord, L: Live) {
   const now = Date.now();
   const t = L.tracker;
   await watchOutput(d, r, L);
+  // A trial: how far it got is kept for its estimate, and it is stopped when its time is up. Nothing else is watched.
+  if (isTrialRun(r)) {
+    if (t.progress && t.progress.done !== r.tried?.last?.done) updateRun(d.db, r.id, { info: { tried: { first: r.tried?.first ?? { ...t.progress }, last: { ...t.progress } } } });
+    const seconds = trySecondsOf(r);
+    if (r.startedAt && now - r.startedAt >= seconds * 1000 && !r.stopping) await stopRun(d, r.id, tryUpWhy(seconds));
+    return;
+  }
   const stallMs = (r.onCall?.stallMinutes ?? 30) * 60_000;
   if (now - L.outputAt > stallMs) {
     if (!L.stalled && L.stalls < 3) {
@@ -566,18 +815,31 @@ async function watch(d: Deps, r: RunRecord, L: Live) {
       notice(d, r, 'waiting', `${w.metric} is ${fmt(v)}, ${w.op === '>' || w.op === '>=' ? 'over' : 'under'} ${w.value}`);
     }
   }
-  if (r.hours && r.startedAt && now - r.startedAt > r.hours * 3_600_000 && !r.stopping && placeOf(r.where).kind === 'local') await stopRun(d, r.id, `It reached its time limit of ${r.hours} h`);
+  if (r.hours && r.startedAt && now - r.startedAt > r.hours * 3_600_000 && !r.stopping && keepsLimit(d, r)) await stopRun(d, r.id, `It reached its time limit of ${hoursSaid(r.hours)} h`, { app: true });
   if (r.sweep && now - L.judgedAt > 15_000 && !r.stopping) {
     L.judgedAt = now;
-    const sw = getSweep(d.db, r.sweep);
-    if (sw?.earlyStop) {
-      const others = listRuns(d.db, { sweep: r.sweep, limit: 1000 })
-        .filter((x) => x.id !== r.id)
-        .map((x) => live.get(x.id)?.tracker.series ?? seriesOf(d.db, x.id));
-      const e = earlyStop(t.series, others, sw.earlyStop);
-      if (e.stop) await stopRun(d, r.id, `Stopped early: ${sw.earlyStop.metric} was ${fmt(e.value)} at step ${e.step}, worse than the median of the other ${e.others} runs then (${fmt(e.median)})`);
-    }
+    const rule = getSweep(d.db, r.sweep)?.earlyStop;
+    if (rule) await stopIfBehind(d, r, t.series, rule);
   }
+}
+
+/**
+ * A sweep's early stop for one of its runs, judged where the sweep is kept: here, whether it runs here or on another
+ * machine (whose series come as it is followed, and are kept with its copy).
+ */
+async function stopIfBehind(d: Deps, r: RunRecord, own: MetricSeries, rule: NonNullable<SweepSpec['earlyStop']>) {
+  const others = listRuns(d.db, { sweep: r.sweep, limit: 1000 })
+    .filter((x) => x.id !== r.id)
+    // A copy's live tracker reads nothing: its series are the ones kept.
+    .map((x) => (x.remote ? seriesOf(d.db, x.id) : (live.get(x.id)?.tracker.series ?? seriesOf(d.db, x.id))));
+  const e = earlyStop(own, others, rule);
+  if (e.stop) await stopRun(d, r.id, `Stopped early: ${rule.metric} was ${fmt(e.value)} at step ${e.step}, worse than the median of the other ${e.others} runs then (${fmt(e.median)})`, { app: true });
+}
+
+/** Whether the app itself keeps its time limit: here, and on a plain SSH machine (SLURM keeps its own, as --time). */
+function keepsLimit(d: Deps, r: RunRecord): boolean {
+  const p = placeOf(r.where);
+  return p.kind === 'local' || (p.kind === 'cluster' && getCluster(d.db, p.id)?.kind === 'ssh');
 }
 
 /**
@@ -589,6 +851,8 @@ async function fire(d: Deps, r: RunRecord, L: Live | null, kind: WatchKind, text
   addEvent(d.db, r.id, { kind, text });
   tellRuns(d, [r.id]);
   const oc = r.onCall;
+  // Whether it is a loss that is NaN: by the metric that became so, else by what its log's words say.
+  if (!oc?.on) tellWrong(d, r, kind, text, !!L && (L.tracker.nan.length ? L.tracker.nan.some((k) => /loss/i.test(k)) : /loss/i.test(L.nanLine ?? '')));
   if (!oc?.on || !(oc.watch ?? WATCH_ALL).includes(kind)) return false;
   const status = kind === 'crash' || (kind === 'oom' && ACTIVE.indexOf(r.status) < 0) ? 'failed' : 'waiting';
   if (oc.act === 'agent') {
@@ -603,6 +867,27 @@ async function fire(d: Deps, r: RunRecord, L: Live | null, kind: WatchKind, text
   }
   notice(d, r, status, text);
   return true;
+}
+
+/**
+ * Without the agent on call, a NaN, a stall or a divergence in a run still going is told all the same: to the session
+ * that asked to hear how it went (each once), and a stall or a NaN loss to you (one notice a run).
+ */
+function tellWrong(d: Deps, r: RunRecord, kind: WatchKind, text: string, lossNan: boolean) {
+  if ((kind !== 'nan' && kind !== 'stall' && kind !== 'diverge') || r.status !== 'running' || isScoringRun(r) || isTrialRun(r)) return;
+  // One that has just ended is told of by its end, not as still running.
+  if (placeOf(r.where).kind === 'local' && !r.remote && exitOf(r.folder ?? runFolder(r.id)) !== null) return;
+  const told = getRun(d.db, r.id)?.told ?? [];
+  const now: string[] = [];
+  if (r.report && r.startedBy?.session && !told.includes(kind)) {
+    tellEnded(d, r.startedBy.session, { runs: [r.id], line: `“${r.name ?? r.id}” (${r.id}) is still running: ${text}.`, at: Date.now(), wrong: true, ...experimentOf(d.db, r.group) });
+    now.push(kind);
+  }
+  if ((kind === 'stall' || (kind === 'nan' && lossNan)) && !told.includes('you')) {
+    notice(d, r, 'waiting', `${text}. It is still running.`);
+    now.push('you');
+  }
+  if (now.length) updateRun(d.db, r.id, { info: { told: [...told, ...now] } });
 }
 
 // ---- the agent on call -------------------------------------------------------------------------------------------
@@ -632,7 +917,10 @@ export function onCallBrief(d: Deps, r: RunRecord, kind: WatchKind, text: string
     '',
     `What happened: ${text}.`,
     `Command: ${r.command}`,
+    r.resume ? `To carry on from its last checkpoint: ${r.resume} (experiment_run with again and carryOn: true runs that)` : '',
     `Folder: ${r.cwd}${place.kind === 'cluster' ? ` (on the cluster ${whereWords(d.db, r)}, reached with ssh ${getCluster(d.db, place.id)?.host ?? ''})` : ''}`,
+    r.codeDir ? `The folder had changed since it was queued, so it ran from a copy of the code as queued: ${r.codeDir} (the paths in its log are the copy’s; running it again with experiment_run takes the folder as it is now).` : '',
+    r.ranAs ? `Run as: ${r.ranAs}` : '',
     `Where: ${whereWords(d.db, r)}${r.gpus ? `; it asked for ${r.gpus} GPU${r.gpus === 1 ? '' : 's'}${r.gpuMemGb ? ` with ${r.gpuMemGb} GB free each` : ''}` : ''}`,
     `Status: ${r.status}${r.why ? ` (${r.why})` : ''}${r.startedAt ? `; started ${new Date(r.startedAt).toISOString()}` : ''}${r.exitCode !== undefined && r.exitCode !== null ? `; exit code ${r.exitCode}` : ''}`,
     r.commit ? `Code: commit ${r.commit.slice(0, 12)}${r.branch ? ` on ${r.branch}` : ''}${r.dirty ? `, with changes not committed (the patch: ${r.patchPath})` : ''}` : '',
@@ -713,7 +1001,7 @@ export function forgetNotices() {
 }
 
 /** A notice about a run (at most 8 in 10 minutes; past that, one that counts the rest). */
-export function notice(d: Deps, r: RunRecord, kind: NotifyEvent['kind'], body: string, o: { title?: string; url?: string } = {}) {
+export function notice(d: Deps, r: RunRecord, kind: NotifyEvent['kind'], body: string, o: { title?: string; url?: string; ownWords?: boolean } = {}) {
   const now = Date.now();
   while (sent.length && sent[0] < now - 10 * 60_000) sent.shift();
   if (sent.length >= NOTICES) {
@@ -736,7 +1024,7 @@ export function notice(d: Deps, r: RunRecord, kind: NotifyEvent['kind'], body: s
     return;
   }
   sent.push(now);
-  d.sessions.emit('notify', { key: `experiment:${r.id}`, kind, title: o.title ?? r.name ?? 'Experiment', body: body.slice(0, 300), agent: 'claude', at: now, url: o.url ?? `/experiments/${r.id}` } satisfies NotifyEvent);
+  d.sessions.emit('notify', { key: `experiment:${r.id}`, kind, title: o.title ?? r.name ?? 'Experiment', body: body.slice(0, 300), agent: 'claude', at: now, url: o.url ?? `/experiments/${r.id}`, ...(o.ownWords ? { ownWords: true } : {}) } satisfies NotifyEvent);
 }
 
 const took = (r: RunRecord) => {
@@ -800,6 +1088,8 @@ function reportOf(db: DB, r: RunRecord) {
 
 /** A run ended: tell you (as it asked; a sweep's runs once, when the sweep ends) and the session that asked to hear. */
 async function ending(d: Deps, r: RunRecord, toldAlready: boolean) {
+  // A trial answers whoever waits for it; no one else is told.
+  if (isTrialRun(r)) return;
   // A night run that ends in its night is told of in the morning: no "done" notice of its own.
   const morning = endedAtNight(d.db, r);
   if (r.sweep) return sweepEnding(d, r.sweep, morning);
@@ -836,7 +1126,8 @@ function bestOf(sw: ReturnType<typeof getSweep>, runs: RunRecord[], metric: stri
 
 /** A sweep's run ended: when it was the last, one notice for the sweep, with its best run. */
 async function sweepEnding(d: Deps, sweep: string, morning = false) {
-  const runs = listRuns(d.db, { sweep, limit: 1000 });
+  // One the app took up again is counted once, as the run that took its place.
+  const runs = listRuns(d.db, { sweep, limit: 1000 }).filter((x) => !x.restartedAs);
   if (!runs.length || runs.some((x) => ACTIVE.includes(x.status))) return;
   const sw = getSweep(d.db, sweep);
   const count = (s: RunRecord['status']) => runs.filter((x) => x.status === s).length;
@@ -865,17 +1156,27 @@ async function sweepEnding(d: Deps, sweep: string, morning = false) {
 // ---- the end of a run ----------------------------------------------------------------------------------------------
 
 /** A run ended (with its exit code; null: it went missing). Its last output is read, its metrics kept, you told. */
-async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { missing?: string; why?: string; oom?: boolean } = {}) {
+async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { missing?: string; why?: string; oom?: boolean; preempted?: boolean; noExitCode?: boolean } = {}) {
   if (placeOf(r.where).kind === 'local') readLocal(r, L, true);
   if (L.carry) consume(L, '\n', 'log');
   // What its last output said (NaN, divergence) is noticed before its end is.
   await watchOutput(d, { ...r, status: 'done' }, L);
+  await endUsage(d.db, r);
+  // Where it first went wrong, read from its whole log (only when it did not end well).
+  const scan = code === 0 ? null : await scanLog(files(r.folder ?? runFolder(r.id)).log);
   const cur = getRun(d.db, r.id) ?? r;
-  if (cur.stopping === NIGHT_AGAIN) return backToWaiting(d, cur);
+  if (stoppedHard(cur, code)) addEvent(d.db, r.id, { kind: 'note', text: `It had not left ${cur.grace ?? GRACE.default} seconds after the warning, so it was stopped hard` });
+  if (isNightAgain(cur.stopping)) {
+    await fromCopy(d, cur);
+    return backToWaiting(d, cur, L);
+  }
   const now = Date.now();
   let status: RunRecord['status'];
   let why: string | null = null;
-  const oom = !!L.oomLine || code === 137 || !!o.oom;
+  // Out of memory only when it was: its log says so at the end, or the kernel killed it and memory was near its limit
+  // (or the log says memory ran out).
+  const killed = code === 137;
+  const oom = !!o.oom || (!!scan && (scan.oom || (killed && (memoryNearLimit(cur) || !!scan.oomLine))));
   if (cur.stopping) {
     status = 'stopped';
     why = cur.stopping;
@@ -885,15 +1186,20 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
   } else if (code === 0) status = 'done';
   else {
     status = 'failed';
-    why = o.why ?? (oom ? `It ran out of memory${code === 137 ? ' (it was killed: exit code 137)' : ''}` : `Its command ended with exit code ${code}`);
+    why = o.why ?? (oom ? oomWords(cur, scan?.oom ? scan.oomLine : undefined, killed) : killed ? KILLED_WHY : `Its command ended with exit code ${code}`);
   }
   const folder = cur.folder ?? runFolder(r.id);
+  // Lost here or on a plain SSH machine (its process gone: the computer restarted, tmux died), or preempted on a cluster:
+  // one that says how to carry on is started again. A SLURM job that only went missing from the accounting is not.
+  const place = placeOf(r.where);
+  const takeUp = cutOff(cur) && ((status === 'lost' && (place.kind === 'local' || (place.kind === 'cluster' && getCluster(d.db, place.id)?.kind === 'ssh'))) || (!!o.preempted && status === 'failed'));
+  if (takeUp && o.preempted) why = 'The cluster took its place back (preempted): it was sent again to carry on from its checkpoint';
   // What it leaves in its folder: its metrics, and the per-example scores it wrote.
   let scores = false;
   if (placeOf(r.where).kind === 'local') {
     const own = path.join(folder, 'scores.jsonl');
     if (cur.scoresFile) {
-      const from = path.resolve(cur.cwd, runFile(cur, cur.scoresFile, folder));
+      const from = path.resolve(ranIn(cur), runFile(cur, cur.scoresFile, folder));
       try {
         if (fs.statSync(from).size <= MAX_SCORES) {
           if (from !== own) fs.copyFileSync(from, own);
@@ -908,6 +1214,7 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
         scores = st.isFile() && st.size > 0 && st.size <= MAX_SCORES;
       } catch {}
   }
+  const leftInCopy = await fromCopy(d, cur);
   updateRun(d.db, r.id, {
     status,
     why,
@@ -915,7 +1222,18 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
     metrics: L.tracker.snapshot(),
     logOffset: L.log,
     fileOffset: L.file,
-    info: { exitCode: code, outputAt: L.outputAt, stopping: undefined, nightStop: undefined, ...(scores ? { scores: true } : {}) },
+    info: {
+      // (A job SLURM ended without its command leaving a code has none to show.)
+      exitCode: o.noExitCode ? undefined : code,
+      outputAt: L.outputAt,
+      stopping: undefined,
+      nightStop: undefined,
+      hardStopAt: undefined,
+      ...(leftInCopy.length ? { leftInCopy: leftInCopy.slice(0, 100) } : {}),
+      ...(scores ? { scores: true } : {}),
+      ...((status === 'failed' || status === 'lost') && scan?.firstError ? { firstError: scan.firstError } : {}),
+      ...(isTrialRun(cur) && L.tracker.progress ? { tried: { first: cur.tried?.first ?? { ...L.tracker.progress }, last: { ...L.tracker.progress } } } : {}),
+    },
   });
   saveSeries(d.db, r.id, L.tracker.series);
   try {
@@ -924,6 +1242,15 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
   addEvent(d.db, r.id, { kind: status === 'done' ? 'done' : status === 'stopped' ? 'stopped' : 'failed', text: status === 'done' ? `Done in ${took({ ...cur, endedAt: now })}` : (why ?? status) });
   live.delete(r.id);
   const rec = getRun(d.db, r.id)!;
+  // Taken up again: nothing to tell yet. The run that carries on is told of when it ends.
+  if (takeUp) {
+    if (await takeUpAgain(d, rec, why ?? status)) {
+      tellRuns(d, [r.id]);
+      ended.emit('ended', r.id);
+      return;
+    }
+    if (o.preempted) updateRun(d.db, r.id, { why: (why = o.why ?? why) });
+  }
   let told = false;
   if (status === 'failed' || status === 'lost') {
     const kind: WatchKind = oom ? 'oom' : 'crash';
@@ -934,9 +1261,54 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
   ended.emit('ended', r.id);
 }
 
-/** A night run stopped because its night ended waits for the next one, to start from the beginning; its log so far is set aside. */
-function backToWaiting(d: Deps, r: RunRecord) {
+/** Whether a warned stop had to be made hard: it was still going when its seconds were up. */
+function stoppedHard(r: RunRecord, code: number | null): boolean {
+  if (!r.stopping || !r.hardStopAt || Date.now() < r.hardStopAt) return false;
+  // On SLURM it is said when the app cancels the job (followCluster); on a plain SSH machine only its end is seen:
+  // killed, or ended by a signal.
+  if (r.clusterJob) return false;
+  if (placeOf(r.where).kind !== 'local') return code === null || code >= 128;
+  try {
+    // (A file's time can lag the clock by a few milliseconds.)
+    return fs.statSync(files(r.folder ?? runFolder(r.id)).exit).mtimeMs >= r.hardStopAt - 100;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * A run in a copy of its code ended: what it made there goes to its folder, where nothing is in the way, and the copy
+ * is taken down to what stayed.
+ */
+async function fromCopy(d: Deps, r: RunRecord): Promise<string[]> {
+  if (!r.codeDir || r.remote) return [];
   const folder = r.folder ?? runFolder(r.id);
+  let left: string[] = [];
+  try {
+    left = await bringBack(folder);
+    await pruneCopy(folder, left);
+  } catch (e) {
+    addEvent(d.db, r.id, { kind: 'note', text: `Its copy could not be tidied after it ran (${(e as Error).message}): what it made stays there` });
+  }
+  if (left.length) addEvent(d.db, r.id, { kind: 'note', text: `Left in its copy, as its folder has its own: ${left.slice(0, 5).join(', ')}${left.length > 5 ? ` and ${left.length - 5} more` : ''}` });
+  return left;
+}
+
+/**
+ * A night run stopped because its night ended waits for the next one; its log so far is set aside. It starts from the
+ * beginning, or, when it says how to carry on, from its checkpoint, keeping its curves (`L`: what was read of it as it
+ * went; none for one stopped before it started). Either way it runs the code kept in its folder.
+ */
+function backToWaiting(d: Deps, r: RunRecord, L?: Live) {
+  // The GPU hours of the start that ends here are still its own.
+  if (r.startedAt) updateRun(d.db, r.id, { info: { earlierSpans: [...(r.earlierSpans ?? []), [r.startedAt, Date.now()]] } });
+  const folder = r.folder ?? runFolder(r.id);
+  const carry = r.stopping === NIGHT_CARRY;
+  const why = carry ? NIGHT_CARRY : NIGHT_AGAIN;
+  if (carry && L) {
+    updateRun(d.db, r.id, { metrics: L.tracker.snapshot(), fileOffset: L.file });
+    saveSeries(d.db, r.id, L.tracker.series);
+  }
   const f = files(folder);
   try {
     fs.renameSync(f.log, path.join(folder, `log-before-${Date.now()}.txt`));
@@ -944,24 +1316,25 @@ function backToWaiting(d: Deps, r: RunRecord) {
   // Its last exit code must not be taken for the next start's.
   fs.rmSync(f.exit, { force: true });
   fs.rmSync(f.pid, { force: true });
-  resetRun(d.db, r.id, NIGHT_AGAIN);
-  addEvent(d.db, r.id, { kind: 'waiting', text: NIGHT_AGAIN });
+  resetRun(d.db, r.id, why, { carry });
+  addEvent(d.db, r.id, { kind: 'waiting', text: why });
   live.delete(r.id);
   tellRuns(d, [r.id]);
   wake();
 }
 
-// ---- starting runs ------------------------------------------------------------------------------------------------
+// ---- waiting and failing ----------------------------------------------------------------------------------------
 
-function setWaiting(d: Deps, r: RunRecord, why: string) {
-  if (r.status === 'waiting' && r.why === why) return;
-  updateRun(d.db, r.id, { status: 'waiting', why });
-  if (r.status !== 'waiting') addEvent(d.db, r.id, { kind: 'waiting', text: why });
+/** A run waits: why (`event`: as its events say it, without the estimate), when it may start, and since when a night run has waited. */
+function setWaiting(d: Deps, r: RunRecord, why: string, o: { startsAbout?: number; waitingSince?: number; event?: string } = {}) {
+  if (r.status === 'waiting' && r.why === why && r.startsAbout === o.startsAbout && r.waitingSince === o.waitingSince) return;
+  updateRun(d.db, r.id, { status: 'waiting', why, info: { startsAbout: o.startsAbout, waitingSince: o.waitingSince } });
+  if (r.status !== 'waiting') addEvent(d.db, r.id, { kind: 'waiting', text: o.event ?? why });
   tellRuns(d, [r.id]);
 }
 
 function fail(d: Deps, r: RunRecord, why: string) {
-  updateRun(d.db, r.id, { status: 'failed', why, endedAt: Date.now() });
+  updateRun(d.db, r.id, { status: 'failed', why, endedAt: Date.now(), info: { startsAbout: undefined } });
   addEvent(d.db, r.id, { kind: 'failed', text: why });
   const rec = getRun(d.db, r.id)!;
   void ending(d, rec, false);
@@ -969,33 +1342,126 @@ function fail(d: Deps, r: RunRecord, why: string) {
   ended.emit('ended', r.id);
 }
 
+// ---- what waits: when it may start, and a long wait ------------------------------------------------------------
+
+/** A run's estimate is worked out again at most this often. */
+const ESTIMATE_MS = 60_000;
+const estimates = new Map<string, { madeAt: number; f: Forecast }>();
+
+/**
+ * The GPUs last kept for a long-waiting run. When too few look usable for a moment (memory a run that just ended has
+ * not given back yet), they stay kept this long, so nothing slips in through the gap.
+ */
+const lastKept = new Map<string, { at: number; gpus: Set<number> }>();
+const KEEP_MS = 2 * 60_000;
+
+/** A run this pass found has to wait: why, and for a GPU or a slot (an estimate follows) since when. */
+interface Wait {
+  r: RunRecord;
+  why: string;
+  for?: 'gpu' | 'slot';
+  since?: number;
+}
+
+/** Since when a run has waited: since it was made (or since it was last held); a night run, since it first found no room in the night. */
+const waitingSince = (r: RunRecord, now: number) => (r.when === 'night' ? (r.waitingSince ?? now) : Math.max(r.createdAt, r.freedAt ?? 0));
+
+const wantOf = (r: RunRecord, since?: number): Want => ({ id: r.id, name: r.name ?? r.id, gpus: r.gpus ?? 0, gpuMemGb: r.gpuMemGb, alone: r.alone, hours: r.hours, since });
+
+/** Writes down what each waiting run waits for, with about when it may start, and tells you of one that has waited long. */
+function sayWaits(d: Deps, waits: Wait[], work: (queue: Want[]) => Map<string, Forecast>) {
+  const now = clock.now();
+  const tz = nightZone(d.db);
+  const inLine = waits.filter((w) => w.for);
+  const stale = inLine.filter((w) => now - (estimates.get(w.r.id)?.madeAt ?? -Infinity) >= ESTIMATE_MS);
+  if (stale.length) {
+    const all = work(inLine.map((w) => wantOf(w.r, w.for === 'gpu' ? w.since : undefined)));
+    for (const w of stale) estimates.set(w.r.id, { madeAt: now, f: all.get(w.r.id) ?? {} });
+  }
+  const waiting = new Set(inLine.map((w) => w.r.id));
+  for (const id of estimates.keys()) if (!waiting.has(id)) estimates.delete(id);
+  for (const id of lastKept.keys()) if (!waiting.has(id)) lastKept.delete(id);
+  for (const w of waits) {
+    // It may have been stopped while this pass was starting others.
+    const r = getRun(d.db, w.r.id);
+    if (!r || (r.status !== 'queued' && r.status !== 'waiting')) continue;
+    const f = w.for ? estimates.get(r.id)?.f : undefined;
+    setWaiting(d, r, `${w.why}${estimateWords(f, now, tz)}`, { startsAbout: f?.at, waitingSince: r.when === 'night' && w.for ? w.since : undefined, event: w.why });
+    if (w.since !== undefined && now - w.since >= TELL_AFTER_MS && !r.waitTold) {
+      // A sweep tells of its long wait once, not once for each of its runs.
+      const told = !!r.sweep && listRuns(d.db, { sweep: r.sweep, limit: 1000 }).some((x) => x.waitTold);
+      updateRun(d.db, r.id, { info: { waitTold: true } });
+      if (told) continue;
+      const what = r.gpus ? gpuCountWords(r.gpus) : 'a place among the runs without a GPU';
+      notice(d, r, 'waiting', `“${r.name ?? r.id}” has waited ${Math.floor((now - w.since) / 3_600_000)} hours for ${what}`, { ownWords: true });
+    }
+  }
+}
+
+// ---- starting runs ------------------------------------------------------------------------------------------------
+
 /**
  * The runs here that wait: each takes what it needs while it is free, by priority then age. Night runs come after all
- * the others, whatever their priorities: they start only in the night (`night`) and while no other run waits.
+ * the others, whatever their priorities: they start only in the night (`night`) and while no other run waits. A run
+ * that has waited long for GPUs keeps them from those behind it, unless they are sure to be gone before it could start.
  */
 async function startWaiting(d: Deps, night: string | null, settings: ExperimentsSettings) {
   const all = listRuns(d.db, { status: ['queued', 'waiting', 'starting', 'running'], limit: 5000, oldest: true }).filter((r) => !r.remote && placeOf(r.where).kind === 'local');
-  const waiting = all.filter((r) => (r.status === 'queued' || r.status === 'waiting') && !busy.has(r.id));
-  if (!waiting.length) return;
+  // A run whose code is still to be read waits for it (after a restart it is read now).
+  for (const r of all) if (r.codePending && !taking.has(r.id) && (r.status === 'queued' || r.status === 'waiting')) void takeFor(d, r.id, r, codeReader());
+  const waiting = all.filter((r) => (r.status === 'queued' || r.status === 'waiting') && !busy.has(r.id) && !taking.has(r.id));
+  if (!waiting.length) return estimates.clear();
   const last = (r: RunRecord) => (r.when === 'night' ? 1 : 0);
   waiting.sort((a, b) => last(a) - last(b) || (b.priority ?? 0) - (a.priority ?? 0) || a.createdAt - b.createdAt);
   const going = all.filter((r) => r.status === 'starting' || r.status === 'running' || busy.has(r.id));
-  const held = new Set(going.flatMap((r) => r.gpuIds ?? []));
+  const now = clock.now();
+  const sharing = settings.shareGpus;
+  // Your runs on each GPU, and those without one, each with when it should end.
+  const on = new Map<number, Holder[]>();
+  const cpu: { end: number; name: string }[] = [];
+  const takes = (r: RunRecord, ids: number[], end: number) => {
+    for (const i of ids) on.set(i, [...(on.get(i) ?? []), { id: r.id, ask: askOf(r), end, name: r.name ?? r.id }]);
+    if (!r.gpus) cpu.push({ end, name: r.name ?? r.id });
+  };
+  for (const r of going) takes(r, r.gpuIds ?? [], endAbout(r, now));
+  const onAtFirst = new Map(on);
+  const goingIds = new Set(going.map((r) => r.id));
+  const endIfStarted = (r: RunRecord) => (r.hours ? now + r.hours * 3_600_000 : Infinity);
   const slots = settings.cpuSlots;
   let free = slots - going.filter((r) => !r.gpus).length;
   let reading: GpuReading | null = null;
+  // What other programs hold on the GPUs, looked at when a run has to wait for one.
+  let others: Map<number, Others> | null = null;
+  const states = (): GpuState[] => (reading?.gpus ?? []).map((g) => ({ gpu: g, others: others?.get(g.index)?.mem ?? 0, on: on.get(g.index) ?? [] }));
+  // GPUs kept for runs that have waited long for them, and by when each of those could have its own.
+  const kept: { r: RunRecord; gpus: Set<number>; at: number }[] = [];
+  const waits: Wait[] = [];
   // An ordinary run that waits holds back the night runs that want what it wants: a GPU, or a processor slot. (One
   // stuck waiting for a GPU that never frees does not keep a night run that needs none from starting.)
   const othersWait = { gpu: false, cpu: false };
-  const wait = (r: RunRecord, why: string) => {
-    setWaiting(d, r, why);
+  const wait = (r: RunRecord, why: string, forWhat?: Wait['for']) => {
+    waits.push({ r, why, ...(forWhat ? { for: forWhat, since: waitingSince(r, now) } : {}) });
     if (r.when !== 'night') othersWait[r.gpus ? 'gpu' : 'cpu'] = true;
   };
   const seen = new Set(waiting.map((r) => r.id));
+  // At the ceiling on agents' GPU hours, their runs are held: they wait for you, not for a GPU, and hold nobody back.
+  // Counted again after each start: it is decided as a run is about to start, by what agents' runs have used by then.
+  let use = ceilingUse(d.db);
+  const held: RunRecord[] = [];
   // One that came in while this pass was at its GPUs or starting others goes first too (looked for again after each).
   let came: boolean | null = null;
   const cameIn = () => (came ??= listRuns(d.db, { status: ['queued'], limit: 5000 }).some((r) => !seen.has(r.id) && r.when !== 'night' && !r.remote && placeOf(r.where).kind === 'local'));
   for (const r of waiting) {
+    if (r.held || (reached(use) && holdable(r))) {
+      // Looked up again: it may have been let go or stopped while this pass was starting others.
+      const x = getRun(d.db, r.id);
+      if (!x || (x.status !== 'queued' && x.status !== 'waiting')) continue;
+      if (holdRun(d, x, use)) {
+        held.push(x);
+        continue;
+      }
+      Object.assign(r, { held: x.held, letRun: x.letRun, freedAt: x.freedAt });
+    }
     if (r.when === 'night' && (!night || othersWait[r.gpus ? 'gpu' : 'cpu'] || cameIn())) {
       wait(r, night ? NIGHT_BEHIND : nightWhy(r, settings));
       continue;
@@ -1004,9 +1470,11 @@ async function startWaiting(d: Deps, night: string | null, settings: Experiments
     if (!need) {
       if (free > 0) {
         free--;
+        takes(r, [], endIfStarted(r));
         await begin(d, r, []);
         came = null;
-      } else wait(r, `Waiting for one of your runs without a GPU to end (${slots} at most at once)`);
+        use = ceilingUse(d.db);
+      } else wait(r, `Waiting for one of your runs without a GPU to end (${slots} at most at once: Where runs go changes that)`, 'slot');
       continue;
     }
     reading ??= await readGpus().catch((): GpuReading => ({ gpus: [], error: 'failed' }));
@@ -1022,20 +1490,50 @@ async function startWaiting(d: Deps, night: string | null, settings: Experiments
       fail(d, r, `It asks for ${need} GPUs, and this computer has ${reading.gpus.length}`);
       continue;
     }
-    const pick = chooseGpus(reading.gpus, need, r.gpuMemGb, held);
-    if ('why' in pick) {
-      wait(r, pick.why);
+    const taken = new Set(sharing ? [] : on.keys());
+    const how = { on: sharing ? on : undefined, alone: r.alone };
+    // The GPUs kept for runs ahead of it, unless it is sure to be gone before they could start.
+    const against = kept.filter((k) => !(r.hours && Number.isFinite(k.at) && endIfStarted(r) <= k.at));
+    const pick = chooseGpus(reading.gpus, need, r.gpuMemGb, new Set([...taken, ...against.flatMap((k) => [...k.gpus])]), how);
+    if ('ids' in pick) {
+      const shared = pick.ids.flatMap((gpu) => (on.get(gpu)?.length ? [{ gpu, runs: on.get(gpu)!.map((h) => h.id) }] : []));
+      takes(r, pick.ids, endIfStarted(r));
+      await begin(d, r, pick.ids, reading, shared);
+      came = null;
+      use = ceilingUse(d.db);
       continue;
     }
-    for (const i of pick.ids) held.add(i);
-    await begin(d, r, pick.ids, reading);
-    came = null;
+    if (!others) {
+      const apps = (await readGpus({ apps: true }).catch(() => null))?.apps;
+      others = othersOn({ ...reading, apps }, onAtFirst, goingIds);
+    }
+    const open = chooseGpus(reading.gpus, need, r.gpuMemGb, taken, { ...how, others });
+    // It would start, were it not for runs ahead of it: which of them, and by when they could have theirs.
+    const behind = 'ids' in open ? against.filter((k) => open.ids.some((i) => k.gpus.has(i))) : [];
+    if ('why' in open) wait(r, open.why, 'gpu');
+    else {
+      const first = (behind[0] ?? against[0]).r;
+      wait(r, `Waiting behind “${first.name ?? first.id}”, which needs ${gpuCountWords(first.gpus!)} and has waited ${waitedWords(now - waitingSince(first, now))}`, 'gpu');
+    }
+    if (now - waitingSince(r, now) >= NEXT_AFTER_MS) {
+      const fitsNow = new Set(reading.gpus.filter((g) => !taken.has(g.index) && roomOn(g, r.gpuMemGb, r.alone, how.on?.get(g.index)) !== null).map((g) => g.index));
+      const x = freeBy(states(), wantOf(r), sharing, now, fitsNow);
+      const before = lastKept.get(r.id);
+      if (x) {
+        lastKept.set(r.id, { at: now, gpus: x.gpus });
+        kept.push({ r, gpus: x.gpus, at: Math.max(x.at, ...behind.map((k) => k.at)) });
+      } else if (before && now - before.at < KEEP_MS) kept.push({ r, gpus: before.gpus, at: Infinity });
+    }
   }
+  tellHeld(d, held, use);
+  sayWaits(d, waits, (queue) => forecast({ now, gpus: states(), sharing, cpu, slots, queue }));
 }
 
 /** The run's own variables: its id and folder, Python's output unbuffered (so the log follows), its seed, its GPUs. */
 function runEnv(r: RunRecord, folder: string, gpuIds: number[] | null): Record<string, string> {
-  const env: Record<string, string> = { PYTHONUNBUFFERED: '1', ...r.env, HYDOR_RUN: r.id, HYDOR_RUN_DIR: folder };
+  const env: Record<string, string> = { PYTHONUNBUFFERED: '1', ...r.env, HYDOR_RUN: r.id, HYDOR_RUN_DIR: folder, HYDOR_GRACE_SECONDS: String(r.grace ?? GRACE.default) };
+  // Where its code is and where its project is: the same folder, unless it runs from a copy (on a cluster, unset).
+  if (placeOf(r.where).kind === 'local') env.HYDOR_CODE_DIR = env.HYDOR_PROJECT_DIR = r.cwd;
   if (r.seed !== undefined) env.HYDOR_SEED = String(r.seed);
   // The GPUs it was given; none for a job without a GPU, unless it set them itself.
   if (gpuIds?.length) env.CUDA_VISIBLE_DEVICES = gpuIds.join(',');
@@ -1043,18 +1541,70 @@ function runEnv(r: RunRecord, folder: string, gpuIds: number[] | null): Record<s
   return env;
 }
 
-/** Starts a run here: its record (commit, patch), its wrapper in tmux, then its environment in the background. */
-async function begin(d: Deps, r: RunRecord, gpuIds: number[], reading?: GpuReading) {
+/** Starts a run here: its code (as queued, or as the folder has it), its wrapper in tmux, then its environment in the background. */
+async function begin(d: Deps, r: RunRecord, gpuIds: number[], reading?: GpuReading, shared: NonNullable<RunRecord['shared']> = []) {
   busy.add(r.id);
   const folder = runFolder(r.id);
+  const done = () => {
+    busy.delete(r.id);
+    tellRuns(d, [r.id]);
+  };
+  const broke = async (e: unknown) => {
+    // A copy made for it that never ran is taken down.
+    const made = getRun(d.db, r.id);
+    if (made) await fromCopy(d, made);
+    const why = (e as Error).message;
+    if (!(e instanceof NoCopy)) return fail(d, r, `It could not start: ${why}`);
+    fail(d, r, e.large ? 'Its code changed while it waited and was too large to keep as queued: run it again' : `Its code changed while it waited and could not be put back as it was queued (${why}): run it again`);
+  };
   try {
-    updateRun(d.db, r.id, { status: 'starting', why: null, startedAt: Date.now(), info: { host: os.hostname(), gpuIds, folder, logPath: files(folder).log } });
+    updateRun(d.db, r.id, { status: 'starting', why: null, startedAt: Date.now(), info: { host: os.hostname(), gpuIds, folder, logPath: files(folder).log, shared: shared.length ? shared : undefined, startsAbout: undefined, waitingSince: undefined } });
+    startUsage(d.db, r.id, gpuIds, reading?.gpus ?? []);
     tellRuns(d, [r.id]);
     if (!fs.existsSync(r.cwd)) throw new Error(`The folder ${r.cwd} is not there`);
     fs.mkdirSync(folder, { recursive: true, mode: 0o700 });
-    const env = runEnv(r, folder, gpuIds);
     const base = agentBaseEnv();
-    const sh = localShell(r.cwd, { ...base, ...r.env });
+    // The code kept when it was queued, and what the folder no longer has of it.
+    const code = takesCode(r) ? loadManifest(folder) : null;
+    const changed = code ? await differences(code, r.cwd, { ...base, ...r.env }) : [];
+    const rest = launch(d, r, { gpuIds, reading, code, changed }).catch(broke).finally(done);
+    // A copy can take a while to make: the queue goes on meanwhile.
+    if (!changed.length || (r.code === 'now' && !carriesOn(r))) await rest;
+  } catch (e) {
+    await broke(e);
+    done();
+  }
+}
+
+async function launch(d: Deps, r: RunRecord, o: { gpuIds: number[]; reading?: GpuReading; code: Manifest | null; changed: string[] }) {
+  const { gpuIds, reading, code, changed } = o;
+  const folder = runFolder(r.id);
+  const base = agentBaseEnv();
+  let env = runEnv(r, folder, gpuIds);
+  let cwd = r.cwd;
+  let command = commandOf(r);
+  let copy: { top: string; cwd: string } | undefined;
+  const differ = { codeChanged: changed.length ? changed.slice(0, 20) : undefined };
+  // One that carries on runs the code kept with it, whatever it was queued to do: never new code between checkpoints.
+  if (code && changed.length && (r.code !== 'now' || carriesOn(r))) {
+    copy = await makeCopy(code, folder, { link: true, env: { ...base, ...r.env } });
+    const there = forCopy(code, copy, folder, { ...r, command: commandOf(r) });
+    ({ command } = there);
+    cwd = copy.cwd;
+    env = { ...env, ...there.env, HYDOR_CODE_DIR: copy.cwd };
+    updateRun(d.db, r.id, { info: { ...recordOfCode(code, folder), ...differ, codeAt: 'queued', codeDir: copy.cwd, ranAs: ranAs(commandOf(r), there) } });
+    addEvent(d.db, r.id, { kind: 'note', text: 'The folder had changed since it was queued: it runs a copy of the code as it was queued' });
+  } else if (code && !changed.length) {
+    const kept = await keepNewlyNamed(code, r, folder).catch(() => code);
+    updateRun(d.db, r.id, { info: { ...recordOfCode(kept, folder), codeAt: 'queued' } });
+  } else if (code) {
+    // code: "now": the folder as it is, kept as it is now.
+    const now = await takeCode(codeReader(), r, r.id, folder);
+    updateRun(d.db, r.id, { info: { ...(now ? recordOfCode(now, folder) : {}), ...differ, codeAt: 'start' } });
+  }
+  const sh = localShell(cwd, { ...base, ...r.env });
+  // Without code kept when it was queued: read now (a score's, a trial's, a run from before this was done).
+  if (!code) {
     const git = await captureGit(sh).catch(() => ({}) as Awaited<ReturnType<typeof captureGit>>);
     const info: Partial<RunInfo> = { commit: git.commit, branch: git.branch, dirty: git.dirty, untracked: git.untracked };
     if (git.patch) {
@@ -1068,61 +1618,85 @@ async function begin(d: Deps, r: RunRecord, gpuIds: number[], reading?: GpuReadi
       if (named?.notKept.length) info.notKept = named.notKept;
     }
     updateRun(d.db, r.id, { info });
-    // The evaluations of this folder: a scoring run does not start on changed files, any other is marked.
-    await stampRun(d, r);
-    await startLocal({ id: r.id, folder, cwd: r.cwd, command: r.command, env });
-    const now = Date.now();
-    updateRun(d.db, r.id, { status: 'running', info: { outputAt: now } });
-    addEvent(d.db, r.id, { kind: 'started', text: `Started on ${os.hostname()}${gpuIds.length ? `, ${gpuList(gpuIds)}` : ''}` });
-    live.delete(r.id);
-    const names = gpuIds.map((i) => reading?.gpus.find((g) => g.index === i)?.name ?? '').filter(Boolean);
-    void captureEnvironment(sh, { command: r.command, cwd: r.cwd, pathDirs: pathDirs({ ...base, ...r.env }), gpus: gpuIds.length > 0, gpuNames: names })
-      .then((environment) => {
-        updateRun(d.db, r.id, { info: { environment } });
-        tellRuns(d, [r.id]);
-      })
-      .catch(() => {});
-  } catch (e) {
-    fail(d, r, `It could not start: ${(e as Error).message}`);
-  } finally {
-    busy.delete(r.id);
-    tellRuns(d, [r.id]);
   }
+  // The evaluations of this folder: a scoring run does not start on changed files, any other is marked.
+  await stampRun(d, r, copy ? { top: code!.top, copy: copy.top } : undefined);
+  // Stopped while its code was being made ready: it does not start.
+  const asked = getRun(d.db, r.id);
+  if (asked?.stopping) return stoppedBeforeStart(d, r, asked.stopping);
+  await startLocal({ id: r.id, folder, cwd, command, env });
+  const now = Date.now();
+  updateRun(d.db, r.id, { status: 'running', info: { outputAt: now, ranResume: carriesOn(r) || undefined } });
+  addEvent(d.db, r.id, { kind: 'started', text: `Started on ${os.hostname()}${gpuIds.length ? `, ${gpuList(gpuIds)}` : ''}${carriesOn(r) ? ', to carry on from its checkpoint' : ''}` });
+  live.delete(r.id);
+  // Asked to stop as it started.
+  const asking = getRun(d.db, r.id);
+  if (asking?.stopping) await stopLocal(r.id, folder, asking.hardStopAt ? Math.max(0, asking.hardStopAt - Date.now()) : undefined);
+  const names = gpuIds.map((i) => reading?.gpus.find((g) => g.index === i)?.name ?? '').filter(Boolean);
+  void captureEnvironment(sh, { command, cwd, pathDirs: pathDirs({ ...base, ...r.env }), gpus: gpuIds.length > 0, gpuNames: names })
+    .then((environment) => {
+      updateRun(d.db, r.id, { info: { environment } });
+      tellRuns(d, [r.id]);
+    })
+    .catch(() => {});
+}
+
+async function stoppedBeforeStart(d: Deps, r: RunRecord, why: string) {
+  await fromCopy(d, getRun(d.db, r.id)!);
+  if (isNightAgain(why)) {
+    // Never started, so there is no checkpoint of its own to carry on from: unless it was carrying on already.
+    if (why === NIGHT_CARRY && !carriesOn(r)) updateRun(d.db, r.id, { info: { stopping: NIGHT_AGAIN } });
+    return backToWaiting(d, getRun(d.db, r.id)!);
+  }
+  updateRun(d.db, r.id, { status: 'stopped', why, endedAt: Date.now(), info: { stopping: undefined, hardStopAt: undefined } });
+  addEvent(d.db, r.id, { kind: 'stopped', text: why });
+  ended.emit('ended', r.id);
+  void ending(d, getRun(d.db, r.id)!, true);
 }
 
 // ---- stopping ------------------------------------------------------------------------------------------------
 
-/** Stops a run: one in line at once; one running is asked to stop (Ctrl-C, then harder) and ends as stopped. */
-export async function stopRun(d: Deps, id: string, why = 'Stopped by you'): Promise<RunRecord> {
+/**
+ * Stops a run: one in line at once; one running is asked to stop (Ctrl-C, then harder) and ends as stopped. A stop the
+ * app decides itself (`app`: its time limit, the night's end, an early stop) warns it first and gives it its grace to
+ * save a checkpoint and leave; the person's does so only for a run that asked for a grace.
+ */
+export async function stopRun(d: Deps, id: string, why = 'Stopped by you', o: { app?: boolean } = {}): Promise<RunRecord> {
   const r = getRun(d.db, id);
   if (!r) throw new HttpError(404, 'There is no such run');
   if (!ACTIVE.includes(r.status)) return r;
   if (r.remote) {
     const m = remoteMachine(r.remote.machine);
     if (!m) throw new HttpError(502, 'Its machine is no longer in Settings → Machines');
-    const there = await m.call<{ run: RemoteRun }>('POST', `/api/experiments/runs/${r.remote.id}/stop`, 20_000, {});
+    const there = await m.call<{ run: RemoteRun }>('POST', `/api/experiments/runs/${r.remote.id}/stop`, 20_000, { why, ...(o.app ? { warn: true } : {}) });
     copyRemote(d, r, there.run);
     return getRun(d.db, id)!;
   }
   const place = placeOf(r.where);
   if (r.status === 'queued' || (r.status === 'waiting' && !(place.kind === 'cluster' && r.clusterJob))) {
-    updateRun(d.db, id, { status: 'stopped', why, endedAt: Date.now() });
+    updateRun(d.db, id, { status: 'stopped', why, endedAt: Date.now(), info: { startsAbout: undefined, held: undefined } });
     addEvent(d.db, id, { kind: 'stopped', text: why });
     tellRuns(d, [id]);
     ended.emit('ended', id);
     void ending(d, getRun(d.db, id)!, true);
     return getRun(d.db, id)!;
   }
-  updateRun(d.db, id, { info: { stopping: why } });
-  addEvent(d.db, id, { kind: 'note', text: `Stopping: ${why}` });
+  const c = place.kind === 'cluster' ? getCluster(d.db, place.id) : null;
+  // A job still waiting in SLURM's queue has nothing to warn.
+  const grace = c?.kind === 'slurm' && r.status !== 'running' ? undefined : o.app ? (r.grace ?? GRACE.default) : r.grace;
+  const hardStopAt = grace === undefined ? undefined : Math.min(Date.now() + grace * 1000, r.hardStopAt ?? Infinity);
+  updateRun(d.db, id, { info: { stopping: why, hardStopAt } });
+  addEvent(d.db, id, { kind: 'note', text: `Stopping: ${why}${grace === undefined ? '' : `. Warned with Ctrl-C: it has ${grace} seconds to save a checkpoint and leave`}` });
   if (place.kind === 'cluster') {
-    const c = getCluster(d.db, place.id);
-    if (c?.kind === 'slurm' && r.clusterJob) await runSsh(c.host, `scancel ${r.clusterJob}`, { timeoutMs: 30_000 });
-    else if (c && r.remoteDir) {
+    if (c?.kind === 'slurm' && r.clusterJob) {
+      // The warning to every program of the job; the hard stop comes when its seconds are up (followCluster).
+      const warned = grace === undefined ? null : await runSsh(c.host, `scancel --signal=INT --full ${r.clusterJob}`, { timeoutMs: 30_000 });
+      if (warned?.code !== 0) await runSsh(c.host, `scancel ${r.clusterJob}`, { timeoutMs: 30_000 });
+    } else if (c && r.remoteDir) {
       const pid = `$(cat ${q(`${r.remoteDir}/pid`)} 2>/dev/null)`;
-      await runSsh(c.host, `p=${pid}; [ -n "$p" ] && { kill -INT -- -$p 2>/dev/null; nohup sh -c "sleep 10; kill -TERM -- -$p 2>/dev/null; sleep 10; kill -KILL -- -$p 2>/dev/null" >/dev/null 2>&1 & }`, { timeoutMs: 30_000 });
+      await runSsh(c.host, `p=${pid}; [ -n "$p" ] && { kill -INT -- -$p 2>/dev/null; nohup sh -c "sleep ${grace ?? 10}; kill -TERM -- -$p 2>/dev/null; sleep 10; kill -KILL -- -$p 2>/dev/null" >/dev/null 2>&1 & }`, { timeoutMs: 30_000 });
     }
-  } else await stopLocal(r.id, r.folder ?? runFolder(r.id));
+  } else await stopLocal(r.id, r.folder ?? runFolder(r.id), grace === undefined ? undefined : grace * 1000);
   tellRuns(d, [id]);
   wake();
   return getRun(d.db, id)!;
@@ -1175,25 +1749,35 @@ async function submitCluster(d: Deps, r: RunRecord, c: NonNullable<ReturnType<ty
       fs.writeFileSync(files(folder).patch, git.patch, { mode: 0o600 });
       info.patchPath = files(folder).patch;
     }
-    const put = await runSsh(c.host, `cat > ${q(`${dir}/command.sh`)}`, { input: `${r.command}\n`, timeoutMs: 30_000 });
+    const put = await runSsh(c.host, `cat > ${q(`${dir}/command.sh`)}`, { input: `${commandOf(r)}\n`, timeoutMs: 30_000 });
     if (put.code !== 0) return setWaiting(d, r, `Waiting: could not write to ${c.name} (${sshWhy(put)}); trying again`);
+    info.ranResume = carriesOn(r) || undefined;
     if (c.kind === 'slurm') {
       const script = sbatchScript({ run: r, cluster: c, dir, cwd: r.cwd || undefined, env });
+      // Asked first: what it refuses is said at once, and when it would start.
+      const asked = await testOnly(c.host, dir, script);
+      if (asked.refused) {
+        updateRun(d.db, r.id, { info });
+        return fail(d, r, asked.refused);
+      }
       const sb = await runSsh(c.host, `cat > ${q(`${dir}/job.sbatch`)} && sbatch --parsable ${q(`${dir}/job.sbatch`)}`, { input: script, timeoutMs: 60_000 });
       const job = parseSbatch(sb.out);
       if (!job) return fail(d, r, `sbatch did not take it: ${(sb.err || sb.out).trim().split('\n').pop() || `exit code ${sb.code}`}`);
-      updateRun(d.db, r.id, { status: 'waiting', why: 'In the cluster’s queue', info: { ...info, clusterJob: job } });
+      // Its guess is said, not kept as when it will start: squeue's own estimate is (followCluster).
+      const why = asked.startsAbout === undefined ? 'In the cluster’s queue' : `In the cluster’s queue. ${guessWords(whenWords(asked.startsAbout, Date.now(), nightZone(d.db)))}`;
+      updateRun(d.db, r.id, { status: 'waiting', why, info: { ...info, clusterJob: job, startsGuess: asked.startsAbout } });
       addEvent(d.db, r.id, { kind: 'waiting', text: `Submitted to ${c.name} as job ${job}` });
     } else {
       const wrapper = wrapperScript({ id: r.id, folder: dir, cwd: r.cwd || dir, env });
+      // set -m: without it a program started in the background here would ignore Ctrl-C, the warning before a stop.
       const go = await runSsh(
         c.host,
-        `cat > ${q(`${dir}/run.sh`)} && rm -f ${q(`${dir}/exit`)} && if command -v tmux >/dev/null; then tmux new-session -d -s x${r.id} ${q(`bash ${q(`${dir}/run.sh`)}`)}; else nohup setsid bash ${q(`${dir}/run.sh`)} >/dev/null 2>&1 & fi`,
+        `cat > ${q(`${dir}/run.sh`)} && rm -f ${q(`${dir}/exit`)} && if command -v tmux >/dev/null; then tmux new-session -d -s x${r.id} ${q(`bash ${q(`${dir}/run.sh`)}`)}; else set -m; nohup setsid bash ${q(`${dir}/run.sh`)} >/dev/null 2>&1 & fi`,
         { input: wrapper, timeoutMs: 45_000 },
       );
       if (go.code !== 0) return fail(d, r, `It could not start on ${c.name}: ${sshWhy(go)}`);
       updateRun(d.db, r.id, { status: 'running', why: null, startedAt: Date.now(), info: { ...info, outputAt: Date.now() } });
-      addEvent(d.db, r.id, { kind: 'started', text: `Started on ${c.name}${env.CUDA_VISIBLE_DEVICES ? `, ${gpuList(env.CUDA_VISIBLE_DEVICES.split(',').map(Number))}` : ''}` });
+      addEvent(d.db, r.id, { kind: 'started', text: `Started on ${c.name}${env.CUDA_VISIBLE_DEVICES ? `, ${gpuList(env.CUDA_VISIBLE_DEVICES.split(',').map(Number))}` : ''}${info.ranResume ? ', to carry on from its checkpoint' : ''}` });
     }
     void captureEnvironment(sh, { command: r.command, cwd: r.cwd, pathDirs: null, gpus: !!r.gpus, host: c.host })
       .then((environment) => updateRun(d.db, r.id, { info: { environment } }))
@@ -1216,44 +1800,131 @@ async function followCluster(d: Deps, r: RunRecord) {
     L.polledAt = now;
     return submitCluster(d, r, c);
   }
-  if (now - L.polledAt < timing.cluster) return;
+  // A warned stop whose seconds are up is looked at without waiting for the next turn, and made hard if it still goes.
+  // (On a plain SSH machine the stop sent there does it itself: this is for when that did not arrive.)
+  const hardDue = !!r.stopping && !!r.hardStopAt && !L.forced && now >= r.hardStopAt + (c.kind === 'slurm' ? 0 : 15_000);
+  if (now - L.polledAt < timing.cluster && !hardDue) return;
   L.polledAt = now;
   const dir = r.remoteDir!;
-  let state: { ended: false; status: 'waiting' | 'running'; why?: string } | { ended: true; code: number | null; slurm?: ReturnType<typeof endOfSlurm> };
+  let state: { ended: false; status: 'waiting' | 'running'; why?: string; startsAbout?: number } | { ended: true; code: number | null; slurm?: ReturnType<typeof endOfSlurm> };
+  // SLURM keeps a job in COMPLETING while it cleans up after it, which on a real cluster took most of a minute.
+  let completing = false;
+  // Whether the command left an exit code of its own (sacct's, beside a signal, is not one).
+  let leftCode = false;
   if (c.kind === 'slurm') {
-    const s = await runSsh(c.host, `squeue -h -j ${r.clusterJob} -o '%i|%T|%r|%M|%N' 2>/dev/null; echo @@; cat ${q(`${dir}/exit`)} 2>/dev/null; echo @@; sacct -j ${r.clusterJob} --format=State,ExitCode,Elapsed -P -n 2>/dev/null | head -n 3`, {
-      timeoutMs: 45_000,
-    });
+    const s = await runSsh(
+      c.host,
+      `squeue -h -j ${r.clusterJob} -o '%i|%T|%r|%M|%N|%S' 2>/dev/null; echo @@; cat ${q(`${dir}/exit`)} 2>/dev/null; echo @@; sacct -j ${r.clusterJob} --format=State,ExitCode,Elapsed -P -n 2>/dev/null | head -n 3; echo @@; date +%z`,
+      { timeoutMs: 45_000 },
+    );
     if (s.code !== 0) return setWhy(d, r, `Could not reach ${c.name} just now (${sshWhy(s)}); trying again`);
-    const [sq, ex, sa] = s.out.split('@@\n');
+    const [sq, ex, sa, zone] = s.out.split('@@\n');
     const inQueue = parseSqueue(sq ?? '').get(r.clusterJob!);
     const code = /^-?\d+$/.test((ex ?? '').trim()) ? Number(ex.trim()) : null;
-    const acct = parseSacct(sa ?? '');
-    if (inQueue && !slurmEnded(inQueue.state)) state = /^PENDING/i.test(inQueue.state) ? { ended: false, status: 'waiting', why: `In the cluster’s queue: ${reasonWords(inQueue.reason)}` } : { ended: false, status: 'running' };
-    else if (code !== null) state = { ended: true, code };
-    else if (acct && slurmEnded(acct.state)) state = { ended: true, code: acct.exitCode ?? null, slurm: endOfSlurm(acct) };
+    leftCode = code !== null;
+    const acct = sacctState(sa ?? '');
+    const told = acct && slurmEnded(acct.state) && slurmTells(acct.state) ? endOfSlurm(acct, r) : undefined;
+    completing = !!inQueue && /^COMPLETING/i.test(inQueue.state);
+    // Over already when its command has left its exit code, or when the accounting had its end at the last look too (one
+    // look more, as a command stopped at its limit may still be saving).
+    const over = completing && (code !== null || (!!L.closing && !!acct && slurmEnded(acct.state)));
+    if (completing && !!acct && slurmEnded(acct.state)) L.closing = true;
+    if (inQueue && !slurmEnded(inQueue.state) && !over) {
+      if (/^PENDING/i.test(inQueue.state)) {
+        // About when it starts, once squeue says: what was said stands until its estimate moves by more than ten
+        // minutes. Until then --test-only's cautious guess is said, while it is still to come.
+        const estimate = slurmTime(inQueue.start, zone);
+        let about = r.startsAbout;
+        if (estimate !== undefined && (about === undefined || Math.abs(estimate - about) > 10 * 60_000)) about = estimate;
+        if (about !== undefined && about <= Date.now() - 60_000) about = undefined;
+        const when = (at: number) => whenWords(at, Date.now(), nightZone(d.db));
+        const head = inQueue.reason ? `In the cluster’s queue: ${reasonWords(inQueue.reason)}` : 'In the cluster’s queue';
+        const more = about !== undefined ? `. It expects to start about ${when(about)}` : r.startsGuess && r.startsGuess > Date.now() ? `. ${guessWords(when(r.startsGuess))}` : '';
+        state = { ended: false, status: 'waiting', why: `${head}${more}`, startsAbout: about };
+      } else state = { ended: false, status: 'running' };
+    } else if (code !== null && acct && !slurmEnded(acct.state) && !L.lagged) {
+      // The job left the queue but the accounting still has it going: one more look, so why it ended can be said.
+      L.lagged = true;
+      return;
+    }
+    // (A program that saves and leaves with 0 when SLURM takes its place back, or its time is up, did not finish.)
+    else if (code !== null) state = { ended: true, code, slurm: code !== 0 || /^(PREEMPTED|TIMEOUT)/i.test(acct?.state ?? '') ? told : undefined };
+    else if (acct && slurmEnded(acct.state)) state = { ended: true, code: acct.exitCode ?? null, slurm: endOfSlurm(acct, r) };
     else if (acct) state = { ended: false, status: /^PENDING/i.test(acct.state) ? 'waiting' : 'running' };
     else state = { ended: true, code: null };
   } else {
-    const s = await runSsh(c.host, `cat ${q(`${dir}/exit`)} 2>/dev/null; echo @@; p=$(cat ${q(`${dir}/pid`)} 2>/dev/null); [ -n "$p" ] && kill -0 $p 2>/dev/null && echo ALIVE`, { timeoutMs: 45_000 });
+    // (`; true`: kill -0 fails once the process is gone, which is an answer, not a failed call.)
+    const s = await runSsh(c.host, `cat ${q(`${dir}/exit`)} 2>/dev/null; echo @@; p=$(cat ${q(`${dir}/pid`)} 2>/dev/null); [ -n "$p" ] && kill -0 $p 2>/dev/null && echo ALIVE; true`, { timeoutMs: 45_000 });
     if (s.code !== 0) return setWhy(d, r, `Could not reach ${c.name} just now (${sshWhy(s)}); trying again`);
     const [ex, alive] = s.out.split('@@\n');
     const code = /^-?\d+$/.test((ex ?? '').trim()) ? Number(ex.trim()) : null;
     state = code !== null ? { ended: true, code } : alive?.includes('ALIVE') ? { ended: false, status: 'running' } : { ended: true, code: null };
   }
-  // Its log, from where the last look stopped, copied here as it comes.
-  const tail = await runSsh(c.host, `tail -c +${L.log + 1} ${q(`${dir}/log.txt`)} 2>/dev/null | head -c ${state.ended ? 8 << 20 : 1 << 20} | base64 | tr -d '\\n'`, { timeoutMs: 60_000 });
-  if (tail.code === 0 && tail.out.trim()) {
-    const buf = Buffer.from(tail.out.trim(), 'base64');
-    let end = buf.length;
-    // A UTF-8 character cut at the end waits for the next look.
-    for (let k = 1; k <= 3 && end - k >= 0; k++) {
-      const b = buf[end - k];
-      if ((b & 0xc0) === 0x80) continue;
-      if (b >= 0xc0 && k < (b >= 0xf0 ? 4 : b >= 0xe0 ? 3 : 2)) end -= k;
-      break;
+  if (hardDue && !state.ended && !completing) {
+    const x =
+      c.kind === 'slurm'
+        ? await runSsh(c.host, `scancel ${r.clusterJob}`, { timeoutMs: 30_000 })
+        : await runSsh(c.host, `p=$(cat ${q(`${dir}/pid`)} 2>/dev/null); [ -n "$p" ] && { kill -TERM -- -$p 2>/dev/null; sleep 2; kill -KILL -- -$p 2>/dev/null; }; true`, { timeoutMs: 30_000 });
+    if (x.code === 0) {
+      L.forced = true;
+      // (A plain SSH machine's end tells it: finish.)
+      if (c.kind === 'slurm') addEvent(d.db, r.id, { kind: 'note', text: `It had not left ${r.grace ?? GRACE.default} seconds after the warning, so it was stopped hard` });
     }
-    const chunk = buf.subarray(0, end);
+  }
+  await readThere(d, r, c.host, L, state.ended);
+  if (!state.ended) {
+    if (state.status === 'running' && r.status !== 'running') {
+      updateRun(d.db, r.id, { status: 'running', why: null, startedAt: Date.now(), info: { startsAbout: undefined, startsGuess: undefined } });
+      addEvent(d.db, r.id, { kind: 'started', text: `Running on ${c.name}` });
+      L.outputAt = Date.now();
+    } else if (state.status === 'waiting' && state.why && (state.why !== r.why || state.startsAbout !== r.startsAbout)) {
+      updateRun(d.db, r.id, { why: state.why, info: { startsAbout: state.startsAbout } });
+      tellRuns(d, [r.id]);
+    }
+    if (state.status === 'running') await watch(d, getRun(d.db, r.id)!, L);
+    return save(d, r, L);
+  }
+  // Its scores come however it ended, as a run's here do.
+  await fetchScores(c.host, r);
+  if (state.slurm) {
+    const s = state.slurm;
+    if (s.status === 'stopped' && !getRun(d.db, r.id)?.stopping) updateRun(d.db, r.id, { info: { stopping: s.why ?? 'Cancelled' } });
+    return finish(d, getRun(d.db, r.id)!, L, s.status === 'done' ? 0 : state.code || 1, { why: s.why, oom: /memory/.test(s.why ?? ''), preempted: s.preempted, noExitCode: !leftCode && s.status !== 'done' });
+  }
+  return finish(d, getRun(d.db, r.id)!, L, state.code, state.code === null ? { missing: `It is no longer in ${c.name}’s queue and left no exit code` } : {});
+}
+
+/** A chunk of a file read in pieces, without a UTF-8 character cut at its end (it waits for the next look). */
+function wholeChars(buf: Buffer): Buffer {
+  let end = buf.length;
+  for (let k = 1; k <= 3 && end - k >= 0; k++) {
+    const b = buf[end - k];
+    if ((b & 0xc0) === 0x80) continue;
+    if (b >= 0xc0 && k < (b >= 0xf0 ? 4 : b >= 0xe0 ? 3 : 2)) end -= k;
+    break;
+  }
+  return buf.subarray(0, end);
+}
+
+/**
+ * A run's new output on a cluster, in one call: its log from where the last look stopped (copied here as it comes) and,
+ * when it names a metrics file, that file's new part (from its start again if it became shorter). A file that is not
+ * there is nothing new.
+ */
+async function readThere(d: Deps, r: RunRecord, host: string, L: Live, ended: boolean) {
+  const dir = r.remoteDir!;
+  const most = ended ? 8 << 20 : 1 << 20;
+  let script = `tail -c +${L.log + 1} ${q(`${dir}/log.txt`)} 2>/dev/null | head -c ${most} | base64 | tr -d '\\n'`;
+  if (r.metricsFile) {
+    const file = rq(runFile(r, r.metricsFile, dir));
+    script += `; echo; echo @@; cd ${rq(r.cwd || dir)} 2>/dev/null && [ -f ${file} ] && { size=$(($(wc -c < ${file}))); from=${L.file}; [ "$size" -lt "$from" ] && from=0; echo "$from"; tail -c +$((from + 1)) ${file} | head -c ${most} | base64 | tr -d '\\n'; }; true`;
+  }
+  const got = await runSsh(host, script, { timeoutMs: 60_000 });
+  const [log, metrics] = got.out.split('@@\n');
+  // A call cut short could leave half a chunk: only a whole answer is taken.
+  if (got.code !== 0) return;
+  if (log?.trim()) {
+    const chunk = wholeChars(Buffer.from(log.trim(), 'base64'));
     try {
       fs.mkdirSync(r.folder ?? runFolder(r.id), { recursive: true });
       fs.appendFileSync(files(r.folder ?? runFolder(r.id)).log, chunk);
@@ -1261,22 +1932,13 @@ async function followCluster(d: Deps, r: RunRecord) {
     L.log += chunk.length;
     consume(L, chunk.toString('utf8'), 'log');
   }
-  if (!state.ended) {
-    if (state.status === 'running' && r.status !== 'running') {
-      updateRun(d.db, r.id, { status: 'running', why: null, startedAt: Date.now() });
-      addEvent(d.db, r.id, { kind: 'started', text: `Running on ${c.name}` });
-      L.outputAt = Date.now();
-    } else if (state.status === 'waiting' && state.why && state.why !== r.why) setWhy(d, r, state.why);
-    if (state.status === 'running') await watch(d, getRun(d.db, r.id)!, L);
-    return save(d, r, L);
-  }
-  if (state.code === 0) await fetchScores(c.host, r);
-  if (state.slurm && state.code === null) {
-    const s = state.slurm;
-    if (s.status === 'stopped' && !getRun(d.db, r.id)?.stopping) updateRun(d.db, r.id, { info: { stopping: s.why ?? 'Cancelled' } });
-    return finish(d, getRun(d.db, r.id)!, L, s.status === 'done' ? 0 : 1, { why: s.why, oom: /memory/.test(s.why ?? '') });
-  }
-  return finish(d, getRun(d.db, r.id)!, L, state.code, state.code === null ? { missing: `It is no longer in ${c.name}’s queue and left no exit code` } : {});
+  const m = /^(\d+)\n([\s\S]*)$/.exec(metrics ?? '');
+  if (!m) return;
+  const from = Number(m[1]);
+  if (from < L.file) L.fileCarry = '';
+  const chunk = wholeChars(Buffer.from(m[2].trim(), 'base64'));
+  L.file = from + chunk.length;
+  if (chunk.length) consume(L, chunk.toString('utf8'), 'file');
 }
 
 /** A cluster run's per-example scores (the file it named, else scores.jsonl in its folder there), copied here when it ends. */
@@ -1303,9 +1965,9 @@ function setWhy(d: Deps, r: RunRecord, why: string) {
 /** Copies what another machine says of a run it keeps into the copy here; tells you of its end the way the job asked. */
 function copyRemote(d: Deps, r: RunRecord, there: RemoteRun) {
   // Put back to wait at the end of that machine's night: the copy drops what its last start recorded, too.
-  if (there.why === NIGHT_AGAIN && r.why !== NIGHT_AGAIN) resetRun(d.db, r.id, NIGHT_AGAIN);
+  if (isNightAgain(there.why) && !isNightAgain(r.why)) resetRun(d.db, r.id, there.why, { carry: there.why === NIGHT_CARRY });
   const info: Partial<RunInfo> = {};
-  for (const k of ['host', 'gpuIds', 'exitCode', 'commit', 'branch', 'dirty', 'untracked', 'kept', 'notKept', 'environment', 'outputAt', 'scores', 'stopping'] as const) (info as Record<string, unknown>)[k] = there[k];
+  for (const k of ['ranResume', 'hardStopAt', 'held', 'letRun', 'host', 'gpuIds', 'startsAbout', 'startsGuess', 'exitCode', 'commit', 'branch', 'dirty', 'untracked', 'kept', 'notKept', 'environment', 'outputAt', 'scores', 'queuedCode', 'codeAt', 'codeChanged', 'leftInCopy', 'ranAs', 'stopping', 'peak', 'gpuTotalGb', 'others', 'memoryLimitGb', 'memoryLow', 'firstError'] as const) (info as Record<string, unknown>)[k] = there[k];
   updateRun(d.db, r.id, { status: there.status, why: there.why ?? null, ...(there.startedAt ? { startedAt: there.startedAt } : {}), ...(there.endedAt ? { endedAt: there.endedAt } : {}), info, ...(there.metrics ? { metrics: there.metrics } : {}) });
   if (there.status !== r.status) {
     tellRuns(d, [r.id]);
@@ -1323,8 +1985,13 @@ async function followRemote(d: Deps, r: RunRecord) {
   const m = remoteMachine(r.remote!.machine);
   if (!m) return setWhy(d, r, 'Its machine is no longer in Settings → Machines');
   try {
-    const there = await m.call<{ run: RemoteRun }>('GET', `/api/experiments/runs/${r.remote!.id}?log=0`, 10_000);
+    const there = await m.call<{ run: RemoteRun; series?: MetricSeries }>('GET', `/api/experiments/runs/${r.remote!.id}?log=0`, 10_000);
+    // The sweep is kept here, not there: so its early stop is judged here, by the series read from there.
+    const rule = r.sweep ? getSweep(d.db, r.sweep)?.earlyStop : undefined;
+    if (rule && there.series) saveSeries(d.db, r.id, there.series);
     copyRemote(d, r, there.run);
+    const now = getRun(d.db, r.id);
+    if (rule && there.series && now?.status === 'running' && !now.stopping) await stopIfBehind(d, now, there.series, rule);
   } catch (e) {
     setWhy(d, r, `${m.name} did not answer just now (${(e as Error).message})`);
   }
@@ -1389,14 +2056,20 @@ export async function queueNow(d: Deps): Promise<QueueNow> {
   const here = runs.filter((r) => !r.remote && placeOf(r.where).kind === 'local');
   const going = here.filter((r) => r.status === 'starting' || r.status === 'running');
   const reading = await readGpus().catch((): GpuReading => ({ gpus: [], error: 'failed' }));
-  const holder = new Map(going.flatMap((r) => (r.gpuIds ?? []).map((g) => [g, r.id] as const)));
+  // The runs on each GPU, the longest there first.
+  const holders = new Map<number, string[]>();
+  for (const r of [...going].reverse()) for (const g of r.gpuIds ?? []) holders.set(g, [...(holders.get(g) ?? []), r.id]);
   return {
     running: runs.filter((r) => r.status === 'running' || r.status === 'starting').length,
     waiting: runs.filter((r) => r.status === 'queued' || r.status === 'waiting').length,
-    gpus: reading.gpus.map((g) => (holder.has(g.index) ? { ...g, run: holder.get(g.index) } : g)),
+    gpus: reading.gpus.map((g) => {
+      const ids = holders.get(g.index);
+      return ids ? { ...g, run: ids[0], ...(ids.length > 1 ? { runs: ids } : {}) } : g;
+    }),
     ...(reading.error === 'missing' ? { gpuNote: 'No NVIDIA GPU here' } : reading.error === 'failed' ? { gpuNote: 'The GPUs could not be read just now' } : {}),
     cpuRunning: going.filter((r) => !r.gpus).length,
     cpuSlots: settingsOf(d.db).cpuSlots,
+    ...(settingsOf(d.db).agentGpuHours !== null ? { agents: agentsUse(d.db) } : {}),
   };
 }
 
@@ -1420,7 +2093,9 @@ export interface WaitFor {
 }
 
 function chosen(db: DB, w: WaitFor): RunRecord[] {
-  if (w.ids?.length) return w.ids.map((id) => getRun(db, id)).filter((r): r is RunRecord => !!r);
+  // One the app took up again is followed to the run that took its place (its `from` names the one asked for).
+  const latest = (r: RunRecord | null): RunRecord | null => (r?.restartedAs ? (latest(getRun(db, r.restartedAs)) ?? r) : r);
+  if (w.ids?.length) return w.ids.map((id) => latest(getRun(db, id))).filter((r): r is RunRecord => !!r);
   return listRuns(db, { group: w.group, tag: w.tag, limit: 2000 });
 }
 
@@ -1458,6 +2133,8 @@ export async function waitRuns(d: Deps, w: WaitFor, o: { hours: number; key: str
 /** For the tests: the loop's memory of runs goes (as after a restart). */
 export function forgetLive() {
   live.clear();
+  estimates.clear();
+  lastKept.clear();
 }
 
 export type { RunEvent };

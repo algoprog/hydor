@@ -500,10 +500,178 @@ for (const s of [
 // toast (the constants of server/experiments/night.ts), and the box a refused time names (queue.ts).
 for (const m of fs.readFileSync(path.join(ROOT, 'server/experiments/night.ts'), 'utf8').matchAll(/^(?:export )?const NIGHT_\w+ = ('(?:[^'\\]|\\.)*');$/gm)) for (const s of literals(m[1])) add(s, 'server/experiments/night.ts');
 add('Night to', 'server/experiments/queue.ts');
+// Why a run waits, as the queue puts it together (queue.ts, gpus.ts, forecast.ts), every reading written out. The pages'
+// translator takes a reason of several sentences sentence by sentence, and what follows "Waiting for …: " (clauses joined
+// with "; ") clause by clause; a cluster reached over SSH adds " (on <name>)".
+for (const s of [
+  ...['Waiting for 1 GPU with {0} free', 'Waiting for 1 GPU that is free', 'Waiting for {0} GPUs with {1} free each', 'Waiting for {0} GPUs that are free'].flatMap((head) => {
+    const n = (head.match(/\{\d\}/g) ?? []).length;
+    return [`${head}: {${n}}`, `${head}: {${n}} (on {${n + 1}})`];
+  }),
+  'only GPU {0} has that now',
+  '{0} have that (GPUs {1}) now',
+  'the most free now is {0}, on GPU {1}',
+  'another program ({0}) holds {1} GB on GPU {2}',
+  'another program holds {0} GB on GPU {1}',
+  'other programs ({0} and more) hold {1} GB on GPU {2}',
+  'other programs hold {0} GB on GPU {1}',
+  'your other runs hold GPU {0}',
+  'your other runs hold GPUs {0} and {1}',
+  'none is free now',
+  'Waiting behind “{0}”, which needs {1} and has waited {2}',
+  // About when it may start: the clock "on" a weekday or a date (also the Research tab's "starts about …"). A day more
+  // than a week away is "5 December" (the translator takes only a day's number before a month's name). A reason's own
+  // "About <clock>" is written whole: "{0} tomorrow" would take its "About" for part of the clock, and "About {0}" is
+  // about a topic ("Über", "Unos") elsewhere.
+  'About {0}:{1}',
+  'About {0}:{1} on {2}',
+  '{0}:{1} on {2}',
+  ...['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m) => `{0} ${m}`),
+  'About {0}:{1} tomorrow',
+  'About {0}, when “{1}” should end',
+  // The same with the clock written as one ("las 14:20"), and a weekday's whole reading: a weekday's own entry has the
+  // capital of a label, which Spanish, French and Portuguese do not write inside a sentence.
+  'About {0}:{1}, when “{2}” should end',
+  'It expects to start about {0}:{1}',
+  'starts about {0}:{1}',
+  ...['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].flatMap((day) => [`{0}:{1} on ${day}`, `About {0}:{1} on ${day}`]),
+  'No telling when: those runs do not say how far they have to go',
+  'Waiting for one of your runs without a GPU to end ({0} at most at once: Where runs go changes that)',
+  'Waiting: the GPUs could not be read just now (nvidia-smi failed); trying again',
+  'This computer has no NVIDIA GPU that nvidia-smi can see: run it with 0 GPUs, or on another machine or cluster',
+  'It asks for {0} GPUs, and this computer has {1}',
+  // The notice of a long wait.
+  '“{0}” has waited {1} hours for {2}',
+  'a place among the runs without a GPU',
+])
+  add(s, 'server/experiments/queue.ts');
+// "4 GPUs" (a waiting reason, the Research tab): its one word is all capitals but for the s, which add() takes for a name in code.
+found.set('{0} GPUs', 'server/experiments/queue.ts');
+// Why a run ended (failures.ts, and finish in queue.ts), and what the watch finds in a run still going, which a notice says.
+for (const s of [
+  'It ran out of memory',
+  'It ran out of memory (it was killed: exit code 137)',
+  'It ran out of memory: it had reached {0} of {1} GB of memory',
+  'It ran out of memory (it was killed: exit code 137): it had reached {0} of {1} GB of memory',
+  'It ran out of memory on GPU {0}',
+  'It ran out of memory on GPU {0}: it had reached {1} of {2} GB',
+  'It ran out of memory on GPU {0}: another program held {1} GB there when it started',
+  'It ran out of memory on GPU {0}: it had reached {1} of {2} GB, and another program held {3} GB there when it started',
+  'It was killed (exit code 137): by the system or by someone, perhaps for memory',
+  'Its command ended with exit code {0}',
+  'Its process went missing',
+  'Its process went missing without an exit code: the computer may have restarted, or something killed it',
+  'It reached its time limit of {0} h',
+  'Its code changed while it waited and was too large to keep as queued: run it again',
+  'Its code changed while it waited and could not be put back as it was queued ({0}): run it again',
+  'Stopped early: {0} was {1} at step {2}, worse than the median of the other {3} runs then ({4})',
+  'Stopped: whoever asked for the trial stopped waiting',
+  '{0} became NaN',
+  '{0} became NaN at step {1}',
+  '{0} became infinite',
+  '{0} became infinite at step {1}',
+  'NaN in its log: “{0}”',
+  'Out of memory in its log: “{0}”',
+  '{0} went over twice its best ({1}) and stayed there: {2} now',
+  'No new output for about a minute',
+  'No new output for {0} minutes',
+  'No new output for {0} hours',
+  'It is still running',
+  'An agent is looking into it',
+])
+  add(s, 'server/experiments/failures.ts');
+// What a cluster says (clusters.ts and queue.ts): about when it expects to start a run, why it refused one before it was
+// sent (a sentence of the app's, then the cluster's own line), and how a SLURM job ended, with what to do.
+for (const s of [
+  'The cluster’s cautious guess to start it is {0}; it often starts much sooner',
+  'It expects to start about {0}',
+  'It is over a limit of your account or queue there: wait for one of your jobs to end, or ask for less',
+  'No node of the cluster has what it asks for: ask for fewer GPUs, processors or memory, or another partition',
+  'The cluster has no partition by that name, or you may not use it: check Partition',
+  'It asks for more time than the cluster allows there: give it fewer hours, or another partition',
+  'The cluster did not accept the account: check the cluster’s Account in Where runs go',
+  'It asks for more memory than the cluster allows there: ask for less',
+  'The cluster cannot give it those GPUs: check GPUs and Partition',
+  'It asks for more processors than the cluster allows there: ask for fewer',
+  'The cluster did not accept it',
+  'The cluster said: “{0}”',
+  'It was cancelled in the cluster’s queue: if that was not you, ask who runs the cluster, then run it again',
+  'It reached the cluster’s time limit: give it more hours, or a way to carry on',
+  'It reached the cluster’s time limit of {0} h: give it more hours, or a way to carry on',
+  'It reached the cluster’s time limit: give it more hours, or run it again to carry on from its checkpoint',
+  'It reached the cluster’s time limit of {0} h: give it more hours, or run it again to carry on from its checkpoint',
+  'The cluster stopped it for memory: it asked for {0} GB. Give it more memory, or use a smaller batch',
+  'The cluster stopped it for memory: it asked for no amount, so it had the cluster’s default. Give it more memory, or use a smaller batch',
+  'Give it more memory, or use a smaller batch',
+  'The cluster stopped it for memory: it asked for {0} GB',
+  'The cluster stopped it for memory: it asked for no amount, so it had the cluster’s default',
+  'The node it ran on failed',
+  'The cluster took its place back (preempted): run it again to carry on from its checkpoint',
+  'The cluster took its place back (preempted): run it again, or give it a way to carry on',
+  'The cluster took its place back (preempted): it was sent again to carry on from its checkpoint',
+  // Why it waits in SLURM's queue (reasonWords), each reading whole: SLURM's own code stays as SLURM writes it, and a
+  // code that is one plain word is written out, so it is not taken for one of the app's words.
+  'In the cluster’s queue: other jobs come first (Priority)',
+  'In the cluster’s queue: the cluster waits for the resources it asks for to be free (Resources)',
+  'In the cluster’s queue: you have as many jobs running as the cluster allows ({0})',
+  'In the cluster’s queue: you use as much of the cluster as your share allows ({0})',
+  'In the cluster’s queue: the nodes it needs are not available now ({0})',
+  'In the cluster’s queue: it waits for another job (Dependency)',
+  'In the cluster’s queue: it waits for another job ({0})',
+  'In the cluster’s queue: it is set to start later ({0})',
+  'In the cluster’s queue: it is held ({0})',
+  'In the cluster’s queue: its time is over the partition’s limit: give it fewer hours ({0})',
+  'In the cluster’s queue: it waits for a reservation (Reservation)',
+  'In the cluster’s queue: it waits for a reservation ({0})',
+  'In the cluster’s queue: SLURM says: {0}',
+  'It ended as {0}',
+  'It ended as {0}, with exit code {1}',
+  // Why an SSH call failed (sshWhy), and what Check says of a cluster.
+  'SSH refused the sign-in: this computer needs a key there that works without a password (ssh-copy-id), as BatchMode allows no prompts',
+  'That host name is not known (check ~/.ssh/config)',
+  'Could not reach it: {0}',
+  'Its host key is not known yet: connect once with ssh from a terminal to accept it',
+  'ssh ended with exit code {0}',
+  'SSH works, but sbatch is not there: is it a SLURM cluster (or does it need a module loaded in the setup lines)?',
+  'SSH and SLURM work.',
+  'SSH and SLURM work. Partitions: {0}',
+  'SSH works.',
+  'GPUs: {0} ({1}); runs go into tmux there',
+  'GPUs: {0} ({1}); tmux is not there, so runs go in the background (nohup)',
+  'No NVIDIA GPUs found; runs go into tmux there',
+  'No NVIDIA GPUs found; tmux is not there, so runs go in the background (nohup)',
+])
+  add(s, 'server/experiments/clusters.ts');
+// Why a run on a cluster or a plain SSH machine waits or ended, and why a run was stopped (queue.ts); then the refusals
+// that choose between two sentences there (`carryOn ? … : …`), which the scan of server errors does not see.
+for (const s of [
+  'sbatch did not take it: {0}',
+  'It could not start on {0}: {1}',
+  'It is no longer in {0}’s queue and left no exit code',
+  'Its cluster is no longer in Where runs go',
+  '{0} has no NVIDIA GPU that nvidia-smi can see',
+  'Waiting: could not reach {0} just now ({1}); trying again',
+  'Waiting: could not write to {0} ({1}); trying again',
+  'Could not reach {0} just now ({1}); trying again',
+  'Stopped: this Hydor cannot keep it for the night',
+  'Stopped by an agent',
+  'Stopped by an agent: {0}',
+  'Its score could not be started',
+  'Its score was not started in full',
+  'Its own code was not kept, so it cannot carry on with it: start over, with the folder as it is now',
+  'Its own code was not kept: run it again with the folder as it is now',
+  'Carrying on runs its own code, which belongs to its folder on this computer: leave the folder and where it runs as they were, or start over',
+  'Its own code belongs to its folder on this computer: leave the folder and where it runs as they were, or run the folder as it is now',
+  'Its own code cannot be put back as it was ({0}), so it cannot carry on with it: start over, with the folder as it is now',
+  'Its own code cannot be put back as it was ({0}): run it again with the folder as it is now',
+])
+  add(s, 'server/experiments/queue.ts');
+// The box a refused number names (queue.ts).
+add('Seconds of warning before a stop', 'server/experiments/queue.ts');
 // The morning's notice (morningWords in night.ts): its counts joined by commas, the first saying "run" or "runs". The pages'
 // translator takes it whole or not at all, so every reading is written out here.
 {
-  const parts = ['done', 'failed', 'stopped', 'still running', 'waits'];
+  const parts = ['done', 'failed', 'stopped', 'still running', 'waits', 'held'];
   for (let set = 1; set < 1 << parts.length; set++) {
     const used = parts.filter((_, i) => set & (1 << i));
     for (const one of [true, false]) {
@@ -511,13 +679,42 @@ add('Night to', 'server/experiments/queue.ts');
       let k = one ? 0 : 1;
       used.forEach((p, i) => {
         const count = i ? `{${k++}}` : one ? '1 run' : '{0} runs';
-        const said = p !== 'waits' ? [p] : (i ? [true, false] : [one]).map((single) => `still ${single ? 'waits' : 'wait'} for tonight`);
+        const said = p !== 'waits' && p !== 'held' ? [p] : (i ? [true, false] : [one]).map((single) => (p === 'held' ? `${single ? 'waits' : 'wait'} for you` : `still ${single ? 'waits' : 'wait'} for tonight`));
         readings = readings.flatMap((r) => said.map((w) => `${r}${i ? ', ' : ''}${count} ${w}`));
       });
       for (const r of readings) add(`Last night: ${r}`, 'server/experiments/night.ts');
     }
   }
 }
+// Runs held at the limit on agents' GPU hours (budget.ts): why one waits (the whole reason, and without its first words,
+// where the status says them already), what its events say, and the day's notice.
+for (const s of [
+  'Waits for you: agents have used {0} of {1} GPU hours in the last seven days',
+  'Agents have used {0} of {1} GPU hours in the last seven days',
+  'There is room again under the limit: it takes its turn',
+  'You let it run beyond the limit on agents’ GPU hours',
+  'Agents reached the {0} GPU hours you allow in seven days: 1 run waits for you',
+  'Agents reached the {0} GPU hours you allow in seven days: {1} runs wait for you',
+])
+  add(s, 'server/experiments/budget.ts');
+// The titles of the cards that ask before an agent's runs, searches and evaluations (server/experiments/tools.ts), which
+// the pages and a phone's notification translate; what a card shows below its title is the command itself.
+for (const s of [
+  'Run a job',
+  'Run a job on 1 GPU',
+  'Run a job on {0} GPUs',
+  'Run “{0}” again',
+  'Try a job for {0} seconds?',
+  'Start a sweep of {0} runs',
+  'Stop the run “{0}”',
+  'Allow {0} of runs?',
+  'Score “{0}”',
+  'Create and seal the evaluation “{0}”?',
+  'Create and seal',
+  'Evolve {0} with “{1}”',
+  'Evolve {0} files with “{1}”',
+])
+  add(s, 'server/experiments/tools.ts');
 // A night evolution's sentence in that notice (searchWords in evolve.ts), joined after the runs' with ". ": the pages'
 // translator takes the notice sentence by sentence, so each reading is an entry of its own, without its full stop.
 for (const s of [
@@ -532,6 +729,9 @@ const NAMED = ['assistants/builtins', 'apps/templates', 'apps/templates-more', '
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
   for (const m of src.matchAll(/\b(name|label|description|detail|placeholder|help|title|category|note)\s*:\s*((['"`])(?:(?!\3)[^\\]|\\.)*\3)/g)) for (const s of literals(m[2])) add(s, f);
+  // The paper check's titles that choose between two sentences (one and several: `title: count === 1 ? … : …`).
+  if (f === 'server/pages/latex-check.ts')
+    for (const m of src.matchAll(/\btitle\s*:\s*[^'"`\n,{}?]+\?\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)\s*:\s*((['"`])(?:(?!\4)[^\\]|\\.)*\4)/g)) for (const s of [...literals(m[1]), ...literals(m[3])]) add(s, f);
   // The sentences the paper check puts together into one finding's text, one pushed at a time.
   if (f === 'server/pages/latex-check.ts') for (const m of src.matchAll(/\b(?:changed|said)\.push\(\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, f);
   // A ready-made app's choices, which its form shows as chips (the answer sent stays the option as written).
@@ -581,6 +781,12 @@ for (const f of fs.readdirSync(path.join(ROOT, 'docs/guide')).filter((x) => /^\d
 }
 
 const out = Object.fromEntries([...found.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+// --list <file>: what it finds, written there instead (a test's look: the shipped list and its counts stay as they are).
+const listFlag = process.argv.indexOf('--list');
+if (listFlag !== -1) {
+  fs.writeFileSync(process.argv[listFlag + 1], JSON.stringify(out));
+  process.exit(0);
+}
 fs.mkdirSync(path.join(ROOT, 'web/src/i18n'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'web/src/i18n/strings.json'), `${JSON.stringify(out, null, 0).replace(/^\{/, '{\n').replace(/","/g, '",\n"').replace(/\}$/, '\n}')}\n`);
 console.log(`${found.size} strings`);

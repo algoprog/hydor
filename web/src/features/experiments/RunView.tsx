@@ -1,28 +1,39 @@
-// A run's page (/experiments/<id>): a way back to its experiment, its name, Stop, Run again and a menu; its status
-// and why, and how far it is while it runs; then three tabs. Overview: how a failed run ended, its key metrics as tiles
-// (a tap opens that curve on the Charts tab), its hyperparameters, the numbers it printed once, and what it ran from
-// (details, code, command, environment) and what happened. Charts: every metric that is a curve over steps. Log: the
-// output, newest at the bottom, following while it goes, with a box to find lines. A run kept on another machine is
-// read through that machine. A run in an evaluation's folder says whether the sealed files were as sealed; a run that
-// scores one leads back to it.
+// A run's page (/experiments/<id>): a way back to its experiment, its name, Stop, Run again, Ask an agent why (a
+// failed one) and a menu; its status and why, and how far it is while it runs; then three tabs. Overview: where a
+// failed run first went wrong (with a link to that line of the log) and how it ended, its key metrics as tiles (a tap
+// opens that curve on the Charts tab), its hyperparameters, the numbers it printed once, and what it ran from (details,
+// code, command, environment) and what happened. Charts: every metric that is a curve over steps, and under System
+// what it used over time. Log: the output, newest at the bottom, following while it goes, with a box to find lines. A
+// run kept on another machine is read through that machine. A run in an evaluation's folder says whether the sealed
+// files were as sealed; a run that scores one leads back to it. Under its name: where it stands among the attempts at
+// the same thing, a line about it to write or change, and that it is archived; a star beside the name.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Copy, FolderOpen, Gauge, Lock, MoreHorizontal, Play, RotateCcw, Search, Square, Trash2 } from 'lucide-react';
+import { AlertTriangle, Archive, ArchiveRestore, ArrowLeft, Copy, FolderOpen, Gauge, Lock, MoreHorizontal, Play, RotateCcw, Search, Sparkles, Square, Star, Trash2 } from 'lucide-react';
+import { whyRequest } from '@shared/ask-why';
 import type { EvalScore, EvaluationListed } from '@shared/evaluations';
-import type { ExperimentGroup, MetricSeries, RunRecord } from '@shared/experiments';
+import { isTrialRun, trySecondsOf, type ExperimentGroup, type FirstError, type MetricSeries, type RunChain, type RunFiles, type RunRecord } from '@shared/experiments';
 import { evalUrl, scoredBy } from './evalApi';
 import { pathWords } from './evalWords';
 import { api, ApiError } from '../../lib/api';
 import { LOCALE } from '../../i18n/locale';
-import { trIn } from '../../i18n/runtime';
+import { tr, trIn } from '../../i18n/runtime';
 import { saidByStatus } from './nightWords';
 import { machinePath } from '../../lib/machine';
 import { go, goFull, sessionPath, showInFiles } from '../../lib/nav';
 import { canReveal, reveal, revealLabel } from '../../lib/reveal';
-import { toast, toastError } from '../../lib/store';
+import { toast, toastError, useApp } from '../../lib/store';
 import { useFeatureEvent } from '../../lib/featureEvents';
+import { lastAgent, startSettings } from '../../lib/start';
+import { startSession } from '../../lib/starting';
+import { useRun } from '../git/BisectDialog';
+import { fill, peakLines } from './tryWords';
 import { DiffView } from '../../components/DiffView';
 import { Meter } from '../../components/charts';
-import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Tabs, Throbber, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Tabs, Throbber } from '../../components/ui';
+import { askDelete } from './DeleteRuns';
+import { HeldRun } from './HeldRun';
+import { ChainLine, NoteLine } from './RunMarks';
+import { markRun } from './marksApi';
 import { baseOf, copy, gpuWords, isActive, keyMetrics, leftWords, num, progressOf, rankMetrics, rankValues, statusTone, statusWords, took, type RunTab } from './api';
 import { paramsOf, paramText, runKey } from './analysis';
 import { Sparkline } from './Charts';
@@ -30,9 +41,12 @@ import { ChartsPanel } from './ChartsPanel';
 
 interface View {
   run: RunRecord;
+  chain?: RunChain;
   series: MetricSeries;
   log: string;
   logSize: number;
+  system?: MetricSeries;
+  folderFiles?: RunFiles;
 }
 
 const EVENT_WORDS: Record<string, string> = {
@@ -50,6 +64,9 @@ const EVENT_WORDS: Record<string, string> = {
   failed: 'Failed',
   note: 'Note',
 };
+
+/** Whether an event's text says no more than its kind's word ("In line" under "In line"). */
+const onlyItsWord = (word: string, text: string) => text.trim().replace(/\.$/, '').toLowerCase() === word.toLowerCase();
 
 const when = (t: number) => new Date(t).toLocaleString(LOCALE, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -79,6 +96,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 const linkCls = 'text-left text-accent hover:underline';
+const CODE = 'block rounded-lg bg-bg-1 px-2.5 py-2 font-mono text-[12px] leading-relaxed break-all whitespace-pre-wrap';
 
 /** The files the command names that git does not track: what became of them, and their names. */
 function NotInGit({ words, files }: { words: string; files: string[] }) {
@@ -89,6 +107,67 @@ function NotInGit({ words, files }: { words: string; files: string[] }) {
         {files.join(', ')}
       </span>
     </p>
+  );
+}
+
+/** File names in a sentence: the first two, then how many more. */
+function FileNames({ files }: { files: string[] }) {
+  const more = files.length - 2;
+  return (
+    <>
+      <span translate="no" className="font-mono text-[11.5px] [overflow-wrap:anywhere]">
+        {files.slice(0, 2).join(', ')}
+      </span>
+      {more > 0 ? <span> {fill(tr('and {0} more.'), more)}</span> : <span translate="no">.</span>}
+    </>
+  );
+}
+
+/**
+ * Which code it ran when the folder had changed since it was queued, a way to open its code, and what stayed in its
+ * copy.
+ */
+function OwnCode({ r, going, open }: { r: RunRecord; going: boolean; open?: () => void }) {
+  const changed = r.codeChanged ?? [];
+  const line = 'border-t border-line pt-1.5 text-[12px] leading-snug text-fg-3 first:border-t-0 first:pt-0';
+  return (
+    <>
+      {changed.length > 0 && (
+        <p className={line}>
+          {r.codeAt === 'start' ? (
+            <span>{going ? 'It runs the folder as it was when it started. It had changed since it was queued:' : 'It ran the folder as it was when it started. It had changed since it was queued:'}</span>
+          ) : (
+            <span>{going ? 'It runs the code as it was when it was queued. The folder had changed since:' : 'It ran the code as it was when it was queued. The folder had changed since:'}</span>
+          )}{' '}
+          <FileNames files={changed} />
+          {going && r.codeDir && (
+            <>
+              {' '}
+              <span>What it writes into new folders shows in your folder when it ends.</span>
+            </>
+          )}
+        </p>
+      )}
+      {open && (
+        <div className={line}>
+          <button type="button" onClick={open} className={cx(linkCls, 'inline-flex min-h-6 items-center gap-1')}>
+            <FolderOpen size={12} /> Open its code
+          </button>
+        </div>
+      )}
+      {!!r.leftInCopy?.length && r.folder && (
+        <div className={line}>
+          <p>Left in its copy, as its folder has its own:</p>
+          <p translate="no" className="font-mono text-[11.5px] [overflow-wrap:anywhere]">
+            {r.leftInCopy.slice(0, 20).join(', ')}
+          </p>
+          {r.leftInCopy.length > 20 && <p>{fill(tr('and {0} more.'), r.leftInCopy.length - 20)}</p>}
+          <p translate="no" className="mt-1 font-mono text-[11px] [overflow-wrap:anywhere]">
+            {`${r.folder}/code`}
+          </p>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -132,6 +211,52 @@ function Tail({ text }: { text: string }) {
       {text}
     </pre>
   );
+}
+
+/** The lines where a run first went wrong, the one that says it marked. */
+function WrongLines({ at }: { at: FirstError }) {
+  // A traceback's lines may have a middle left out, so the line that says it is found by its text.
+  const marked = at.lines.findIndex((l) => l.trim() === at.text);
+  return (
+    // Lines are kept whole and the block scrolls sideways: wrapped, a traceback's "^^^^" would not sit under what it marks.
+    <pre translate="no" className="max-h-[320px] overflow-auto rounded-lg bg-[var(--term-bg)] py-2 font-mono text-[11.5px] leading-[1.55] whitespace-pre text-[var(--term-fg)]">
+      {/* As wide as the longest line, so the marked line's colour goes as far as one scrolls. */}
+      <div className="w-max min-w-full">
+        {at.lines.map((l, i) => (
+          <div key={i} className={cx('px-3', i === marked && 'border-l-2 border-err bg-err/15 pl-2.5')}>
+            {l || ' '}
+          </div>
+        ))}
+      </div>
+    </pre>
+  );
+}
+
+/** Opens a new session in the run's folder that looks into why it failed, changing nothing (shared/ask-why.ts). */
+function useAskWhy(r: RunRecord | undefined): () => void {
+  const [who] = useState(lastAgent);
+  const run = useRun(who.agent, who.acp);
+  const acpList = useApp((s) => s.boot?.acpAgents);
+  return () => {
+    if (!r) return;
+    // A run on a cluster or another machine has its folder there, not here.
+    const cwd = !r.remote && (!r.where || r.where === 'local') ? r.cwd : undefined;
+    const prompt = whyRequest({ id: r.id, name: r.name ?? r.id, status: r.status, why: r.why, firstError: r.firstError });
+    const s = startSettings();
+    startSession(
+      { agent: who.agent, acpName: run.acpName ?? acpList?.find((a) => a.id === who.acp)?.name, title: prompt.slice(0, 300), text: prompt, atts: [], cwd: cwd ?? '' },
+      async () => ({
+        agent: who.agent,
+        acpAgent: who.agent === 'acp' ? who.acp : undefined,
+        prompt,
+        model: run.model ?? undefined,
+        mode: run.mode ?? undefined,
+        account: run.account,
+        cwd,
+      }),
+      { text: prompt, files: [], extra: {}, folder: cwd ? { cwd, over: JSON.stringify([s.cwd ?? null, s.task ?? null, s.space ?? null]) } : undefined, from: '' },
+    );
+  };
 }
 
 /** The numbers a run gave once, as name and value pairs in a card, a Find box above when there are many. */
@@ -180,6 +305,46 @@ function Values({ names, last }: { names: string[]; last: Record<string, number>
     >
       <PairsCard names={shown} value={(k) => num(last[k])} find={all && names.length > 24} />
     </Block>
+  );
+}
+
+/** The log from one line on (where a failed run first went wrong), that line marked; Show the end goes back. */
+function LogAt({ id, base, at, onEnd }: { id: string; base?: string; at: FirstError; onEnd: () => void }) {
+  const [text, setText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const mark = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let live = true;
+    api<{ text: string }>(`/api/experiments/runs/${id}/log?from=${at.offset}`, base !== undefined ? { base } : {})
+      .then((r) => live && setText(r.text))
+      .catch((e) => live && setError((e as Error).message));
+    return () => {
+      live = false;
+    };
+  }, [id, base, at]);
+  useEffect(() => {
+    mark.current?.scrollIntoView({ block: 'center' });
+  }, [text]);
+  const lines = useMemo(() => (text ?? '').replace(/\n$/, '').split('\n'), [text]);
+  const marked = at.line - at.from;
+  return (
+    <section className="flex min-w-0 flex-col">
+      <div className="mb-2 flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="tnum flex-1 text-[12.5px] text-fg-3">{fill(tr('The log from line {0}'), at.from)}</span>
+        <Button size="sm" variant="ghost" onClick={onEnd}>
+          Show the end
+        </Button>
+      </div>
+      <pre translate="no" className="h-[calc(100dvh-250px)] min-h-[60vh] overflow-auto rounded-xl border border-line bg-[var(--term-bg)] py-2 font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap text-[var(--term-fg)] [overflow-wrap:anywhere]">
+        {error ?? null}
+        {text !== null &&
+          lines.map((l, i) => (
+            <div key={i} ref={i === marked ? mark : undefined} className={cx('px-3', i === marked && 'border-l-2 border-err bg-err/15 pl-2.5')}>
+              {l || ' '}
+            </div>
+          ))}
+      </pre>
+    </section>
   );
 }
 
@@ -277,8 +442,8 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
   const [menu, setMenu] = useState(false);
   const [patch, setPatch] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
+  const [logAt, setLogAt] = useState<FirstError | null>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
-  const [confirm, confirmNode] = useConfirm();
   const load = useCallback(
     (lines = 400) =>
       api<View>(`/api/experiments/runs/${id}?lines=${lines}`, base !== undefined ? { base } : {})
@@ -292,12 +457,15 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
   useEffect(() => {
     setV(null);
     setFocus(null);
+    setLogAt(null);
     load();
   }, [load]);
-  // A focused metric is for one visit to the Charts tab.
+  // A focused metric is for one visit to the Charts tab, a line of the log to one visit to the Log tab.
   useEffect(() => {
     if (tab !== 'charts') setFocus(null);
+    if (tab !== 'log') setLogAt(null);
   }, [tab]);
+  const askWhy = useAskWhy(v?.run);
   const going = !!v && isActive(v.run);
   // A run that ends while the page is open: its whole log is read once more (the one read at load stops where it was then), and the Log shows it.
   const wasGoing = useRef(false);
@@ -348,10 +516,20 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
   };
   const remove = async () => {
     setMenu(false);
-    if (!(await confirm({ title: 'Delete this run’s record?', body: 'Its record, log, patch and metrics go. The files it made in its own folder stay.', confirm: 'Delete', danger: true }))) return;
+    const on = base !== undefined ? { base } : {};
     try {
-      await api(`/api/experiments/runs/${id}`, { method: 'DELETE', ...(base !== undefined ? { base } : {}) });
-      onBack();
+      // Its folder as it is now: what is said to go is what goes.
+      const now = await api<View>(`/api/experiments/runs/${id}?lines=0`, on);
+      // A copy of a run another machine keeps: only the copy goes.
+      const elsewhere = !machine && !!now.run.remote;
+      askDelete({
+        title: 'Delete this run’s record?',
+        files: now.folderFiles,
+        ...(elsewhere ? { instead: tr('Its record here goes. The run, its log and its files stay on the machine that ran it.') } : {}),
+        stays: elsewhere ? undefined : tr(now.run.where?.startsWith('c:') ? 'What it wrote on the cluster stays.' : 'What it wrote in the project’s folder stays.'),
+        remove: (keep) => api<{ kept?: string }>(`/api/experiments/runs/${id}${keep ? '?files=keep' : ''}`, { method: 'DELETE', ...on }),
+        done: onBack,
+      });
     } catch (e) {
       toastError(e);
     }
@@ -367,8 +545,23 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
     }
   };
   const copyText = async (text: string, said: string) => toast((await copy(text)) ? said : 'Could not copy');
+  /** The run's code in Files: its copy, or one made now from what was kept. */
+  const openCode = async () => {
+    try {
+      const c = await api<{ dir: string }>(`/api/experiments/runs/${id}/code`, { method: 'POST', body: {} });
+      showInFiles(c.dir);
+    } catch (e) {
+      toastError(e);
+    }
+  };
 
   const r = v?.run;
+  // A note, a star or archiving, then the run as it is now.
+  const mark = async (body: { note?: string; starred?: boolean; archived?: boolean }) => {
+    await markRun({ id, ...(machine ? { machine: { id: machine, name: '' } } : {}) }, body);
+    await load(0);
+  };
+  const tryMark = (body: Parameters<typeof mark>[0]) => void mark(body).catch(toastError);
   // A chart is for a metric with a curve (two points or more), the ones that matter most first; the others are values.
   const metrics = v
     ? rankMetrics(
@@ -382,6 +575,11 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
   const progress = r ? progressOf(r) : null;
   const sessionLink = (key: string) => (machine ? goFull(machinePath(machine, sessionPath(key))) : go(sessionPath(key)));
   const local = !machine && !r?.remote;
+  // An agent here can read only this computer's runs.
+  const canAsk = !machine && !scored && (r?.status === 'failed' || r?.status === 'lost');
+  // A run that scored an evaluation is not run again by itself (the evaluation scores again); one that is held, waits or
+  // is in line has not run a first time yet.
+  const canAgain = !!r && !scored && (!!r.startedAt || (r.status !== 'queued' && r.status !== 'waiting'));
 
   const head = (
     <div className="shrink-0">
@@ -395,13 +593,22 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
         <h1 translate="no" className="min-w-0 flex-1 py-0.5 text-[17px] leading-snug font-semibold break-words">
           {r ? r.name || r.id : <span className="inline-block h-5 w-56 max-w-full animate-pulse rounded bg-bg-2 align-middle" />}
         </h1>
+        {r && !scored && (
+          <IconButton label={r.starredAt ? 'Take the star off this run' : 'Star this run'} aria-pressed={!!r.starredAt} onClick={() => tryMark({ starred: !r.starredAt })} className={r.starredAt ? '!text-warn' : undefined}>
+            <Star size={16} fill={r.starredAt ? 'currentColor' : 'none'} />
+          </IconButton>
+        )}
         {r && going && (
           <Button size="sm" variant="secondary" icon={<Square size={13} />} onClick={stop} disabled={!!r.stopping}>
             {r.stopping ? 'Stopping' : 'Stop'}
           </Button>
         )}
-        {/* A run that scored an evaluation is not run again by itself: the evaluation scores again. */}
-        {r && !scored && (
+        {canAsk && (
+          <Button size="sm" variant="ghost" icon={<Sparkles size={14} />} onClick={askWhy} className="max-sm:hidden">
+            Ask an agent why
+          </Button>
+        )}
+        {canAgain && (
           <Button size="sm" variant="ghost" icon={<RotateCcw size={14} />} onClick={again} className="max-sm:hidden">
             Run again
           </Button>
@@ -414,15 +621,28 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
             <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={240}>
               {!scored && (
                 <div className="sm:hidden">
-                  <MenuItem
-                    icon={<RotateCcw size={14} />}
-                    onClick={() => {
-                      setMenu(false);
-                      again();
-                    }}
-                  >
-                    Run again
-                  </MenuItem>
+                  {canAsk && (
+                    <MenuItem
+                      icon={<Sparkles size={14} />}
+                      onClick={() => {
+                        setMenu(false);
+                        askWhy();
+                      }}
+                    >
+                      Ask an agent why
+                    </MenuItem>
+                  )}
+                  {canAgain && (
+                    <MenuItem
+                      icon={<RotateCcw size={14} />}
+                      onClick={() => {
+                        setMenu(false);
+                        again();
+                      }}
+                    >
+                      Run again
+                    </MenuItem>
+                  )}
                 </div>
               )}
               <MenuItem
@@ -456,6 +676,17 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                   {revealLabel()}
                 </MenuItem>
               )}
+              {!going && !scored && (
+                <MenuItem
+                  icon={r.archivedAt ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                  onClick={() => {
+                    setMenu(false);
+                    tryMark({ archived: !r.archivedAt });
+                  }}
+                >
+                  {r.archivedAt ? 'Bring back' : 'Archive'}
+                </MenuItem>
+              )}
               {!going && (
                 <>
                   <MenuSep />
@@ -470,6 +701,16 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
       </div>
       {r && (
         <div className="mt-1 space-y-1.5">
+          {v?.chain && <ChainLine chain={v.chain} machine={machine} />}
+          <NoteLine key={id} note={r.note} by={r.noteBy} onSave={(note) => mark({ note })} />
+          {r.archivedAt && (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-fg-2">
+              <span>Archived: out of the table, the charts and the counts.</span>
+              <Button size="sm" variant="secondary" icon={<ArchiveRestore size={13} />} onClick={() => tryMark({ archived: false })}>
+                Bring back
+              </Button>
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px]">
             <span className={cx('h-2 w-2 shrink-0 rounded-full', statusTone(r.status))} />
             <span className="font-medium">{statusWords(r)}</span>
@@ -516,7 +757,9 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
               </span>
             </button>
           )}
-          {r.why && !saidByStatus(r.why) && (r.status === 'queued' || r.status === 'waiting' || r.status === 'failed' || r.status === 'lost' || r.status === 'stopped') && (
+          {isTrialRun(r) && <p className="text-[12.5px] text-fg-3">{fill(tr('A trial of the command: it runs for {0} seconds at most and is left out of experiments.'), trySecondsOf(r))}</p>}
+          {r.held && r.status === 'waiting' && <HeldRun r={r} machine={machine} base={base} onChanged={() => load(0)} />}
+          {r.why && !(r.held && r.status === 'waiting') && !saidByStatus(r.why) && (r.status === 'queued' || r.status === 'waiting' || r.status === 'failed' || r.status === 'lost' || r.status === 'stopped') && (
             <p className={cx('rounded-lg border px-3 py-2 text-[13px] leading-relaxed text-fg-2', r.status === 'failed' || r.status === 'lost' ? 'border-err/40 bg-err/5' : 'border-line bg-bg-1')}>{r.why}</p>
           )}
         </div>
@@ -543,27 +786,53 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
         <Throbber />
       </div>
     );
-  else if (tab === 'log') body = <Log key={logRev} id={id} base={base} initial={v.log} size={v.logSize} going={going} />;
+  else if (tab === 'log') body = logAt ? <LogAt id={id} base={base} at={logAt} onEnd={() => setLogAt(null)} /> : <Log key={logRev} id={id} base={base} initial={v.log} size={v.logSize} going={going} />;
   else if (tab === 'charts')
     body = (
       <ChartsPanel
         single
         focus={focus}
+        system={v.system}
         runs={[{ key: runKey({ id, machine: machine ? { id: machine, name: r.machine?.name ?? machine } : undefined }), label: r.name || r.id, color: 'var(--viz-1)', series: v.series, better: r.better, last: r.metrics?.last, best: r.metrics?.best }]}
         empty={going ? 'No metrics over steps yet.' : 'This run has no metrics over steps.'}
       />
     );
   else {
     const tiles = keyMetrics(r, 6);
-    const ended = r.status === 'failed' || r.status === 'lost' || (r.status === 'stopped' && r.exitCode !== undefined && r.exitCode !== null && r.exitCode !== 0);
+    const ended = r.status === 'failed' || r.status === 'lost' || (r.status === 'stopped' && r.exitCode !== undefined && r.exitCode !== null && r.exitCode !== 0 && !isTrialRun(r));
     const tail = v.log.trimEnd().split('\n').slice(-15).join('\n');
+    const wrong = (r.status === 'failed' || r.status === 'lost') && r.firstError ? r.firstError : null;
+    // The end of its log is shown when it says more than where it first went wrong does.
+    const sameEnd = !!wrong && wrong.lines.map((l) => l.trim()).includes(tail.split('\n').pop()!.trim());
+    const peaks = peakLines(r);
     const params = paramsOf(r);
     const paramNames = Object.keys(params);
     const env = Object.entries(r.environment ?? {});
     const where = machine || r.where?.startsWith('c:') || r.where?.startsWith('m:') ? [machine ? r.machine?.name : null, r.host].filter(Boolean).join(' · ') : 'This computer';
     body = (
       <div className="space-y-5">
-        {ended && (
+        {wrong && (
+          <Block
+            title="Where it first went wrong"
+            right={
+              <button
+                type="button"
+                onClick={() => {
+                  setLogAt(wrong);
+                  onTab('log');
+                }}
+                className="text-[12px] text-accent hover:underline"
+              >
+                {fill(tr('Open the log at line {0}'), wrong.line)}
+              </button>
+            }
+          >
+            <div className={CARD}>
+              <WrongLines at={wrong} />
+            </div>
+          </Block>
+        )}
+        {ended && !sameEnd && (
           <Block title="How it ended" right={<button type="button" onClick={() => onTab('log')} className="text-[12px] text-accent hover:underline">Open the log</button>}>
             <div className={CARD}>{tail ? <Tail text={tail} /> : <p className="py-1 text-[12.5px] text-fg-3">Its log is empty.</p>}</div>
           </Block>
@@ -642,6 +911,17 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                   {where === 'This computer' ? where : <span translate="no">{where}</span>}
                 </Row>
                 <Row label="GPUs">{r.gpuIds?.length ? gpuWords(r.gpuIds) : r.gpus ? (r.gpus === 1 ? '1 GPU' : `${r.gpus} GPUs`) : 'No GPU'}</Row>
+                {!!peaks.length && (
+                  <Row label="Most used">
+                    <span className="tnum block space-y-0.5">
+                      {peaks.map((p) => (
+                        <span key={p} className="block">
+                          {p}
+                        </span>
+                      ))}
+                    </span>
+                  </Row>
+                )}
                 {r.seed !== undefined && (
                   <Row label="Seed">
                     <span className="tnum">{r.seed}</span>
@@ -701,7 +981,8 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                             <span className="text-fg-3">Not committed</span>
                           )
                         ) : (
-                          <span className="text-fg-3">Nothing changed since</span>
+                          // "Since" the commit: not to be read as the folder's, which the line below may say had changed.
+                          <span className="text-fg-3">{r.codeChanged?.length ? 'All committed' : 'Nothing changed since'}</span>
                         )}
                       </Row>
                       {r.untracked ? <p className="border-t border-line pt-1.5 text-[12px] text-fg-3">{r.untracked === 1 ? '1 file git does not track' : `${r.untracked} files git does not track`}</p> : null}
@@ -709,6 +990,8 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                   )}
                   {!!r.kept?.length && <NotInGit words="Not in git, kept with the run:" files={r.kept} />}
                   {!!r.notKept?.length && <NotInGit words="Not in git and too large to keep:" files={r.notKept} />}
+                  {/* Once it has started; its code is opened where it ran: a run of this computer in a git repository. */}
+                  {r.startedAt && r.status !== 'starting' && <OwnCode r={r} going={going} open={local && r.commit && !r.where?.startsWith('c:') ? openCode : undefined} />}
                 </div>
               </Block>
             )}
@@ -721,9 +1004,35 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
               }
             >
               <div className={CARD}>
-                <code translate="no" className="block rounded-lg bg-bg-1 px-2.5 py-2 font-mono text-[12px] leading-relaxed break-all whitespace-pre-wrap">
+                {r.ranResume && r.resume && (
+                  <div className="mb-2 space-y-1">
+                    <p className="text-[12.5px] leading-relaxed text-fg-2">{r.startedAt ? 'It carried on from a checkpoint:' : 'It is to carry on from a checkpoint:'}</p>
+                    <code translate="no" className={CODE}>
+                      {r.resume}
+                    </code>
+                    <p className="pt-1 text-[12.5px] text-fg-3">Its command from the beginning:</p>
+                  </div>
+                )}
+                <code translate="no" className={CODE}>
                   {r.command}
                 </code>
+                {!r.ranResume && r.resume && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[12.5px] text-fg-3">To carry on after a stop:</p>
+                    <code translate="no" className={CODE}>
+                      {r.resume}
+                    </code>
+                  </div>
+                )}
+                {r.grace !== undefined && <p className="mt-2 text-[12.5px] leading-relaxed text-fg-3">{fill(tr('It is warned {0} seconds before a stop.'), r.grace)}</p>}
+                {r.ranAs && (
+                  <div className="mt-2">
+                    <div className="mb-1 text-[12px] text-fg-3">Run as:</div>
+                    <code translate="no" className="block rounded-lg bg-bg-1 px-2.5 py-2 font-mono text-[11.5px] leading-relaxed break-all whitespace-pre-wrap text-fg-2">
+                      {r.ranAs}
+                    </code>
+                  </div>
+                )}
                 {r.cwd && (
                   <div className="mt-2 space-y-1">
                     <div translate="no" className="font-mono text-[12px] break-all text-fg-2">
@@ -760,17 +1069,20 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
                 <li key={i} className="flex gap-3 text-[12.5px] max-sm:flex-wrap">
                   <span className="tnum w-[92px] shrink-0 text-fg-3">{when(e.at)}</span>
                   <span className={cx('w-[96px] shrink-0 font-medium', ['nan', 'oom', 'crash', 'failed', 'diverge'].includes(e.kind) ? 'text-err' : e.kind === 'stall' ? 'text-warn' : 'text-fg-2')}>{EVENT_WORDS[e.kind] ?? e.kind}</span>
-                  <span className="min-w-0 flex-1 text-fg-2 max-sm:basis-full">
-                    <span translate="no">{e.text}</span>
-                    {e.session && (
-                      <>
-                        {' '}
-                        <button type="button" onClick={() => sessionLink(e.session!)} className="inline-flex items-center gap-0.5 text-accent hover:underline">
-                          <Play size={11} /> Open its session
-                        </button>
-                      </>
-                    )}
-                  </span>
+                  {/* Nothing to say beyond its word: no empty line for it on a phone. */}
+                  {(e.session || !onlyItsWord(EVENT_WORDS[e.kind] ?? e.kind, e.text)) && (
+                    <span className="min-w-0 flex-1 text-fg-2 max-sm:basis-full">
+                      {!onlyItsWord(EVENT_WORDS[e.kind] ?? e.kind, e.text) && <span translate="no">{e.text}</span>}
+                      {e.session && (
+                        <>
+                          {' '}
+                          <button type="button" onClick={() => sessionLink(e.session!)} className="inline-flex items-center gap-0.5 text-accent hover:underline">
+                            <Play size={11} /> Open its session
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  )}
                 </li>
               ))}
             </ol>
@@ -786,10 +1098,9 @@ export function RunView({ id, machine, tab, onTab, onBack, backLabel, onAgain, o
         {head}
         <div className="flex flex-1 flex-col pt-4">{body}</div>
       </div>
-      <Dialog open={patch !== null} onClose={() => setPatch(null)} title="The changes it ran with" width={900}>
+      <Dialog open={patch !== null} onClose={() => setPatch(null)} title={r && !r.startedAt && r.queuedCode ? 'The changes it was queued with' : 'The changes it ran with'} width={900}>
         {patch ? <DiffView diff={patch} /> : <p className="text-[13px] text-fg-3">The patch is no longer kept.</p>}
       </Dialog>
-      {confirmNode}
     </div>
   );
 }

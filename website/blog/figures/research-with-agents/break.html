@@ -1,0 +1,18 @@
+<figure class="fig" data-fig="research-with-agents-break">
+<div class="fig-stage rw-break">
+<div class="rw-head"><span class="rw-eg">An illustration with made-up numbers</span></div>
+<div class="rw-claim"><span class="rw-cap">The result to test</span><p>Hard negatives from BM25 beat in-batch negatives: <b>+0.019 nDCG@10</b></p></div>
+<ul class="rw-suspects" aria-label="Other explanations">
+<li data-s="seeds"><button class="rw-run" type="button" aria-label="Run the control for lucky seeds"><span class="chip">Lucky seeds</span></button><span class="rw-ctl">Five new seeds for both recipes</span><span class="rw-res"><span class="rw-bar"><i></i></span><em></em></span></li>
+<li data-s="base"><button class="rw-run" type="button" aria-label="Run the control for an untuned baseline"><span class="chip">An untuned baseline</span></button><span class="rw-ctl">Tune the baseline's learning rate the way the new recipe was</span><span class="rw-res"><span class="rw-bar"><i></i></span><em></em></span></li>
+<li data-s="leak"><button class="rw-run" type="button" aria-label="Run the control for a leak"><span class="chip">A leak</span></button><span class="rw-ctl">Look for dev queries and passages in the training data</span><span class="rw-res"><span class="rw-bar"><i></i></span><em></em></span></li>
+<li data-s="bug"><button class="rw-run" type="button" aria-label="Run the control for a metric bug"><span class="chip">A metric bug</span></button><span class="rw-ctl">Score both with a second nDCG@10 implementation</span><span class="rw-res"><span class="rw-bar"><i></i></span><em></em></span></li>
+</ul>
+<p class="rw-verdict-line" data-verdict aria-live="polite"></p>
+</div>
+<div class="fig-controls" role="group" aria-label="Controls">
+<button class="fig-btn" type="button" data-act="all">Run every control</button>
+<button class="fig-btn" type="button" data-act="reset">Start over</button>
+</div>
+<figcaption>An illustration, not a real run: every number is made up. Tap a suspect to run its control, or let them run in turn. Three controls leave the gain standing. The one that tunes the baseline the same way shrinks it to +0.006, so the verdict is <b>It holds in part</b>.</figcaption>
+</figure>

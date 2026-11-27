@@ -869,7 +869,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
   if (item.peer) return <PeerMessage item={item} />;
   if (parsed.run) return <RunMessageRow item={item} run={parsed.run} />;
   if (parsed.goal) return <GoalMessage ts={item.ts} message={parsed.goal} />;
-  if (parsed.notice) return <ExperimentNotice ts={item.ts} body={parsed.notice.body} />;
+  if (parsed.notice) return <ExperimentNotice ts={item.ts} body={parsed.notice.body} wrong={parsed.notice.wrong} />;
   if (parsed.child) return <ChildReplyRow ts={item.ts} reply={parsed.child} />;
   if (item.meta === 'slash') {
     return (

@@ -11,10 +11,12 @@ import { childKeys } from '../children/family.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { GivenAtStart } from '../features/freshStart.ts';
 import type { Deps, Feature, RunCtx } from '../features/types.ts';
+import { jobs } from '../jobs/index.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { leadInstructions, RESEARCHER_INSTRUCTIONS } from './instructions.ts';
 import { OEIS_GUIDE, oeisTool } from './oeis.ts';
 import { PRIOR_WORK_GUIDE, priorWorkTool } from './prior-work.ts';
+import { researchRoutes } from './project.ts';
 
 /** The research a session takes part in: its lead's key and settings, and whether it leads or researches. */
 export function researchFor(db: DB, key: string, extra = sessionExtra(db, key)): { lead: string; settings: ResearchSettings; role: 'lead' | 'researcher' } | null {
@@ -80,6 +82,8 @@ export const research: Feature = {
 
   routes(d) {
     d.app.get('/api/research/:key', async (req) => researchState(d, (req.params as { key: string }).key) ?? { key: (req.params as { key: string }).key, settings: null });
+    // A project's Research tab: what waits for the person, what is new, where it stands (project.ts).
+    researchRoutes(d, () => jobs.list(0, Date.now()));
   },
 
   // "Is this new?" (prior-work.ts) and the OEIS (oeis.ts): every agent's and apps' steps', in a research or not.

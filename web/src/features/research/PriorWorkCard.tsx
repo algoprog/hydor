@@ -31,7 +31,9 @@ function Verdict({ verdict }: { verdict: PriorVerdict }) {
 }
 
 function Paper({ p }: { p: PriorPaper }) {
+  // arXiv says it itself; another paper server or an upload is named as what it is.
   const about = [p.authors, p.year, p.venue].filter(Boolean).join(' · ');
+  const preprint = !!p.preprint && p.venue !== 'arXiv';
   return (
     <li className="py-1.5">
       {/^https?:\/\//i.test(p.url) ? (
@@ -43,9 +45,15 @@ function Paper({ p }: { p: PriorPaper }) {
           {p.title}
         </span>
       )}
-      {about && (
-        <div translate="no" className="text-[12px] leading-snug break-words text-fg-3">
-          {about}
+      {(about || preprint) && (
+        <div className="text-[12px] leading-snug break-words text-fg-3">
+          <span translate="no">{about}</span>
+          {preprint && (
+            <>
+              {about && <span> · </span>}
+              <span>preprint</span>
+            </>
+          )}
         </div>
       )}
       {p.same && (

@@ -10,20 +10,11 @@ const HEIGHT = 168;
 const AXIS_W = 48;
 const PAD = { top: 10, right: 12, bottom: 20 };
 
-const day = (t: number) => new Date(t).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' });
-const clock = (t: number) => new Date(t).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+export const day = (t: number) => new Date(t).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' });
+export const clock = (t: number) => new Date(t).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
 
-/** Round numbers for the axis, about three of them inside lo…hi. */
-function ticks(lo: number, hi: number): number[] {
-  const raw = (hi - lo) / 3;
-  const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((s) => s >= raw) ?? raw;
-  const out: number[] = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9 && out.length < 8; v += step) out.push(Number(v.toPrecision(12)));
-  return out;
-}
-
-export function ScoreChart({ scores, baseline, onPick }: { scores: EvalScore[]; baseline?: number; onPick: (id: string) => void }) {
+/** The width of an element, kept up to date as it changes (0 until it is measured): what a chart draws itself to. */
+export function useWidth() {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
@@ -35,6 +26,21 @@ export function ScoreChart({ scores, baseline, onPick }: { scores: EvalScore[]; 
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  return { box, width };
+}
+
+/** Round numbers for the axis, about three of them inside lo…hi. */
+export function ticks(lo: number, hi: number): number[] {
+  const raw = (hi - lo) / 3;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((s) => s >= raw) ?? raw;
+  const out: number[] = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9 && out.length < 8; v += step) out.push(Number(v.toPrecision(12)));
+  return out;
+}
+
+export function ScoreChart({ scores, baseline, onPick }: { scores: EvalScore[]; baseline?: number; onPick: (id: string) => void }) {
+  const { box, width } = useWidth();
 
   const ends = scores.flatMap((s) => [s.mean! - (s.std ?? 0), s.mean! + (s.std ?? 0)]);
   if (baseline !== undefined) ends.push(baseline);
@@ -54,7 +60,9 @@ export function ScoreChart({ scores, baseline, onPick }: { scores: EvalScore[]; 
 
   // Its height is there before its width is measured, so a scroll to a score below it lands where it should.
   return (
-    <div ref={box} style={{ minHeight: HEIGHT + 14 }} className="rounded-xl border border-line bg-panel px-2 pt-2 pb-1">
+    <div style={{ minHeight: HEIGHT + 14 }} className="rounded-xl border border-line bg-panel px-2 pt-2 pb-1">
+      {/* Measured without the panel's padding: the drawing is this wide, no wider. */}
+      <div ref={box}>
       {width > 0 && (
         <svg width="100%" height={HEIGHT} role="group" aria-label="Scores over time">
           {ticks(lo, hi).map((t) => (
@@ -68,9 +76,6 @@ export function ScoreChart({ scores, baseline, onPick }: { scores: EvalScore[]; 
           {baseline !== undefined && (
             <g>
               <line x1={AXIS_W} x2={width - PAD.right} y1={y(baseline)} y2={y(baseline)} stroke="var(--fg-3)" strokeWidth={1.5} strokeDasharray="5 4" />
-              <text x={width - PAD.right - 4} y={y(baseline) - 5} textAnchor="end" className="fill-[var(--fg-3)] text-[10px]" style={{ paintOrder: 'stroke', stroke: 'var(--panel)', strokeWidth: 3 }}>
-                Baseline
-              </text>
             </g>
           )}
           {scores.map((s, i) => {
@@ -94,14 +99,24 @@ export function ScoreChart({ scores, baseline, onPick }: { scores: EvalScore[]; 
           <text x={x(0)} y={HEIGHT - 5} textAnchor="middle" className="tnum fill-[var(--fg-3)] text-[10px]">
             {label(first)}
           </text>
+          {/* What the dashed line is, in the row of dates: on the line itself a score could be drawn over it. */}
+          {baseline !== undefined && (
+            <g>
+              <line x1={AXIS_W + plotW / 2 - 34} x2={AXIS_W + plotW / 2 - 18} y1={HEIGHT - 8.5} y2={HEIGHT - 8.5} stroke="var(--fg-3)" strokeWidth={1.5} strokeDasharray="5 4" />
+              <text x={AXIS_W + plotW / 2 - 13} y={HEIGHT - 5} className="fill-[var(--fg-3)] text-[10px]">
+                Baseline
+              </text>
+            </g>
+          )}
           {/* Two scores of the same minute need its time once. */}
           {scores.length > 1 && label(last) !== label(first) && (
-            <text x={x(scores.length - 1)} y={HEIGHT - 5} textAnchor="middle" className="tnum fill-[var(--fg-3)] text-[10px]">
+            <text x={Math.min(width - 1, x(scores.length - 1) + 16)} y={HEIGHT - 5} textAnchor="end" className="tnum fill-[var(--fg-3)] text-[10px]">
               {label(last)}
             </text>
           )}
         </svg>
       )}
+      </div>
     </div>
   );
 }

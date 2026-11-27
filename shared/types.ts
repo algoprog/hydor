@@ -85,6 +85,8 @@ export interface ApprovalRequest {
   from?: string;
   /** The detail is plain words in Markdown (a change to the app, ask_form's message), not a command's output. */
   prose?: boolean;
+  /** A command card whose long lines wrap: it says something at their end that must be read (what a run may cost). */
+  wrap?: boolean;
   /**
    * One of the user's apps an agent runs for them (use_app), asking for what the request left out: the card shows
    * as the app (its icon and name), with what the request said already; its form's fields are the questions left.
@@ -609,6 +611,8 @@ export interface NotifyEvent {
   approval?: QuickAnswer;
   /** Where it opens, when that is not its session (a template's run, which may have none). */
   url?: string;
+  /** Its title and body are the app's own words, not an agent's: a system notification translates them. */
+  ownWords?: boolean;
 }
 
 /** Another machine running Hydor that this one uses (Settings → Machines); its token stays on the server. */

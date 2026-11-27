@@ -5,11 +5,12 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, FlaskConical, MoreHorizontal, Pause, Play, Square, Trash2 } from 'lucide-react';
 import type { Candidate, Evolution } from '@shared/evolve';
 import { LOCALE } from '../../i18n/locale';
-import { trIn } from '../../i18n/runtime';
+import { tr, trIn } from '../../i18n/runtime';
 import { del, post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { Button, cx, Empty, IconButton, MenuItem, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
+import { askDelete, runFilesOf } from './DeleteRuns';
 import { evaluationPath } from './evalApi';
 import { meanStd, toneClass } from './evalWords';
 import { EvolutionChart } from './EvolutionChart';
@@ -31,6 +32,7 @@ import {
   TAKE_ABOUT,
   tryScore,
   waitsWords,
+  heldSearch,
   workedMs,
   type StateLine,
 } from './evolveWords';
@@ -92,7 +94,7 @@ function Page({ id, open, onTry, onBack, onDeleted }: EvolutionViewProps) {
   const best = e.best ? data.candidates.find((c) => c.id === e.best) : undefined;
   const opened = open ? (data.candidates.find((c) => c.id === open) ?? null) : null;
 
-  const act = async (path: 'pause' | 'resume' | 'stop') => {
+  const act = async (path: 'pause' | 'resume' | 'stop' | 'let-run') => {
     setBusy(true);
     try {
       await post(evolveUrl(e.id, `/${path}`));
@@ -119,10 +121,15 @@ function Page({ id, open, onTry, onBack, onDeleted }: EvolutionViewProps) {
     void reload();
   };
   const remove = async () => {
-    if (!(await confirm({ title: 'Delete this evolution?', body: 'Its tries, their scores and its working copies go. A branch you took stays.', confirm: 'Delete', danger: true }))) return;
     try {
-      await del(evolveUrl(e.id));
-      onDeleted(e.evaluation);
+      askDelete({
+        title: 'Delete this evolution?',
+        lead: tr('Its tries, their scores and its working copies go. A branch you took stays.'),
+        many: true,
+        files: await runFilesOf(`evolution=${encodeURIComponent(e.id)}`),
+        remove: (keep) => del<{ kept?: string }>(`${evolveUrl(e.id)}${keep ? '?files=keep' : ''}`),
+        done: () => onDeleted(e.evaluation),
+      });
     } catch (err) {
       toastError(err);
     }
@@ -137,6 +144,7 @@ function Page({ id, open, onTry, onBack, onDeleted }: EvolutionViewProps) {
         onBack={onBack && (() => onBack(e.evaluation))}
         onPause={() => void act('pause')}
         onResume={() => void act('resume')}
+        onLetRun={() => void act('let-run')}
         onStop={() => void stop()}
         onTake={() => void take()}
         onDelete={() => void remove()}
@@ -231,7 +239,7 @@ function State({ data }: { data: EvolutionDetail }) {
   );
 }
 
-function Header({ data, busy, taking, onBack, onPause, onResume, onStop, onTake, onDelete }: { data: EvolutionDetail; busy: boolean; taking: boolean; onBack?: () => void; onPause: () => void; onResume: () => void; onStop: () => void; onTake: () => void; onDelete: () => void }) {
+function Header({ data, busy, taking, onBack, onPause, onResume, onLetRun, onStop, onTake, onDelete }: { data: EvolutionDetail; busy: boolean; taking: boolean; onBack?: () => void; onPause: () => void; onResume: () => void; onLetRun: () => void; onStop: () => void; onTake: () => void; onDelete: () => void }) {
   const e = data.evolution;
   const [menu, setMenu] = useState(false);
   const [whole, setWhole] = useState(false);
@@ -276,6 +284,12 @@ function Header({ data, busy, taking, onBack, onPause, onResume, onStop, onTake,
       {/* On a phone the buttons take the whole width, so they stay on one line. */}
       <div className="flex min-w-0 shrink-0 flex-col gap-1.5 sm:items-end">
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+          {/* Held at the limit on agents' GPU hours: the whole search goes on beyond it, not one score at a time. */}
+          {heldSearch(e) && (
+            <Button size="sm" variant="primary" onClick={onLetRun} disabled={busy}>
+              Let it run
+            </Button>
+          )}
           {e.status === 'running' && (
             <Button size="sm" variant="secondary" icon={<Pause size={14} />} onClick={onPause} disabled={busy}>
               Pause
@@ -330,7 +344,7 @@ function StartTile({ evolution: e }: { evolution: Evolution }) {
           <span translate="no">{meanStd(e.start)}</span>
         </Big>
       ) : (
-        <Big muted>{isEnded(e) ? 'Not scored' : waitsWords(e) ? nightStatusPlain(undefined) : 'Scoring…'}</Big>
+        <Big muted>{isEnded(e) ? 'Not scored' : heldSearch(e) ? 'Waits for you' : waitsWords(e) ? nightStatusPlain(undefined) : 'Scoring…'}</Big>
       )}
       <Sub>
         {seeds > 0 && <span>{seeds === 1 ? '1 seed' : `${seeds} seeds`}</span>}

@@ -9,7 +9,7 @@ import { goApp } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { CodeBlock, Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
-import { Button } from '../../components/ui';
+import { Button, cx } from '../../components/ui';
 import { AppIcon } from '../apps/AppIcon';
 import { AppForm, formErrors, type FormFiles } from '../apps/Form';
 import { AppKeys, emptyKeys, keysMissing, type KeyInput } from '../apps/AppKeys';
@@ -167,7 +167,7 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
   // The command, change or input itself: shown on the card, or behind the plain card's button.
   const raw = (
     <>
-      {a.detail && a.kind === 'command' && <CodeBlock code={a.detail} lang="bash" maxHeight={260} className="!my-0" />}
+      {a.detail && a.kind === 'command' && <CodeBlock code={a.detail} lang="bash" maxHeight={260} className={cx('!my-0', a.wrap && '[&_code]:!whitespace-pre-wrap', a.wrap && '[&_pre]:!whitespace-pre-wrap', a.wrap && '[&_pre]:break-words')} />}
       {a.detail && a.kind === 'file' && <FileDetail detail={a.detail} />}
       {a.detail && a.kind === 'plan' && (
         <div className="max-h-[420px] overflow-auto rounded-lg border border-line px-3 py-2">

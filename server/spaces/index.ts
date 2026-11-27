@@ -22,6 +22,7 @@ import type { Deps, Feature } from '../features/types.ts';
 import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
 import { repoRoot } from '../memory/store.ts';
 import { folderNewsOfSpace } from '../sidebar/folders.ts';
+import { researchProjects } from '../research/has.ts';
 import { spacesActivity } from './activity.ts';
 import { claimSessions } from './found.ts';
 import { hideSuggestion, spaceSuggestions } from './suggest.ts';
@@ -61,7 +62,9 @@ export function spaceViews(db: DB): SpaceView[] {
   );
   const kept = libraryCounts(db);
   const shared = peopleCounts(db);
-  return allSpaces(db).map((s) => ({
+  const all = allSpaces(db);
+  const research = researchProjects(db, all);
+  return all.map((s) => ({
     ...s,
     sessions: counts.get(s.id)?.n ?? 0,
     lastAt: counts.get(s.id)?.last ?? undefined,
@@ -69,6 +72,7 @@ export function spaceViews(db: DB): SpaceView[] {
     skills: skillsOf(s.id).length,
     library: kept.get(s.id) ?? 0,
     ...(shared.get(s.id) ? { people: shared.get(s.id) } : {}),
+    ...(research.has(s.id) ? { research: true as const } : {}),
   }));
 }
 
