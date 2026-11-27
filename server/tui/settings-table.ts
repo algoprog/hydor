@@ -420,10 +420,10 @@ row('mcp', 'Check connections', 'action', {
     slow: true,
     run: async (api) => {
       const out: string[] = [];
-      for (const agent of ['claude', 'codex']) {
+      for (const agent of ['claude', 'codex', 'custom']) {
         const r = await api<{ servers: any[] }>('POST', '/api/setup/mcp/status', { agent }, { timeoutMs: 180_000 });
         for (const s of r.servers ?? [])
-          out.push(`${agent === 'claude' ? 'Claude Code' : 'Codex'} · ${s.name}: ${s.state}${s.tools != null ? ` (${s.tools} tools)` : ''}${s.error ? ` — ${s.error}` : ''}`);
+          out.push(`${agent === 'claude' ? 'Claude Code' : agent === 'custom' ? 'Custom' : 'Codex'} · ${s.name}: ${s.state}${s.tools != null ? ` (${s.tools} tools)` : ''}${s.error ? ` — ${s.error}` : ''}`);
       }
       return out.length ? out : ['No MCP servers are set up.'];
     },

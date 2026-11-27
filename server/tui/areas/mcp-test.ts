@@ -42,7 +42,7 @@ test('list: a table with the keys’ names (never values); --agent, --scope, --f
   assert.equal(f.calls[0].path, '/api/setup/mcp?cwd=%2Fcode%2Fapp');
   assert.deepEqual((await run(fakeConn(routes()).conn, ['mcp', '--json'])).json, [{ servers }]);
   assert.match((await run(fakeConn({ 'GET /api/setup/mcp': { servers: [] } }).conn, ['mcp'])).out, /No MCP servers: hydor mcp add <name> <command…> adds one\./);
-  await refused(run(conn, ['mcp', '--agent', 'x']), /--agent takes claude or codex/);
+  await refused(run(conn, ['mcp', '--agent', 'x']), /--agent takes claude, codex or custom/);
 });
 
 test('show: the program, scope, command or address, the names of env and headers (never values), on or off, tools when asked', async () => {
@@ -100,7 +100,7 @@ test('status: each agent’s servers started, one after the other; --agent; --js
   const r = await run(conn, ['mcp', 'status']);
   assert.deepEqual(
     calls.map((c) => c.body),
-    [{ agent: 'claude' }, { agent: 'codex' }],
+    [{ agent: 'claude' }, { agent: 'codex' }, { agent: 'custom' }],
   );
   assert.match(r.out, /^● +github +Claude Code +connected · 12 tools$/m);
   assert.match(r.out, /^✗ +bad +Codex +failed +spawn ENOENT$/m);
@@ -147,7 +147,7 @@ test('add: a command server to both agents; a remote one; env hidden; what each 
   await refused(run(good.conn, ['mcp', 'add', 'x']), /Say what starts it: hydor mcp add x <command…> \(or --url for a remote one\)/);
   await refused(run(good.conn, ['mcp', 'add', 'x', '--url', 'ftp://x']), /Give its http\(s\) address with --url/);
   await refused(run(good.conn, ['mcp', 'add', 'x', '--url', 'https://x.dev', '--env', 'A=b']), /--env is for a command server/);
-  await refused(run(good.conn, ['mcp', 'add', 'x', '--transport', 'sse', '--url', 'https://x.dev', '--agent', 'codex']), /SSE is Claude Code’s only/);
+  await refused(run(good.conn, ['mcp', 'add', 'x', '--transport', 'sse', '--url', 'https://x.dev', '--agent', 'codex']), /Codex does not support SSE/);
   await refused(run(good.conn, ['mcp', 'add', 'x', '--transport', 'pipe']), /--transport takes stdio, http or sse/);
   const j = await run(good.conn, ['mcp', 'add', 'docs', '--url', 'https://x.dev/mcp', '--json']);
   assert.deepEqual(j.json, [{ results: [ok('claude')] }]);
@@ -192,6 +192,23 @@ test('edit: removed, then added again with what is kept; values asked for again;
   await refused(run(secret.conn, ['mcp', 'edit', 'claude:user:github', '--env', 'GITHUB_TOKEN=n', '-y']), /It is removed: add it again with hydor mcp add\./, ApiError);
   const stuck = fakeConn(routes({ 'POST /api/setup/mcp/remove': { ok: false, output: 'in use' } }));
   await refused(run(stuck.conn, ['mcp', 'edit', 'docs', '--url', 'https://x.dev/v3', '-y']), /Claude Code would not remove “docs”: in use/, ApiError);
+});
+
+test('Custom: added when neither program is set up, listed without the programs’ servers it reads, changed in place', async () => {
+  const none = fakeConn({ 'GET /api/setup/mcp': { servers: [], programs: { claude: false, codex: false } }, 'POST /api/setup/mcp': { results: [{ agent: 'custom', ok: true, output: '' }] } });
+  const r = await run(none.conn, ['mcp', 'add', 'shop', '--url', 'https://x.dev/mcp']);
+  assert.deepEqual(none.calls.at(-1)?.body, { agents: ['custom'], name: 'shop', transport: 'http', url: 'https://x.dev/mcp' });
+  assert.match(r.out, /^✓ Added “shop” to Custom\.$/m);
+  await run(none.conn, ['mcp', 'add', 's', '--agent', 'custom', '--transport', 'sse', '--url', 'https://x.dev/sse']);
+  assert.deepEqual((none.calls.at(-1)?.body as { agents: string[] }).agents, ['custom']);
+  const mine = { agent: 'custom', name: 'db', scope: 'user', transport: 'stdio', command: 'uvx', args: ['sqlite'], envKeys: ['TOKEN'] };
+  const theirs = { agent: 'custom', from: 'claude', name: 'docs', scope: 'user', transport: 'http', url: 'https://x.dev/mcp', signedIn: true };
+  const f = fakeConn({ 'GET /api/setup/mcp': { servers: [docs, mine, theirs] }, 'PUT /api/setup/mcp/custom/db': { ok: true } });
+  assert.doesNotMatch((await run(f.conn, ['mcp', '--agent', 'custom'])).out, /docs/);
+  assert.match((await run(f.conn, ['mcp', 'show', 'docs'])).out, /^Program +Claude Code$/m);
+  const e = await run(f.conn, ['mcp', 'edit', 'db', '--env', 'X=1', '-y']);
+  assert.deepEqual(f.calls.at(-1), { method: 'PUT', path: '/api/setup/mcp/custom/db', body: { agents: ['custom'], name: 'db', transport: 'stdio', command: 'uvx', args: ['sqlite'], env: { TOKEN: '', X: '1' } } });
+  assert.match(e.out, /^Changed “db” for Custom\.$/m);
 });
 
 test('remove: asks, names the agent, an agent’s refusal is an error', async () => {

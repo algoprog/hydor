@@ -20,6 +20,7 @@ import {
   setTested,
   type Conn,
   type Cred,
+  type OAuthCred,
 } from './apps.ts';
 import { fill } from './catalog.ts';
 import { authorizeUrl, discover, exchangeCode, OAuthError, pkce, register, type AuthServer, type OAuthClient } from './oauth.ts';
@@ -86,11 +87,30 @@ export function connectPlain(db: DB, entry: CatalogApp, body: { fields?: Record<
 
 // ---- signing in in the browser ------------------------------------------------------------------------
 
+/**
+ * What a sign-in in the browser is for: a connected app, or an MCP server added in Settings (server/mcpservers).
+ */
+export interface SignInTarget {
+  /** Tells sign-ins for the same thing apart: a connected app's id, an MCP server's address. */
+  key: string;
+  name: string;
+  /** The MCP server's address. */
+  url: string;
+  /** Sent when looking for the sign-in server. */
+  headers?: Record<string, string>;
+  clientId?: string;
+  clientSecret?: string;
+  scopes?: string[];
+  extra?: Record<string, string>;
+  /** The app's page the browser comes back to. */
+  back: string;
+  /** Keeps the tokens, sealed. */
+  save(oauth: OAuthCred): void;
+}
+
 interface Flow {
   id: string;
-  appId: string;
-  entry: CatalogApp;
-  fields: Record<string, string>;
+  target: SignInTarget;
   verifier: string;
   redirectUri: string;
   client: OAuthClient;
@@ -107,6 +127,9 @@ const flows = new Map<string, Flow>();
 /** How each ended, by flow id, for the page that started it. */
 const results = new Map<string, { app: string; name: string; ok: boolean; error?: string; at: number }>();
 
+/** Where a refused or unknown sign-in is started again from. */
+const START_AGAIN = 'Start again from Apps → Connected apps, or Settings → MCP servers.';
+
 function sweep() {
   const now = Date.now();
   for (const [k, f] of flows) if (now - f.createdAt > FLOW_TTL) flows.delete(k);
@@ -115,27 +138,25 @@ function sweep() {
 
 export const flowResult = (id: string) => results.get(id) ?? null;
 
-/** Starts signing in: returns the address to send the person to. `origin` is where they reach this app. */
-export async function startOAuth(db: DB, entry: CatalogApp, o: { origin: string; fields?: Record<string, unknown>; clientId?: string; clientSecret?: string }): Promise<{ url?: string; flow?: string; connected?: Conn }> {
-  if (entry.auth.type !== 'oauth' || (entry.server.transport !== 'http' && entry.server.transport !== 'sse')) throw new HttpError(400, `${entry.name} does not sign in in the browser`);
+/**
+ * Looks for the server's sign-in, registers Hydor with it unless a client ID is given, and returns the address to
+ * send the person to (`open` when the server answers without a sign-in). `origin` is where they reach this app.
+ */
+export async function beginSignIn(db: DB, t: SignInTarget, origin: string): Promise<{ open?: true; url?: string; flow?: string }> {
   sweep();
-  const old = oldOf(db, entry.id);
-  const { fields } = readFields(entry, o.fields, old);
-  const url = fill(entry.server.url, fields);
   let disc;
   try {
-    disc = await discover(url, { expectAuth: true });
+    disc = await discover(t.url, { expectAuth: true, headers: t.headers });
   } catch (e) {
     throw new HttpError(502, (e as Error).message);
   }
-  // It answers without a sign-in after all.
-  if (disc.open) return { connected: saveConnection(db, entry, { fields, hint: null }) };
-  const redirectUri = `${o.origin}/connections/callback`;
-  const given = clip(o.clientId, 300) || entry.auth.clientId;
-  let client: OAuthClient | null = given ? { client_id: given, ...(o.clientSecret ? { client_secret: clip(o.clientSecret, 500), auth_method: 'client_secret_basic' } : { auth_method: 'none' }) } : null;
+  if (disc.open) return { open: true };
+  const redirectUri = `${origin}/connections/callback`;
+  const given = clip(t.clientId, 300);
+  let client: OAuthClient | null = given ? { client_id: given, ...(t.clientSecret ? { client_secret: clip(t.clientSecret, 500), auth_method: 'client_secret_basic' } : { auth_method: 'none' }) } : null;
   let registered = false;
-  // A sign-in for this app that never came back: the server may have forgotten the client, so register again.
-  const unfinished = [...flows.entries()].filter(([, f]) => f.appId === entry.id && f.registered && f.as.issuer === disc.as.issuer && f.redirectUri === redirectUri);
+  // A sign-in for this that never came back: the server may have forgotten the client, so register again.
+  const unfinished = [...flows.entries()].filter(([, f]) => f.target.key === t.key && f.registered && f.as.issuer === disc.as.issuer && f.redirectUri === redirectUri);
   if (!client && unfinished.length) {
     forgetClient(db, disc.as.issuer, redirectUri);
     for (const [k] of unfinished) flows.delete(k);
@@ -145,7 +166,7 @@ export async function startOAuth(db: DB, entry: CatalogApp, o: { origin: string;
     registered = true;
     if (!client) {
       try {
-        client = await register(disc.as, redirectUri, entry.auth.scopes ?? disc.scopes);
+        client = await register(disc.as, redirectUri, t.scopes ?? disc.scopes);
       } catch (e) {
         throw new HttpError(e instanceof OAuthError && /client ID/.test(e.message) ? 409 : 502, (e as Error).message);
       }
@@ -154,33 +175,56 @@ export async function startOAuth(db: DB, entry: CatalogApp, o: { origin: string;
   }
   const { verifier, challenge } = pkce();
   const state = crypto.randomBytes(32).toString('base64url');
-  const flow: Flow = { id: crypto.randomBytes(12).toString('base64url'), appId: entry.id, entry, fields, verifier, redirectUri, client, registered, as: disc.as, resource: disc.resource, createdAt: Date.now() };
+  const flow: Flow = { id: crypto.randomBytes(12).toString('base64url'), target: t, verifier, redirectUri, client, registered, as: disc.as, resource: disc.resource, createdAt: Date.now() };
   flows.set(state, flow);
+  return { url: authorizeUrl({ as: disc.as, client, redirectUri, state, challenge, scopes: t.scopes ?? disc.scopes, resource: disc.resource, extra: t.extra }), flow: flow.id };
+}
+
+/** Starts signing in to a connected app: returns the address to send the person to. */
+export async function startOAuth(db: DB, entry: CatalogApp, o: { origin: string; fields?: Record<string, unknown>; clientId?: string; clientSecret?: string }): Promise<{ url?: string; flow?: string; connected?: Conn }> {
+  if (entry.auth.type !== 'oauth' || (entry.server.transport !== 'http' && entry.server.transport !== 'sse')) throw new HttpError(400, `${entry.name} does not sign in in the browser`);
+  const old = oldOf(db, entry.id);
+  const { fields } = readFields(entry, o.fields, old);
   const auth = entry.auth;
-  return { url: authorizeUrl({ as: disc.as, client, redirectUri, state, challenge, scopes: auth.scopes ?? disc.scopes, resource: disc.resource, extra: auth.params }), flow: flow.id };
+  const r = await beginSignIn(
+    db,
+    {
+      key: entry.id,
+      name: entry.name,
+      url: fill(entry.server.url, fields),
+      clientId: clip(o.clientId, 300) || auth.clientId,
+      clientSecret: o.clientSecret,
+      scopes: auth.scopes,
+      extra: auth.params,
+      back: '/apps/connected',
+      save: (oauth) => void saveConnection(db, entry, { fields, cred: { oauth }, hint: null }),
+    },
+    o.origin,
+  );
+  // It answers without a sign-in after all.
+  if (r.open) return { connected: saveConnection(db, entry, { fields, hint: null }) };
+  return { url: r.url, flow: r.flow };
 }
 
 /** The sign-in server sent the person back: checks the state (once only), takes the tokens, keeps them sealed. */
-export async function finishOAuth(db: DB, q: Record<string, string | undefined>): Promise<{ flow?: string; app?: string; ok: boolean; error?: string }> {
+export async function finishOAuth(db: DB, q: Record<string, string | undefined>): Promise<{ flow?: string; app?: string; back?: string; ok: boolean; error?: string }> {
   const state = String(q.state ?? '');
   const f = state ? flows.get(state) : undefined;
   if (f) flows.delete(state);
-  if (!f || Date.now() - f.createdAt > FLOW_TTL) return { ok: false, error: 'This sign-in has expired or was already used. Start again from Apps → Connected apps.' };
+  if (!f || Date.now() - f.createdAt > FLOW_TTL) return { ok: false, error: `This sign-in has expired or was already used. ${START_AGAIN}` };
+  const { key, name, back } = f.target;
   const done = (ok: boolean, error?: string) => {
-    results.set(f.id, { app: f.appId, name: f.entry.name, ok, ...(error ? { error } : {}), at: Date.now() });
-    return { flow: f.id, app: f.appId, ok, ...(error ? { error } : {}) };
+    results.set(f.id, { app: key, name, ok, ...(error ? { error } : {}), at: Date.now() });
+    return { flow: f.id, app: key, back, ok, ...(error ? { error } : {}) };
   };
   // A different sign-in server answering than the one asked (RFC 9207) is refused.
   if (q.iss && f.as.issuer && ![f.as.issuer, f.as.metadataIssuer].some((i) => i && i.replace(/\/+$/, '') === q.iss!.replace(/\/+$/, '')))
     return done(false, 'The answer came from a different sign-in server than the one asked');
-  if (q.error) return done(false, q.error === 'access_denied' ? 'You did not allow access' : `${f.entry.name} said: ${clip(q.error_description || q.error, 200)}`);
+  if (q.error) return done(false, q.error === 'access_denied' ? 'You did not allow access' : `${name} said: ${clip(q.error_description || q.error, 200)}`);
   if (!q.code) return done(false, 'No sign-in code came back');
   try {
     const t = await exchangeCode({ tokenEndpoint: f.as.token_endpoint, client: f.client, code: q.code, verifier: f.verifier, redirectUri: f.redirectUri, resource: f.resource });
-    const cred: Cred = {
-      oauth: { ...t, token_endpoint: f.as.token_endpoint, ...(f.as.revocation_endpoint ? { revocation_endpoint: f.as.revocation_endpoint } : {}), issuer: f.as.issuer, resource: f.resource, client: f.client },
-    };
-    saveConnection(db, f.entry, { fields: f.fields, cred, hint: null });
+    f.target.save({ ...t, token_endpoint: f.as.token_endpoint, ...(f.as.revocation_endpoint ? { revocation_endpoint: f.as.revocation_endpoint } : {}), issuer: f.as.issuer, resource: f.resource, client: f.client });
     return done(true);
   } catch (e) {
     // The sign-in server forgot the client it registered: register again next time.

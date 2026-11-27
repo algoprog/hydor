@@ -67,6 +67,7 @@ import { PART_FRAME_HTML } from './pages/slides.ts';
 import { movedPdfNotes } from './pdfnotes/index.ts';
 import { annotateKept, keptFilesDeleted, keptFilesMoved } from './spaces/kept-files.ts';
 import * as setup from './setup.ts';
+import * as customMcp from './mcpservers/index.ts';
 import { switchSkill } from './skillpack/codexOff.ts';
 import { standAll } from './openForms.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
@@ -1523,15 +1524,33 @@ const agentOf = async (v: unknown): Promise<Agent> => (v === 'claude' || v === '
 const body = (req: FastifyRequest) => (req.body ?? {}) as Record<string, any>;
 const query = (req: FastifyRequest) => req.query as Record<string, string | undefined>;
 
-app.get('/api/setup/mcp', async (req) => ({ servers: await setup.listMcp(query(req).cwd) }));
+app.get('/api/setup/mcp', async (req) => {
+  const cwd = query(req).cwd;
+  // `programs`: which of Claude Code and Codex are set up here (a server is added only to those, unless asked).
+  return { servers: [...(await setup.listMcp(cwd)), ...customMcp.listCustom(db, setup.folder(cwd))], programs: await programStatus() };
+});
 app.post('/api/setup/mcp', async (req) => ({ results: await setup.addMcp(body(req) as McpSpec) }));
+app.put('/api/setup/mcp/custom/:name', async (req) => {
+  const spec = { ...(body(req) as McpSpec), agents: ['custom' as const], name: String((req.params as { name: string }).name) };
+  setup.checkSpec(spec);
+  customMcp.updateCustom(db, spec.name, spec);
+  return { ok: true };
+});
 app.post('/api/setup/mcp/remove', async (req) => {
   const b = body(req);
-  return setup.removeMcp(await agentOf(b.agent), String(b.name ?? ''), b.scope, b.cwd);
+  const name = String(b.name ?? '');
+  if (b.agent === 'custom') return customMcp.removeCustom(db, name);
+  const agent = await agentOf(b.agent);
+  return customMcp.removingTheirs(db, name, setup.folder(b.cwd), () => setup.removeMcp(agent, name, b.scope, b.cwd));
 });
-app.post('/api/setup/mcp/status', async (req) => ({ servers: await setup.mcpStatus(await agentOf(body(req).agent), codex, body(req).cwd) }));
+app.post('/api/setup/mcp/status', async (req) => {
+  const b = body(req);
+  return { servers: b.agent === 'custom' ? await customMcp.customStatus(db, setup.folder(b.cwd)) : await setup.mcpStatus(await agentOf(b.agent), codex, b.cwd) };
+});
 app.post('/api/setup/mcp/login', async (req) => {
   const b = body(req);
+  // Custom's servers sign in in the browser (POST /api/setup/mcp/signin), not in a terminal.
+  if (b.agent === 'custom') throw new HttpError(400, 'Custom signs in in the browser');
   const name = String(b.name ?? '');
   return terms.createTerminal({ cwd: b.cwd || config.home, name: `MCP login · ${name}`, command: setup.loginCommand(await agentOf(b.agent), name) });
 });

@@ -63,6 +63,7 @@ const RULES: Rule[] = [
   ['*', /^\/api\/computer\/sessions\//, 'refuse', 'Use the computer tools (computer_screenshot, computer_act) for that.'],
   // Sign-ins the user does: an MCP server's OAuth in a terminal they drive, a profile's sites in a browser they drive.
   ['POST', /^\/api\/setup\/mcp\/login$/, 'refuse', 'Signing in to an MCP server happens in a terminal the user drives: they press Sign in on the server in Settings → MCP servers.'],
+  ['POST', /^\/api\/setup\/mcp\/signin$/, 'refuse', 'Signing in to an MCP server happens in the user’s browser: they press Sign in on the server in Settings → MCP servers.'],
   ['POST', /^\/api\/browser\/profiles\/[^/]+\/open$/, 'refuse', 'Signing in to sites in a profile is the user’s: they press Log in to sites on the profile in Settings → Browser.'],
   ['POST', /^\/api\/computer\/permissions\//, 'refuse', 'macOS asks the user for these permissions itself: tell them to press Allow in Settings → Capabilities → Computer use.'],
   ['*', /^\/api\/sessions\/[^/]+\/approvals\//, 'refuse', 'Only the user answers approval cards.'],
@@ -135,7 +136,7 @@ const RULES: Rule[] = [
   ['DELETE', /^\/api\/webapps\/[^/]+$/, 'always', 'This forgets the web app, and removes its own keys (those saved for it, for each place) from the vault.'],
   ['DELETE', /./, 'always'],
   ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|stop-all|interrupt|cancel)(\/|$)/, 'always'],
-  ['W', /^\/api\/setup\//, 'always', 'This changes what Claude Code or Codex load in every session; an MCP server runs a program on this computer.'],
+  ['W', /^\/api\/setup\//, 'always', 'This changes what Claude Code, Codex or Custom load in every session; an MCP server runs a program on this computer.'],
   ['W', /^\/api\/(custom|browser)\/settings$/, 'always', 'This changes what agents may do without asking.'],
   ['W', /^\/api\/computer\/settings$/, 'always', 'This lets agents see this Mac’s screen and use its mouse and keyboard (each session still asks before its agent starts).'],
   ['W', /^\/api\/(update|update\/auto|startup|machines|scm\/accounts|acp-agents|agent-accounts|clients)(\/|$)/, 'always'],

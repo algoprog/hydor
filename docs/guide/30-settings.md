@@ -149,7 +149,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 [Settings → MCP servers](/settings?s=mcp): tools the agents can call. More in [Connected apps, keys and tools](/guide/connections).
 
-- [**Add server**](/settings?s=mcp&find=Add%20server): A tool server for Claude Code or Codex.
+- [**Add server**](/settings?s=mcp&find=Add%20server): A tool server for Claude Code, Codex or Custom.
 - [**Check connections**](/settings?s=mcp&find=Check%20connections): See whether each MCP server answers.
 
 ### Skills

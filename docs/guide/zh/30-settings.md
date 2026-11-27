@@ -149,7 +149,7 @@
 
 [设置 → MCP 服务器](/settings?s=mcp)：智能体可以调用的工具。详见[已连接的应用、密钥和工具](/guide/connections)。
 
-- [**添加服务器**](/settings?s=mcp&find=Add%20server)：供 Claude Code 或 Codex 使用的工具服务器。
+- [**添加服务器**](/settings?s=mcp&find=Add%20server)：适用于 Claude Code、Codex 或 Custom 的工具服务器。
 - [**检查连接**](/settings?s=mcp&find=Check%20connections)：查看每个 MCP 服务器是否有响应。
 
 ### 技能

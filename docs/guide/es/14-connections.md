@@ -10,7 +10,7 @@ Los agentes pueden hacer más cuando les das herramientas. Hay tres lugares para
 
 - **Apps conectadas** ([Apps → Apps conectadas](/apps/connected)): servicios de un mercado, conectados una sola vez para todos los agentes: Claude Code, Codex, Custom y los agentes que hablan ACP, y las apps que ejecutan. Cada cuenta conectada da sus herramientas a los agentes.
 - **La bóveda** (la pestaña **Claves** de la misma página): claves de API, tokens y las contraseñas de los inicios de sesión. Una clave de API es una contraseña que te da un servicio para que los programas puedan usar tu cuenta. Los agentes las usan para llamar a un servicio, iniciar sesión en un sitio o ejecutar un programa, pero nunca las ven.
-- **Servidores MCP y plugins** ([Configuración → Servidores MCP](/settings?s=mcp) y [Configuración → Plugins](/settings?s=plugins)): servidores de herramientas que configuras tú mismo en los ajustes propios de Claude Code y Codex, y plugins que aportan habilidades y herramientas a todos los agentes (consulta [Plugins](/guide/plugins)).
+- **Servidores MCP y plugins** ([Configuración → Servidores MCP](/settings?s=mcp) y [Configuración → Plugins](/settings?s=plugins)): servidores de herramientas que configuras tú mismo, para Claude Code, Codex o Custom, y plugins que aportan habilidades y herramientas a todos los agentes (consulta [Plugins](/guide/plugins)).
 
 MCP (el Model Context Protocol) es la forma común en que un servicio ofrece herramientas a los agentes. Una cuenta conectada es un servidor MCP que Hydor configura y en el que inicia sesión para todos los agentes. Los servidores MCP de Configuración → Agentes son los que configuras a mano, con un comando o una dirección.
 
@@ -325,17 +325,18 @@ Algunos servicios necesitan algo de ti a mitad de una tarea: una fecha, una opci
 
 **Rechazar** dice que no. **Ahora no** cancela esta vez. La tarjeta de un servicio espera hasta una hora; si el turno del agente termina antes, la solicitud se cancela. Los servidores MCP que configures para Codex preguntan con el mismo tipo de tarjeta.
 
-## Configurar servidores MCP para Claude Code y Codex
+## Configurar servidores MCP para Claude Code, Codex y Custom
 
-Abre [Configuración → Agentes → Servidores MCP](/settings?s=mcp). Son servidores de herramientas en la configuración propia de Claude Code y de Codex, para herramientas que el marketplace no tiene o servidores que ejecutas tú. Las sesiones nuevas los cargan; las sesiones que ya están en marcha recogen los cambios cuando se reinician. Custom, el agente propio de la app, también los usa, todos menos los SSE (consulta [Custom](/guide/custom)).
+Abre [Configuración → Agentes → Servidores MCP](/settings?s=mcp). Son servidores de herramientas que configuras tú, para herramientas que el marketplace no tiene o servidores que ejecutas tú. Los de Claude Code y Codex se guardan en su propia configuración; los de Custom los guarda Hydor, así que puedes añadirlos sin tener ninguno de los dos programas. Custom, el agente propio de la app, los usa todos (consulta [Custom](/guide/custom)). Las sesiones nuevas los cargan; las sesiones que ya están en marcha recogen los cambios cuando se reinician.
 
-La página enumera los servidores de Claude Code y los de Codex en dos grupos, y **Añadir servidor** está junto al título de la página. El chip **Carpeta** de arriba elige la carpeta cuyos servidores ves, ya que Claude Code puede tener servidores para una carpeta además de para todas. La (i) junto al nombre de cada grupo dice que las sesiones nuevas cargan los servidores, y que las que están en marcha recogen los cambios cuando se reinician.
+La página enumera los servidores en tres grupos, **Claude Code**, **Codex** y **Custom**, y **Añadir servidor** está junto al título de la página. Un grupo de Claude Code o de Codex que no está configurado y no tiene servidores no aparece. El chip **Carpeta** de arriba elige la carpeta cuyos servidores ves, ya que Claude Code puede tener servidores para una carpeta además de para todas. La (i) junto al nombre de cada grupo dice cuándo se aplican los cambios.
 
 Cada servidor muestra:
 
 - su nombre y su tipo: **Comando** (un programa que ejecuta esta máquina), o **HTTP** o **SSE** (un servidor en una dirección; SSE es el tipo más antiguo);
 - en Claude Code, dónde se aplica: **Todas las carpetas**, **Esta carpeta, solo tú** o **Esta carpeta, compartido**;
 - **Desactivado**, para un servidor de Codex desactivado en la configuración propia de Codex;
+- en el grupo **Custom**, **De Claude Code**, **De Codex** o **De .mcp.json** para un servidor que Custom lee de ahí, y **Sesión iniciada** o **Iniciar sesión de nuevo** para uno que inicia sesión en el navegador;
 - su comando o dirección, y los nombres de sus variables de entorno, encabezados o variable del token Bearer. Sus valores se quedan en el servidor y nunca se muestran;
 - tras una comprobación, cómo está el servidor (una insignia al final de su fila).
 
@@ -343,31 +344,34 @@ Cada servidor muestra:
 
 Haz clic en [Añadir servidor](/settings?s=mcp&find=Add%20server). El diálogo **Añadir un servidor MCP** pregunta:
 
-- **Añadir a**: Claude Code, Codex, o ambos (ambos al principio).
+- **Añadir a**: Claude Code, Codex, Custom, o varios de ellos. Al principio son Claude Code y Codex si están configurados; si no, Custom. Un programa sin configurar no se puede elegir, y el diálogo explica por qué. Custom también usa los servidores de Claude Code y Codex, así que añade a Custom los que solo él deba tener, o cuando no tengas ninguno de los dos programas.
 - **Nombre**: letras, dígitos, puntos, guiones o guiones bajos, hasta 64, empezando por una letra o un dígito. Los agentes muestran sus herramientas como el nombre, una barra y la herramienta.
 - **Escribir**: **Comando**, **HTTP** o **SSE**. Codex no admite SSE, así que elegir SSE deja fuera a Codex.
 - Para un comando:
   - **Comando**: la línea de comandos completa, como `npx -y @modelcontextprotocol/server-github`. Se ejecuta en esta máquina cuando empieza una sesión. Pon entre comillas los argumentos que contengan espacios. Un ~ al principio de un argumento significa tu carpeta de inicio.
-  - **Entorno**: un CLAVE=valor por línea (se omiten las líneas que empiezan por #). Los valores pasan a los archivos de configuración de los agentes y nunca se vuelven a mostrar aquí.
+  - **Entorno**: un CLAVE=valor por línea (se omiten las líneas que empiezan por #). Los valores pasan a los archivos de configuración de los agentes (para Custom, un archivo que Hydor guarda en este equipo) y nunca se vuelven a mostrar aquí.
 - Para HTTP o SSE:
   - **URL**: la dirección del servidor, que empieza por http:// o https://.
-  - **Encabezados** (para Claude Code): uno “Nombre: valor” por línea, para servidores que aceptan una clave de API. Los servidores que usan un inicio de sesión en el navegador (OAuth) no necesitan ninguno: inicia sesión desde la lista después de añadirlo.
+  - **Encabezados** (para Claude Code y Custom): uno “Nombre: valor” por línea, para servidores que aceptan una clave de API. Los servidores que usan un inicio de sesión en el navegador (OAuth) no necesitan ninguno: inicia sesión desde la lista después de añadirlo.
   - **Variable del token Bearer** (para Codex, **opcional**): el nombre de una variable de entorno cuyo valor Codex envía como token Bearer.
 - **Dónde lo usa Claude Code** (**Dónde se usa** cuando solo se elige Claude Code):
   - **Todas las carpetas**: todas las sesiones de Claude Code en esta máquina. Es el valor predeterminado.
   - **Esta carpeta**: solo las sesiones de la carpeta elegida arriba, guardado en tu propia configuración de Claude Code.
   - **.mcp.json compartido**: se guarda en un archivo .mcp.json de esa carpeta, de modo que todos los que trabajan en el repositorio lo reciben.
 
-  Los servidores de Codex siempre se aplican a todas las carpetas.
+  Los servidores de Codex y de Custom siempre se aplican a todas las carpetas.
 
-Haz clic en **Añadir servidor** en el diálogo. Hydor lo añade mediante el comando propio de cada agente, de modo que su configuración quede como la esperan. Si un agente lo rechaza, el diálogo indica que no añadió el servidor, con lo que dijo el agente. Corrige lo que esté mal y haz clic en **Añadir servidor** de nuevo: solo se reintenta con los agentes que fallaron.
+Haz clic en **Añadir servidor** en el diálogo. Hydor lo añade a Claude Code y Codex mediante el comando propio de cada programa, de modo que su configuración quede como la esperan, y guarda él mismo el de Custom. Si un agente lo rechaza, el diálogo indica que no añadió el servidor, con lo que dijo el agente. Corrige lo que esté mal y haz clic en **Añadir servidor** de nuevo: solo se reintenta con los agentes que fallaron. Un servidor con el mismo nombre que uno que Custom ya lee de Claude Code o Codex lo sustituye para Custom.
+
+Para cambiar un servidor de Custom, abre su menú **⋯** y elige **Editar**. Las variables y los encabezados aparecen con valores vacíos: deja uno vacío para conservar el valor guardado, o borra su línea para quitarlo. Si cambias el comando, o el sitio de la dirección, vuelve a escribir los valores.
 
 ### Comprobar qué servidores se conectan
 
-[Comprobar conexiones](/settings?s=mcp&find=Check%20connections), al final del título del grupo de Claude Code o de Codex, inicia todos los servidores como lo haría una sesión nueva y muestra cómo le fue a cada uno:
+[Comprobar conexiones](/settings?s=mcp&find=Check%20connections), al final del título de un grupo, inicia todos los servidores como lo haría una sesión nueva y muestra cómo le fue a cada uno. En el grupo **Custom** comprueba todo lo que Custom carga, así que, tras una comprobación, ahí aparecen también los servidores que lee de Claude Code, Codex y el .mcp.json de la carpeta:
 
 - **Conectada**, con su número de herramientas;
-- **Requiere iniciar sesión**;
+- **Requiere iniciar sesión**; en Custom, un servidor que pide iniciar sesión en el navegador (OAuth);
+- **Iniciar sesión de nuevo**, en Custom, cuando un inicio de sesión terminó y no se pudo renovar;
 - **Aún conectando**;
 - **Fallido**, con el motivo (“El servidor no se inició o no respondió.” cuando no hay ninguno);
 - **Desactivado**.
@@ -376,11 +380,15 @@ No se usa ningún modelo. Puede tardar hasta uno o dos minutos. En Claude Code, 
 
 ### Iniciar sesión en un servidor
 
-Un servidor en una dirección que inicia sesión con OAuth necesita que inicies sesión una vez. Haz clic en **Iniciar sesión** (se muestra cuando una comprobación dice que requiere iniciar sesión), o abre el menú **⋯** del servidor y elige **Iniciar sesión (OAuth) en una terminal**. Se abre una terminal en la app, que ejecuta el inicio de sesión propio del agente para ese servidor: sigue allí sus pasos.
+Un servidor en una dirección que inicia sesión con OAuth necesita que inicies sesión una vez.
+
+En **Claude Code** y **Codex**, haz clic en **Iniciar sesión** (se muestra cuando una comprobación dice que requiere iniciar sesión), o abre el menú **⋯** del servidor y elige **Iniciar sesión (OAuth) en una terminal**. Se abre una terminal en la app, que ejecuta el inicio de sesión propio del programa para ese servidor: sigue allí sus pasos.
+
+En **Custom** (servidores HTTP, los suyos y los que lee de los programas), haz clic en **Iniciar sesión** y luego en **Iniciar sesión** en el diálogo: inicias sesión en la página del propio servicio, en una ventana pequeña (un teléfono se queda en su pestaña), como con las [cuentas conectadas](#services-you-sign-in-to-in-the-browser). La mayoría de los servidores dejan que Hydor se registre solo; cuando uno no lo permite, el diálogo pide un ID de cliente que creas en la configuración para desarrolladores del servicio, y muestra la dirección de retorno que debes darle. Los tokens se guardan cifrados en el almacén, se envían solo a ese servidor y se renuevan solos, así que Custom nunca los ve. **Iniciar sesión de nuevo** aparece solo cuando falla la renovación. **Cerrar sesión**, en el menú **⋯**, olvida el inicio de sesión.
 
 ### Quitar un servidor
 
-Abre el menú **⋯** del servidor, elige **Quitar** y confirma con **Quitar**. El agente deja de cargarlo. Las sesiones que ya están en marcha lo conservan hasta que se reinicien.
+Abre el menú **⋯** del servidor, elige **Quitar** y confirma con **Quitar**. El agente deja de cargarlo. Las sesiones que ya están en marcha lo conservan hasta que se reinicien. Al quitar un servidor de Custom también se olvida su inicio de sesión, si ningún otro servidor usa esa dirección.
 
 ## Añadir plugins a Claude Code
 
@@ -421,6 +429,7 @@ Los agentes pueden hacer esto por ti, con tu visto bueno en una tarjeta. Nunca e
 - “Muéstrame las herramientas de Notion y desactiva las que eliminan páginas.”
 - “Pon las herramientas de Gmail que envían o eliminan en Preguntar primero, y deja el resto activadas.”
 - “Añade un servidor MCP para Claude Code y Codex que ejecute npx -y @modelcontextprotocol/server-memory, y luego comprueba que se conecta.”
+- “Añade a Custom el servidor MCP HTTP de https://mcp.example.com/mcp y dime cuándo tengo que pulsar Iniciar sesión.”
 - “Muéstrame los plugins de Claude Code más instalados y luego instala el que yo elija.”
 - “Inicia sesión en mi cuenta de Voltaro y descarga las facturas de este año en esta carpeta.” (La primera vez, pide el inicio de sesión en una tarjeta.)
 - “Sube esta rama a GitHub con el token de la bóveda.”

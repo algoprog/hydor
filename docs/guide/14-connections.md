@@ -10,7 +10,7 @@ Agents can do more when you give them tools. There are three places to do that:
 
 - **Connected apps** ([Apps → Connected apps](/apps/connected)): services from a marketplace, connected once for every agent: Claude Code, Codex, Custom and the agents that speak ACP, and the apps they run. Each connected account gives the agents its tools.
 - **The vault** (the **Keys** tab of the same page): API keys, tokens and the passwords of sign-ins. An API key is a password a service gives you so that programs can use your account. Agents use these to call a service, sign in to a site or run a program, but never see them.
-- **MCP servers and plugins** ([Settings → MCP servers](/settings?s=mcp) and [Settings → Plugins](/settings?s=plugins)): tool servers you set up yourself in Claude Code's and Codex's own settings, and plugins that bring skills and tools to every agent (see [Plugins](/guide/plugins)).
+- **MCP servers and plugins** ([Settings → MCP servers](/settings?s=mcp) and [Settings → Plugins](/settings?s=plugins)): tool servers you set up yourself, for Claude Code, Codex or Custom, and plugins that bring skills and tools to every agent (see [Plugins](/guide/plugins)).
 
 MCP (the Model Context Protocol) is the common way a service offers tools to agents. A connected account is an MCP server that Hydor sets up and signs in to for every agent. The MCP servers in Settings → Agents are ones you set up by hand, with a command or an address.
 
@@ -325,17 +325,18 @@ Some services need something from you partway through a task: a date, a choice, 
 
 **Decline** says no. **Not now** cancels this time. A service's card waits up to an hour; if the agent's turn ends first, the request is cancelled. MCP servers you set up for Codex ask in the same kind of card.
 
-## Set up MCP servers for Claude Code and Codex
+## Set up MCP servers for Claude Code, Codex and Custom
 
-Open [Settings → Agents → MCP servers](/settings?s=mcp). These are tool servers in Claude Code's and Codex's own settings, for tools the marketplace doesn't have or servers you run yourself. New sessions load them; sessions already running pick up changes when they restart. Custom, the app's own agent, uses them too, all but the SSE ones (see [Custom](/guide/custom)).
+Open [Settings → Agents → MCP servers](/settings?s=mcp). These are tool servers you set up yourself, for tools the marketplace doesn't have or servers you run yourself. Claude Code's and Codex's are kept in their own settings; Custom's are kept by Hydor, so you can add them with neither program set up. Custom, the app's own agent, uses all of them (see [Custom](/guide/custom)). New sessions load them; sessions already running pick up changes when they restart.
 
-The page lists Claude Code's servers and Codex's in two groups, and **Add server** sits beside the page's title. The **Folder** chip at the top picks the folder whose servers you see, since Claude Code can keep servers for one folder as well as for all of them. The (i) beside each group's name says that new sessions load the servers, and running ones pick up changes when they restart.
+The page lists the servers in three groups, **Claude Code**, **Codex** and **Custom**, and **Add server** sits beside the page's title. A group for Claude Code or Codex that isn't set up and has no servers is left out. The **Folder** chip at the top picks the folder whose servers you see, since Claude Code can keep servers for one folder as well as for all of them. The (i) beside each group's name says when changes take effect.
 
 Each server shows:
 
 - its name and its type: **Command** (a program this machine runs), or **HTTP** or **SSE** (a server at an address; SSE is the older kind);
 - for Claude Code, where it applies: **All folders**, **This folder, only you** or **This folder, shared**;
 - **Off**, for a Codex server turned off in Codex's own settings;
+- in the **Custom** group, **From Claude Code**, **From Codex** or **From .mcp.json** for a server Custom reads from there, and **Signed in** or **Sign in again** for one that signs in in the browser;
 - its command or address, and the names of its environment variables, headers or bearer token variable. Their values stay on the server and are never shown;
 - after a check, how the server is doing (a badge at the end of its row).
 
@@ -343,31 +344,34 @@ Each server shows:
 
 Click [Add server](/settings?s=mcp&find=Add%20server). The **Add an MCP server** dialog asks:
 
-- **Add to**: Claude Code, Codex, or both (both at first).
+- **Add to**: Claude Code, Codex, Custom, or several of them. At first it is Claude Code and Codex where they are set up, else Custom. A program that isn't set up can't be picked, and the dialog says why. Custom uses Claude Code's and Codex's servers too, so add to Custom for a server only it should have, or when you have neither program.
 - **Name**: letters, digits, dots, dashes or underscores, up to 64, starting with a letter or digit. The agents show its tools as the name, a slash and the tool.
 - **Type**: **Command**, **HTTP** or **SSE**. Codex doesn't support SSE, so picking SSE leaves Codex out.
 - For a command:
   - **Command**: the whole command line, like `npx -y @modelcontextprotocol/server-github`. It runs on this machine when a session starts. Quote arguments that contain spaces. A ~ at the start of an argument means your home folder.
-  - **Environment**: one KEY=value per line (lines starting with # are skipped). The values go into the agents' config files and are never shown here again.
+  - **Environment**: one KEY=value per line (lines starting with # are skipped). The values go into the agents' config files (for Custom, a file Hydor keeps on this computer) and are never shown here again.
 - For HTTP or SSE:
   - **URL**: the server's address, starting with http:// or https://.
-  - **Headers** (for Claude Code): one "Name: value" per line, for servers that take an API key. Servers that use a sign-in in the browser (OAuth) need none: sign in from the list after adding.
+  - **Headers** (for Claude Code and Custom): one "Name: value" per line, for servers that take an API key. Servers that use a sign-in in the browser (OAuth) need none: sign in from the list after adding.
   - **Bearer token variable** (for Codex, optional): the name of an environment variable whose value Codex sends as the bearer token.
 - **Where Claude Code uses it** (**Where it is used** when only Claude Code is picked):
   - **All folders**: every Claude Code session on this machine. This is the default.
   - **This folder**: only sessions in the folder picked at the top, kept in your own Claude Code settings.
   - **Shared .mcp.json**: saved to a .mcp.json file in that folder, so everyone working in the repository gets it.
 
-  Codex servers always apply to every folder.
+  Codex's and Custom's servers always apply to every folder.
 
-Click **Add server** in the dialog. Hydor adds it through each agent's own command, so their settings stay the way they expect. If an agent refuses, the dialog shows that it did not add the server, with what the agent said. Fix what's wrong and click **Add server** again: only the agents that failed are tried.
+Click **Add server** in the dialog. Hydor adds it to Claude Code and Codex through each program's own command, so their settings stay the way they expect, and keeps Custom's itself. If an agent refuses, the dialog shows that it did not add the server, with what the agent said. Fix what's wrong and click **Add server** again: only the agents that failed are tried. A server named like one Custom already reads from Claude Code or Codex replaces that one for Custom.
+
+To change one of Custom's servers, open its **⋯** menu and pick **Edit**. Variables and headers are listed with empty values: leave one empty to keep the value saved, or delete its line to remove it. If you change the command, or the address's site, enter the values again.
 
 ### Check which servers connect
 
-[Check connections](/settings?s=mcp&find=Check%20connections), at the end of the Claude Code or Codex group's title, starts every server the way a new session would and shows how each did:
+[Check connections](/settings?s=mcp&find=Check%20connections), at the end of a group's title, starts every server the way a new session would and shows how each did. In the **Custom** group it checks everything Custom loads, so the servers it reads from Claude Code, Codex and the folder's .mcp.json are listed there too after a check:
 
 - **Connected**, with its number of tools;
-- **Needs sign-in**;
+- **Needs sign-in**; for Custom, a server that asks for a sign-in in the browser (OAuth);
+- **Sign in again**, for Custom, when a sign-in ended and could not be renewed;
 - **Still connecting**;
 - **Failed**, with the reason ("The server did not start or did not answer." when there is none);
 - **Off**.
@@ -376,11 +380,15 @@ No model is used. It can take up to a minute or two. For Claude Code, it runs in
 
 ### Sign in to a server
 
-A server at an address that signs in with OAuth needs signing in once. Click **Sign in** (shown when a check says it needs a sign-in), or open the server's **⋯** menu and pick **Sign in (OAuth) in a terminal**. A terminal opens in the app, running the agent's own sign-in for that server: follow its steps there.
+A server at an address that signs in with OAuth needs signing in once.
+
+For **Claude Code** and **Codex**, click **Sign in** (shown when a check says it needs a sign-in), or open the server's **⋯** menu and pick **Sign in (OAuth) in a terminal**. A terminal opens in the app, running the program's own sign-in for that server: follow its steps there.
+
+For **Custom** (HTTP servers, its own and those it reads from the programs), click **Sign in**, then **Sign in** in the dialog: you sign in on the service's own page, in a small window (a phone stays in its tab), the way [connected accounts](#services-you-sign-in-to-in-the-browser) do. Most servers let Hydor register by itself; when one doesn't, the dialog asks for a client ID you make in the service's developer settings, and shows the callback address to give it. The tokens are kept encrypted in the vault, sent only to that server, and renewed by themselves, so Custom never sees them. **Sign in again** appears only when renewing fails. **Sign out**, in the **⋯** menu, forgets the sign-in.
 
 ### Remove a server
 
-Open the server's **⋯** menu, pick **Remove**, and confirm with **Remove**. The agent stops loading it. Sessions already running keep it until they restart.
+Open the server's **⋯** menu, pick **Remove**, and confirm with **Remove**. The agent stops loading it. Sessions already running keep it until they restart. Removing one of Custom's servers also forgets its sign-in, if no other server uses that address.
 
 ## Add plugins to Claude Code
 
@@ -421,6 +429,7 @@ Agents can do these for you, with your OK on a card. They never type a key's val
 - "Show me Notion's tools and turn off the ones that delete pages."
 - "Set Gmail's tools that send or delete to Ask first, and leave the rest on."
 - "Add an MCP server for Claude Code and Codex that runs npx -y @modelcontextprotocol/server-memory, then check that it connects."
+- "Add the HTTP MCP server at https://mcp.example.com/mcp to Custom, and tell me when I need to press Sign in."
 - "Show me the most installed Claude Code plugins, then install the one I pick."
 - "Sign in to my Voltaro account and download this year's bills into this folder." (The first time, it asks for the sign-in on a card.)
 - "Push this branch to GitHub with the token in the vault."

@@ -1992,8 +1992,9 @@ agents that speak ACP and take MCP servers.
 OpenRouter session costs and token usage show above the message box without a spending cap. Charges come from OpenRouter automatically, with its generation records and catalog prices as fallbacks; its catalog also supplies Usage estimates, so no manual prices are required.
 
 Custom is the app's own agent, for models beyond Claude Code's and Codex's, and for theirs too: it also runs the models of your Claude and ChatGPT plans. Its working and starting indicators use the Hydor loading animation (a stream of bright water running through its Ω), vertically centred beside their text. It works like them: it reads,
-edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
-Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
+edits and searches files, runs commands, keeps a plan, loads skills, uses its own MCP servers (added in
+Settings → MCP servers, kept by Hydor, no other program needed) and those set up for Claude Code and for Codex (and
+the project's `.mcp.json`), signing in to the HTTP ones that ask for it in the browser, asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context. In Auto mode routine steps go ahead and a quick check asks you
 about risky ones, and commands can run in a sandbox that lets them change files only in the folder and the temporary folders (bubblewrap on Linux, Seatbelt on a Mac; on Windows, low integrity, with the folder marked once and a temporary folder of their own). Forks and
 "Edit from here" (with the files put back) work for it as they do for Claude Code and Codex, and goals work for it as for every agent.
@@ -2402,6 +2403,12 @@ programs shows each program's version and what is out, with Check now, Update no
   runs away is stopped alone, never the app or another session.
 - Settings: sign the agents in and out from the browser, and manage MCP servers, skills, plugins, Agent
   Guidelines and the CLAUDE.md / AGENTS.md instruction files.
+- **MCP servers** (Settings → MCP servers): add a command, HTTP or SSE server to Claude Code, Codex (through their
+  own commands) or Custom (kept by Hydor, so no other program is needed), edit and remove Custom's, and **Check
+  connections**. An HTTP server that answers with OAuth details shows **Needs sign-in** for Custom: **Sign in** runs
+  the same browser flow as connected apps (discovery, dynamic client registration or a client ID of yours), keeps the
+  tokens sealed in the vault, adds them to requests itself, renews them, and asks to sign in again only when renewing
+  fails. This also covers the servers Custom reads from Claude Code, Codex and `.mcp.json`.
 - An MCP server of its own, so an agent elsewhere can list, read, start and steer sessions here.
 
 ## In a terminal

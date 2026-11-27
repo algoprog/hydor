@@ -149,7 +149,7 @@
 
 [設定 → MCPサーバー](/settings?s=mcp)：エージェントが呼び出せるツール。詳しくは[接続済みアプリ、キー、ツール](/guide/connections)。
 
-- [**サーバーを追加**](/settings?s=mcp&find=Add%20server)：Claude CodeやCodex用のツールサーバー。
+- [**サーバーを追加**](/settings?s=mcp&find=Add%20server)：Claude Code、Codex、Custom向けのツールサーバー。
 - [**接続を確認**](/settings?s=mcp&find=Check%20connections)：各MCPサーバーが応答するかを確認。
 
 ### スキル

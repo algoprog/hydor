@@ -518,12 +518,13 @@ test('buttons call their endpoint and say what happened', async () => {
   await runAction(f.ctl, findRow('images.picture-tools-on-this-computer'));
   assert.deepEqual(f.writes(), [{ method: 'POST', path: '/api/images/local/setup', body: undefined }]);
   f = fake();
-  assert.deepEqual((await runAction(f.ctl, findRow('mcp.check-connections'))).length, 2);
+  assert.deepEqual((await runAction(f.ctl, findRow('mcp.check-connections'))).length, 3);
   assert.deepEqual(
     f.writes().map((w) => [w.path, w.body]),
     [
       ['/api/setup/mcp/status', { agent: 'claude' }],
       ['/api/setup/mcp/status', { agent: 'codex' }],
+      ['/api/setup/mcp/status', { agent: 'custom' }],
     ],
   );
   await assert.rejects(runAction(f.ctl, findRow('general.tips')), (e) => e instanceof UsageError && /hydor settings set general\.tips/.test(e.message));

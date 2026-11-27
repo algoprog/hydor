@@ -89,7 +89,7 @@ export const WAYS: Record<string, Way> = {
   'guidelines.for-a-project': { how: 'GET /api/guidelines?space=<project id>; PUT /api/guidelines { space: { id, text } }' },
   'guidelines.for-one-session': { how: 'GET /api/guidelines?key=this; PUT /api/guidelines { session: { key: "this" (or a session’s key), text } }' },
   'guidelines.instruction-files': { how: 'GET /api/setup/instructions?agent=claude|codex&cwd=<folder> lists them; read and change a file with your own file tools.' },
-  'mcp.add-server': { how: 'GET /api/setup/mcp; POST /api/setup/mcp { agents: ["claude","codex"], name, transport: "stdio"|"http"|"sse", command?, args?, url?, scope?, cwd? }; POST /api/setup/mcp/remove { agent, name, scope?, cwd? }. Keys and tokens the person enters.' },
+  'mcp.add-server': { how: 'GET /api/setup/mcp; POST /api/setup/mcp { agents: ["claude","codex","custom"], name, transport: "stdio"|"http"|"sse", command?, args?, url?, scope?, cwd? }; PUT /api/setup/mcp/custom/:name changes one of Custom’s; POST /api/setup/mcp/remove { agent, name, scope?, cwd? }. Keys, tokens and signing in (Sign in on the server) are the person’s.' },
   'skills.new-skill': { how: 'skill_save (your tool), or POST /api/skillpack/skills { name, description, body }' },
   'skills.built-in': { how: SKILLS },
   'skills.yours': { how: `${SKILLS}; POST /api/skillpack/skills/:name/remove removes one of yours` },

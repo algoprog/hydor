@@ -1,16 +1,32 @@
 // MCP servers for Console: the user's (Claude Code's user and project settings, the project's
-// .mcp.json, Codex's config.toml) and those the app hands over (its show_html page server). Over stdio
-// (newline-delimited JSON-RPC) or Streamable HTTP; their tools join Console's as mcp__<server>__<tool>.
-// An app's tool steps call a plugin's tools with the same client (server/apps/plugins.ts).
+// .mcp.json, Codex's config.toml, and Custom's own, kept by Hydor: server/mcpservers) and those the app hands
+// over (its show_html page server). Over stdio (newline-delimited JSON-RPC), Streamable HTTP or the older SSE;
+// their tools join Console's as mcp__<server>__<tool>. A server that wants a browser sign-in is reached through
+// the app, which adds the token (def.relay). An app's tool steps call a plugin's tools with the same client
+// (server/apps/plugins.ts).
 import { spawn, type ChildProcess } from 'node:child_process';
 import { spawnProgram } from '../platform.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { SseLink, Unauthorized } from '../connections/upstream.ts';
+import { readStore, STORE_ENV } from '../mcpservers/store.ts';
+
+export { Unauthorized };
+
+/** Where a server was set up: Claude Code's settings, a folder's .mcp.json, Codex's, Custom's own, or the app. */
+export type McpFrom = 'claude' | 'project' | 'codex' | 'custom' | 'app';
 
 export interface McpDef {
   name: string;
-  type: 'stdio' | 'http';
+  type: 'stdio' | 'http' | 'sse';
+  from?: McpFrom;
+  /** The folder a stdio server starts in (this process's unless given). */
+  cwd?: string;
+  /** The app's address that adds a browser sign-in to an HTTP server's requests (server/mcpservers). */
+  relay?: string;
+  /** Hydor holds a sign-in for this address: its requests go through `relay` from the start. */
+  signedIn?: boolean;
   command?: string;
   args?: string[];
   env?: Record<string, string>;
@@ -44,23 +60,38 @@ const readJson = (f: string): any => {
   }
 };
 
-/** MCP servers from Claude Code's settings and the project's .mcp.json, plus the ones the app passes. */
-export function mcpServers(cwd: string, fromClient: any[]): McpDef[] {
+/**
+ * MCP servers from Claude Code's settings, the project's .mcp.json, Codex's settings and Custom's own (which win
+ * over the same name in a program's), plus the ones the app passes (which win over all). `store` is Hydor's file
+ * of Custom's servers; `relay` is the app's address that adds browser sign-ins.
+ */
+export function mcpServers(cwd: string, fromClient: any[], o: { store?: string; relay?: string } = {}): McpDef[] {
   const out = new Map<string, McpDef>();
-  const add = (name: string, d: any) => {
+  const add = (name: string, d: any, from: McpFrom) => {
     if (!d || typeof d !== 'object' || d.disabled) return;
-    const type = d.type === 'http' || d.type === 'streamable-http' || (d.url && d.type !== 'sse') ? 'http' : d.command ? 'stdio' : null;
+    const type = d.type === 'sse' && d.url ? 'sse' : d.type === 'http' || d.type === 'streamable-http' || d.url ? 'http' : d.command ? 'stdio' : null;
     if (!type) return;
     const headers = Array.isArray(d.headers) ? Object.fromEntries(d.headers.map((h: any) => [h.name, h.value])) : d.headers;
-    out.set(name, { name, type, command: d.command, args: d.args ?? [], env: d.env, url: d.url, headers });
+    out.set(name, { name, type, from, command: d.command, args: d.args ?? [], env: d.env, url: d.url, headers });
   };
   const claude = readJson(path.join(os.homedir(), '.claude.json'));
-  for (const [n, d] of Object.entries(claude?.mcpServers ?? {})) add(n, d);
-  for (const [n, d] of Object.entries(claude?.projects?.[cwd]?.mcpServers ?? {})) add(n, d);
-  for (const [n, d] of Object.entries(readJson(path.join(cwd, '.mcp.json'))?.mcpServers ?? {})) add(n, d);
+  for (const [n, d] of Object.entries(claude?.mcpServers ?? {})) add(n, d, 'claude');
+  for (const [n, d] of Object.entries(claude?.projects?.[cwd]?.mcpServers ?? {})) add(n, d, 'claude');
+  for (const [n, d] of Object.entries(readJson(path.join(cwd, '.mcp.json'))?.mcpServers ?? {})) add(n, d, 'project');
   // Codex's, where Claude Code has none of the same name.
-  for (const [n, d] of Object.entries(codexServers())) if (!out.has(n)) out.set(n, d);
-  for (const d of fromClient ?? []) if (d?.name) add(d.name, d);
+  for (const [n, d] of Object.entries(codexServers())) if (!out.has(n)) out.set(n, { ...d, from: 'codex' });
+  let kept: Record<string, unknown> = {};
+  let signedIn: string[] = [];
+  try {
+    ({ servers: kept, signedIn } = readStore(o.store ?? process.env[STORE_ENV]));
+  } catch (e) {
+    console.error((e as Error).message);
+  }
+  for (const [n, d] of Object.entries(kept)) add(n, d, 'custom');
+  // Sign-ins are for the user's own servers only: what the app passes carries its own.
+  for (const d of out.values())
+    if (d.type === 'http' && o.relay) Object.assign(d, { relay: o.relay, ...(signedIn.includes(d.url!) ? { signedIn: true } : {}) });
+  for (const d of fromClient ?? []) if (d?.name) add(d.name, d, 'app');
   return [...out.values()];
 }
 
@@ -221,15 +252,18 @@ export class McpClient {
   /** The last of what a stdio server wrote on stderr, to say why it stopped. */
   private said = '';
   private proc?: ChildProcess;
+  private link?: SseLink;
   private seq = 0;
   private waiting = new Map<number, (m: any) => void>();
   private session?: string;
+  /** Requests go through the app, which adds the sign-in. */
+  private relayed = false;
 
   constructor(readonly def: McpDef) {}
 
   async connect(): Promise<void> {
     if (this.def.type === 'stdio') {
-      this.proc = spawnProgram(this.def.command!, this.def.args ?? [], { env: { ...(this.def.baseEnv ?? process.env), ...(this.def.env ?? {}) }, stdio: ['pipe', 'pipe', 'pipe'] });
+      this.proc = spawnProgram(this.def.command!, this.def.args ?? [], { cwd: this.def.cwd, env: { ...(this.def.baseEnv ?? process.env), ...(this.def.env ?? {}) }, stdio: ['pipe', 'pipe', 'pipe'] });
       let buf = '';
       this.proc.stderr!.on('data', (d) => (this.said = (this.said + d.toString()).slice(-4000)));
       // A server that ended: writing to it fails here, not as a crash of this process.
@@ -254,7 +288,7 @@ export class McpClient {
       };
       this.proc.on('exit', () => ended());
       this.proc.on('error', (e) => ended(e.message));
-    }
+    } else if (this.def.type === 'sse') this.link = await SseLink.open(this.def.url!, this.def.headers ?? {});
     await this.request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'console', version: '1' } }, 30_000);
     this.notify('notifications/initialized');
     const tools: any[] = [];
@@ -312,6 +346,7 @@ export class McpClient {
   }
 
   close() {
+    this.link?.close();
     const p = this.proc;
     if (!p) return;
     // Its input closed first: a server ends on that even behind a launcher that is killed.
@@ -322,6 +357,7 @@ export class McpClient {
   private notify(method: string, params: unknown = {}) {
     const m = { jsonrpc: '2.0', method, params };
     if (this.proc) this.proc.stdin!.write(JSON.stringify(m) + '\n');
+    else if (this.link) void this.link.send(m, this.def.headers ?? {}).catch(() => {});
     else void this.post(m).catch(() => {});
   }
 
@@ -337,22 +373,45 @@ export class McpClient {
         this.waiting.set(id, (r) => (clearTimeout(t), this.waiting.delete(id), resolve(r)));
         this.proc!.stdin!.write(JSON.stringify(msg) + '\n');
       });
-    } else m = await this.post(msg, timeout, signal);
+    } else if (this.link) m = await this.link.send(msg, this.def.headers ?? {}, { timeoutMs: timeout, signal });
+    else m = await this.post(msg, timeout, signal);
     if (m.error) throw new Error(`${this.def.name}: ${m.error.message ?? 'error'}`);
     return m.result ?? {};
   }
 
   /** Streamable HTTP: the answer comes as JSON, or as an event stream that carries it. */
   private async post(msg: any, timeout = 30_000, signal?: AbortSignal): Promise<any> {
-    const r = await fetch(this.def.url!, {
+    const own = this.def.headers ?? {};
+    const keyed = Object.keys(own).some((h) => h.toLowerCase() === 'authorization');
+    // Signed in through Hydor, and no key of the server's own to try first.
+    if (this.def.relay && this.def.signedIn && !keyed) this.relayed = true;
+    const relayed = this.relayed;
+    const session: Record<string, string> = this.session ? { 'mcp-session-id': this.session } : {};
+    const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...session };
+    if (relayed) {
+      // The server's own headers go along (all but Authorization, which the sign-in replaces).
+      headers['x-hydor-mcp-url'] = this.def.url!;
+      headers['x-hydor-mcp-headers'] = Buffer.from(JSON.stringify(Object.fromEntries(Object.entries(own).filter(([h]) => h.toLowerCase() !== 'authorization')))).toString('base64');
+    } else Object.assign(headers, own);
+    const r = await fetch(relayed ? this.def.relay! : this.def.url!, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(this.session ? { 'mcp-session-id': this.session } : {}), ...(this.def.headers ?? {}) },
+      headers,
       body: JSON.stringify(msg),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
     });
+    const refused = async () => String(((await r.json().catch(() => ({}))) as { error?: unknown }).error ?? '');
+    if (r.status === 401) {
+      // A server that wants a sign-in: asked again through the app, which has it when the person signed in.
+      if (!relayed && this.def.relay) {
+        r.body?.cancel().catch(() => {});
+        this.relayed = true;
+        return this.post(msg, timeout, signal);
+      }
+      throw new Unauthorized(`${this.def.name}: ${(relayed && (await refused())) || 'refused the request (401)'}`);
+    }
     this.session = r.headers.get('mcp-session-id') ?? this.session;
     if (msg.id == null) return null;
-    if (!r.ok) throw new Error(`${this.def.name} answered ${r.status}`);
+    if (!r.ok) throw new Error((relayed && (await refused())) || `${this.def.name} answered ${r.status}`);
     if (!(r.headers.get('content-type') ?? '').includes('text/event-stream')) return r.json();
     const text = await r.text();
     for (const block of text.split(/\n\n/))

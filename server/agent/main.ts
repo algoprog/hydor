@@ -161,7 +161,8 @@ function save(s: Session) {
 
 function connectMcp(s: Session) {
   s.mcp = Promise.all(
-    mcpServers(s.cwd, s.mcpDefs)
+    // A server that wants a browser sign-in is reached through the app, which holds the sign-in.
+    mcpServers(s.cwd, s.mcpDefs, { relay: RUNTIME ? `${RUNTIME}/mcp` : undefined })
       // A public run, and a confidential session, have the app's own server alone: the user's other servers reach outside.
       .filter((d) => (!PUBLIC_RUN && !CONFIDENTIAL_ENV) || d.name === OWN)
       .map(async (d) => {

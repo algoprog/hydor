@@ -149,7 +149,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 
 [Paramètres → Serveurs MCP](/settings?s=mcp) : les outils que les agents peuvent appeler. Pour en savoir plus : [Apps connectées, clés et outils](/guide/connections).
 
-- [**Ajouter le serveur**](/settings?s=mcp&find=Add%20server) : Un serveur d’outils pour Claude Code ou Codex.
+- [**Ajouter le serveur**](/settings?s=mcp&find=Add%20server) : Un serveur d’outils pour Claude Code, Codex ou Custom.
 - [**Vérifier les connexions**](/settings?s=mcp&find=Check%20connections) : Voir si chaque serveur MCP répond.
 
 ### Compétences
