@@ -1,13 +1,18 @@
-// `hydor mcp`: Settings → Agents → MCP servers. The tool servers Claude Code and Codex use: list, status (does each
-// start), add (to one or both), edit (replaces one: remove, then add) and remove. The API has no on and off for a
-// server: removing one is how it stops. Values of env and headers are never returned by the server, so edit asks for them again.
+// `hydor mcp`: Settings → Agents → MCP servers. The tool servers of Claude Code, Codex and Custom: list, status (does
+// each start), add (to any of them), edit (Custom's changed in place; the programs' removed, then added) and remove.
+// The API has no on and off for a server: removing one is how it stops. Values of env and headers are never returned
+// by the server, so editing a program's server asks for them again (Custom's keeps the ones not given).
 import path from 'node:path';
 import { ApiError } from '../client.ts';
 import { Cancelled, choose, fields, flag, mark, str, strs, table, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
 
+type Target = 'claude' | 'codex' | 'custom';
+const TARGETS: Target[] = ['claude', 'codex', 'custom'];
 interface Server {
-  agent: 'claude' | 'codex';
+  agent: Target;
   name: string;
+  /** Custom's list also names the signed-in servers it reads from elsewhere: those are listed where they are. */
+  from?: string;
   scope: 'user' | 'local' | 'project';
   transport: 'stdio' | 'http' | 'sse';
   command?: string;
@@ -19,17 +24,17 @@ interface Server {
   enabled?: boolean;
 }
 interface Result {
-  agent: 'claude' | 'codex';
+  agent: Target;
   ok: boolean;
   output: string;
 }
-const programName = (a: string) => (a === 'claude' ? 'Claude Code' : 'Codex');
+const programName = (a: string) => (a === 'claude' ? 'Claude Code' : a === 'custom' ? 'Custom' : 'Codex');
 const MCP_HINT = 'hydor mcp lists them';
 const server = { name: 'server', kind: 'mcp', pick: true } as const;
 const idOf = (s: Server) => `${s.agent}:${s.scope}:${s.name}`;
 
 const PICK: Record<'agent' | 'scope' | 'folder', OptionSpec> = {
-  agent: { type: 'string', value: 'claude|codex', desc: 'Only this agent’s servers', values: ['claude', 'codex'] },
+  agent: { type: 'string', value: 'claude|codex|custom', desc: 'Only this agent’s servers', values: TARGETS },
   scope: { type: 'string', value: 'user|local|project', desc: 'Claude Code’s scope: user, local (this folder) or project', values: ['user', 'local', 'project'] },
   folder: { type: 'string', value: '<folder>', desc: 'The folder for local and project servers (default: home)', kind: 'dir' },
 };
@@ -38,10 +43,13 @@ const folderOf = (ctx: Ctx, v: Values): string | undefined => {
   const f = str(v, 'folder');
   return f === undefined ? undefined : ctx.conn.here && !f.startsWith('~') ? path.resolve(f) : f;
 };
-const agentOf = (v: Values): 'claude' | 'codex' | undefined => {
+const checkTarget = (a: string) => {
+  if (!TARGETS.includes(a as Target)) throw new UsageError(`--agent takes claude, codex or custom (it was “${a}”)`);
+};
+const agentOf = (v: Values): Target | undefined => {
   const a = str(v, 'agent');
-  if (a !== undefined && a !== 'claude' && a !== 'codex') throw new UsageError(`--agent takes claude or codex (it was “${a}”)`);
-  return a as 'claude' | 'codex' | undefined;
+  if (a !== undefined) checkTarget(a);
+  return a as Target | undefined;
 };
 const scopeOf = (v: Values): Server['scope'] | undefined => {
   const s = str(v, 'scope');
@@ -54,7 +62,7 @@ async function listServers(ctx: Ctx, v: Values): Promise<Server[]> {
   const agent = agentOf(v);
   const scope = scopeOf(v);
   const r = await ctx.conn.api<{ servers: Server[] }>('GET', `/api/setup/mcp${cwd ? `?cwd=${encodeURIComponent(cwd)}` : ''}`, undefined, { timeoutMs: 60_000 });
-  return r.servers.filter((s) => (!agent || s.agent === agent) && (!scope || s.scope === scope));
+  return r.servers.filter((s) => !s.from && (!agent || s.agent === agent) && (!scope || s.scope === scope));
 }
 
 const findServer = async (ctx: Ctx, v: Values, given: string | undefined): Promise<Server> =>
@@ -100,7 +108,7 @@ const SPEC_OPTIONS: Record<string, OptionSpec> = {
   command: { type: 'string', value: '<command>', desc: 'The command that starts it, with its arguments' },
   url: { type: 'string', value: '<address>', desc: 'Its http(s) address (a remote server)' },
   env: { type: 'strings', value: 'KEY=value', desc: 'An environment variable; KEY alone is asked for hidden' },
-  header: { type: 'strings', value: 'Name:value', desc: 'A header for a remote server (Claude Code only)' },
+  header: { type: 'strings', value: 'Name:value', desc: 'A header for a remote server (Claude Code and Custom)' },
   'bearer-env': { type: 'string', value: '<VAR>', desc: 'Codex only: the variable holding the bearer token' },
 };
 
@@ -116,7 +124,7 @@ async function addServer(ctx: Ctx, body: Record<string, unknown>, quiet = false)
 export const mcp: Area = {
   name: 'mcp',
   summary: 'Tool servers (MCP) for the agents',
-  help: 'An MCP server gives an agent tools (GitHub, a database, a browser…). These are the ones Claude Code and Codex have, which Hydor’s sessions with them use. Name one by its name; with the same name in several places, by agent:scope:name (or --agent, --scope). Keys it needs go in the vault (hydor keys). There is no on and off for a server: remove it to stop it, add it to have it back.',
+  help: 'An MCP server gives an agent tools (GitHub, a database, a browser…). These are the ones of Claude Code and Codex, in their own settings, and of Custom, kept by Hydor (Custom uses the programs’ ones too). Name one by its name; with the same name in several places, by agent:scope:name (or --agent, --scope). Keys it needs go in the vault (hydor keys). There is no on and off for a server: remove it to stop it, add it to have it back.',
   group: 'tools',
   verbs: [
     {
@@ -124,7 +132,7 @@ export const mcp: Area = {
       args: [],
       options: PICK,
       summary: 'The servers each agent has',
-      examples: ['hydor mcp', 'hydor mcp --agent codex', 'hydor mcp --folder ~/code/app', 'hydor mcp --json'],
+      examples: ['hydor mcp', 'hydor mcp --agent custom', 'hydor mcp --folder ~/code/app', 'hydor mcp --json'],
       async run(ctx, _a, v) {
         if (ctx.o.json) return ctx.json({ servers: await listServers(ctx, v) });
         const list = await listServers(ctx, v);
@@ -153,7 +161,7 @@ export const mcp: Area = {
       args: [server],
       options: { ...PICK, tools: { type: 'boolean', desc: 'Start it and count its tools (slow: up to 2 minutes)' } },
       summary: 'One server: program, command, keys, state',
-      help: 'Which program has it (Claude Code or Codex), its scope, its command and arguments or its address, the names of its environment variables and headers (never their values: the agents do not give them out), and whether it is on. The API has no tools list without starting servers, so --tools starts the program’s servers, as hydor mcp status does, and says how many tools this one has.',
+      help: 'Which agent has it (Claude Code, Codex or Custom), its scope, its command and arguments or its address, the names of its environment variables and headers (never their values: the agents do not give them out), and whether it is on. The API has no tools list without starting servers, so --tools starts the program’s servers, as hydor mcp status does, and says how many tools this one has.',
       examples: ['hydor mcp show github', 'hydor mcp show github --agent codex', 'hydor mcp show docs --tools', 'hydor mcp show claude:user:github --json'],
       async run(ctx, [given], v) {
         const s = await findServer(ctx, v, given);
@@ -188,10 +196,10 @@ export const mcp: Area = {
       args: [],
       options: { agent: PICK.agent, folder: PICK.folder },
       summary: 'Start each server and say which work',
-      help: 'No model is used. It takes up to about 45 seconds for Claude Code and about 2 minutes for Codex. Without --agent, both are checked, one after the other.',
-      examples: ['hydor mcp status', 'hydor mcp status --agent claude'],
+      help: 'No model is used. It takes up to about 45 seconds for Claude Code and about 2 minutes for Codex. Custom’s check starts every server it would load, the programs’ ones too; one that wants a sign-in in the browser says auth (sign in on Settings → MCP servers). Without --agent, all three are checked, one after the other.',
+      examples: ['hydor mcp status', 'hydor mcp status --agent custom'],
       async run(ctx, _a, v) {
-        const agents = agentOf(v) ? [agentOf(v)!] : (['claude', 'codex'] as const);
+        const agents = agentOf(v) ? [agentOf(v)!] : TARGETS;
         const cwd = folderOf(ctx, v);
         const all: Record<string, unknown> = {};
         const { p } = ctx.look;
@@ -231,17 +239,18 @@ export const mcp: Area = {
         { name: 'command', kind: 'text', optional: true, rest: true },
       ],
       options: {
-        agent: { type: 'strings', value: 'claude|codex', desc: 'Add it to this agent (again for both; default both)', values: ['claude', 'codex'] },
+        agent: { type: 'strings', value: 'claude|codex|custom', desc: 'Add it to this agent (again for more; default: set up)', values: TARGETS },
         ...SPEC_OPTIONS,
         scope: PICK.scope,
         folder: PICK.folder,
       },
-      summary: 'Add a server to Claude Code, Codex or both',
-      help: 'A command server: the words after the name are the command and its arguments (put -- before them when they start with a dash). A remote server: --url. Letters, digits, dots, dashes or underscores in the name; the agents show tools as name/tool. Env values and headers are saved in the agents’ own settings; put a real key in the vault when you can. Where an agent would not take it, the others still did: retry only for that one with --agent.',
+      summary: 'Add a server to Claude Code, Codex or Custom',
+      help: 'Without --agent it is added to Claude Code and Codex where they are set up, else to Custom (which also uses their servers). A command server: the words after the name are the command and its arguments (put -- before them when they start with a dash). A remote server: --url. Letters, digits, dots, dashes or underscores in the name; the agents show tools as name/tool. Env values and headers are saved in the agents’ own settings (Custom’s with Hydor); put a real key in the vault when you can. Where an agent would not take it, the others still did: retry only for that one with --agent.',
       examples: [
         'hydor mcp add github --env GITHUB_TOKEN -- npx -y gh-mcp',
         'hydor mcp add docs --url https://example.com/mcp',
         'hydor mcp add db --agent claude --scope local --folder ~/app -- uvx sqlite',
+        'hydor mcp add shop --agent custom --url https://example.com/mcp',
       ],
       async run(ctx, [name, ...words], v) {
         const body = await specOf(ctx, v, { name, words });
@@ -255,13 +264,24 @@ export const mcp: Area = {
       aliases: ['set'],
       args: [server],
       options: { ...PICK, ...SPEC_OPTIONS },
-      summary: 'Change a server (removed, then added again)',
-      help: 'The agents have no way to change a server, so this removes it and adds it again with what you name changed and the rest kept: the command and arguments, or the address. The values of its env and headers are never returned to Hydor, so a server with some needs them given again (--env KEY=value). It asks first.',
+      summary: 'Change a server',
+      help: 'Custom’s servers are changed in place: what you name changes and the rest is kept, the values of env and headers too (while the command, or the address’s site, stays the same). Claude Code and Codex have no way to change a server, so theirs are removed and added again; the values of their env and headers are never returned to Hydor, so a server with some needs them given again (--env KEY=value). It asks first.',
       examples: ['hydor mcp edit github --env GITHUB_TOKEN', 'hydor mcp edit docs --url https://example.com/v2/mcp', 'hydor mcp edit db --command "uvx mcp-server-sqlite --read-only" --agent claude'],
       async run(ctx, [given], v) {
         const s = await findServer(ctx, v, given);
         const named = ['transport', 'command', 'url', 'env', 'header', 'bearer-env'].some((k) => v[k] !== undefined);
         if (!named) throw new UsageError(`Say what to change: ${['--command', '--url', '--env', '--header', '--bearer-env'].join(', ')} (${ctx.usage})`);
+        if (s.agent === 'custom') {
+          const spec = await specOf(ctx, v, { name: s.name, existing: s });
+          // Empty values: the ones saved are kept.
+          const kept = (keys: string[] | undefined, given: unknown) => ({ ...Object.fromEntries((keys ?? []).map((k) => [k, ''])), ...(given as Record<string, string> | undefined) });
+          if (spec.transport === 'stdio') spec.env = kept(s.envKeys, spec.env);
+          else spec.headers = kept(s.headerKeys, spec.headers);
+          if (!(await ctx.confirm(`Change “${s.name}” of Custom?`))) return ctx.out('Not changed.');
+          const r = await ctx.conn.api<{ ok: boolean }>('PUT', `/api/setup/mcp/custom/${encodeURIComponent(s.name)}`, spec, { timeoutMs: 60_000 });
+          if (ctx.o.json) return ctx.json(r);
+          return ctx.out(`Changed “${s.name}” for Custom.`);
+        }
         const needs = [...(s.envKeys ?? []), ...(s.headerKeys ?? [])];
         const gave = [...strs(v, 'env'), ...strs(v, 'header')].map((x) => x.split(/[=:]/)[0].trim());
         const lost = needs.filter((k) => !gave.includes(k));
@@ -329,10 +349,17 @@ async function specOf(ctx: Ctx, v: Values, o: { name: string; words?: string[]; 
   if (typed !== undefined && !['stdio', 'http', 'sse'].includes(typed)) throw new UsageError(`--transport takes stdio, http or sse (it was “${typed}”)`);
   const command = o.words?.length ? o.words : str(v, 'command') ? splitCommand(str(v, 'command')!, ctx.look.home) : undefined;
   const transport = (typed ?? (str(v, 'url') ? 'http' : command ? 'stdio' : (ex?.transport ?? (url ? 'http' : 'stdio')))) as 'stdio' | 'http' | 'sse';
-  const agents = ex ? [ex.agent] : strs(v, 'agent').length ? strs(v, 'agent') : ['claude', 'codex'];
-  for (const a of agents) if (a !== 'claude' && a !== 'codex') throw new UsageError(`--agent takes claude or codex (it was “${a}”)`);
-  const body: Record<string, unknown> = { agents: transport === 'sse' ? agents.filter((a) => a === 'claude') : agents, name: o.name, transport };
-  if (transport === 'sse' && !agents.includes('claude')) throw new UsageError('SSE is Claude Code’s only');
+  let agents: string[] = ex ? [ex.agent] : strs(v, 'agent');
+  for (const a of agents) checkTarget(a);
+  if (!agents.length) {
+    // Where Claude Code and Codex are set up; with neither, Custom (which also uses their servers).
+    const { programs } = await ctx.conn.api<{ programs?: Record<string, boolean> }>('GET', '/api/setup/mcp', undefined, { timeoutMs: 60_000 });
+    agents = ['claude', 'codex'].filter((p) => programs?.[p] !== false);
+    if (!agents.length) agents = ['custom'];
+  }
+  const usable = transport === 'sse' ? agents.filter((a) => a !== 'codex') : agents;
+  if (!usable.length) throw new UsageError('Codex does not support SSE');
+  const body: Record<string, unknown> = { agents: usable, name: o.name, transport };
   if (transport === 'stdio') {
     const parts = command ?? (ex?.command ? [ex.command, ...(ex.args ?? [])] : []);
     if (!parts.length) throw new UsageError(`Say what starts it: hydor mcp add ${o.name} <command…> (or --url for a remote one)`);
@@ -348,7 +375,7 @@ async function specOf(ctx: Ctx, v: Values, o: { name: string; words?: string[]; 
     if (Object.keys(headers).length) body.headers = headers;
     const bearer = str(v, 'bearer-env') ?? ex?.bearerEnv;
     if (bearer) body.bearerEnv = bearer;
-    if (strs(v, 'env').length) throw new UsageError('--env is for a command server: a remote one takes --header (Claude Code) or --bearer-env (Codex)');
+    if (strs(v, 'env').length) throw new UsageError('--env is for a command server: a remote one takes --header (Claude Code, Custom) or --bearer-env (Codex)');
   }
   const scope = scopeOf(v);
   if (scope) body.scope = scope;

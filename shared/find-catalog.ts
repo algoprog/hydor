@@ -182,8 +182,8 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['guidelines', 'For one session', 'session guidelines instructions start page', 'Guidelines for one session, from the start page or the session’s menu', 'Guidelines for one session'],
   ['guidelines', 'Instruction files', 'claude.md agents.md instruction files project folder', 'CLAUDE.md and AGENTS.md, which Claude Code and Codex read on their own', 'CLAUDE.md and AGENTS.md'],
   // Agents › MCP servers
-  ['mcp', 'Add server', 'mcp tools server add', 'A tool server for Claude Code or Codex', 'Add an MCP server'],
-  ['mcp', 'Check connections', 'mcp status connected failed', 'See whether each MCP server answers', 'Check MCP servers'],
+  ['mcp', 'Add server', 'mcp tools server add custom edit oauth sign in', 'A tool server for Claude Code, Codex or Custom', 'Add an MCP server'],
+  ['mcp', 'Check connections', 'mcp status connected failed custom needs sign-in oauth', 'See whether each MCP server answers', 'Check MCP servers'],
   // Agents › Skills
   ['skills', 'New skill', 'skill create write own add', 'Write a skill for every agent, or for Claude Code or Codex alone'],
   ['skills', 'Built in', 'skills bundled come with the app library', 'The skills that come with the app', 'Built-in skills'],

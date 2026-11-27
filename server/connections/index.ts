@@ -87,7 +87,7 @@ const VAULT_GUIDE =
   'Keys and sign-ins: when a task needs one, use what is set up already (list_connections shows the vault and the connected accounts; a program on this computer may be signed in already). If it is not there, call request_secret (name, why, domains; fields for a sign-in in several parts; items for several at once; how and url for how to get it; commands: true for use in commands): the user fills in a card, the values go to the vault, and a message tells you when they are saved. You never see them: use them by name, in http_request (auth: NAME, or {{NAME}} in the address, headers or body), in browser_act (a type step with "secret": NAME, to sign in on a site) and in run_with_secrets ($NAME in a command).';
 
 /** The address the person reaches this app at, from the page that asked (sign-ins come back there). */
-function originOf(d: Deps, h: Record<string, unknown>): string {
+export function originOf(d: Deps, h: Record<string, unknown>): string {
   const o = String(h.origin ?? '');
   try {
     const u = new URL(o);
@@ -187,9 +187,13 @@ function routes(d: Deps) {
     const r = await finishOAuth(db, req.query as Record<string, string>);
     reply.header('cache-control', 'no-store');
     if (r.flow) {
-      changed('apps', r.app);
-      if (r.ok && r.app) testLater(r.app);
-      return reply.redirect(`/apps/connected?flow=${encodeURIComponent(r.flow)}`);
+      const back = r.back ?? '/apps/connected';
+      // A connected app's sign-in (an MCP server's is kept by what began it, server/mcpservers).
+      if (back === '/apps/connected') {
+        changed('apps', r.app);
+        if (r.ok && r.app) testLater(r.app);
+      }
+      return reply.redirect(`${back}${back.includes('?') ? '&' : '?'}flow=${encodeURIComponent(r.flow)}`);
     }
     return reply
       .code(400)

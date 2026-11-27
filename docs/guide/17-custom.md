@@ -40,7 +40,7 @@ You can switch the model during a session from the menu under the message box. C
 - **Web pages**: fetch a page as clean text with its headings, links, lists and tables; PDFs and Office files online are read as text. It only reaches public addresses; for this computer or its network it uses a command such as `curl`.
 - **A plan**: for work with several steps it keeps a checklist, shown in the session, and ticks items off.
 - **Skills**: it loads the skills that fit the task: the project's, yours (Claude Code's and Codex's skill folders) and the app's [skill library](/guide/skills). It knows them by group and name, and can also look for one by what the work is, in a few words.
-- **MCP servers**: tool servers you set up for Claude Code (for all folders and for this folder), the project's `.mcp.json`, and Codex's.
+- **MCP servers**: Custom's own, added in [Settings → MCP servers](/settings?s=mcp) (see [Add a server](/guide/connections#add-a-server)), and those set up for Claude Code (for all folders and for this folder), in the project's `.mcp.json` and in Codex; a name kept for Custom wins. One that asks for a sign-in in the browser is signed in to there (see [Sign in to a server](/guide/connections#sign-in-to-a-server)).
 - **The app's own tools**: web search, the browser, memory, pages, your [connections](/guide/connections) and the rest, as every agent here gets them.
 
 Each step shows in the session with a plain name ("Read index.ts", "Edit README.md", "Fetch https://…"), with its diff or output a click away.

@@ -17,6 +17,8 @@ export interface AuthServer {
   scopes_supported?: string[];
   code_challenge_methods_supported?: string[];
   token_endpoint_auth_methods_supported?: string[];
+  /** No metadata was found: these are the older specification's default paths, which may not be there. */
+  guessed?: boolean;
 }
 
 export interface Discovery {
@@ -108,7 +110,7 @@ async function authServer(issuer: string, legacy: boolean): Promise<AuthServer> 
   }
   if (other) throw new OAuthError(`The sign-in details at ${u.host} name another server (${other}): not signing in there`);
   // The 2025-03-26 specification's fallback: the server's own origin, with the default paths.
-  if (legacy) return { issuer: u.origin, authorization_endpoint: `${u.origin}/authorize`, token_endpoint: `${u.origin}/token`, registration_endpoint: `${u.origin}/register` };
+  if (legacy) return { issuer: u.origin, authorization_endpoint: `${u.origin}/authorize`, token_endpoint: `${u.origin}/token`, registration_endpoint: `${u.origin}/register`, guessed: true };
   throw new OAuthError(`Could not find how to sign in at ${u.host}`);
 }
 

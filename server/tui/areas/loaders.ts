@@ -115,7 +115,7 @@ export const LOADERS: Record<ArgKind, Loader> = {
   },
   skill: skills,
   plugin: plugins,
-  mcp: async (c) => ((await c.get<{ servers?: { agent: string; scope: string; name: string }[] }>('/api/setup/mcp'))?.servers ?? []).map((s) => [s.name, `${s.agent === 'claude' ? 'Claude Code' : 'Codex'}${s.scope === 'user' ? '' : `, ${s.scope}`}`]),
+  mcp: async (c) => ((await c.get<{ servers?: { agent: string; scope: string; name: string; from?: string }[] }>('/api/setup/mcp'))?.servers ?? []).filter((s) => !s.from).map((s) => [s.name, `${s.agent === 'claude' ? 'Claude Code' : s.agent === 'custom' ? 'Custom' : 'Codex'}${s.scope === 'user' ? '' : `, ${s.scope}`}`]),
   key: async (c) => ((await c.get<{ secrets?: { name: string; domains: string[]; note: string }[] }>('/api/connections'))?.secrets ?? []).map((s) => [s.name, s.domains.join(', ') || s.note]),
   note: notes,
   experiment: async (c) =>

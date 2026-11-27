@@ -14,6 +14,7 @@ import { signedOutText } from '../signin.ts';
 import { CONTEXT_PARTS, type AcpAgentDef, type ApprovalOption, type LiveState, type ModelOption } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT, config } from '../config.ts';
+import { STORE_ENV, storeFile } from '../mcpservers/store.ts';
 import { AGENT_FILE, MODELS_DIR } from '../models/config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { GivenAdditions } from '../features/types.ts';
@@ -126,7 +127,7 @@ const consoleDef = (): AcpAgentDef => ({
   name: 'Custom',
   command: process.execPath,
   args: [path.join(APP_ROOT, 'dist/server/agent.js')],
-  env: { HYDOR_MODELS: AGENT_FILE, HYDOR_STATE: path.join(MODELS_DIR, 'sessions') },
+  env: { HYDOR_MODELS: AGENT_FILE, HYDOR_STATE: path.join(MODELS_DIR, 'sessions'), [STORE_ENV]: storeFile(config.dataDir) },
   hint: 'Built in: models from OpenRouter, Ollama and vLLM, in Settings → Models',
   builtin: true,
 });

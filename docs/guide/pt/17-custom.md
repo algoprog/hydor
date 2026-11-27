@@ -40,7 +40,7 @@ Você pode trocar o modelo durante uma sessão pelo menu abaixo da caixa de mens
 - **Páginas da web**: busca uma página como texto limpo, com títulos, links, listas e tabelas; PDFs e arquivos do Office online são lidos como texto. Só acessa endereços públicos; para este computador ou a rede dele, usa um comando como `curl`.
 - **Um plano**: para trabalhos com várias etapas, mantém uma lista de verificação, exibida na sessão, e vai marcando os itens.
 - **Habilidades**: carrega as habilidades que combinam com a tarefa: as do projeto, as suas (as pastas de habilidades do Claude Code e do Codex) e a [biblioteca de habilidades](/guide/skills) do app. Ele as conhece por grupo e nome, e também pode procurar uma pelo tipo de trabalho, em poucas palavras.
-- **Servidores MCP**: servidores de ferramentas que você configurou para o Claude Code (para todas as pastas e para esta pasta), o `.mcp.json` do projeto e os do Codex.
+- **Servidores MCP**: os do próprio Custom, adicionados em [Configurações → Servidores MCP](/settings?s=mcp) (veja [Adicionar um servidor](/guide/connections#add-a-server)), e os configurados para o Claude Code (para todas as pastas e para esta pasta), no `.mcp.json` do projeto e no Codex; um nome mantido pelo Custom tem prioridade. Em um que pede login no navegador, você entra por lá (veja [Entrar em um servidor](/guide/connections#sign-in-to-a-server)).
 - **As ferramentas do próprio app**: busca na web, o navegador, a memória, páginas, suas [conexões](/guide/connections) e o resto, como todo agente aqui recebe.
 
 Cada passo aparece na sessão com um nome simples (“Read index.ts”, “Edit README.md”, “Fetch https://…”), com o diff ou a saída a um clique de distância.

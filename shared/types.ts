@@ -1363,9 +1363,15 @@ export interface GitCloneJob {
 export type McpScope = 'user' | 'project' | 'local';
 export type McpTransport = 'stdio' | 'http' | 'sse';
 
+/** Whose MCP server it is: Claude Code's or Codex's settings, or Custom's, which Hydor keeps. */
+export type McpTarget = 'claude' | 'codex' | 'custom';
+
+/** Where a server Custom reads from elsewhere was set up (`project` is a folder's .mcp.json). */
+export type McpFrom = 'claude' | 'project' | 'codex';
+
 /** A configured MCP server. Env and header values never leave the server: only their names. */
 export interface McpEntry {
-  agent: Agent;
+  agent: McpTarget;
   name: string;
   scope: McpScope;
   transport: McpTransport;
@@ -1376,10 +1382,15 @@ export interface McpEntry {
   headerKeys?: string[];
   bearerEnv?: string;
   enabled?: boolean;
+  /** Custom's list: a server it reads from a program's settings or a .mcp.json (not one of its own). */
+  from?: McpFrom;
+  /** Custom is signed in to it through Hydor; `again`: the sign-in could not be renewed. */
+  signedIn?: boolean;
+  again?: boolean;
 }
 
 export interface McpSpec {
-  agents: Agent[];
+  agents: McpTarget[];
   name: string;
   transport: McpTransport;
   command?: string;
@@ -1399,6 +1410,12 @@ export interface McpStatus {
   state: 'connected' | 'failed' | 'auth' | 'pending' | 'off';
   error?: string;
   tools?: number;
+  /** Custom's: where a server it reads from elsewhere was set up, its type and address, and its sign-in. */
+  from?: McpFrom;
+  transport?: McpTransport;
+  url?: string;
+  signedIn?: boolean;
+  again?: boolean;
 }
 
 export interface SkillEntry {

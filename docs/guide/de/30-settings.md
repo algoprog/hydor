@@ -149,7 +149,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 [Einstellungen → MCP-Server](/settings?s=mcp): Tools, die die Agenten aufrufen können. Mehr dazu unter [Verbundene Apps, Keys und Tools](/guide/connections).
 
-- [**Server hinzufügen**](/settings?s=mcp&find=Add%20server): Ein Toolserver für Claude Code oder Codex.
+- [**Server hinzufügen**](/settings?s=mcp&find=Add%20server): Ein Tool-Server für Claude Code, Codex oder Custom.
 - [**Verbindungen prüfen**](/settings?s=mcp&find=Check%20connections): Erreichbarkeit aller MCP-Server prüfen.
 
 ### Skills

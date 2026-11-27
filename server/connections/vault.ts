@@ -74,6 +74,7 @@ const SEALED: { table: string; id: string; col: string; aad: (id: string) => str
   { table: 'conn_apps', id: 'id', col: 'cred', aad: (n) => `app:${n}` },
   { table: 'conn_clients', id: 'k', col: 'client', aad: (n) => `client:${n}` },
   { table: 'conn_app_keys', id: 'k', col: 'value', aad: (n) => `appkey:${n}` },
+  { table: 'conn_mcp', id: 'url', col: 'cred', aad: (n) => `mcp:${n}` },
 ];
 
 /** A sealed column of another store's (the saved signatures'), sealed again with the rest when the key is replaced. */
@@ -502,6 +503,17 @@ function maskList(): { find: string; put: string }[] {
       const found: string[] = [];
       credStrings(JSON.parse(unseal(a.cred, `app:${a.id}`)), found);
       for (const v of found) add(v, `[${a.id} sign-in]`);
+    } catch {}
+  }
+  let servers: { url: string; name: string; cred: string }[] = [];
+  try {
+    servers = db.prepare('select url, name, cred from conn_mcp').all() as { url: string; name: string; cred: string }[];
+  } catch {}
+  for (const s of servers) {
+    try {
+      const found: string[] = [];
+      credStrings(JSON.parse(unseal(s.cred, `mcp:${s.url}`)), found);
+      for (const v of found) add(v, `[${s.name} sign-in]`);
     } catch {}
   }
   // Longest first, so a value inside another is not half masked.

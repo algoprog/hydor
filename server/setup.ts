@@ -7,12 +7,13 @@ import { execProgram, spawnProgram } from './platform.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, InstructionFile, MarketplaceEntry, McpEntry, McpScope, McpSpec, McpStatus, PluginEntry, SetupResult, SkillEntry } from '../shared/types.ts';
+import type { Agent, InstructionFile, MarketplaceEntry, McpEntry, McpScope, McpSpec, McpStatus, McpTarget, PluginEntry, SetupResult, SkillEntry } from '../shared/types.ts';
 import { codexEnv } from './agents/codex.ts';
 import type { CodexControl } from './agents/control.ts';
 import { HttpError } from './auth.ts';
 import { config } from './config.ts';
 import { agentBaseEnv } from './env.ts';
+import { addCustom } from './mcpservers/custom.ts';
 import { LineSplitter } from './runner/frames.ts';
 
 type Json = Record<string, any>;
@@ -50,7 +51,7 @@ function run(agent: Agent, args: string[], opts: { cwd?: string; timeoutMs?: num
 
 const result = (r: { code: number; out: string; err: string }): SetupResult => ({ ok: r.code === 0, output: (r.out + (r.err ? (r.out ? '\n' : '') + r.err : '')).trim() });
 
-function folder(cwd: unknown): string {
+export function folder(cwd: unknown): string {
   const d = typeof cwd === 'string' && cwd ? path.resolve(cwd) : HOME;
   if (!fs.existsSync(d) || !fs.statSync(d).isDirectory()) throw new HttpError(400, 'Not a folder');
   return d;
@@ -105,18 +106,18 @@ export async function listMcp(cwdArg?: string): Promise<McpEntry[]> {
   return out;
 }
 
-function checkSpec(s: McpSpec) {
+export function checkSpec(s: McpSpec) {
   if (!NAME.test(s.name ?? '')) throw new HttpError(400, 'Use letters, digits, dots, dashes or underscores for the name');
   if (s.transport === 'stdio' ? !s.command?.trim() : !/^https?:\/\//.test(s.url ?? '')) throw new HttpError(400, s.transport === 'stdio' ? 'Enter the command to run' : 'Enter an http(s) URL');
   for (const k of [...Object.keys(s.env ?? {}), ...(s.bearerEnv ? [s.bearerEnv] : [])]) if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) throw new HttpError(400, `Bad variable name: ${k}`);
   for (const k of Object.keys(s.headers ?? {})) if (!/^[A-Za-z0-9-]+$/.test(k)) throw new HttpError(400, `Bad header name: ${k}`);
 }
 
-/** Adds the server to each chosen agent. */
-export async function addMcp(s: McpSpec): Promise<(SetupResult & { agent: Agent })[]> {
+/** Adds the server to each chosen agent: Claude Code and Codex through their own commands, Custom in Hydor's own list. */
+export async function addMcp(s: McpSpec): Promise<(SetupResult & { agent: McpTarget })[]> {
   checkSpec(s);
   const cwd = folder(s.cwd);
-  const out: (SetupResult & { agent: Agent })[] = [];
+  const out: (SetupResult & { agent: McpTarget })[] = [];
   for (const agent of new Set(s.agents)) {
     if (agent === 'claude') {
       const cfg =
@@ -134,6 +135,8 @@ export async function addMcp(s: McpSpec): Promise<(SetupResult & { agent: Agent 
         if (s.bearerEnv) args.push('--bearer-token-env-var', s.bearerEnv);
       }
       out.push({ agent, ...result(await run('codex', args)) });
+    } else if (agent === 'custom') {
+      out.push({ agent, ...addCustom(s) });
     }
   }
   return out;

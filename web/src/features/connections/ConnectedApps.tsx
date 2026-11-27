@@ -12,41 +12,13 @@ import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { Badge, Button, cx, Empty, IconButton, inputCls, Section, Segmented, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
-import { ConnectDialog, FLOW_KEY } from './ConnectDialog';
+import { ConnectDialog } from './ConnectDialog';
 import { Keys } from './Keys';
+import { useSignInReturn } from './signInReturn';
 import { AppIcon, authLabel, REPO_CATALOG, useConn } from './store';
 
 export type ConnTab = 'market' | 'connected' | 'keys';
 type Tab = ConnTab;
-
-/** The browser came back from signing in (?flow=…): says how it went, then tidies the address. */
-function useSignInReturn(onDone: () => void) {
-  useEffect(() => {
-    const q = new URLSearchParams(location.search);
-    const flow = q.get('flow');
-    if (!flow) return;
-    // In the small sign-in window: the page that opened it is told, and this window closes.
-    if (window.opener && window.name === 'naget-sign-in') {
-      try {
-        window.opener.postMessage({ type: 'naget-connections-flow', flow }, location.origin);
-      } catch {}
-      window.close();
-    }
-    sessionStorage.removeItem(FLOW_KEY);
-    q.delete('flow');
-    q.delete('s');
-    go(`/apps/connected${q.size ? `?${q}` : ''}`, true);
-    api<{ result: { app: string; name: string; ok: boolean; error?: string } | null }>(`/api/connections/flows/${enc(flow)}`)
-      .then((r) => {
-        if (!r.result) return;
-        const name = r.result.name;
-        if (r.result.ok) toast(`${name} is connected`, 'ok');
-        else toast(`${name}: ${r.result.error ?? 'signing in did not finish'}`, 'error');
-        onDone();
-      })
-      .catch(() => {});
-  }, []);
-}
 
 function AppCard({ app, connected, onOpen, big }: { app: CatalogApp; connected?: ConnectionView; onOpen: () => void; big?: boolean }) {
   return (

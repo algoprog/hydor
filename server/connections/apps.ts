@@ -345,6 +345,45 @@ function splitList(template: string, value: string): string[] {
 
 const refreshing = new Map<string, Promise<OAuthCred>>();
 
+/**
+ * OAuth tokens renewed when they end within a minute (or `force`), one renewal at a time per `key`: `save` keeps
+ * the new ones, `ended` is told when the sign-in cannot be renewed any more, `lapsed` is the error then.
+ */
+export async function renewOAuth(
+  key: string,
+  o: OAuthCred,
+  r: { force?: boolean; save: (next: OAuthCred) => void; ended: () => void; lapsed: () => Error },
+): Promise<OAuthCred> {
+  if (!r.force && (!o.expires_at || o.expires_at - Date.now() > 60_000)) return o;
+  if (!o.refresh_token) {
+    if (o.expires_at && o.expires_at <= Date.now()) {
+      r.ended();
+      throw r.lapsed();
+    }
+    return o;
+  }
+  let p = refreshing.get(key);
+  if (!p) {
+    p = (async () => {
+      try {
+        const t = await refreshTokens({ tokenEndpoint: o.token_endpoint, client: o.client, refreshToken: o.refresh_token!, resource: o.resource });
+        const next: OAuthCred = { ...o, ...t };
+        if (!t.expires_at) delete next.expires_at;
+        r.save(next);
+        return next;
+      } catch (e) {
+        // A refused refresh token will not work again; a network failure might.
+        if (e instanceof OAuthError && /invalid_grant|invalid_client|unauthorized_client/.test(e.message)) r.ended();
+        throw e;
+      } finally {
+        refreshing.delete(key);
+      }
+    })();
+    refreshing.set(key, p);
+  }
+  return p;
+}
+
 /** The headers that sign requests to a remote app: its key, or an OAuth token (renewed first when it is about to end). */
 export async function authHeaders(db: DB, c: Conn, force = false): Promise<Record<string, string>> {
   const a = c.entry.auth;
@@ -362,37 +401,16 @@ export async function authHeaders(db: DB, c: Conn, force = false): Promise<Recor
 }
 
 /** The OAuth tokens, renewed when they end within a minute (or `force`); one renewal at a time per app. */
-export async function freshOAuth(db: DB, c: Conn, o: OAuthCred, force = false): Promise<OAuthCred> {
-  if (!force && (!o.expires_at || o.expires_at - Date.now() > 60_000)) return o;
-  if (!o.refresh_token) {
-    if (o.expires_at && o.expires_at <= Date.now()) {
-      setStatus(db, c.id, 'signin', 'The sign-in ended: connect again');
-      throw new HttpError(409, `${c.entry.name}'s sign-in ended: connect it again in Apps → Connected apps`);
-    }
-    return o;
-  }
-  let p = refreshing.get(c.id);
-  if (!p) {
-    p = (async () => {
-      try {
-        const t = await refreshTokens({ tokenEndpoint: o.token_endpoint, client: o.client, refreshToken: o.refresh_token!, resource: o.resource });
-        const next: OAuthCred = { ...o, ...t };
-        if (!t.expires_at) delete next.expires_at;
-        setCred(db, c.id, { ...readCred(db, c.id), oauth: next });
-        if (c.status === 'signin') setStatus(db, c.id, 'untested');
-        return next;
-      } catch (e) {
-        // A refused refresh token will not work again; a network failure might.
-        if (e instanceof OAuthError && /invalid_grant|invalid_client|unauthorized_client/.test(e.message)) setStatus(db, c.id, 'signin', 'The sign-in ended: connect again');
-        throw e;
-      } finally {
-        refreshing.delete(c.id);
-      }
-    })();
-    refreshing.set(c.id, p);
-  }
-  return p;
-}
+export const freshOAuth = (db: DB, c: Conn, o: OAuthCred, force = false): Promise<OAuthCred> =>
+  renewOAuth(`app:${c.id}`, o, {
+    force,
+    save: (next) => {
+      setCred(db, c.id, { ...readCred(db, c.id), oauth: next });
+      if (c.status === 'signin') setStatus(db, c.id, 'untested');
+    },
+    ended: () => setStatus(db, c.id, 'signin', 'The sign-in ended: connect again'),
+    lapsed: () => new HttpError(409, `${c.entry.name}'s sign-in ended: connect it again in Apps → Connected apps`),
+  });
 
 /** Apps whose sign-in ends within `ms`: renewed now, so a quiet app stays signed in. */
 export async function renewSoon(db: DB, ms = 10 * 60_000): Promise<string[]> {

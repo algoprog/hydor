@@ -149,7 +149,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 
 [Configurações → Servidores MCP](/settings?s=mcp): ferramentas que os agentes podem chamar. Mais em [Apps conectados, chaves e ferramentas](/guide/connections).
 
-- [**Adicionar servidor**](/settings?s=mcp&find=Add%20server): Um servidor de ferramentas para o Claude Code ou o Codex.
+- [**Adicionar servidor**](/settings?s=mcp&find=Add%20server): Um servidor de ferramentas para Claude Code, Codex ou Custom.
 - [**Verificar conexões**](/settings?s=mcp&find=Check%20connections): Veja se cada servidor MCP responde.
 
 ### Habilidades
