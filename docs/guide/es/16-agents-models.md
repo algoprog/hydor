@@ -474,6 +474,10 @@ Cada modelo muestra su creador, nombre y etiquetas: **Último** (siempre la vers
 
 Haz clic en **Añadir** en un modelo. Su fila dirá entonces **Añadido**, y el modelo aparece en el grupo **Tus modelos de OpenRouter** (“In the model pickers”) sobre la búsqueda y en el menú **Modelo** de Custom. Haz clic en la × de uno de ellos para quitarlo de los menús. Hasta que añadas al menos uno, OpenRouter no ofrece ningún modelo (“Add at least one model to use OpenRouter.”).
 
+### Esfuerzo en los modelos de OpenRouter
+
+Un modelo que razona ofrece, en el menú **Esfuerzo**, los niveles de esfuerzo que OpenRouter indica para él, entre **Ninguno** (sin razonamiento), **Minimalista**, **Bajo**, **Media**, **Alto**, **Xhigh** y **Máximo**. Custom pide un esfuerzo medio mientras está elegido **Predeterminado**, y el esfuerzo que elijas en los demás casos. Un modelo cuyos niveles no incluyen el medio conserva su propio valor predeterminado, y un modelo que no indica ninguno no tiene el ajuste **Esfuerzo** y se le pide un esfuerzo medio.
+
 ## Conectar Ollama, vLLM u otro endpoint
 
 El grupo **Entornos de ejecución y endpoints** conecta los programas que ejecutan modelos. Ábrelo en [Configuración → Agentes → Modelos](/settings?s=models&find=Runtimes%20and%20endpoints).
@@ -496,7 +500,9 @@ Muchos programas y servicios responden igual que la API de OpenAI: LM Studio, el
 
 El endpoint aparece como una fila con su dirección y cuántos modelos ofrece. Sus modelos aparecen en la lista de Custom como «modelo (nombre)». La × lo quita. Si añades otro endpoint con el mismo nombre, reemplaza al primero.
 
-Haz clic en **Definir lo que puede hacer cada modelo** debajo de la fila para ver sus modelos, cada uno con dos opciones: **Ve imágenes** y **Esfuerzo de razonamiento**. Cada una puede ser **Automático**, **Sí** o **No**. Un modelo que ve imágenes recibe las capturas de pantalla y las imágenes como imágenes, mientras que uno que no las ve recibe una descripción de ellas (consulta [Imágenes para modelos que no ven](/guide/custom#images-for-models-that-dont-see)); un modelo que razona ofrece Bajo, Medio y Alto en el menú **Esfuerzo**, y Custom envía el que elijas como `reasoning_effort`, el ajuste que aceptan los servidores compatibles con OpenAI (no se envía nada mientras esté elegido **Predeterminado**). **Automático** sigue lo que el endpoint dice del modelo, y el menú muestra cuál es: los servidores que describen sus modelos (al estilo de OpenRouter, Mistral y otros) lo indican en su lista de modelos, y en una pasarela LiteLLM Hydor también consulta la información de sus modelos, con la misma clave. Un endpoint que no dice nada cuenta como no: elige **Sí** para los modelos que sepas que ven imágenes o razonan. Lo que definas se conserva cuando vuelves a añadir el endpoint.
+Haz clic en **Definir lo que puede hacer cada modelo**, debajo de la fila, para ver sus modelos, cada uno con dos opciones: **Ve imágenes** y **Esfuerzo de razonamiento**. Cada una puede ser **Automático**, **Sí** o **No**. Un modelo que razona tiene una tercera, **Niveles de esfuerzo**. Un modelo que ve imágenes recibe las capturas de pantalla y las imágenes como imágenes, mientras que uno que no las ve recibe una descripción de ellas (consulta [Imágenes para modelos que no ven](/guide/custom#images-for-models-that-dont-see)); un modelo que razona ofrece sus niveles en el menú **Esfuerzo** (Low, Medium y High, a menos que definas otros), y Custom envía el que elijas como `reasoning_effort`, el ajuste que aceptan los servidores compatibles con OpenAI (no se envía nada mientras esté elegido **Predeterminado**). **Automático** sigue lo que el endpoint dice del modelo, y el menú muestra qué es: los servidores que describen sus modelos (al estilo de OpenRouter, el de Mistral y otros) lo indican en su lista de modelos, y en el caso de una pasarela LiteLLM, Hydor además le pide la información de sus modelos, con la misma clave. Un endpoint que no dice nada cuenta como no: elige **Sí** para los modelos que sabes que ven imágenes o razonan. Lo que definas se conserva cuando vuelvas a añadir el endpoint.
+
+Para cambiar los niveles de un modelo, haz clic en **Niveles de esfuerzo** a su lado. Marca los que acepta entre `none`, `minimal`, `low`, `medium`, `high`, `xhigh` y `max`, o escribe otro que acepte el endpoint en **Otro nivel** y haz clic en **Añadir** (una sola palabra; al menos un nivel queda marcado). **Usar low, medium y high** vuelve a poner los tres habituales. Qué niveles acepta un modelo lo decide su servidor: si rechaza uno, Custom envía la solicitud de nuevo sin él, y el modelo funciona con su propio valor predeterminado.
 
 Una [sesión confidencial](/guide/sessions#keep-a-session-confidential) puede usar un endpoint cuya dirección sea esta computadora o tu red privada: `localhost`, `127.0.0.1`, `::1`, `10.…`, `192.168.…`, de `172.16.…` a `172.31.…`, o un nombre que termine en `.local`. Cualquier otra dirección cuenta como en línea, incluso si lleva a tu propio servidor: usa en su lugar su dirección privada. Lo mismo vale para la dirección de Ollama, y los modelos en la nube de Ollama (sus nombres terminan en «cloud») siempre cuentan como en línea.
 
@@ -515,6 +521,7 @@ Un [token de Hugging Face](/settings?s=models&find=Hugging%20Face%20token) permi
 - "¿Por qué una tarea programada no puede usar Antigravity CLI?"
 - "Añade una segunda cuenta de Grok para el trabajo y empieza mi próxima sesión con ella."
 - "Empieza mi próxima sesión de Grok con esfuerzo xhigh."
+- “Ofrece los niveles de esfuerzo low, high y xhigh para el modelo gpt de mi endpoint de pasarela.”
 - "¿Cuánto me queda de mi plan de Grok esta semana?"
 - "Usa todas mis cuentas de Grok: cuando una llegue a su límite, sigue con otra."
 - "Añade Gemini CLI y Goose a mis agentes, y dime qué me falta por instalar."

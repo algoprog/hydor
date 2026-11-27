@@ -400,7 +400,7 @@ row('models', 'OpenRouter', 'secret', {
 row('models', 'Runtimes and endpoints', 'text', {
   read: rd('/api/models', 'ollama.url'),
   write: put('/api/models', (v) => ({ ollamaUrl: v })),
-  note: 'Here it is Ollama’s address; the vLLM command and other OpenAI-compatible endpoints are set on the page.',
+  note: 'Here it is Ollama’s address; the vLLM command, other OpenAI-compatible endpoints and what each of their models can do (images, reasoning, effort levels) are set on the page.',
 });
 row('models', 'Hugging Face token', 'secret', {
   read: { endpoint: '/api/models', pick: (d) => !!d.hfTokenHint },

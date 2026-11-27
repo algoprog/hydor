@@ -474,6 +474,10 @@ Each model shows its maker, name and labels: **Latest** (always the maker's newe
 
 Click **Add** on a model. Its row then says **Added**, and the model appears in the **Your OpenRouter models** group ("In the model pickers") above the search and in Custom's **Model** menu. Click the × on one of them to take it out of the menus. Until you add at least one, OpenRouter offers no models ("Add at least one model to use OpenRouter.").
 
+### Effort for OpenRouter models
+
+A model that reasons offers, in the **Effort** menu, the efforts OpenRouter lists for it, among **None** (no reasoning), **Minimal**, **Low**, **Medium**, **High**, **Xhigh** and **Max**. Custom asks for medium while **Default** is picked, and for the effort you pick otherwise. A model whose efforts leave out medium keeps its own default, and a model that lists none has no **Effort** setting and is asked for medium.
+
 ## Connect Ollama, vLLM or another endpoint
 
 The **Runtimes and endpoints** group connects the programs that run models. Open it at [Settings → Agents → Models](/settings?s=models&find=Runtimes%20and%20endpoints).
@@ -496,7 +500,9 @@ Many programs and services answer the same way OpenAI's API does: LM Studio, lla
 
 The endpoint shows as a row with its address and how many models it offers. Its models appear in Custom's list as "model (name)". The × removes it. Adding another endpoint with the same name replaces the first.
 
-Click **Set what each model can do** under the row to see its models, each with two choices: **Sees images** and **Reasoning effort**. Each is **Automatic**, **Yes** or **No**. A model that sees images gets screenshots and pictures as pictures, where a model that doesn't gets a description of them (see [Images for models that don't see](/guide/custom#images-for-models-that-dont-see)); a model that reasons offers Low, Medium and High in the **Effort** menu, and Custom sends the one you pick as `reasoning_effort`, the setting OpenAI-compatible servers take (nothing is sent while **Default** is picked). **Automatic** follows what the endpoint says of the model, and the menu shows what that is: servers that describe their models (OpenRouter's style, Mistral's, and others) say it with their list of models, and for a LiteLLM gateway Hydor also asks its model information, with the same key. An endpoint that says nothing counts as no: set **Yes** for the models you know see images or reason. What you set is kept when you add the endpoint again.
+Click **Set what each model can do** under the row to see its models, each with two choices: **Sees images** and **Reasoning effort**. Each is **Automatic**, **Yes** or **No**. A model that reasons has a third, **Effort levels**. A model that sees images gets screenshots and pictures as pictures, where a model that doesn't gets a description of them (see [Images for models that don't see](/guide/custom#images-for-models-that-dont-see)); a model that reasons offers its levels in the **Effort** menu (Low, Medium and High, unless you set others), and Custom sends the one you pick as `reasoning_effort`, the setting OpenAI-compatible servers take (nothing is sent while **Default** is picked). **Automatic** follows what the endpoint says of the model, and the menu shows what that is: servers that describe their models (OpenRouter's style, Mistral's, and others) say it with their list of models, and for a LiteLLM gateway Hydor also asks its model information, with the same key. An endpoint that says nothing counts as no: set **Yes** for the models you know see images or reason. What you set is kept when you add the endpoint again.
+
+To change a model's levels, click **Effort levels** beside it. Tick the ones it takes among `none`, `minimal`, `low`, `medium`, `high`, `xhigh` and `max`, or type another one the endpoint takes in **Another level** and click **Add** (one word; at least one level stays ticked). **Use low, medium and high** puts the usual three back. Which levels a model takes is for its server to say: if it refuses one, Custom sends the request again without it, and the model runs at its own default.
 
 A [confidential session](/guide/sessions#keep-a-session-confidential) may use an endpoint whose address is this computer or your private network: `localhost`, `127.0.0.1`, `::1`, `10.…`, `192.168.…`, `172.16.…` to `172.31.…`, or a name ending in `.local`. Any other address counts as online, even one that leads to your own server: use its private address instead. The same goes for Ollama's address, and Ollama's cloud models (their names end in "cloud") always count as online.
 
@@ -515,6 +521,7 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 - "Why can't a scheduled task use Antigravity CLI?"
 - "Add a second Grok account for work, and start my next session on it."
 - "Start my next Grok session on xhigh effort."
+- "Offer the effort levels low, high and xhigh for the gpt model of my gateway endpoint."
 - "How much of my Grok plan is left this week?"
 - "Use all my Grok accounts: when one hits its limit, carry on with another."
 - "Add Gemini CLI and Goose to my agents, and tell me what I still have to install."

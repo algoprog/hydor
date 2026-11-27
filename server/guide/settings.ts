@@ -82,6 +82,7 @@ export const WAYS: Record<string, Way> = {
   'agents.add-your-own': { how: ACP },
   'agents.agents-that-speak-acp': { how: ACP },
   'models.tiers': { how: 'GET /api/models/tiers; PUT /api/models/tiers { tiers: { claude|codex|console: { quick|standard|best|max: { model, effort } } } }' },
+  'models.runtimes-and-endpoints': { how: 'This value is Ollama’s address. Endpoints and what each of their models can do (images, reasoning, effort levels): GET /api/models → endpoints; PUT /api/models { endpointModel: { endpoint, model, vision?, reasoning?, efforts? } } or { endpoint: { name, baseUrl } }; an endpoint’s key is the person’s' },
   'models.your-subscriptions': { how: 'GET /api/models → subscriptions. Signing in is the person’s (Settings → Accounts).' },
   'models.on-this-machine': { how: 'GET /api/models → local; POST /api/models/start { repo }, POST /api/models/stop { repo }, POST /api/models/remove { id }' },
   'models.add-a-model-from-hugging-face': { how: 'GET /api/models/picks, or GET /api/models/hf?q=; POST /api/models/install { repo } or { ollama } (its progress: GET /api/models → downloads)' },

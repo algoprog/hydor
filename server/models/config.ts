@@ -27,6 +27,8 @@ export interface Endpoint {
 export interface EndpointModelSetting {
   vision?: boolean;
   reasoning?: boolean;
+  /** The effort levels it is offered when it reasons; left out: low, medium and high. */
+  efforts?: string[];
 }
 
 export interface ModelsConfig {

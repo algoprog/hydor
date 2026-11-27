@@ -28951,5 +28951,22 @@
   "1 run has none of these metrics: {0} reports {1} instead.": "1件の実行には、次の指標がいずれもありません：{0}は代わりに{1}を報告しています。",
   "{0} runs have none of these metrics: {1} report no metrics.": "{0}件の実行には、次の指標がいずれもありません：{1}は指標を報告していません。",
   "{0} runs have none of these metrics: {1} report no number for {2}.": "{0}件の実行には、次の指標がいずれもありません：{1}は{2}の数値を報告していません。",
-  "{0} runs have none of these metrics: {1} report {2} instead.": "{0}件の実行には、次の指標がいずれもありません：{1}は代わりに{2}を報告しています。"
+  "{0} runs have none of these metrics: {1} report {2} instead.": "{0}件の実行には、次の指標がいずれもありません：{1}は代わりに{2}を報告しています。",
+  "An effort level is one word, as the endpoint takes it (like low or xhigh)": "思考レベルは、エンドポイントが受け付ける形の1単語です（lowやxhighなど）",
+  "Another level": "別のレベル",
+  "Effort levels": "思考レベル",
+  "Effort levels: {0}": "思考レベル：{0}",
+  "Offered in the Effort menu. Tick the ones this model takes.": "思考レベルのメニューに表示されます。このモデルが対応しているものにチェックを入れてください。",
+  "The app did not take the address it was given.": "アプリは指定されたアドレスを受け付けませんでした。",
+  "Use low, medium and high": "low、medium、highを使う",
+  "backups, clean-up, updates": "バックアップ、クリーンアップ、アップデート",
+  "building, compiling, packaging": "ビルド、コンパイル、パッケージ化",
+  "cleaning, converting, indexing, embedding data": "データのクリーニング、変換、インデックス作成、埋め込み",
+  "crawling, scraping, downloading, querying services, labelling or generating data": "クロール、スクレイピング、ダウンロード、サービスへの問い合わせ、データのラベル付けや生成",
+  "ollama vllm openai compatible endpoint url reasoning effort levels sees images": "ollama vllm openai 互換 エンドポイント url reasoning effort 思考レベル 画像認識",
+  "research, reports, plots, statistics": "調査、レポート、グラフ、統計",
+  "shipping, releasing, running servers": "出荷、リリース、サーバーの運用",
+  "test suites, type checks, linting": "テストスイート、型チェック、lint",
+  "training, evaluation, sweeps, benchmarks": "学習、評価、スイープ、ベンチマーク",
+  "writing or changing code, docs or translations, reviewing it": "コード・ドキュメント・翻訳の作成や変更、そのレビュー"
 }

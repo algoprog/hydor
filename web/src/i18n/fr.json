@@ -28950,5 +28950,22 @@
   "1 run has none of these metrics: {0} reports {1} instead.": "1 exécution n’a aucune de ces métriques : {0} indique plutôt {1}.",
   "{0} runs have none of these metrics: {1} report no metrics.": "{0} exécutions n’ont aucune de ces métriques : {1} n’indiquent aucune métrique.",
   "{0} runs have none of these metrics: {1} report no number for {2}.": "{0} exécutions n’ont aucune de ces métriques : {1} n’indiquent aucun nombre pour {2}.",
-  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} exécutions n’ont aucune de ces métriques : {1} indiquent plutôt {2}."
+  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} exécutions n’ont aucune de ces métriques : {1} indiquent plutôt {2}.",
+  "An effort level is one word, as the endpoint takes it (like low or xhigh)": "Un niveau d’effort est un seul mot, tel que le point de terminaison l’accepte (comme low ou xhigh)",
+  "Another level": "Autre niveau",
+  "Effort levels": "Niveaux d’effort",
+  "Effort levels: {0}": "Niveaux d’effort : {0}",
+  "Offered in the Effort menu. Tick the ones this model takes.": "Proposés dans le menu Effort. Cochez ceux que ce modèle accepte.",
+  "The app did not take the address it was given.": "L’app n’a pas accepté l’adresse qui lui a été donnée.",
+  "Use low, medium and high": "Utiliser low, medium et high",
+  "backups, clean-up, updates": "sauvegardes, nettoyage, mises à jour",
+  "building, compiling, packaging": "build, compilation, packaging",
+  "cleaning, converting, indexing, embedding data": "nettoyage, conversion, indexation, vectorisation de données",
+  "crawling, scraping, downloading, querying services, labelling or generating data": "exploration, extraction, téléchargement, interrogation de services, étiquetage ou génération de données",
+  "ollama vllm openai compatible endpoint url reasoning effort levels sees images": "ollama vllm openai compatible point de terminaison endpoint url effort raisonnement niveaux voit images",
+  "research, reports, plots, statistics": "recherches, rapports, graphiques, statistiques",
+  "shipping, releasing, running servers": "livraison, publication, exécution de serveurs",
+  "test suites, type checks, linting": "suites de tests, vérification des types, linting",
+  "training, evaluation, sweeps, benchmarks": "entraînement, évaluation, balayages de paramètres, benchmarks",
+  "writing or changing code, docs or translations, reviewing it": "écriture ou modification de code, de documentation ou de traductions, et leur relecture"
 }

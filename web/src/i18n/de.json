@@ -29584,5 +29584,22 @@
   "1 run has none of these metrics: {0} reports {1} instead.": "1 Lauf hat keine dieser Metriken: {0} meldet stattdessen {1}.",
   "{0} runs have none of these metrics: {1} report no metrics.": "{0} Läufe haben keine dieser Metriken: {1} melden keine Metriken.",
   "{0} runs have none of these metrics: {1} report no number for {2}.": "{0} Läufe haben keine dieser Metriken: {1} melden keine Zahl für {2}.",
-  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} Läufe haben keine dieser Metriken: {1} melden stattdessen {2}."
+  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} Läufe haben keine dieser Metriken: {1} melden stattdessen {2}.",
+  "An effort level is one word, as the endpoint takes it (like low or xhigh)": "Eine Aufwandsstufe ist ein Wort, so wie der Endpunkt es annimmt (etwa low oder xhigh)",
+  "Another level": "Weitere Stufe",
+  "Effort levels": "Aufwandsstufen",
+  "Effort levels: {0}": "Aufwandsstufen: {0}",
+  "Offered in the Effort menu. Tick the ones this model takes.": "Werden im Menü „Aufwand“ angeboten. Hake die an, die dieses Modell annimmt.",
+  "The app did not take the address it was given.": "Die App hat die Adresse, die sie bekommen hat, nicht angenommen.",
+  "Use low, medium and high": "low, medium und high verwenden",
+  "backups, clean-up, updates": "Backups, Aufräumen, Updates",
+  "building, compiling, packaging": "Bauen, Kompilieren, Paketieren",
+  "cleaning, converting, indexing, embedding data": "Daten bereinigen, konvertieren, indexieren, einbetten",
+  "crawling, scraping, downloading, querying services, labelling or generating data": "Crawlen, Scrapen, Herunterladen, Dienste abfragen, Daten labeln oder erzeugen",
+  "ollama vllm openai compatible endpoint url reasoning effort levels sees images": "ollama vllm openai kompatibel endpunkt endpoint url adresse reasoning effort aufwand stufen levels sieht bilder",
+  "research, reports, plots, statistics": "Recherche, Berichte, Diagramme, Statistik",
+  "shipping, releasing, running servers": "Ausliefern, Veröffentlichen, Server betreiben",
+  "test suites, type checks, linting": "Testsuiten, Typprüfungen, Linting",
+  "training, evaluation, sweeps, benchmarks": "Training, Evaluation, Sweeps, Benchmarks",
+  "writing or changing code, docs or translations, reviewing it": "Code, Dokumentation oder Übersetzungen schreiben oder ändern und prüfen"
 }

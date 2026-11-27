@@ -7,6 +7,7 @@ import path from 'node:path';
 import { modelSource, type AgentModel, type EndpointModelCaps, type HfInspect, type LocalModel, type ModelDownload, type ModelEntry, type ModelOption, type ModelsState, type SubscriptionModels, type VllmServer } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { isLocalAddress } from '../../shared/confidential.ts';
+import { effortsOf, ENDPOINT_EFFORTS, isEffortName, OPENROUTER_EFFORT, orderEfforts } from '../../shared/efforts.ts';
 import { keyHint, loadConfig, MODELS_DIR, saveConfig, writeAgentModels, type Endpoint, type ModelsConfig } from './config.ts';
 import * as hf from './hf.ts';
 import { machine } from './machine.ts';
@@ -117,6 +118,8 @@ export class ModelManager {
           tools: m?.tools ?? 'native',
           vision: m?.vision,
           reasoning: m?.reasoning,
+          ...(m?.reasoning && m.efforts ? { efforts: m.efforts } : {}),
+          ...(m?.reasoning && m.efforts ? { defaultEffort: m.efforts.includes(OPENROUTER_EFFORT) ? OPENROUTER_EFFORT : m.defaultEffort } : {}),
           maxOutput: m?.maxOutput,
           headers: { 'HTTP-Referer': 'https://github.com/algoprog/hydor', 'X-Title': 'Hydor' },
         });
@@ -156,7 +159,7 @@ export class ModelManager {
           tools: 'native',
           contextLength: this.endpointContext.get(`${e.id}/${m}`),
           ...(caps.vision ? { vision: true } : {}),
-          ...(caps.reasoning ? { reasoning: true } : {}),
+          ...(caps.reasoning ? { reasoning: true, efforts: caps.efforts } : {}),
           ...(isLocalAddress(e.baseUrl) ? { local: true } : {}),
         });
       }
@@ -208,7 +211,8 @@ export class ModelManager {
         value: m.id,
         label: m.label,
         description: [where, m.contextLength ? `${Math.round(m.contextLength / 1000)}K context` : '', m.start ? 'starts when used' : ''].filter(Boolean).join(' · '),
-        efforts: m.provider === 'endpoint' && m.reasoning ? endpointCaps.ENDPOINT_EFFORTS : [],
+        efforts: effortsOf(m),
+        ...(m.defaultEffort && effortsOf(m).includes(m.defaultEffort) ? { defaultEffort: m.defaultEffort } : {}),
         source,
         via,
         ...(m.local ? { local: true } : {}),
@@ -278,8 +282,8 @@ export class ModelManager {
     vllmCommand?: string | null;
     hfToken?: string | null;
     endpoint?: Partial<Omit<Endpoint, 'models'>> & { remove?: boolean };
-    /** What one endpoint's model can do, set by hand; null is Automatic (what the endpoint says). */
-    endpointModel?: { endpoint: string; model: string; vision?: boolean | null; reasoning?: boolean | null };
+    /** What one endpoint's model can do, set by hand; null is Automatic (what the endpoint says; for the levels, low, medium and high). */
+    endpointModel?: { endpoint: string; model: string; vision?: boolean | null; reasoning?: boolean | null; efforts?: string[] | null };
   }) {
     const c = this.cfg;
     if (p.openrouterKey !== undefined) c.openrouter.apiKey = p.openrouterKey?.trim() || undefined;
@@ -309,10 +313,16 @@ export class ModelManager {
       }
     }
     if (p.endpointModel) {
-      const { endpoint, model, vision, reasoning } = p.endpointModel;
+      const { endpoint, model, vision, reasoning, efforts } = p.endpointModel;
       // A model's name as its endpoint lists it (never one of an object's own keys), each setting yes, no or null (Automatic).
       if (typeof model !== 'string' || !model.trim() || model.length > 500 || ['__proto__', 'constructor', 'prototype'].includes(model)) throw new HttpError(400, 'No such option');
       if ([vision, reasoning].some((v) => v !== undefined && v !== null && typeof v !== 'boolean')) throw new HttpError(400, 'No such option');
+      let levels: string[] | undefined;
+      if (efforts !== undefined && efforts !== null) {
+        if (!Array.isArray(efforts) || efforts.some((v) => typeof v !== 'string')) throw new HttpError(400, 'No such option');
+        levels = orderEfforts(efforts.map((v) => v.trim().toLowerCase()));
+        if (levels.length > 16 || !levels.every(isEffortName)) throw new HttpError(400, 'An effort level is one word, as the endpoint takes it (like low or xhigh)');
+      }
       const e = c.endpoints.find((x) => x.id === endpoint);
       if (!e) throw new HttpError(404, 'There is no such endpoint');
       const set = { ...e.models?.[model] };
@@ -320,6 +330,11 @@ export class ModelManager {
       else if (vision !== undefined) set.vision = !!vision;
       if (reasoning === null) delete set.reasoning;
       else if (reasoning !== undefined) set.reasoning = !!reasoning;
+      // No list, an empty one, or low, medium and high: the usual levels again.
+      if (efforts !== undefined) {
+        if (levels?.length && levels.join() !== ENDPOINT_EFFORTS.join()) set.efforts = levels;
+        else delete set.efforts;
+      }
       const models = { ...e.models };
       if (Object.keys(set).length) models[model] = set;
       else delete models[model];

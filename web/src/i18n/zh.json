@@ -30787,5 +30787,22 @@
   "1 run has none of these metrics: {0} reports {1} instead.": "有 1 次运行没有以下任何指标：{0} 报告的是 {1}。",
   "{0} runs have none of these metrics: {1} report no metrics.": "有 {0} 次运行没有以下任何指标：{1} 没有报告任何指标。",
   "{0} runs have none of these metrics: {1} report no number for {2}.": "有 {0} 次运行没有以下任何指标：{1} 没有报告 {2} 的数值。",
-  "{0} runs have none of these metrics: {1} report {2} instead.": "有 {0} 次运行没有以下任何指标：{1} 报告的是 {2}。"
+  "{0} runs have none of these metrics: {1} report {2} instead.": "有 {0} 次运行没有以下任何指标：{1} 报告的是 {2}。",
+  "An effort level is one word, as the endpoint takes it (like low or xhigh)": "思考强度级别是一个单词，与端点接受的写法一致（例如 low 或 xhigh）",
+  "Another level": "另一个级别",
+  "Effort levels": "思考强度级别",
+  "Effort levels: {0}": "思考强度级别：{0}",
+  "Offered in the Effort menu. Tick the ones this model takes.": "会显示在“思考强度”菜单中。勾选此模型支持的级别。",
+  "The app did not take the address it was given.": "应用未接受给它的地址。",
+  "Use low, medium and high": "使用 low、medium 和 high",
+  "backups, clean-up, updates": "备份、清理、更新",
+  "building, compiling, packaging": "构建、编译、打包",
+  "cleaning, converting, indexing, embedding data": "清洗、转换、索引、嵌入数据",
+  "crawling, scraping, downloading, querying services, labelling or generating data": "爬取、抓取、下载、查询服务、标注或生成数据",
+  "ollama vllm openai compatible endpoint url reasoning effort levels sees images": "ollama vllm openai 兼容 端点 接口 url 网址 推理 思考强度 级别 看图 识图 图片",
+  "research, reports, plots, statistics": "调研、报告、图表、统计",
+  "shipping, releasing, running servers": "发布上线、运行服务器",
+  "test suites, type checks, linting": "测试套件、类型检查、代码规范检查",
+  "training, evaluation, sweeps, benchmarks": "训练、评估、参数扫描、基准测试",
+  "writing or changing code, docs or translations, reviewing it": "编写或修改代码、文档或翻译，以及审查这些内容"
 }

@@ -2005,16 +2005,19 @@ Its models come from Settings → Models:
 
 - **OpenRouter**: add a key, then add the suggested models (GPT-6 Luna, fast and cheap; Grok 4.7, good with fewer
   refusals; GPT-6.1 Sol, better; Claude Opus 5.5, best overall) or search its catalog (each model's maker, context,
-  longest reply, price, release date, and whether it reasons, sees images or calls tools; filter and sort).
+  longest reply, price, release date, and whether it reasons, sees images or calls tools; filter and sort). A model
+  that reasons offers the efforts OpenRouter lists for it (among none, minimal, low, medium, high, xhigh and max) in
+  the Effort menu, medium unless you pick one.
 - **Ollama**: the models of an Ollama server, with GGUF weights pulled straight from Hugging Face.
 - **vLLM**: Hugging Face models downloaded here and served on a GPU (a 16-bit model too big for it at 8-bit, FP8),
   split across 2, 4 or 8 GPUs when one has too little memory, or on a Mac's Apple silicon (vllm-metal), started
   when a session first uses them.
 - **Any OpenAI-compatible endpoint** (LM Studio, llama.cpp's server, a LiteLLM gateway, another provider), with what
   each of its models can do: whether it sees images (screenshots and pictures reach it as pictures) and whether it
-  reasons (the Effort menu offers Low, Medium and High, sent as `reasoning_effort`). Hydor reads it from the endpoint's
+  reasons (the Effort menu offers its levels, sent as `reasoning_effort`). Hydor reads it from the endpoint's
   model list (OpenRouter's, Mistral's and other styles) or LiteLLM's model information, and you set it by hand,
-  per model, when the endpoint says nothing or says it wrong.
+  per model, when the endpoint says nothing or says it wrong. Each model's effort levels are Low, Medium and High
+  until you set others: ticked among none, minimal, low, medium, high, xhigh and max, or typed.
 
 Before any search, the models suggested for this computer show by what it can run, each with how it would run here
 and Install: LFM3-VL 2B (almost any computer), Gemma 4 12B (a good graphics card), Flint (a Mac with Apple silicon and

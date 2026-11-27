@@ -13,6 +13,7 @@ import { toolAllowed } from '../../shared/assistants.ts';
 import { isSubscription, type AgentModel, type ContextPart } from '../../shared/types.ts';
 import { PUBLIC_RUN_ENV, publicRunOf, publicRunPrompt } from '../apps/publicRun.ts';
 import { checkpoint, estimate, NOTES_START, pinned, prune, summaryRequest, tailStart, type Pins } from './compact.ts';
+import { acceptedEfforts } from '../../shared/efforts.ts';
 import { callId, familyOf, requestOptions } from './families.ts';
 import { Guard, signature, type PlanEntry } from './guard.ts';
 import { chat, ContextOverflow, setPlanGateway, StreamCut, ToolsUnsupported, type ChatMessage, type Part, type Reply, type ToolSchema } from './llm.ts';
@@ -43,8 +44,6 @@ const OWN = 'hydor';
 /** A public app's run (server/apps/publicRun.ts): no shell, no files, only the app's own server. */
 const PUBLIC_RUN = publicRunOf(process.env[PUBLIC_RUN_ENV]);
 const MAX_STEPS = 200;
-/** The reasoning efforts Custom offers a model that reasons (server/models/endpoint.ts ENDPOINT_EFFORTS). */
-const EFFORTS = ['low', 'medium', 'high'];
 // A model of your Claude or ChatGPT plan is asked through the app, which holds Claude Code's and Codex's sign-ins.
 if (RUNTIME) setPlanGateway(planClient(RUNTIME));
 
@@ -105,7 +104,7 @@ interface Session {
   cwd: string;
   mode: Mode;
   model?: string;
-  /** The reasoning effort picked for the session (an endpoint's reasoning model gets it); none: the model's own default. */
+  /** The reasoning effort picked for the session (a model that reasons gets it); none: its default. */
   effort?: string;
   messages: ChatMessage[];
   /** What "Always allow" covers: "edit", "cmd:npm test", "mcp:<tool>", "read:<folder>", "write:<folder>", "secret:<file>". */
@@ -177,11 +176,15 @@ function connectMcp(s: Session) {
   );
 }
 
+/** The efforts the session may be set to now: those of its model (the first, until it has one). */
+const effortsFor = (s: Session, list = usable(CONFIDENTIAL_ENV)) => acceptedEfforts(list.find((m) => m.id === s.model) ?? list[0]);
+
 function offers(s: Session) {
   const list = usable(CONFIDENTIAL_ENV);
   return {
     modes: { currentModeId: s.mode, availableModes: MODES.map((m) => ({ id: m.id, name: m.name, description: m.description })) },
-    models: { currentModelId: s.model ?? list[0]?.id ?? '', availableModels: list.map((m) => ({ modelId: m.id, name: m.label, description: m.provider })) },
+    // Each model says its own efforts, so the app sets one only where the model picked takes it.
+    models: { currentModelId: s.model ?? list[0]?.id ?? '', availableModels: list.map((m) => ({ modelId: m.id, name: m.label, description: m.provider, _meta: { reasoningEfforts: acceptedEfforts(m).map((value) => ({ value })) } })) },
     // The reasoning effort (used for models that reason: the app's pickers offer it only for those).
     configOptions: [
       {
@@ -191,7 +194,7 @@ function offers(s: Session) {
         type: 'select',
         ...(s.effort ? { currentValue: s.effort } : {}),
         // "default" first: Default in the app's menu clears the effort (the model's own default again).
-        options: ['default', ...EFFORTS].map((value) => ({ value, name: value })),
+        options: ['default', ...effortsFor(s, list)].map((value) => ({ value, name: value })),
       },
     ],
   };
@@ -913,7 +916,7 @@ async function handle(m: any): Promise<unknown> {
     }
     case 'session/set_config_option': {
       const s = sessions.get(p.sessionId);
-      if (!s || p.configId !== 'reasoning_effort' || !['default', ...EFFORTS].includes(String(p.value))) throw new Error('No such option');
+      if (!s || p.configId !== 'reasoning_effort' || !['default', ...effortsFor(s)].includes(String(p.value))) throw new Error('No such option');
       if (p.value === 'default') delete s.effort;
       else s.effort = String(p.value);
       save(s);

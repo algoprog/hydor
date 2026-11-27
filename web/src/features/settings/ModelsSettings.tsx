@@ -7,6 +7,7 @@ import { toast, toastError } from '../../lib/store';
 import { go } from '../../lib/nav';
 import { live } from '../../lib/ws';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, Throbber, useConfirm } from '../../components/ui';
+import { EffortLevels } from './EffortLevels';
 import { EmptyRow, Group, MoreMenu, Row, Select, Stack } from './kit';
 import { HelperModel } from './HelperModel';
 import { TiersSection } from './TiersSection';
@@ -1169,7 +1170,7 @@ export function OpenRouterBody({ st }: { st: ModelsState }) {
 type Setting = 'auto' | 'yes' | 'no';
 const settingOf = (v?: boolean): Setting => (v === undefined ? 'auto' : v ? 'yes' : 'no');
 
-/** An endpoint's models, each with what Custom does with it: sees images, reasons. Automatic follows what the endpoint says. */
+/** An endpoint's models, each with what Custom does with it: sees images, reasons (and the effort levels then offered). Automatic follows what the endpoint says. */
 function EndpointModels({ endpoint: e, save }: { endpoint: ModelsState['endpoints'][number]; save: (body: Record<string, unknown>) => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
   const set = (model: string, field: 'vision' | 'reasoning', v: Setting) => save({ endpointModel: { endpoint: e.id, model, [field]: v === 'auto' ? null : v === 'yes' } });
@@ -1205,6 +1206,7 @@ function EndpointModels({ endpoint: e, save }: { endpoint: ModelsState['endpoint
                 </span>
                 {c && pick(m, c, 'vision', 'Sees images')}
                 {c && pick(m, c, 'reasoning', 'Reasoning effort')}
+                {c?.reasoning && <EffortLevels model={m} levels={c.efforts} custom={!!c.set.efforts} onChange={(efforts) => void save({ endpointModel: { endpoint: e.id, model: m, efforts } })} />}
               </div>
             );
           })}
