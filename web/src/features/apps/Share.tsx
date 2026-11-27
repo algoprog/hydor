@@ -90,7 +90,7 @@ export function ShareTab({ detail, onChange }: { detail: AppDetail; onChange: ()
   const example = Object.fromEntries(
     app.fields
       .filter((f) => f.type !== 'file')
-      .map((f) => [f.id, f.default || (f.type === 'date' ? today : f.type === 'number' ? 3 : f.type === 'yesno' ? 'Yes' : f.type === 'choice' ? f.options?.[0] : f.placeholder?.replace(/^e\.g\.\s*/i, '').split(/,? or /)[0]) || '…']),
+      .map((f) => [f.id, f.default || (f.type === 'date' ? today : f.type === 'number' ? 3 : f.type === 'yesno' ? 'Yes' : f.type === 'choice' ? f.options?.[0] : f.type === 'project' ? 'My project' : f.placeholder?.replace(/^e\.g\.\s*/i, '').split(/,? or /)[0]) || '…']),
   );
   const curl = `curl -X POST ${origin()}/api/apps/${app.slug}/run \\
   -H "Authorization: Bearer ${made ?? 'napp_…'}" \\

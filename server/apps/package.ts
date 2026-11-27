@@ -32,6 +32,7 @@ import { createPage } from '../pages/store.ts';
 import { isInstalled, setInstalled } from './builtins.ts';
 import { mediaBytes, putMediaBuffer } from './media.ts';
 import { secretsOf } from './secrets.ts';
+import { pluginNeeds } from './plugins.ts';
 import { templateById } from './templates.ts';
 
 /** The newest package format this server reads. */
@@ -96,9 +97,15 @@ function modelNeeds(r: AppRecipe): ModelNeed[] {
 }
 
 /** What travels of a recipe: everything but its folder and what is this computer's own; its models said portably. */
+/** The forms without the projects their project questions start from: yours stay here, and say what others may reach. */
+function unset<T extends Pick<AppRecipe, 'fields' | 'flows'>>(r: T): T {
+  const plain = (fields: AppRecipe['fields']) => fields.map(({ default: d, ...f }) => (f.type === 'project' || d === undefined ? f : { ...f, default: d }));
+  return { ...r, fields: plain(r.fields ?? []), ...(r.flows ? { flows: Object.fromEntries(Object.entries(r.flows).map(([k, f]) => [k, f.inputs ? { ...f, inputs: plain(f.inputs) } : f])) } : {}) };
+}
+
 function travelling(a: AppRecipe): Record<string, unknown> {
   // What is kept beside its recipe here (its address, who may run it, where it came from) stays here.
-  const { id: _i, slug: _s, mcp: _m, agents: _a, fromFile: _f, webapp: _wa, public: _p, template: _t, createdAt: _c, updatedAt: _u, cwd: _w, ...recipe } = a as AppDef;
+  const { id: _i, slug: _s, mcp: _m, agents: _a, fromFile: _f, webapp: _wa, public: _p, template: _t, createdAt: _c, updatedAt: _u, cwd: _w, ...recipe } = unset(a as AppDef);
   const models = modelNeeds(a);
   return { ...recipe, ...(models.length ? { requires: { ...(recipe.requires ?? {}), models } } : {}) } as unknown as Record<string, unknown>;
 }
@@ -340,6 +347,11 @@ function intake(db: DB, raw: Record<string, any>, named: string, files?: Record<
   const total = Object.entries(files ?? {}).reduce((n, [name, b]) => n + (recipe.assets?.[name] ? b.length : 0), 0);
   if (total > MEDIA_LIMITS.assets) problems.push(`${named}Its files are ${Math.round(total / 1048576)} MB together, over the ${MEDIA_LIMITS.assets >> 20} MB an app may have`);
   if (typeof raw.cwd === 'string' && raw.cwd.trim()) notes.push(`${named}It worked in the folder ${raw.cwd.trim()} where it was made: here each run gets a folder of its own`);
+  // A project a question starts from says which of yours others may reach: a file never sets it.
+  if ([recipe.fields, ...Object.values(recipe.flows ?? {}).map((f) => f.inputs ?? [])].some((fields) => fields.some((f) => f.type === 'project' && f.default))) {
+    Object.assign(recipe, unset(recipe));
+    notes.push(`${named}It started from a project where it was made: here none is set until you pick one in its settings`);
+  }
   if (recipe.mode && SKIP_ASKING.has(recipe.mode)) {
     notes.push(`${named}It asked to run with every step allowed (${recipe.mode}): here it starts in Auto, which goes ahead with routine steps and asks about the rest; change it in its settings if you trust it`);
     recipe.mode = undefined;
@@ -462,13 +474,19 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
     warnings.push(...c.warnings);
   }
   // What it needs on this computer.
-  const needs = { node: [] as string[], python: [] as string[], commands: [] as string[], missing: [] as string[] };
+  const needs = { node: [] as string[], python: [] as string[], commands: [] as string[], missing: [] as string[], plugins: [] as { name: string; title: string; on: boolean }[] };
   for (const r of all) {
     for (const [n, v] of Object.entries(r.requires?.node ?? {})) if (!needs.node.includes(`${n} ${v}`)) needs.node.push(`${n} ${v}`);
     for (const p of r.requires?.python ?? []) if (!needs.python.includes(p)) needs.python.push(p);
     for (const c of r.requires?.commands ?? []) if (!needs.commands.includes(c)) needs.commands.push(c);
   }
   needs.missing = needs.commands.filter((c) => !hasCommand(c));
+  // The plugins it needs: installing the app adds none of them, its page offers to.
+  const plugins = [...new Set(all.flatMap((r) => r.requires?.plugins ?? []))];
+  for (const p of pluginNeeds(db, { requires: { plugins } })) {
+    needs.plugins.push({ name: p.name, title: p.title, on: p.state === 'on' });
+    if (p.state !== 'on') warnings.push(`It needs the ${p.title} plugin, which ${p.problem}: it does not run until then. ${p.fix}`);
+  }
   for (const c of needs.missing) warnings.push(`It uses the command ${c}, which is not on this computer: install it, or the steps that use it fail`);
   const data = Object.keys(recipe.data ?? {}).map((name) => ({ name, records: Array.isArray(pkg.records?.[name]) ? Math.min(pkg.records![name].length, DATA_LIMITS.records) : 0 }));
   for (const name of Object.keys(pkg.records ?? {})) if (!recipe.data?.[name]) warnings.push(`Its file holds records for “${name}”, a collection it does not keep: they are left out`);

@@ -1,12 +1,13 @@
 // An app's form: each field as the right control (text, a long text that grows, number, date, a choice
 // as chips or a list, yes/no, a file), with its help line and what to fix under it. Used by the app's
 // page, the builder's test run and the public page.
-import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, FileUp, X } from 'lucide-react';
 import { foldedParts } from '@shared/app-me';
 import type { AppField } from '@shared/apps';
 import { bytes } from '../../lib/format';
 import { cx, inputCls, Switch } from '../../components/ui';
+import { useSpaces } from '../spaces/state';
 import { fileToBase64 } from './api';
 
 export interface FileValue {
@@ -83,6 +84,26 @@ function FilePick({ value, onPick, disabled, maxMb }: { value?: FileValue; onPic
       </div>
       {err && <div className="mt-1 text-[12px] text-err">{err}</div>}
     </div>
+  );
+}
+
+/** A project question: your projects by name; its value is the project's id (a name given is taken as its project). */
+export function ProjectSelect({ id, value, onChange, required, disabled, className }: { id?: string; value: string; onChange: (v: string) => void; required?: boolean; disabled?: boolean; className?: string }) {
+  const spaces = useSpaces();
+  const picked = spaces?.find((s) => s.id === value || s.name === value);
+  // A project that is gone (a remembered answer, an old run's) is no answer.
+  useEffect(() => {
+    if (value && spaces && !picked) onChange('');
+  }, [value, spaces, picked]);
+  return (
+    <select id={id} className={cx(inputCls, 'max-w-[360px] pr-8', className)} value={picked?.id ?? ''} disabled={disabled || !spaces} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{required ? 'Pick a project…' : 'None'}</option>
+      {(spaces ?? []).map((s) => (
+        <option key={s.id} value={s.id} translate="no">
+          {s.name}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -165,6 +186,8 @@ export function FieldInput({ f, value, onChange, file, onFile, disabled, maxMb =
       );
     case 'file':
       return <FilePick value={file} onPick={(v) => onFile?.(v)} disabled={disabled} maxMb={maxMb} />;
+    case 'project':
+      return <ProjectSelect id={id} value={value} onChange={onChange} required={f.required} disabled={disabled} />;
     default:
       return <input id={id} className={inputCls} value={value} disabled={disabled} placeholder={f.placeholder} onChange={(e) => onChange(e.target.value)} autoComplete="off" />;
   }

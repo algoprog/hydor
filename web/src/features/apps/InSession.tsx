@@ -33,7 +33,7 @@ export function AppRunNote({ note }: { note: SessionNote; sessionKey: string }) 
   const { d, err } = useRunDetail(data.run);
   const ready = data.app.startsWith('tpl:');
   const r = d?.run;
-  const asked = d && r ? inputsLine(d.recipe.fields, r.inputs, 80) : '';
+  const asked = d && r ? inputsLine(d.recipe.fields, r.inputs, 80, r.project) : '';
   // In the conversation, its view does what it does on the run's page, but asks nothing of the run's own agent.
   const can = d ? viewCan(d).filter((c) => c !== 'ask') : [];
   return (

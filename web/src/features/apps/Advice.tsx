@@ -170,7 +170,7 @@ function FirmUpDialog({ app, recipe, firm, onClose, onUse }: { app: AppDef; reci
         const r = await post<{ runs: { example: string; run?: AppRun; error?: string }[] }>(`/api/apps/${enc(app.id)}/examples/run`, { recipe: changed, trial: true });
         const bad = r.runs.find((x) => x.error);
         if (bad) toastError(new Error(bad.error));
-        setTries(r.runs.filter((x) => x.run).map((x) => ({ label: examples.find((e) => e.id === x.example)?.name || inputsLine(recipe.fields, x.run!.inputs) || x.example, run: x.run! })));
+        setTries(r.runs.filter((x) => x.run).map((x) => ({ label: examples.find((e) => e.id === x.example)?.name || inputsLine(recipe.fields, x.run!.inputs, undefined, x.run!.project) || x.example, run: x.run! })));
       } else {
         const runs = await Promise.all(firm.inputs.map((inputs) => post<{ run: AppRun }>(`/api/apps/${enc(app.id)}/runs`, { recipe: changed, inputs, source: 'test', lang: currentLang() })));
         setTries(runs.map((r, i) => ({ label: inputsLine(recipe.fields, firm.inputs[i]) || tr('A try'), run: r.run })));

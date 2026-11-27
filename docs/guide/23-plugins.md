@@ -142,6 +142,8 @@ Every session the app starts gets the plugins that are on, set up, and whose plu
 
 A plugin can be for some agents only; its window says which. Sessions that are already running get a plugin's changes from their next start.
 
+An [app](/guide/apps#what-an-app-needs-on-this-computer) can need a plugin: it runs only while that plugin is on, its agents get the plugin's skills and tools, and its steps can call the plugin's tools.
+
 ## Claude Code's and Codex's own plugins
 
 Claude Code and Codex have plugins of their own, from their marketplaces, which only they use. Each has a tab on the Plugins page:

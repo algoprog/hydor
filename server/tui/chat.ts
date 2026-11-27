@@ -1699,7 +1699,8 @@ function backgroundWords(list: { task: { description: string; startedAt?: number
 
 /** A form field's choices: a choice's options, or Yes and No. */
 function choicesOf(f: AppField): string[] {
-  if (f.type === 'choice') return f.options ?? [];
+  // A project question's card names the projects (server/apps/use.ts).
+  if (f.type === 'choice' || f.type === 'project') return f.options ?? [];
   if (f.type === 'yesno') return ['Yes', 'No'];
   return [];
 }

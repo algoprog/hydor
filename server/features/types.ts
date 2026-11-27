@@ -44,6 +44,11 @@ export interface RunCtx {
   notice?: { url: string; title: string };
   /** An app's step calls the tool, not an agent: the tools made for steps alone are there too (user_profile). */
   step?: boolean;
+  /**
+   * The project an app's step works in (its run's project question): a step has no session of its own to say it, so
+   * the tools that search or save in a session's project (knowledge_search, save_doc…) take it from here.
+   */
+  project?: string;
 }
 
 /** A tool's answer: text, and images for the agents that take them (a screenshot). */

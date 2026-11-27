@@ -26,7 +26,7 @@ import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
 import { appPath, useRunEvents, type RunDetail } from './api';
 import { AppIcon, ICONS } from './AppIcon';
-import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
+import { AppForm, formErrors, initialValues, ProjectSelect, type FormFiles, type FormValues } from './Form';
 import { ResultView, RunBody } from './Result';
 import { DesignEditor } from './Design';
 import { sampleResult } from './sample';
@@ -376,7 +376,7 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
     <Row n={n} {...nav}>
       <div className="flex flex-wrap items-center gap-2">
         <input className={cx(smallFit, 'min-w-[200px] flex-[3] font-medium')} placeholder="The question, e.g. Where to?" value={f.label} onChange={(e) => onChange({ ...f, label: e.target.value })} />
-        <select className={cx(smallFit, 'min-w-[130px] flex-1')} aria-label="Its kind" value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined, multi: e.target.value === 'choice' ? f.multi : undefined })}>
+        <select className={cx(smallFit, 'min-w-[130px] flex-1')} aria-label="Its kind" value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined, multi: e.target.value === 'choice' ? f.multi : undefined, ...(e.target.value === 'project' ? { default: undefined, from: undefined } : {}) })}>
           {FIELD_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
@@ -417,11 +417,19 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
             <input className={small} placeholder="Optional" value={f.placeholder ?? ''} onChange={(e) => onChange({ ...f, placeholder: e.target.value || undefined })} />
           </Labeled>
           <Labeled label="Filled in at first">
-            <input className={small} placeholder="Optional" value={f.default ?? ''} onChange={(e) => onChange({ ...f, default: e.target.value || undefined })} />
+            {f.type === 'project' ? (
+              <>
+                <ProjectSelect value={f.default ?? ''} onChange={(v) => onChange({ ...f, default: v || undefined })} className="h-8.5 text-[13px]" />
+                <span className="mt-1 block text-[12px] leading-snug text-fg-3">The only project a run started with an app’s key or by a webhook can use.</span>
+              </>
+            ) : (
+              <input className={small} placeholder="Optional" value={f.default ?? ''} onChange={(e) => onChange({ ...f, default: e.target.value || undefined })} />
+            )}
           </Labeled>
           {/* What it starts from instead: About you (the person's own record), or their last answer here. Not for a file. */}
           {f.type !== 'file' && (
             <>
+              {f.type !== 'project' && (
               <Labeled label="Filled in from">
                 <select className={small} value={from ?? ''} onChange={(e) => onChange({ ...f, from: e.target.value ? `me.${e.target.value}` : undefined, remember: e.target.value ? undefined : f.remember })}>
                   <option value="">Nothing</option>
@@ -432,6 +440,7 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
                   ))}
                 </select>
               </Labeled>
+              )}
               <label className="flex h-8.5 cursor-pointer items-center gap-2 self-end text-[13px] text-fg-2 @xl:col-span-2">
                 <Switch on={!!f.remember} onChange={(on) => onChange({ ...f, remember: on || undefined, from: on ? undefined : f.from })} label="Remember the last answer" />
                 Remember the last answer

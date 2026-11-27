@@ -43,7 +43,7 @@ function UsedCard({ u, face }: { u: UsedApp; face: UsedFace }) {
             {face.name}
           </div>
           <div translate="no" className="truncate text-[12.5px] text-fg-3">
-            {inputsLine(face.fields, r.inputs, 60) || '—'}
+            {inputsLine(face.fields, r.inputs, 60, r.project) || '—'}
           </div>
         </div>
       </div>

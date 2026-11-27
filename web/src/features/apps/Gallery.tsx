@@ -131,7 +131,17 @@ function Mark({ icon, title }: { icon: ReactNode; title: string }) {
   );
 }
 
-type CardApp = (AppDef & { lastRunAt?: number; needsKey?: true }) | ReadyApp;
+type CardApp = (AppDef & { lastRunAt?: number; needsKey?: true; needsPlugin?: string[] }) | ReadyApp;
+
+/** "Needs the Media tools plugin", on the card of an app whose plugin is not on. */
+function NeedsPlugin({ titles }: { titles: string[] }) {
+  return (
+    <span className="mt-2 flex w-full min-w-0 items-center gap-1.5 text-[12.5px] text-warn">
+      <Puzzle size={13} className="shrink-0" aria-hidden />
+      <span className="truncate">{titles.length === 1 ? `Needs the ${titles[0]} plugin` : `Needs the plugins ${titles.join(', ')}`}</span>
+    </span>
+  );
+}
 
 /**
  * An app's card, all of one size: its face, one line of what it does, what its form asks for, and small marks (a view
@@ -177,6 +187,8 @@ function AppCard({ a, ready, first }: { a: CardApp; ready?: boolean; first?: boo
           <span className="truncate">Ready to run</span>
         )}
       </div>
+      {/* A plugin it needs that is not on: said on the card, on a phone too. */}
+      {a.needsPlugin && <NeedsPlugin titles={a.needsPlugin} />}
       <div className="mt-auto flex w-full min-w-0 items-center gap-2 pt-2.5 max-sm:hidden">
         {view && <Mark icon={<LayoutDashboard size={14} />} title="Its answer opens in a view of its own: maps, charts, tables" />}
         {chats && <Mark icon={<MessagesSquare size={14} />} title="Ask for what it does in any session, and the agent runs it there" />}
@@ -261,6 +273,7 @@ function ReadyMade({ t, onInstall }: { t: ReadyApp; onInstall: () => void }) {
       <div className="flex flex-1 flex-col px-5 pt-8 pb-4">
         <div className="text-[16px] font-semibold tracking-tight">{t.name}</div>
         <p className="mt-1 line-clamp-2 text-[13.5px] leading-snug text-fg-2">{t.description}</p>
+        {t.needsPlugin && <NeedsPlugin titles={t.needsPlugin} />}
         {pages.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {pages.map((p) => (
@@ -288,7 +301,7 @@ function RecentRun({ r, a }: { r: AppRun; a?: { icon: string; color: string; fie
           {r.appName}
         </span>
         <span className="block truncate text-[12.5px] text-fg-3" translate="no">
-          {(a?.fields ? inputsLine(a.fields, r.inputs, 90) : Object.values(r.inputs).filter(Boolean).join(' · ')) || '—'}
+          {(a?.fields ? inputsLine(a.fields, r.inputs, 90, r.project) : Object.values(r.inputs).filter(Boolean).join(' · ')) || '—'}
         </span>
       </span>
       {statusBadge(r)}

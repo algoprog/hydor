@@ -264,6 +264,46 @@ function writeIfChanged(file: string, text: string) {
   fs.renameSync(tmp, file);
 }
 
+/** One of a plugin's MCP servers as it starts: stdio ones through the launcher; none when its spec cannot be written. */
+function serverSpec(db: DB, { i, m }: Loaded, s: Manifest['servers'][number]): McpServerSpec | null {
+  if (s.type !== 'stdio') return { type: 'http', url: s.url, ...(Object.keys(s.headers).length ? { headers: s.headers } : {}) };
+  const data = dataOf(i.name);
+  const env: Record<string, string> = { ...setupEnv(m.requires, m.root, data) };
+  for (const [k, v] of Object.entries(s.env)) env[k] = fill(v, m.root, data);
+  for (const k of m.requires.keys) {
+    try {
+      const v = readSecret(db, k.name);
+      if (v) env[k.name] = v.value;
+    } catch {}
+  }
+  // Reserved, whatever the server's own env said (§9.1).
+  env.PLUGIN_ROOT = m.root;
+  env.PLUGIN_DATA = data;
+  let command = s.command;
+  if (command.startsWith('./')) command = path.resolve(m.root, command);
+  else if (command === 'node') command = process.execPath;
+  else if ((command === 'python' || command === 'python3') && m.requires.pip.length) command = path.join(venvDir(data), 'bin', 'python');
+  const cwd = s.cwd ? path.resolve(m.root, fill(s.cwd, m.root, data)) : m.root;
+  const file = path.join(viewOf(i.name), 'servers', `${s.name}.json`);
+  try {
+    writeIfChanged(file, JSON.stringify({ command, args: s.args.map((a) => fill(a, m.root, data)), cwd, env }));
+  } catch (e) {
+    console.warn(`[plugins] ${i.name}/${s.name}: ${(e as Error).message}`);
+    return null;
+  }
+  return { type: 'stdio', command: process.execPath, args: [roots.launcher, file], env: {} };
+}
+
+/** The MCP servers of one active plugin, as they start, by their own names (an app's tool steps call their tools). */
+export function pluginServers(db: DB, name: string): { name: string; spec: McpServerSpec }[] {
+  const l = activePlugins(db).find((a) => a.i.name === name);
+  if (!l) return [];
+  return l.m.servers.flatMap((s) => {
+    const spec = serverSpec(db, l, s);
+    return spec ? [{ name: s.name, spec }] : [];
+  });
+}
+
 /**
  * What the active plugins give an agent of this kind: their MCP servers (stdio ones through the launcher,
  * which starts them in the plugin's folder with PLUGIN_ROOT, PLUGIN_DATA, its own packages and the keys it
@@ -273,7 +313,8 @@ export function pluginAdditions(db: DB, kind: PluginAgent): { mcpServers: Record
   const mcpServers: Record<string, McpServerSpec> = {};
   const lines: string[] = [];
   const used = new Set(['hydor', 'naget-agent']);
-  for (const { i, m } of activePlugins(db)) {
+  for (const l of activePlugins(db)) {
+    const { i, m } = l;
     if (!m.agents.includes(kind)) continue;
     const data = dataOf(i.name);
     for (const s of m.servers) {
@@ -281,32 +322,8 @@ export function pluginAdditions(db: DB, kind: PluginAgent): { mcpServers: Record
       if (used.has(n)) n = `${i.name}-${s.name}`.replace(/[^\w.-]/g, '-').slice(0, 64);
       if (used.has(n)) continue;
       used.add(n);
-      if (s.type === 'stdio') {
-        const env: Record<string, string> = { ...setupEnv(m.requires, m.root, data) };
-        for (const [k, v] of Object.entries(s.env)) env[k] = fill(v, m.root, data);
-        for (const k of m.requires.keys) {
-          try {
-            const v = readSecret(db, k.name);
-            if (v) env[k.name] = v.value;
-          } catch {}
-        }
-        // Reserved, whatever the server's own env said (§9.1).
-        env.PLUGIN_ROOT = m.root;
-        env.PLUGIN_DATA = data;
-        let command = s.command;
-        if (command.startsWith('./')) command = path.resolve(m.root, command);
-        else if (command === 'node') command = process.execPath;
-        else if ((command === 'python' || command === 'python3') && m.requires.pip.length) command = path.join(venvDir(data), 'bin', 'python');
-        const cwd = s.cwd ? path.resolve(m.root, fill(s.cwd, m.root, data)) : m.root;
-        const file = path.join(viewOf(i.name), 'servers', `${s.name}.json`);
-        try {
-          writeIfChanged(file, JSON.stringify({ command, args: s.args.map((a) => fill(a, m.root, data)), cwd, env }));
-        } catch (e) {
-          console.warn(`[plugins] ${i.name}/${s.name}: ${(e as Error).message}`);
-          continue;
-        }
-        mcpServers[n] = { type: 'stdio', command: process.execPath, args: [roots.launcher, file], env: {} };
-      } else mcpServers[n] = { type: 'http', url: s.url, ...(Object.keys(s.headers).length ? { headers: s.headers } : {}) };
+      const spec = serverSpec(db, l, s);
+      if (spec) mcpServers[n] = spec;
     }
     const parts: string[] = [];
     if (m.instructions) parts.push(fill(m.instructions, m.root, data));

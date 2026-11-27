@@ -37,13 +37,20 @@ the free data services to call; app_guide's apps topic says what each part does,
 
 ## 1. Pin down the job
 
-- What goes in: the form's questions, few, each of the kind that fits (number, date, choice, yes or no, file).
+- What goes in: the form's questions, few, each of the kind that fits (number, date, choice, yes or no, file,
+  project). A `project` question is a select of the user's projects: the run then works in the one picked (its folder,
+  its knowledge in knowledge_search and knowledge_read), and `{{project_name}}` and `{{project_folder}}` name it. Use
+  it when the app works on a project's sources, not a folder named in the recipe. Its `default` is the only project
+  a run started with an app key or a webhook can use: set one only when the user says which.
 - What comes out: answer fields with types (a table when there are rows, a list for short items, `media` for
   pictures, videos or files the agent finds or makes: an https:// address, or a file's path on this computer, of
   which a copy is kept; a table's `image` column for a picture in each row).
 - What it needs: keys for the services it calls (an API key, a token) go in `secrets` by name, with the hosts each
   may go to and where to get one, never a value: the user gives them when installing it or before its first run,
   and its runs use them by name (http_request `auth: NAME`). Check list_connections for a key already saved.
+- A Hydor plugin it cannot do without goes in `requires.plugins` by name (GET /api/plugins lists them): a run starts
+  only while it is on, its agent steps get its tools and skills, and a tool step calls its MCP tools as
+  `plugin:<plugin>/<tool>`. Give a tool that writes a file a path under `{{run.folder}}`.
 - What makes a run good: the checks you will write. Ask only what changes the design; assume the rest and say so.
 
 ## 2. Pick the steps: the cheapest that works
@@ -51,7 +58,8 @@ the free data services to call; app_guide's apps topic says what each part does,
 - One agent with a task, when the work is open-ended (research, writing, changing code). Start here when unsure,
   and firm it up later.
 - Steps, when parts of the work are fixed:
-  - **Use a tool** for one exact call: read a page, search the web, call an address with a saved key, read a document.
+  - **Use a tool** for one exact call: read a page, search the web, call an address with a saved key, read a document,
+    or call a needed plugin's tool (`plugin:sqlite/sqlite_query`).
     A search step's words are searched as written ("events Lisbon December 2026" looks for those events): to keep
     to dates, sites or kinds of page, set `from`, `to`, `sites` or `categories`.
   - **Ask a model** for one quick answer with no tools: sort, pull out, sum up, classify. Cheap; give it outputs.

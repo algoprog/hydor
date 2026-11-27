@@ -452,7 +452,7 @@ function AskForm({ fields, onChange }: { fields: AppField[]; onChange: (f: AppFi
               onChange={(e) => put(i, { ...f, label: e.target.value, ...(/^(answer|question)(_\d+)?$/.test(f.id) && e.target.value ? { id: fieldId(e.target.value, ids.filter((_, j) => j !== i)) } : {}) })}
             />
             <select className={cx(bare, 'h-8.5 min-w-[110px] flex-1 text-[13.5px]')} value={f.type} onChange={(e) => put(i, { ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined, multi: e.target.value === 'choice' ? f.multi : undefined })}>
-              {FIELD_TYPES.filter((t) => t.value !== 'file').map((t) => (
+              {FIELD_TYPES.filter((t) => t.value !== 'file' && t.value !== 'project').map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>
@@ -628,6 +628,8 @@ function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; 
                   {x.name}
                 </option>
               ))}
+              {/* A plugin's tool (plugin:<plugin>/<tool>), or one not here: kept as it is. */}
+              {s.tool && !t && <option value={s.tool}>{s.tool}</option>}
             </select>
           </label>
           <div>
@@ -1263,7 +1265,7 @@ export function StepsEditor({ recipe, onChange, onAsk, appId, view: given, onPar
 
   // What must change before it saves, and what may surprise, by the step they are about.
   const { msgs, general } = useMemo(() => {
-    const c = checkFlow({ fields: recipe.fields, answer: recipe.answer, flow, data: recipe.data, flows: recipe.flows });
+    const c = checkFlow({ fields: recipe.fields, answer: recipe.answer, flow, data: recipe.data, flows: recipe.flows, requires: recipe.requires });
     const all = [...cleanFlow(flow).errors.map((text) => ({ text, error: true })), ...c.errors.map((text) => ({ text, error: true })), ...c.warnings.map((text) => ({ text, error: false }))];
     const msgs = new Map<string, { text: string; error: boolean }[]>();
     const general: { text: string; error: boolean }[] = [];
@@ -1276,7 +1278,7 @@ export function StepsEditor({ recipe, onChange, onAsk, appId, view: given, onPar
       else general.push(m);
     }
     return { msgs, general };
-  }, [recipe.fields, recipe.answer, flow, recipe.data, recipe.flows]);
+  }, [recipe.fields, recipe.answer, flow, recipe.data, recipe.flows, recipe.requires]);
 
   const setSteps = (steps: Step[]) => onChange({ flow: { ...flow, steps } });
   const taken = () => allSteps(flow.steps).map((s) => s.id);

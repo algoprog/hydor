@@ -451,14 +451,14 @@ function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): s
 
 /**
  * Whose a new page is, and which project it goes in: the project named (by its name or id) when there is one; else an
- * agent's goes in its session's project, and an app's step (which has no session) in none.
+ * agent's goes in its session's project, and an app's step (which has no session) in its run's project, if it has one.
  */
 function madeBy(ctx: RunCtx, project: unknown): { sessionKey?: string; space: string | null } {
   const s = typeof project === 'string' ? project.trim().toLowerCase() : '';
   const all = s ? allSpaces(ctx.deps.db) : [];
   const named = (all.find((x) => x.id.toLowerCase() === s) ?? all.find((x) => x.name.trim().toLowerCase() === s))?.id ?? null;
   if (!ctx.step) return { sessionKey: ctx.key, space: named ?? sessionSpace(ctx.deps.db, ctx.key) };
-  return { space: named };
+  return { space: named ?? ctx.project ?? null };
 }
 
 /** Where a new page goes: madeBy's place (the project named, else the session's), then a folder of it when an older call names one. */

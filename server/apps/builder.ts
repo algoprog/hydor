@@ -417,7 +417,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         type: 'object',
         properties: {
           app: { ...APP, description: 'The app to change; none: a new one.' },
-          recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form; a question that asks about the person, as their units, currency, country, diet or research fields, says from: "me.units" and starts from what they keep in About you; remember: true starts one from their last answer), language ("person": its model and agent steps write in the person\'s language; set it on every new app), prompt (a task for one agent) or flow (its steps), answer, ui (its view: how its answer looks and what a click there does; app_guide\'s API topic, Apps: views), data, memory, requires, flows, examples, tools, limits, agent, model, tier ("quick", "standard", "best" or "max": the tier its agent thinks with, Settings → Models → Tiers, instead of a model by name; it follows the table and works whichever program runs it; pick the lowest that does the job well: quick for short clear jobs, standard for most, best for research and hard reasoning, max rarely; a model by name wins; an agent step has its own), mode…' },
+          recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form; a question that asks about the person, as their units, currency, country, diet or research fields, says from: "me.units" and starts from what they keep in About you; remember: true starts one from their last answer; type "project" is a select of their projects, its value the project\'s id: the run then works in that project, its folder and its knowledge, and {{project_name}} and {{project_folder}} name it; only the person chooses it freely: runs started with an app key, a public page or a webhook get the question\'s default, a project the person picked, or none, so set a default only when they ask for one), language ("person": its model and agent steps write in the person\'s language; set it on every new app), prompt (a task for one agent) or flow (its steps), answer, ui (its view: how its answer looks and what a click there does; app_guide\'s API topic, Apps: views), data, memory, requires (what it needs here: { plugins: names of Hydor plugins, which must be on before it runs and whose MCP tools a tool step calls as "plugin:<plugin>/<tool>" and its agents have; node, python, commands, models }), flows, examples, tools, limits, agent, model, tier ("quick", "standard", "best" or "max": the tier its agent thinks with, Settings → Models → Tiers, instead of a model by name; it follows the table and works whichever program runs it; pick the lowest that does the job well: quick for short clear jobs, standard for most, best for research and hard reasoning, max rarely; a model by name wins; an agent step has its own), mode…' },
           patch: { type: 'object', description: 'Merged into the app as saved (or into recipe).' },
           step: { type: 'object', description: 'One step: { id, …its fields } changes it; { id, remove: true } removes it; a new id adds it (after: the step it follows; none: at the end).' },
           assets: { type: 'object', additionalProperties: { type: ['string', 'null'] }, description: 'Its own files by name ("cover.jpg"): a path on this computer, an https:// address or a data: address, kept with the app; null removes one.' },
@@ -520,7 +520,13 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
           for (const s of started) if (s.error) problems.push(`${s.example.id}: ${s.error}`);
           ids = started.filter((s) => s.run).map((s) => s.run!.id);
         } else {
-          const r = startRun({ app: app?.id ?? 'test', slug, recipe, source: 'test', inputs: (a.inputs && typeof a.inputs === 'object' ? a.inputs : {}) as Record<string, unknown>, ...(typeof a.flow === 'string' && a.flow && a.flow !== 'run' ? { flow: a.flow } : {}) });
+          let r: RunRecord;
+          try {
+            r = startRun({ app: app?.id ?? 'test', slug, recipe, source: 'test', inputs: (a.inputs && typeof a.inputs === 'object' ? a.inputs : {}) as Record<string, unknown>, ...(typeof a.flow === 'string' && a.flow && a.flow !== 'run' ? { flow: a.flow } : {}) });
+          } catch (e) {
+            // A plugin or a key it needs, or an answer that does not fit: said as the app's page says it.
+            return { text: `It could not start: ${(e as Error).message}`, isError: true };
+          }
           ids = [r.id];
         }
         const rs = await waited(db, ids, wait);

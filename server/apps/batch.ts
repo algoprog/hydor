@@ -8,6 +8,8 @@ import { cardText } from '../../shared/app-cards.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { checkedInputs, launchQueued, onFinished, startRun, stopRun } from './runs.ts';
+import { needPlugins } from './plugins.ts';
+import { limitProjects, projectOfAnswers } from './project.ts';
 import { getBatch, insertBatch, insertRun, listRuns, runningBatches, setBatchStatus, updateRun } from './store.ts';
 
 export const MAX_ROWS = 500;
@@ -21,11 +23,21 @@ export function startBatch(db: DB, o: { app: string; slug: string; recipe: AppRe
   if (!rows.length) throw new HttpError(400, 'There are no rows to run');
   if (rows.length > MAX_ROWS) throw new HttpError(400, `At most ${MAX_ROWS} rows at a time`);
   const concurrency = Math.max(1, Math.min(Math.round(Number(o.concurrency) || 2), MAX_CONCURRENCY));
+  // A plugin it needs that is not on stops every row alike: said before any is made.
+  needPlugins(db, o.recipe);
   const id = insertBatch(db, { app: o.app, name: o.name?.slice(0, 120), concurrency, total: rows.length });
   slugs.set(id, o.slug);
   rows.forEach((row, i) => {
     // A question the row leaves out takes what it starts from (About you, its last answer), as the run will.
-    const { errors } = checkedInputs(o.recipe, row && typeof row === 'object' ? row : {}, false, {}, undefined, o.app);
+    const { values, errors } = checkedInputs(o.recipe, row && typeof row === 'object' ? row : {}, false, {}, undefined, o.app);
+    // A row that names a project that is not here fails like any other that does not fit.
+    if (!errors.length)
+      try {
+        limitProjects(db, o.recipe.fields, values, row, { limited: () => false });
+        projectOfAnswers(db, o.recipe.fields, values);
+      } catch (e) {
+        errors.push((e as Error).message);
+      }
     if (errors.length) {
       const r = insertRun(db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: 'batch', inputs: Object.fromEntries(Object.entries(row ?? {}).map(([k, v]) => [k, cellText(v)])), status: 'failed', batch: id, row: i + 1 });
       updateRun(db, r.id, { error: errors.join('; '), endedAt: Date.now() });

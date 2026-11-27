@@ -108,7 +108,7 @@ function BatchView({ id, app, onClose }: { id: string; app: AppDef; onClose: () 
                 <td className="tnum border-b border-line py-2 pr-2 text-fg-3">{r.row}</td>
                 {firstFields.map((f) => (
                   <td key={f.id} className="max-w-[180px] truncate border-b border-line px-2 py-2">
-                    {r.inputs[f.id]}
+                    {f.type === 'project' ? (r.project?.name ?? r.inputs[f.id]) : r.inputs[f.id]}
                   </td>
                 ))}
                 <td className="border-b border-line px-2 py-2" title={r.error}>

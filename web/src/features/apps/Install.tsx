@@ -35,7 +35,7 @@ type Picks = Record<string, string>;
 function PreviewCard({ p, picks, onPick, agents, onAgents, keys, onKeys }: { p: InstallPreview; picks: Picks; onPick: (key: string, value: string) => void; agents: boolean; onAgents: (on: boolean) => void; keys: KeyInput; onKeys: (k: KeyInput) => void }) {
   const needs = [...p.needs.node.map((n) => `${n} (Node)`), ...p.needs.python.map((n) => `${n} (Python)`)];
   // Models to pick, commands missing or warnings open the details by themselves.
-  const [open, setOpen] = useState(() => p.models.some((m) => m.status === 'missing' || m.status === 'matched') || p.needs.missing.length > 0 || p.warnings.length > 0);
+  const [open, setOpen] = useState(() => p.models.some((m) => m.status === 'missing' || m.status === 'matched') || p.needs.missing.length > 0 || !!p.needs.plugins?.some((x) => !x.on) || p.warnings.length > 0);
   return (
     <div className="space-y-3">
       {p.problems.length > 0 && (
@@ -124,6 +124,16 @@ function PreviewCard({ p, picks, onPick, agents, onAgents, keys, onKeys }: { p: 
             <Line label="It installs">
               <span translate="no">{needs.join(', ')}</span>
               <div className="text-fg-3">In a folder of its own, not for the whole computer</div>
+            </Line>
+          )}
+          {!!p.needs.plugins?.length && (
+            <Line label="Plugins it needs">
+              {p.needs.plugins.map((x) => (
+                <div key={x.name}>
+                  <span translate="no">{x.title}</span>
+                  {!x.on && <span className="text-warn"> (not on here)</span>}
+                </div>
+              ))}
             </Line>
           )}
           {p.needs.commands.length > 0 && (
