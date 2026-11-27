@@ -1685,9 +1685,10 @@ agents that speak ACP and take MCP servers.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
   sixty that come with the app for every agent (ways of working, writing, documents, research and the web,
   planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
-  Code's and Codex's own, and each project's own. A search, a row of filters and a switch on every skill, for
-  every session (a project can switch any skill the other way for its own sessions, and the row says so: "Off in
-  Thesis"); write your own for every agent or for one, copy the ones you made in other agents (Memory → Bring in…), change a built-in one (your version takes its place),
+  Code's and Codex's own (Custom, which reads both, follows their switches too), and each project's own. A search,
+  a row of filters and a switch on every skill, for every session (a project can switch any skill the other way for
+  its own sessions, and the row says so: "Off in Thesis"); write your own for every agent or for one, copy the ones
+  you made in other agents (Memory → Bring in…), change a built-in one (your version takes its place),
   remove and bring back. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a project,
   for the project alone. Other ACP agents get the list of skills to read when one fits; Custom's instructions name them by group, and it can find one by what the work is. A new session's agent
   hears which skills fit its first message, found by words and by meaning, when any clearly do.

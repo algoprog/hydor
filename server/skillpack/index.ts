@@ -4,8 +4,9 @@
 // Codex and Custom all get the library when they start (library.ts); a session in a space gets the
 // space's own skills with it (spaceSkills.ts), and a proposal there can be kept for the space alone.
 // Custom also gets a short rule on using skills, and the text of any skill whose keywords the user's
-// message uses, before each turn. Every agent starting a new session also hears which skills fit its first
-// message, found by words and meaning (match.ts), unless that is turned off. A project's sessions get the
+// message uses, before each turn. Of Claude Code's and Codex's own skills, Custom has only those switched
+// on for the agent whose folder they are in. Every agent starting a new session also hears which skills fit
+// its first message, found by words and meaning (match.ts), unless that is turned off. A project's sessions get the
 // skills it switches on or off for itself (spaceSkills.ts): the library's and its own through its view,
 // Claude Code's own as --settings skillOverrides, Codex's own as skills.config in its thread's settings.
 import { execFile } from 'node:child_process';
@@ -24,8 +25,9 @@ import type { Deps, Feature, RunCtx, RunTool, SpawnInfo } from '../features/type
 import { requestVector } from '../memory/embed.ts';
 import { addNote, notesOf } from '../notes.ts';
 import { sessionExtra } from '../sessionExtra.ts';
+import { codexSkills } from '../setup.ts';
 import { spaceOfSession } from '../spaces/index.ts';
-import { composeSkill, folders, folderSkills, isOff, librarySkills, parseSkill, setOffSkills, skillText, slug, syncView, viewSkills, visibleSkills, type FolderSkill } from './library.ts';
+import { composeSkill, folders, folderSkills, isOff, librarySkills, ownSkills, parseSkill, setOffSkills, skillText, slug, syncView, viewSkills, visibleSkills, type FolderSkill } from './library.ts';
 import { announce, decide, getProposal, history, libraryView, noteUse, pendingProposals, propose, removedSkills, removeSkill, restoreSkill, saveOwnSkill } from './proposals.ts';
 import { spaceSkillDoc, spaceSkillsView, spaceSkillText, spaceSwitches, spaceView } from './spaceSkills.ts';
 import { allSpaces } from '../spaces/index.ts';
@@ -55,12 +57,69 @@ function claudeOff(): Set<string> {
 /** Which agent one of the skills in the agents' own folders (visibleSkills' "own") belongs to, by its folder. */
 const ownersAgent = (k: FolderSkill): 'claude' | 'codex' => (k.file.includes(`${path.sep}.claude${path.sep}skills${path.sep}`) ? 'claude' : 'codex');
 
+const realFile = (file: string) => {
+  try {
+    return fs.realpathSync(file);
+  } catch {
+    return path.resolve(file);
+  }
+};
+
+/** How long a start or a turn of Custom waits for Codex to say which of its skills are off. */
+const CODEX_WAIT = 10_000;
+
+/**
+ * Codex's own skills switched off, by their real files, as Codex tells Settings → Skills for a folder. What it said
+ * is kept, for when it does not answer.
+ */
+async function codexOff(d: Deps, cwd: string): Promise<Set<string>> {
+  let kept: string[] = [];
+  try {
+    const v = JSON.parse(kvGet(d.db, 'skillpack.codexOff') ?? '[]');
+    if (Array.isArray(v)) kept = v.filter((x) => typeof x === 'string');
+  } catch {}
+  const off = new Set(kept);
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    const late = new Promise<never>((_ok, no) => {
+      timer = setTimeout(() => no(new Error('Codex did not say which of its skills are off')), CODEX_WAIT);
+    });
+    const { skills } = await Promise.race([codexSkills(d.sessions.controlFor('codex'), cwd), late]);
+    for (const k of skills) {
+      if (k.enabled) off.delete(realFile(k.path));
+      else off.add(realFile(k.path));
+    }
+    kvSet(d.db, 'skillpack.codexOff', JSON.stringify([...off].sort()));
+  } catch (e) {
+    warnOnce(e);
+  } finally {
+    clearTimeout(timer);
+  }
+  return off;
+}
+
+/**
+ * The SKILL.md files of the agents' own skills that Custom does not get in a folder: each is on or off as for the
+ * agent whose folder it is in (as the session's project switches it, else as that agent's own settings have it).
+ */
+async function customOff(d: Deps, cwd: string, switches: Record<string, boolean>): Promise<Set<string>> {
+  const own = ownSkills(cwd);
+  const claude = claudeOff();
+  const codex = own.some((k) => ownersAgent(k) === 'codex') ? await codexOff(d, cwd) : new Set<string>();
+  const on = (k: FolderSkill) => {
+    const agent = ownersAgent(k);
+    return switches[switchKey(k.name, agent)] ?? !(agent === 'claude' ? claude.has(k.name) : codex.has(realFile(k.file)));
+  };
+  return new Set(own.filter((k) => !on(k)).map((k) => k.file));
+}
+
 /**
  * The skills a session's agent has, as visibleSkills finds them through `view`: for Claude Code and Codex, of the
- * agents' own skills only theirs, and none switched off (in their settings, or by the session's project).
+ * agents' own skills only theirs, and none switched off (in their settings, or by the session's project). Custom has
+ * both agents' own, without those in `off` (customOff).
  */
-function usableSkills(s: SpawnInfo, view: string, switches: Record<string, boolean>): FolderSkill[] {
-  if (s.agent !== 'claude' && s.agent !== 'codex') return visibleSkills(s.cwd, path.join(view, 'skills'));
+function usableSkills(s: SpawnInfo, view: string, switches: Record<string, boolean>, offOwn: Set<string>): FolderSkill[] {
+  if (s.agent !== 'claude' && s.agent !== 'codex') return visibleSkills(s.cwd, path.join(view, 'skills'), (k) => !offOwn.has(k.file));
   const agent = s.agent;
   const off = agent === 'claude' ? claudeOff() : new Set<string>();
   return visibleSkills(s.cwd, path.join(view, 'skills'), (k) => ownersAgent(k) === agent && (switches[switchKey(k.name, agent)] ?? !off.has(k.name)));
@@ -70,10 +129,10 @@ function usableSkills(s: SpawnInfo, view: string, switches: Record<string, boole
  * The skills that fit a new session's first message (match.ts), as a few lines for the instructions its agent starts
  * with, saying how that agent loads one. None for a session that goes on, an app's run, or with suggesting turned off.
  */
-async function fitLines(s: SpawnInfo, d: Deps, view: string, switches: Record<string, boolean>): Promise<string | null> {
+async function fitLines(s: SpawnInfo, d: Deps, view: string, switches: Record<string, boolean>, offOwn: Set<string>): Promise<string | null> {
   const ask = s.prompt?.trim();
   if (s.resume || !ask || !suggestOn(d.db) || (s.extra.app && typeof s.extra.app === 'object')) return null;
-  const found = await matchSkills(d.db, usableSkills(s, view, switches), ask, { vector: await requestVector(d.db, ask) });
+  const found = await matchSkills(d.db, usableSkills(s, view, switches, offOwn), ask, { vector: await requestVector(d.db, ask) });
   if (!found.length) return null;
   const how = s.agent === 'claude' ? 'load it with the Skill tool' : isCustom(s) ? 'load it with the skill tool' : 'read its SKILL.md';
   const paths = s.agent !== 'claude' && !isCustom(s);
@@ -328,12 +387,16 @@ async function customContext(s: { key: string; cwd: string; extra: SessionExtra 
   if (!triggersOn(d.db)) return rule;
   const ask = await latestAsk(d, s.key);
   const st = active.get(s.key) ?? { prompt: '', skills: [] };
-  if (ask && ask.id !== st.prompt) {
+  const fresh = !!ask && ask.id !== st.prompt;
+  if (!fresh && !st.skills.length) return rule;
+  // Keywords bring in none of the agents' own skills that are switched off.
+  const offOwn = await customOff(d, s.cwd, where ? spaceSwitches(d.db, where.space.id) : {});
+  const visibleNow = () => visibleSkills(s.cwd, skills, (k) => !offOwn.has(k.file));
+  if (ask && fresh) {
     // A new message: what was brought in before fades, what it asks for now comes in.
     st.prompt = ask.id;
     st.skills = st.skills.map((x) => ({ ...x, left: x.left - 1 })).filter((x) => x.left > 0);
-    const visible = visibleSkills(s.cwd, skills);
-    for (const m of matchTriggers(ask.text, visible).reverse()) {
+    for (const m of matchTriggers(ask.text, visibleNow()).reverse()) {
       const had = st.skills.some((x) => x.name === m.name);
       st.skills = [{ name: m.name, trigger: m.trigger, left: TURNS }, ...st.skills.filter((x) => x.name !== m.name)].slice(0, 2);
       if (had) continue;
@@ -344,7 +407,7 @@ async function customContext(s: { key: string; cwd: string; extra: SessionExtra 
     active.set(s.key, st);
   }
   if (!st.skills.length) return rule;
-  const visible = new Map(visibleSkills(s.cwd, skills).map((x) => [x.name, x]));
+  const visible = new Map(visibleNow().map((x) => [x.name, x]));
   let room = budget(d, s.key);
   const parts: string[] = [];
   for (const a of st.skills) {
@@ -470,12 +533,17 @@ export const skillpack: Feature = {
   async spawn(s, d) {
     const where = spaceOfSession(d.db, s.extra);
     const view = viewFor(d.db, where);
-    if (!view) return undefined;
+    if (!view && !isCustom(s)) return undefined;
     if (s.agent === 'claude' && !(await claudeTakesPlugins())) return undefined;
     const switches = where ? spaceSwitches(d.db, where.space.id) : {};
+    // Custom reads both agents' own folders itself (agent/prompt.ts, findSkills): it is told which of those skills are
+    // off, also when there is no view of the library to give it.
+    const offOwn = isCustom(s) ? await customOff(d, s.cwd, switches) : new Set<string>();
+    const offEnv = { HYDOR_SKILLS_OFF: [...offOwn].join(path.delimiter) };
+    if (!view) return { env: offEnv };
     // The skills that fit the first message, once, with it (Custom's, in its context): its instructions stay the same
     // from one session to the next, so the provider's cache of them holds.
-    const fit = await fitLines(s, d, view, switches).catch((e) => (warnOnce(e), null));
+    const fit = await fitLines(s, d, view, switches, offOwn).catch((e) => (warnOnce(e), null));
     const said = fit ? { notes: [fit] } : {};
     // Claude Code: the view is a plugin for this session only, and its own skills as the project switches them
     // (settings given on the command line come before the user's own). Codex: an extra folder of skills, and
@@ -494,7 +562,7 @@ export const skillpack: Feature = {
         fitting.set(s.key, fit);
         if (fitting.size > 500) fitting.delete(fitting.keys().next().value!);
       }
-      return { env: { HYDOR_SKILL_DIRS: path.join(view, 'skills') } };
+      return { env: { HYDOR_SKILL_DIRS: path.join(view, 'skills'), ...offEnv } };
     }
     // Other ACP agents (Gemini CLI, OpenCode…) have no skills of their own: the list, to read when one fits.
     if (s.agent === 'acp') {

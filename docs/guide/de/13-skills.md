@@ -17,7 +17,7 @@ Die Skills-Seite zeigt fünf Quellen, die in den jeweiligen Zeilen gekennzeichne
 - **Eingebaut**: mehr als sechzig mitgelieferte Skills, die mit der App aktualisiert werden.
 - **Deine Skills**: Skills, die du hier geschrieben, nach einem Agentenvorschlag bestätigt, von anderen Agenten auf diesem Computer übernommen oder selbst im Skills-Ordner abgelegt hast. Siehe [Von anderen Assistenten übernehmen](/guide/memory#bring-in-from-other-assistants).
 - **Von Plugins**: Skills deiner aktivierten [Plugins](/guide/plugins). Diese werden mit dem Plugin verfügbar und verschwinden beim Deaktivieren wieder.
-- **Claude Code und Codex**: eigene Skills dieser Agenten in deren Ordnern. Nur der jeweilige Agent erhält sie.
+- **Claude Code und Codex**: die eigenen Skills der Agenten in ihren eigenen Ordnern. Nur der jeweilige Agent und [Custom](/guide/custom) bekommen sie.
 - **In Projekten**: projekteigene Skills, die nur den Sitzungen des Projekts zur Verfügung stehen. Du bearbeitest sie im Tab **Skills** des Projekts; siehe [Eigene Skills für ein Projekt](/guide/projects#give-a-project-skills-of-its-own).
 
 Die ersten drei Quellen bilden die Skill-Bibliothek für alle von der App gestarteten Agenten. Ein Agent kann außerdem bevorzugte Skills festlegen und passende davon vor Beginn der Arbeit laden. Siehe [Agenten](/guide/agents).
@@ -37,7 +37,7 @@ Eine Projektsitzung erhält zusätzlich die projekteigenen Skills. Für alle Ski
 
 Deine eigenen Skills haben Vorrang vor eingebauten Skills gleichen Namens. Hat ein Plugin-Skill einen bereits in der Bibliothek vorhandenen Namen, wird er ausgelassen. Die Plugin-Seite zeigt, welchen Skill die Agenten stattdessen erhalten.
 
-Custom liest mehrere Ordner in dieser Reihenfolge: projekteigene Skills aus `.claude/skills` und `.agents/skills`, eigene Skills von Claude Code und Codex in deinem persönlichen Ordner und danach die Bibliothek. Bei gleichen Namen gilt der zuerst gefundene Skill. So stehen deine Claude-Code- und Codex-Skills auch Custom zur Verfügung. Custom berücksichtigt höchstens 200 Skills, davon maximal 40 projekteigene und persönliche. Seine Anweisungen nennen die Gruppen, etwa projekteigene Skills, deine Skills und Bibliotheksgruppen wie Programmierung oder Dokumente, statt jeden Skill einzeln aufzulisten.
+Custom liest mehrere Ordner in dieser Reihenfolge: projekteigene Skills aus `.claude/skills` und `.agents/skills`, eigene Skills von Claude Code und Codex in deinem persönlichen Ordner und danach die Bibliothek. Bei gleichen Namen gilt der zuerst gefundene Skill. So stehen deine Claude-Code- und Codex-Skills auch Custom zur Verfügung, solange ihr [Schalter](#turn-a-skill-on-or-off) eingeschaltet ist. Custom berücksichtigt höchstens 200 Skills, davon maximal 40 projekteigene und persönliche. Seine Anweisungen nennen die Gruppen, etwa projekteigene Skills, deine Skills und Bibliotheksgruppen wie Programmierung oder Dokumente, statt jeden Skill einzeln aufzulisten.
 
 ## Erkennen, wann ein Agent einen Skill verwendet
 
@@ -75,6 +75,7 @@ Jeder Bibliotheksskill und jeder eigene Skill von Claude Code oder Codex hat rec
 
 - Ein deaktivierter Bibliotheksskill, ob eingebaut, persönlich oder aus einem Plugin, wird für alle Agenten ausgelassen. Projekte können ihn für ihre Sitzungen dennoch aktivieren.
 - Claude Code speichert den Zustand unter dem Skill-Namen in seinen Einstellungen; Codex in seiner eigenen Konfiguration.
+- Custom folgt diesen Schaltern ebenfalls. Es liest die Ordner beider Agenten und hat einen Skill dort nur, solange er für den Agenten eingeschaltet ist, in dessen Ordner er liegt: Claude Code für `.claude/skills`, Codex für `.codex/skills` und `.agents/skills`. Ein ausgeschalteter Skill steht nicht in seiner Liste, wird nicht als passend genannt und nicht durch Schlüsselwörter eingebunden. Der Schalter eines Projekts zählt zuerst. Eine bereits laufende Custom-Sitzung behält ihre Liste, bis ihr Agent neu startet.
 
 Die allgemeinen Schalter gelten für alle Sitzungen. Ein Projekt kann davon in seinem **Skills**-Tab abweichen; siehe [Einen Skill für dieses Projekt aktivieren oder deaktivieren](/guide/projects#turn-a-skill-on-or-off-for-this-project). Die allgemeine Liste zeigt dann etwa „Deaktiviert in Abschlussarbeit“ oder „Aktiviert in 2 Projekten“.
 

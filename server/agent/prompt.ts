@@ -62,12 +62,16 @@ const PROJECT_GROUP = 'This project';
 const OWN_GROUP = 'Your own';
 const OTHER_GROUP = 'More';
 
-/** Skills of the project and of the user (Claude Code's and Codex's folders included), then the app's library (HYDOR_SKILL_DIRS). */
+/**
+ * Skills of the project and of the user (Claude Code's and Codex's folders included), then the app's library
+ * (HYDOR_SKILL_DIRS). Left out: the SKILL.md files switched off (HYDOR_SKILLS_OFF, as server/skillpack finds them).
+ */
 export function findSkills(cwd: string): Skill[] {
   const home = os.homedir();
   const project = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills')];
   const own = [...project, path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
   const library = (process.env.HYDOR_SKILL_DIRS ?? '').split(path.delimiter).filter(Boolean);
+  const off = new Set((process.env.HYDOR_SKILLS_OFF ?? '').split(path.delimiter).filter(Boolean));
   const seen = new Set<string>();
   const out: Skill[] = [];
   const take = (dirs: string[], max: number) => {
@@ -82,6 +86,7 @@ export function findSkills(cwd: string): Skill[] {
       for (const n of list) {
         if (out.length >= max) return;
         const file = path.join(d, n, 'SKILL.md');
+        if (off.has(file)) continue;
         try {
           const fm = frontmatter(fs.readFileSync(file, 'utf8').slice(0, 4000));
           const name = fm.name || n;

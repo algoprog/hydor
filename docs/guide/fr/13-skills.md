@@ -17,7 +17,7 @@ La page Compétences affiche des compétences issues de cinq origines, indiquée
 - **Intégré** : les compétences fournies avec l’app (plus de soixante). Elles se mettent à jour avec l’app.
 - **Les vôtres** : les compétences que vous avez écrites sur cette page, approuvées quand un agent les a suggérées, copiées depuis d’autres agents présents sur cet ordinateur (voir [Reprendre depuis d’autres assistants](/guide/memory#bring-in-from-other-assistants)), ou placées vous-même dans votre dossier de compétences.
 - **Des plugins** : les compétences des [plugins](/guide/plugins) que vous avez activés. Elles vont et viennent avec leur plugin.
-- **Claude Code et Codex** : les compétences propres à ces agents, dans leurs propres dossiers. Seul cet agent les reçoit.
+- **Claude Code et Codex** : les compétences propres à ces agents, dans leurs propres dossiers. Seuls l’agent concerné et [Custom](/guide/custom) les reçoivent.
 - **Dans les projets** : les compétences propres à un projet, que seules ses sessions reçoivent. Vous les modifiez dans l’onglet **Compétences** du projet : voir [Donner à un projet ses propres compétences](/guide/projects#give-a-project-skills-of-its-own).
 
 Les trois premières forment la bibliothèque de compétences, que reçoit chaque agent démarré par l’app. Un agent peut aussi désigner des compétences qu’il privilégie : quand l’une d’elles convient à la tâche, il la charge avant de commencer. Voir [Agents](/guide/agents).
@@ -37,7 +37,7 @@ Une session dans un projet reçoit les compétences propres au projet avec celle
 
 Vos propres compétences passent avant les compétences intégrées : l’une des vôtres portant le nom d’une compétence intégrée la remplace. Une compétence de plugin dont le nom existe déjà dans la bibliothèque est écartée, et la page de son plugin indique quelle compétence les agents reçoivent à la place.
 
-Custom lit les compétences dans plusieurs dossiers, dans cet ordre : les compétences propres au projet (dans ses dossiers `.claude/skills` et `.agents/skills`), celles de Claude Code et de Codex dans votre dossier personnel, puis la bibliothèque. Quand deux compétences portent le même nom, la première trouvée l’emporte. Une compétence que vous écrivez pour Claude Code ou pour Codex parvient donc aussi à Custom. Custom prend jusqu’à 200 compétences, dont au plus 40 pour celles du projet et les vôtres ; ses instructions les nomment par groupe (celles du projet, les vôtres, puis les groupes de la bibliothèque comme Programmation ou Documents) plutôt que de les lister une à une.
+Custom lit les compétences dans plusieurs dossiers, dans cet ordre : les compétences propres au projet (dans ses dossiers `.claude/skills` et `.agents/skills`), celles de Claude Code et de Codex dans votre dossier personnel, puis la bibliothèque. Quand deux compétences portent le même nom, la première trouvée l’emporte. Une compétence que vous écrivez pour Claude Code ou pour Codex parvient donc aussi à Custom, tant que son [interrupteur](#turn-a-skill-on-or-off) est activé. Custom prend jusqu’à 200 compétences, dont au plus 40 pour celles du projet et les vôtres ; ses instructions les nomment par groupe (celles du projet, les vôtres, puis les groupes de la bibliothèque comme Programmation ou Documents) plutôt que de les lister une à une.
 
 ## Voir quand un agent utilise une compétence
 
@@ -75,6 +75,7 @@ Chaque compétence de la bibliothèque, de Claude Code et de Codex a un interrup
 
 - Une compétence de la bibliothèque (intégrée, la vôtre ou celle d’un plugin) désactivée est écartée pour tous les agents, dans tous les projets qui ne l’activent pas pour eux-mêmes.
 - Claude Code conserve son propre choix dans ses paramètres, selon le nom de la compétence ; Codex le conserve dans sa propre configuration.
+- Custom suit aussi ces interrupteurs. Il lit les dossiers des deux agents, et n’y dispose d’une compétence que tant qu’elle est activée pour l’agent auquel appartient le dossier : Claude Code pour `.claude/skills`, Codex pour `.codex/skills` et `.agents/skills`. Une compétence désactivée ne figure pas dans sa liste, n’est pas désignée comme pouvant convenir et n’est pas amenée par des mots-clés. Le réglage d’un projet compte en premier. Une session Custom déjà en cours garde sa liste jusqu’au redémarrage de son agent.
 
 Les interrupteurs de cette page valent pour toutes les sessions. Un projet peut inverser l’état de n’importe quelle compétence pour ses propres sessions, dans son onglet **Compétences** : voir [Activer ou désactiver une compétence pour ce projet](/guide/projects#turn-a-skill-on-or-off-for-this-project). La ligne de la compétence ici l’indique alors : « Désactivée dans Thèse » ou « Activée dans 2 projets ».
 

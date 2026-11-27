@@ -17,7 +17,7 @@ The Skills page shows skills from five places, each marked on its row:
 - **Built in**: the skills that come with the app (more than sixty). They update with the app.
 - **Yours**: skills you wrote on this page, approved when an agent suggested them, copied from other agents on this computer (see [Bring in from other assistants](/guide/memory#bring-in-from-other-assistants)), or put in your skills folder yourself.
 - **From plugins**: the skills of the [plugins](/guide/plugins) you turned on. They come and go with their plugin.
-- **Claude Code and Codex**: the agents' own skills, in their own folders. Only that agent gets them.
+- **Claude Code and Codex**: the agents' own skills, in their own folders. Only that agent and [Custom](/guide/custom) get them.
 - **In projects**: a project's own skills, which only its sessions get. You change them on the project's **Skills** tab: see [Give a project skills of its own](/guide/projects#give-a-project-skills-of-its-own).
 
 The first three make up the skill library, which every agent the app starts gets. An agent can also name skills it favors: when one of them fits the task, it loads it before it starts. See [Agents](/guide/agents).
@@ -37,7 +37,7 @@ A session in a project gets the project's own skills with the library's, each as
 
 Your own skills come before the built-in ones: one of yours with the name of a built-in skill takes its place. A plugin's skill with a name the library already has is left out, and its plugin's page says which skill agents get instead.
 
-Custom reads skills from several folders, in this order: the project's own skills (in its `.claude/skills` and `.agents/skills` folders), Claude Code's and Codex's own skills in your home folder, then the library. Where two skills share a name, the first one found wins. So a skill you write for Claude Code or for Codex reaches Custom too. Custom takes up to 200 skills, at most 40 of them the project's and yours; its instructions name them by group (the project's own, yours, then the library's groups such as Coding or Documents) rather than listing each one.
+Custom reads skills from several folders, in this order: the project's own skills (in its `.claude/skills` and `.agents/skills` folders), Claude Code's and Codex's own skills in your home folder, then the library. Where two skills share a name, the first one found wins. So a skill you write for Claude Code or for Codex reaches Custom too, while its [switch](#turn-a-skill-on-or-off) is on. Custom takes up to 200 skills, at most 40 of them the project's and yours; its instructions name them by group (the project's own, yours, then the library's groups such as Coding or Documents) rather than listing each one.
 
 ## See when an agent uses a skill
 
@@ -75,6 +75,7 @@ Every skill of the library and of Claude Code and Codex has a switch at the end 
 
 - A library skill (built in, yours or a plugin's) turned off is left out for every agent, in every project that doesn't switch it on for itself.
 - Claude Code keeps its own choice in its settings, by the skill's name; Codex keeps it in its own configuration.
+- Custom follows these switches too. It reads both agents' folders, and has a skill there only while it is on for the agent whose folder it is in: Claude Code for `.claude/skills`, Codex for `.codex/skills` and `.agents/skills`. A skill switched off is not in its list, is not named as one that fits, and is not brought in by keywords. A project's switch counts first. A Custom session already going keeps its list until its agent starts again.
 
 The switches here are for every session. A project can switch any skill the other way for its own sessions, on its **Skills** tab: see [Turn a skill on or off for this project](/guide/projects#turn-a-skill-on-or-off-for-this-project). Then the skill's row here says so: "Off in Thesis", or "On in 2 projects".
 

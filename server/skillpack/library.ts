@@ -130,18 +130,23 @@ export function folderSkills(root: string, source: FolderSkill['source']): Folde
   return out;
 }
 
+/** The skills in the agents' own folders, seen from a folder: the project's, then the user's. */
+export function ownSkills(cwd: string): FolderSkill[] {
+  const home = os.homedir();
+  const dirs = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills'), path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
+  return dirs.flatMap((d) => folderSkills(d, 'own'));
+}
+
 /**
  * The skills Custom sees from a folder, in the order its skills list takes them (the project's, the
  * user's, then the library's through the view, or through `view`, a space's): the first of a name wins.
  * `keepOwn`: which of the agents' own skills (the project's and the user's) count, for one agent's list.
  */
 export function visibleSkills(cwd: string, view?: string, keepOwn: (s: FolderSkill) => boolean = () => true): FolderSkill[] {
-  const home = os.homedir();
-  const own = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills'), path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
   const seen = new Set<string>();
   const out: FolderSkill[] = [];
   const lib = view ? folderSkills(view, 'space') : librarySkills().filter((s) => !off.has(s.dir)).map((s) => ({ ...s, file: path.join(viewSkills(), s.dir, 'SKILL.md') }));
-  for (const s of [...own.flatMap((d) => folderSkills(d, 'own')).filter(keepOwn), ...lib]) {
+  for (const s of [...ownSkills(cwd).filter(keepOwn), ...lib]) {
     if (seen.has(s.name)) continue;
     seen.add(s.name);
     out.push(s);

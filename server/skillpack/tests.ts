@@ -29,7 +29,7 @@ import { skillpack } from './index.ts';
 import { composeSkill, folders, librarySkills, parseSkill, setFolders, skillText, syncView, viewSkills, visibleSkills } from './library.ts';
 import { history, libraryView, propose } from './proposals.ts';
 import { scanSkill, secretsMessage } from './scan.ts';
-import { setSpaceSwitch, spaceSkillsDir, spaceSkillText } from './spaceSkills.ts';
+import { clearSpaceSwitches, setSpaceSwitch, spaceSkillsDir, spaceSkillText } from './spaceSkills.ts';
 import { matchTriggers, triggerPattern } from './triggers.ts';
 import { hashOf, setShippedForTests, shippedVectors } from '../find/index.ts';
 import { skillItemText } from '../find/sources.ts';
@@ -256,6 +256,87 @@ await test('what each agent is given: a plugin folder, an extra skills folder, a
   assert.match(other, /read its SKILL\.md with your file tools/);
   assert.ok(other.includes(`- research: `) && other.includes(path.join(viewSkills(), 'research', 'SKILL.md')), 'each skill with its file');
   assert.equal(claude?.instructions, undefined, 'nothing added to Claude Code’s system prompt');
+});
+
+await test("Custom has none of Claude Code's and Codex's own skills that are switched off, unless the project switches one on", async () => {
+  const home = path.join(root, 'switch-home');
+  const proj = path.join(root, 'switch-project');
+  const skill = (dir: string, name: string, description: string, more = '') => {
+    const file = path.join(dir, name, 'SKILL.md');
+    write(file, `---\nname: ${name}\ndescription: ${description}\n${more}---\n\n# ${name}\n\nThe steps of ${name}.\n`);
+    return file;
+  };
+  const hives = skill(path.join(home, '.codex', 'skills'), 'hive-inspection', 'Use when logging beehive inspections and honey harvests.', 'triggers: [beehive]\n');
+  skill(path.join(home, '.claude', 'skills'), 'kiln-firing', 'Use when planning a pottery kiln firing schedule and glazes.');
+  const shared = skill(path.join(proj, '.agents', 'skills'), 'tide-tables', 'Use when reading tide tables.');
+  fs.mkdirSync(path.join(root, 'switch-sp'), { recursive: true });
+  const sp = createSpace(db, { name: 'Apiary', folder: path.join(root, 'switch-sp') });
+  // What Codex reports to Settings → Skills, with each skill on or off as it keeps them.
+  const codexOn = new Map([
+    [hives, false],
+    [shared, false],
+  ]);
+  let answers = true;
+  Object.assign(sessions, {
+    controlFor: () => ({
+      call: async () => {
+        if (!answers) throw new Error('no answer');
+        return { data: [{ skills: [...codexOn].map(([p, enabled]) => ({ name: path.basename(path.dirname(p)), path: p, enabled, scope: 'user' })), errors: [] }] };
+      },
+    }),
+  });
+  const claudeSettings = path.join(home, '.claude', 'settings.json');
+  const before = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR, HYDOR_SKILL_DIRS: process.env.HYDOR_SKILL_DIRS, HYDOR_SKILLS_OFF: process.env.HYDOR_SKILLS_OFF };
+  Object.assign(process.env, { HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: path.join(home, '.claude') });
+  const ALL = ['hive-inspection', 'kiln-firing', 'tide-tables'];
+  /** What a Custom session starting in the project is given: the names its skills list has, and those named as fitting (in its context). */
+  let starts = 0;
+  const start = async (extra: Record<string, unknown> = {}) => {
+    const hints: string[] = [];
+    let list: string[] = [];
+    for (const prompt of ['Log my beehive inspections and honey harvests', 'Plan the pottery kiln firing schedule and glazes']) {
+      const key = `acp:switch-${++starts}`;
+      const given = await skillpack.spawn!({ key, cwd: proj, runId: 'r', resume: false, agent: 'acp', acpAgent: 'console', extra, prompt }, deps);
+      Object.assign(process.env, given!.env);
+      hints.push(String(await skillpack.context!({ key, cwd: proj, extra }, deps)));
+      list = findSkills(proj)
+        .map((k) => k.name)
+        .filter((n) => ALL.includes(n))
+        .sort();
+    }
+    return { list, hinted: ALL.filter((n) => hints.join('\n').includes(`- ${n}: `)) };
+  };
+  try {
+    write(claudeSettings, JSON.stringify({ skillOverrides: { 'kiln-firing': 'off' } }));
+    assert.deepEqual(await start(), { list: [], hinted: [] }, 'all off');
+    // Keywords bring in no skill that is off either.
+    sessions.items.set('acp:off', [{ kind: 'user', id: 'o1', seq: 0, text: 'Time to check on the beehive before winter' }]);
+    assert.doesNotMatch(String(await skillpack.context!({ key: 'acp:off', cwd: proj, extra: {} }, deps)), /<skill name="hive-inspection"/);
+    answers = false;
+    assert.deepEqual((await start()).list, [], 'Codex not answering: what it said last holds');
+    answers = true;
+    // The project's switches come before the agents' own.
+    setSpaceSwitch(db, sp.id, { name: 'hive-inspection', agent: 'codex', on: true });
+    setSpaceSwitch(db, sp.id, { name: 'kiln-firing', agent: 'claude', on: true });
+    assert.deepEqual(await start({ space: sp.id }), { list: ['hive-inspection', 'kiln-firing'], hinted: ['hive-inspection', 'kiln-firing'] });
+    // Switched on in the agents' own settings.
+    codexOn.set(hives, true);
+    codexOn.set(shared, true);
+    write(claudeSettings, '{}');
+    assert.deepEqual(await start(), { list: ALL, hinted: ['hive-inspection', 'kiln-firing'] });
+    sessions.items.set('acp:on', [{ kind: 'user', id: 'o2', seq: 0, text: 'Time to check on the beehive before winter' }]);
+    assert.match(String(await skillpack.context!({ key: 'acp:on', cwd: proj, extra: {} }, deps)), /<skill name="hive-inspection"/);
+    // And a project can switch one off that is on.
+    setSpaceSwitch(db, sp.id, { name: 'hive-inspection', agent: 'codex', on: false });
+    assert.deepEqual(await start({ space: sp.id }), { list: ['kiln-firing', 'tide-tables'], hinted: ['kiln-firing'] });
+  } finally {
+    clearSpaceSwitches(db, sp.id);
+    delete (sessions as { controlFor?: unknown }).controlFor;
+    for (const [k, v] of Object.entries(before)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
 });
 
 console.log('triggers');

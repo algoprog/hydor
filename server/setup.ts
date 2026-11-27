@@ -272,27 +272,37 @@ export async function listSkills(control: CodexControl, cwdArg?: string): Promis
   const skills = [...scanSkills(path.join(claudeDir(), 'skills'), 'user', overrides)];
   if (cwd !== HOME) skills.push(...scanSkills(path.join(cwd, '.claude', 'skills'), 'project', overrides));
   try {
-    const r = await control.call<{ data: { skills: Json[]; errors: Json[] }[] }>('skills/list', { cwds: [cwd], forceReload: true }, 30_000);
-    for (const e of r.data ?? []) {
-      for (const s of e.skills ?? []) {
-        const p = String(s.path ?? '');
-        const file = p.endsWith('SKILL.md') ? p : path.join(p, 'SKILL.md');
-        const scope = (s.scope as SkillEntry['scope']) ?? 'user';
-        skills.push({
-          agent: 'codex',
-          name: String(s.name),
-          description: String(s.interface?.shortDescription ?? s.shortDescription ?? s.description ?? ''),
-          path: file,
-          scope: s.pluginId ? 'plugin' : scope,
-          enabled: s.enabled !== false,
-          plugin: s.pluginId ?? undefined,
-          deletable: !s.pluginId && (scope === 'user' || scope === 'repo'),
-        });
-      }
-      for (const err of e.errors ?? []) errors.push(String(err.message ?? err.path ?? JSON.stringify(err)));
-    }
+    const codex = await codexSkills(control, cwd);
+    skills.push(...codex.skills);
+    errors.push(...codex.errors);
   } catch (e) {
     errors.push(`Codex skills: ${(e as Error).message}`);
+  }
+  return { skills, errors };
+}
+
+/** Codex's skills for a folder, each on or off as Codex has it. Throws when Codex does not answer. */
+export async function codexSkills(control: CodexControl, cwd: string): Promise<{ skills: SkillEntry[]; errors: string[] }> {
+  const skills: SkillEntry[] = [];
+  const errors: string[] = [];
+  const r = await control.call<{ data: { skills: Json[]; errors: Json[] }[] }>('skills/list', { cwds: [cwd], forceReload: true }, 30_000);
+  for (const e of r.data ?? []) {
+    for (const s of e.skills ?? []) {
+      const p = String(s.path ?? '');
+      const file = p.endsWith('SKILL.md') ? p : path.join(p, 'SKILL.md');
+      const scope = (s.scope as SkillEntry['scope']) ?? 'user';
+      skills.push({
+        agent: 'codex',
+        name: String(s.name),
+        description: String(s.interface?.shortDescription ?? s.shortDescription ?? s.description ?? ''),
+        path: file,
+        scope: s.pluginId ? 'plugin' : scope,
+        enabled: s.enabled !== false,
+        plugin: s.pluginId ?? undefined,
+        deletable: !s.pluginId && (scope === 'user' || scope === 'repo'),
+      });
+    }
+    for (const err of e.errors ?? []) errors.push(String(err.message ?? err.path ?? JSON.stringify(err)));
   }
   return { skills, errors };
 }
