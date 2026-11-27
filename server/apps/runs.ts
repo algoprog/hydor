@@ -12,9 +12,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { SessionExtra } from '../../shared/features.ts';
-import type { AnswerField, AppDef, AppRecipe, AppRun, RunAsk, RunPerson, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
+import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, RunAsk, RunPerson, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
 import { signedInPerson } from './keyroutes.ts';
-import { ACTIVE, checkInputs, fillTemplate, inputsLine, isActive } from '../../shared/apps.ts';
+import { ACTIVE, answerOf, checkInputs, fillTemplate, inputsLine, isActive } from '../../shared/apps.ts';
 import { momentOf } from '../../shared/app-manifest.ts';
 import { languageLine, languageName, meVars } from '../../shared/app-me.ts';
 // Loaded first of the cards' part for the whole server: it tells shared/apps.ts how to name and check a card field.
@@ -37,7 +37,7 @@ import { refMedia } from './media.ts';
 import { needSecrets } from './secrets.ts';
 import { addModels, modelStates, needModels } from './models.ts';
 import { needPlugins } from './plugins.ts';
-import { projectOfAnswers } from './project.ts';
+import { limitProjects, projectOfAnswers } from './project.ts';
 import { runFunctions } from './appfns.ts';
 import { getApp, getRun, insertRun, listRuns, listSteps, reuseSteps, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
 import { titleOf } from '../../shared/app-manifest.ts';
@@ -230,6 +230,13 @@ export interface StartInput {
   person?: RunPerson | null;
   /** A short reference of the caller's own (an app's key: the id of the row the run belongs to), kept with the run and used to list them. */
   ref?: string;
+  /** For source "api": the signed-in person called, with no app key. Anything else started that way is someone else's. */
+  signedIn?: boolean;
+  /**
+   * A scheduled task someone else's call or a watcher's find started: the questions whose answers that filled in (none,
+   * for a webhook that fills none). Unset: the task is the person's alone.
+   */
+  outside?: string[];
 }
 
 /** The questions a run answers: the template's form, or the inputs of the flow it runs. */
@@ -258,11 +265,26 @@ export function startRun(o: StartInput): RunRecord {
   // An agent step's run has no form of its own: its step's flow filled its task.
   const { values, errors } = checkedInputs(o.recipe, o.inputs, !!o.public, o.files, o.flow, o.source === 'step' ? undefined : o.app);
   if (errors.length) throw new HttpError(400, `Check the form: ${errors.join('; ')}`);
-  // A public run's agent gets none of the user's plugins, and its visitor none of their projects.
+  // A public run's agent gets none of the user's plugins.
   if (o.public && o.recipe.requires?.plugins?.length) throw new HttpError(409, 'This app needs a plugin, which runs from a public page cannot use');
-  if (o.public && formOf(o.recipe, o.flow).some((f) => f.type === 'project' && values[f.id])) throw new HttpError(400, 'A public page cannot choose one of your projects');
-  // The project it works in: as its project question says; an agent step's is its flow's.
-  const project = o.source === 'step' ? (o.parent ? getRun(d().db, o.parent)?.project : undefined) : o.public ? undefined : projectOfAnswers(d().db, formOf(o.recipe, o.flow), values, { names: o.source !== 'api' });
+  // Whether someone other than the person starts it (an app's key, a public page, a run of theirs calling on), and
+  // whether outside comes into it (a webhook call, a watcher): that goes with the runs it starts.
+  const parent = o.parent ? getRun(d().db, o.parent) : null;
+  const theirs = o.source === 'public' || !!o.public || (o.source === 'api' && !o.signedIn) || ((o.source === 'app' || o.source === 'step') && !!parent?.outside);
+  const filled = new Set(o.outside ?? []);
+  const outside = theirs || !!o.outside;
+  // The project it works in: as its project question says, which only the person answers freely (project.ts). An agent
+  // step's is its flow's. A public run works in none: its visitor gets no files and no knowledge.
+  let project: RunRecord['project'];
+  if (o.source === 'step') project = parent?.project;
+  else {
+    const form = formOf(o.recipe, o.flow);
+    // In a task outside comes into, a project is the person's only where the task itself says it: one filled in from
+    // outside, or left out (which would take their last answer), is held too.
+    const limited = (f: AppField) => theirs || [f.id, ...(f.was ?? [])].some((id) => filled.has(id)) || (!!o.outside && answerOf(f, o.inputs) === undefined);
+    limitProjects(d().db, form, values, o.inputs, { limited, inherited: o.source === 'app' ? parent?.project?.id : undefined });
+    if (!o.public) project = projectOfAnswers(d().db, form, values, { quiet: outside });
+  }
   // The plugins and keys it needs, before it starts (an agent step's run goes by its app's; a public run cannot use them).
   if (!o.public && o.source !== 'step') {
     needPlugins(d().db, o.recipe, o.flow);
@@ -277,7 +299,7 @@ export function startRun(o: StartInput): RunRecord {
     if (f.data.length * 0.75 > maxFile) throw new HttpError(413, `${f.name} is too big (at most ${maxFile >> 20} MB)`);
   }
   const lang = runLanguage(d().db, o.lang, !!o.public);
-  const made = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow, example: o.example, askedBy: o.askedBy, lang, person: o.person === undefined ? ownerOf(o) : o.person, ref: o.ref, project });
+  const made = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow, example: o.example, askedBy: o.askedBy, lang, person: o.person === undefined ? ownerOf(o) : o.person, ref: o.ref, project, outside });
   // The functions of the web app it belongs to, for its agents (appfns.ts): read, and the app started, before the first agent does anything.
   const r = runFunctions()?.begin(made) ?? made;
   // The person's own answers to questions that remember theirs, for their next run.

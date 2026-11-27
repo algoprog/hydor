@@ -9,7 +9,7 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { checkedInputs, launchQueued, onFinished, startRun, stopRun } from './runs.ts';
 import { needPlugins } from './plugins.ts';
-import { projectOfAnswers } from './project.ts';
+import { limitProjects, projectOfAnswers } from './project.ts';
 import { getBatch, insertBatch, insertRun, listRuns, runningBatches, setBatchStatus, updateRun } from './store.ts';
 
 export const MAX_ROWS = 500;
@@ -33,6 +33,7 @@ export function startBatch(db: DB, o: { app: string; slug: string; recipe: AppRe
     // A row that names a project that is not here fails like any other that does not fit.
     if (!errors.length)
       try {
+        limitProjects(db, o.recipe.fields, values, row, { limited: () => false });
         projectOfAnswers(db, o.recipe.fields, values);
       } catch (e) {
         errors.push((e as Error).message);

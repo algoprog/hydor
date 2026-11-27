@@ -1,6 +1,7 @@
 // The plugins an app needs (requires.plugins): how each stands on this computer, the check before a run, and the tool
-// steps that call a plugin's MCP tool ("plugin:<plugin>/<tool>"). A run starts a plugin's servers the first time a
-// step calls one of their tools, keeps them for the rest of the run, and stops them when it ends. The servers are
+// steps that call a plugin's MCP tool ("plugin:<plugin>/<tool>"). A run starts a plugin's servers when a step calls
+// one of their tools and keeps them for the next ones; they stop when the run ends, while it waits (for a person's
+// answer), and after ten minutes without a call, and start again at the next step that needs them. The servers are
 // started as agents start them (plugins/store.ts, through the launcher) and talked to with Custom's MCP client.
 import type { AppRecipe } from '../../shared/apps.ts';
 import { appPrograms, pluginStepTool } from '../../shared/app-manifest.ts';
@@ -84,8 +85,24 @@ interface Server {
   client: McpClient;
 }
 
+/** A run's servers of one plugin: started at a step that calls one of its tools, kept while they are of use. */
+interface Held {
+  servers: Promise<Server[]>;
+  /** Once they have started. */
+  list?: Server[];
+  /** Calls using them now: they are not stopped under one. */
+  busy: number;
+  idle?: NodeJS.Timeout;
+}
+
 /** The servers each run has started, by plugin. */
-const running = new Map<string, Map<string, Promise<Server[]>>>();
+const running = new Map<string, Map<string, Held>>();
+/** Runs that wait now (for a person's answer, paused in the graph): they keep no server of no use. */
+const waiting = new Set<string>();
+
+/** A server with no call for this long inside a run is stopped; the next step that needs it starts it again. */
+let idleMs = 10 * 60_000;
+export const setPluginIdle = (ms: number) => void (idleMs = ms);
 
 function defOf(name: string, spec: McpServerSpec): McpDef {
   // As an agent starts them: with the login shell's environment, not this server's own.
@@ -114,30 +131,42 @@ async function start(db: DB, plugin: string): Promise<Server[]> {
   return ok;
 }
 
-/** The run's servers of a plugin, started now when it has none, or when one of them has ended. */
-async function serversOf(db: DB, run: string, plugin: string): Promise<Server[]> {
+/** Stops a run's servers of a plugin. */
+function drop(run: string, plugin: string) {
+  const mine = running.get(run);
+  const held = mine?.get(plugin);
+  if (!mine || !held) return;
+  mine.delete(plugin);
+  if (!mine.size) running.delete(run);
+  clearTimeout(held.idle);
+  void held.servers.then((list) => list.forEach((s) => s.client.close()), () => {});
+}
+
+/** Does something with a run's servers of a plugin, started now when it has none (or one of them has ended). */
+async function withServers<T>(db: DB, run: string, plugin: string, use: (servers: Server[]) => Promise<T>): Promise<T> {
+  // One that ended (it crashed, or the plugin was set up again): all of the plugin's are started afresh.
+  if (running.get(run)?.get(plugin)?.list?.some((s) => s.client.stopped)) drop(run, plugin);
   let mine = running.get(run);
   if (!mine) running.set(run, (mine = new Map()));
-  const had = mine.get(plugin);
-  if (had) {
-    const list = await had.catch(() => null);
-    if (list && list.every((s) => !s.client.stopped)) return list;
-    for (const s of list ?? []) s.client.close();
-    // Another step may have started them again meanwhile.
-    if (mine.get(plugin) !== had) return serversOf(db, run, plugin);
-  }
-  const made = start(db, plugin);
-  mine.set(plugin, made);
+  let held = mine.get(plugin);
+  if (!held) mine.set(plugin, (held = { servers: start(db, plugin), busy: 0 }));
+  held.busy++;
+  clearTimeout(held.idle);
   try {
-    return await made;
-  } catch (e) {
-    if (mine.get(plugin) === made) mine.delete(plugin);
-    throw e;
+    held.list = await held.servers;
+    return await use(held.list);
+  } finally {
+    held.busy--;
+    // Still the run's (not stopped meanwhile) and used by no other call.
+    if (running.get(run)?.get(plugin) === held && !held.busy) {
+      // None that started (a failed start is tried afresh by the next step), or a run that waits: stopped at once.
+      if (!held.list || waiting.has(run)) drop(run, plugin);
+      else held.idle = setTimeout(() => drop(run, plugin), idleMs).unref();
+    }
   }
 }
 
-async function find(db: DB, run: string, plugin: string, tool: string): Promise<{ server: Server; tool: McpTool }> {
-  const servers = await serversOf(db, run, plugin);
+function toolOf(servers: Server[], plugin: string, tool: string): { server: Server; tool: McpTool } {
   for (const server of servers) {
     const t = server.client.tools.find((x) => x.name === tool);
     if (t) return { server, tool: t };
@@ -154,7 +183,7 @@ export async function pluginTool(db: DB, run: string, name: string, signal: Abor
   if (!ref) throw new Error(`A plugin's tool is "plugin:<plugin>/<tool>", not ${name}`);
   const need = needOf(db, ref.plugin, []);
   if (need.state !== 'on') throw new Error(`The step needs ${needLine(need)}.`);
-  const first = await find(db, run, ref.plugin, ref.tool);
+  const first = await withServers(db, run, ref.plugin, async (servers) => toolOf(servers, ref.plugin, ref.tool));
   let data: unknown;
   return {
     data: () => data,
@@ -164,23 +193,31 @@ export async function pluginTool(db: DB, run: string, name: string, signal: Abor
       inputSchema: first.tool.inputSchema,
       // A tool its server marks as only reading may be tried again after a failure that passes.
       annotations: first.tool.readOnly ? { readOnlyHint: true } : {},
-      async run(args): Promise<ToolOutput> {
-        // Found again at each try: a server that ended is started again.
-        const { server } = await find(db, run, ref.plugin, ref.tool);
-        const r = await server.client.call(ref.tool, args, signal, CALL_MS);
-        data = r.structured;
-        return { text: r.text, ...(r.isError ? { isError: true } : {}) };
-      },
+      // Taken up again at each try: a server that ended or was stopped meanwhile is started again.
+      run: (args): Promise<ToolOutput> =>
+        withServers(db, run, ref.plugin, async (servers) => {
+          const r = await toolOf(servers, ref.plugin, ref.tool).server.client.call(ref.tool, args, signal, CALL_MS);
+          data = r.structured;
+          return { text: r.text, ...(r.isError ? { isError: true } : {}) };
+        }),
     },
   };
 }
 
+/**
+ * A run began or ended waiting (a person's answer, a pause in the graph). While it waits it keeps no server that no
+ * call is using; one still in a call (another branch's) stops when the call ends.
+ */
+export function pluginServersWait(run: string, on: boolean) {
+  if (!on) return void waiting.delete(run);
+  waiting.add(run);
+  for (const [plugin, held] of [...(running.get(run) ?? [])]) if (!held.busy) drop(run, plugin);
+}
+
 /** The run ended: its plugins' servers stop. */
 export function closePluginServers(run: string) {
-  const mine = running.get(run);
-  if (!mine) return;
-  running.delete(run);
-  for (const p of mine.values()) void p.then((list) => list.forEach((s) => s.client.close()), () => {});
+  waiting.delete(run);
+  for (const plugin of [...(running.get(run)?.keys() ?? [])]) drop(run, plugin);
 }
 
 /** The app server is stopping. */

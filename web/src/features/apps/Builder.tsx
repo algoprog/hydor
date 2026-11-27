@@ -26,7 +26,7 @@ import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
 import { appPath, useRunEvents, type RunDetail } from './api';
 import { AppIcon, ICONS } from './AppIcon';
-import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
+import { AppForm, formErrors, initialValues, ProjectSelect, type FormFiles, type FormValues } from './Form';
 import { ResultView, RunBody } from './Result';
 import { DesignEditor } from './Design';
 import { sampleResult } from './sample';
@@ -416,11 +416,16 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
           <Labeled label="An example answer">
             <input className={small} placeholder="Optional" value={f.placeholder ?? ''} onChange={(e) => onChange({ ...f, placeholder: e.target.value || undefined })} />
           </Labeled>
-          {f.type !== 'project' && (
-            <Labeled label="Filled in at first">
+          <Labeled label="Filled in at first">
+            {f.type === 'project' ? (
+              <>
+                <ProjectSelect value={f.default ?? ''} onChange={(v) => onChange({ ...f, default: v || undefined })} className="h-8.5 text-[13px]" />
+                <span className="mt-1 block text-[12px] leading-snug text-fg-3">The only project a run started with an app’s key or by a webhook can use.</span>
+              </>
+            ) : (
               <input className={small} placeholder="Optional" value={f.default ?? ''} onChange={(e) => onChange({ ...f, default: e.target.value || undefined })} />
-            </Labeled>
-          )}
+            )}
+          </Labeled>
           {/* What it starts from instead: About you (the person's own record), or their last answer here. Not for a file. */}
           {f.type !== 'file' && (
             <>

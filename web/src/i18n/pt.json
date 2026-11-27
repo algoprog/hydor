@@ -28955,7 +28955,6 @@
   "(not on here)": "(não ativado aqui)",
   "A plugin it needs is not on.": "Um plugin necessário não está ativado.",
   "A plugin's tool is \"plugin:<plugin>/<tool>\", not {0}": "A ferramenta de um plugin é \"plugin:<plugin>/<tool>\", não {0}",
-  "A public page cannot choose one of your projects": "Uma página pública não pode escolher um dos seus projetos",
   "It cannot be read: remove it and add it again.": "Não é possível lê-lo: remova-o e adicione-o de novo.",
   "It could not be added": "Não foi possível adicioná-lo",
   "It does not come with Hydor: add it in Settings → Plugins from a link, a file or a folder.": "Ele não vem com o Hydor: adicione-o em Configurações → Plugins a partir de um link, um arquivo ou uma pasta.",
@@ -29006,5 +29005,10 @@
   "Add the plugin": "Adicionar o plugin",
   "Set the plugin up": "Configurar o plugin",
   "Turn the plugin on": "Ativar o plugin",
-  "Check the form: {0}: there is no project “{1}”{2}": "Verifique o formulário: {0}: não há um projeto “{1}”{2}"
+  "Check the form: {0}: a run started this way cannot choose a project. Leave it out, and the app uses the one it sets, if it sets one": "Verifique o formulário: {0}: uma execução começada desta forma não pode escolher um projeto. Deixe-o de fora, e o app usa o que ele define, se definir algum",
+  "Check the form: {0}: there is no project “{1}” (you have {2})": "Confira o formulário: {0}: não existe o projeto “{1}” (você tem {2})",
+  "The only project a run started with an app’s key or by a webhook can use.": "O único projeto que uma execução começada com a chave de um app ou por um webhook pode usar.",
+  "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "Verifique o formulário: {0}: uma execução iniciada desta forma não pode escolher um projeto, e o app não define nenhum para ela",
+  "Check the form: {0}: needed": "Verifique o formulário: {0}: obrigatório",
+  "The folder of the project the app sets is not there": "A pasta do projeto que o app define não está lá"
 }

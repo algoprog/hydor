@@ -29588,7 +29588,6 @@
   "(not on here)": "(hier nicht aktiviert)",
   "A plugin it needs is not on.": "Ein benötigtes Plugin ist nicht aktiviert.",
   "A plugin's tool is \"plugin:<plugin>/<tool>\", not {0}": "Das Tool eines Plugins ist \"plugin:<plugin>/<tool>\", nicht {0}",
-  "A public page cannot choose one of your projects": "Eine öffentliche Seite kann keines deiner Projekte auswählen",
   "It cannot be read: remove it and add it again.": "Es kann nicht gelesen werden: Entferne es und füge es erneut hinzu.",
   "It could not be added": "Es konnte nicht hinzugefügt werden",
   "It does not come with Hydor: add it in Settings → Plugins from a link, a file or a folder.": "Es wird nicht mit Hydor mitgeliefert: Füge es unter Einstellungen → Plugins über einen Link, eine Datei oder einen Ordner hinzu.",
@@ -29639,5 +29638,10 @@
   "Add the plugin": "Plugin hinzufügen",
   "Set the plugin up": "Plugin einrichten",
   "Turn the plugin on": "Plugin einschalten",
-  "Check the form: {0}: there is no project “{1}”{2}": "Prüfe das Formular: {0}: Es gibt kein Projekt „{1}“{2}"
+  "Check the form: {0}: a run started this way cannot choose a project. Leave it out, and the app uses the one it sets, if it sets one": "Prüfe das Formular: {0}: Ein so gestarteter Lauf kann kein Projekt auswählen. Lass es weg, dann nutzt die App das von ihr festgelegte, falls sie eines festlegt",
+  "Check the form: {0}: there is no project “{1}” (you have {2})": "Prüfe das Formular: {0}: Es gibt kein Projekt „{1}“ (vorhanden: {2})",
+  "The only project a run started with an app’s key or by a webhook can use.": "Das einzige Projekt, das ein Lauf nutzen kann, der mit dem Key einer App oder über einen Webhook gestartet wurde.",
+  "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "Prüfe das Formular: {0}: Ein so gestarteter Lauf kann kein Projekt auswählen, und die App legt keins dafür fest",
+  "Check the form: {0}: needed": "Prüfe das Formular: {0}: erforderlich",
+  "The folder of the project the app sets is not there": "Der Ordner des Projekts, das die App festlegt, ist nicht vorhanden"
 }

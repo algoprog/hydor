@@ -40,7 +40,8 @@ the free data services to call; app_guide's apps topic says what each part does,
 - What goes in: the form's questions, few, each of the kind that fits (number, date, choice, yes or no, file,
   project). A `project` question is a select of the user's projects: the run then works in the one picked (its folder,
   its knowledge in knowledge_search and knowledge_read), and `{{project_name}}` and `{{project_folder}}` name it. Use
-  it when the app works on a project's sources, not a folder named in the recipe.
+  it when the app works on a project's sources, not a folder named in the recipe. Its `default` is the only project
+  a run started with an app key or a webhook can use: set one only when the user says which.
 - What comes out: answer fields with types (a table when there are rows, a list for short items, `media` for
   pictures, videos or files the agent finds or makes: an https:// address, or a file's path on this computer, of
   which a copy is kept; a table's `image` column for a picture in each row).

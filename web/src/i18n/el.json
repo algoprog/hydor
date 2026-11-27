@@ -30794,7 +30794,6 @@
   "(not on here)": "(δεν είναι ενεργό εδώ)",
   "A plugin it needs is not on.": "Ένα πρόσθετο που χρειάζεται δεν είναι ενεργό.",
   "A plugin's tool is \"plugin:<plugin>/<tool>\", not {0}": "Το εργαλείο ενός πρόσθετου γράφεται \"plugin:<plugin>/<tool>\", όχι {0}",
-  "A public page cannot choose one of your projects": "Μια δημόσια σελίδα δεν μπορεί να επιλέξει κάποιο από τα έργα σας",
   "It cannot be read: remove it and add it again.": "Δεν είναι δυνατή η ανάγνωσή του: αφαιρέστε το και προσθέστε το ξανά.",
   "It could not be added": "Δεν ήταν δυνατή η προσθήκη του",
   "It does not come with Hydor: add it in Settings → Plugins from a link, a file or a folder.": "Δεν συνοδεύει το Hydor: προσθέστε το από τις Ρυθμίσεις → Πρόσθετα, από σύνδεσμο, αρχείο ή φάκελο.",
@@ -30845,5 +30844,10 @@
   "Add the plugin": "Προσθήκη του πρόσθετου",
   "Set the plugin up": "Ρύθμιση του πρόσθετου",
   "Turn the plugin on": "Ενεργοποίηση του πρόσθετου",
-  "Check the form: {0}: there is no project “{1}”{2}": "Ελέγξτε τη φόρμα: {0}: δεν υπάρχει έργο «{1}»{2}"
+  "Check the form: {0}: a run started this way cannot choose a project. Leave it out, and the app uses the one it sets, if it sets one": "Ελέγξτε τη φόρμα: {0}: μια εκτέλεση που ξεκινά με αυτόν τον τρόπο δεν μπορεί να επιλέξει έργο. Παραλείψτε το και η εφαρμογή θα χρησιμοποιήσει αυτό που ορίζει η ίδια, αν ορίζει κάποιο",
+  "Check the form: {0}: there is no project “{1}” (you have {2})": "Ελέγξτε τη φόρμα: {0}: δεν υπάρχει έργο «{1}» (έχετε {2})",
+  "The only project a run started with an app’s key or by a webhook can use.": "Το μόνο έργο που μπορεί να χρησιμοποιήσει μια εκτέλεση η οποία ξεκινά με το κλειδί μιας εφαρμογής ή από webhook.",
+  "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "Ελέγξτε τη φόρμα: {0}: μια εκτέλεση που ξεκινά με αυτόν τον τρόπο δεν μπορεί να επιλέξει έργο και η εφαρμογή δεν ορίζει κανένα για αυτήν",
+  "Check the form: {0}: needed": "Ελέγξτε τη φόρμα: {0}: απαιτείται",
+  "The folder of the project the app sets is not there": "Ο φάκελος του έργου που ορίζει η εφαρμογή δεν υπάρχει"
 }

@@ -30791,7 +30791,6 @@
   "(not on here)": "（此处未启用）",
   "A plugin it needs is not on.": "它需要的一个插件未启用。",
   "A plugin's tool is \"plugin:<plugin>/<tool>\", not {0}": "插件工具的写法是 \"plugin:<plugin>/<tool>\"，而不是 {0}",
-  "A public page cannot choose one of your projects": "公开页面无法选择你的项目",
   "It cannot be read: remove it and add it again.": "无法读取它：请移除后重新添加。",
   "It could not be added": "未能添加它",
   "It does not come with Hydor: add it in Settings → Plugins from a link, a file or a folder.": "Hydor 没有自带它：请在“设置 → 插件”中通过链接、文件或文件夹添加。",
@@ -30842,5 +30841,10 @@
   "Add the plugin": "添加插件",
   "Set the plugin up": "设置插件",
   "Turn the plugin on": "开启插件",
-  "Check the form: {0}: there is no project “{1}”{2}": "检查表单：{0}：没有名为“{1}”的项目{2}"
+  "Check the form: {0}: a run started this way cannot choose a project. Leave it out, and the app uses the one it sets, if it sets one": "检查表单：{0}：以这种方式启动的运行无法选择项目。请去掉它，应用会使用它自己设定的项目（如果设定了的话）",
+  "Check the form: {0}: there is no project “{1}” (you have {2})": "请检查表单：{0}：没有项目“{1}”（你有 {2}）",
+  "The only project a run started with an app’s key or by a webhook can use.": "这是用应用密钥或通过 webhook 启动的运行唯一能使用的项目。",
+  "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "请检查表单：{0}：以这种方式启动的运行无法选择项目，应用也没有为它指定项目",
+  "Check the form: {0}: needed": "请检查表单：{0}：必填",
+  "The folder of the project the app sets is not there": "应用指定的项目的文件夹不存在"
 }

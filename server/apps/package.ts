@@ -97,9 +97,15 @@ function modelNeeds(r: AppRecipe): ModelNeed[] {
 }
 
 /** What travels of a recipe: everything but its folder and what is this computer's own; its models said portably. */
+/** The forms without the projects their project questions start from: yours stay here, and say what others may reach. */
+function unset<T extends Pick<AppRecipe, 'fields' | 'flows'>>(r: T): T {
+  const plain = (fields: AppRecipe['fields']) => fields.map(({ default: d, ...f }) => (f.type === 'project' || d === undefined ? f : { ...f, default: d }));
+  return { ...r, fields: plain(r.fields ?? []), ...(r.flows ? { flows: Object.fromEntries(Object.entries(r.flows).map(([k, f]) => [k, f.inputs ? { ...f, inputs: plain(f.inputs) } : f])) } : {}) };
+}
+
 function travelling(a: AppRecipe): Record<string, unknown> {
   // What is kept beside its recipe here (its address, who may run it, where it came from) stays here.
-  const { id: _i, slug: _s, mcp: _m, agents: _a, fromFile: _f, webapp: _wa, public: _p, template: _t, createdAt: _c, updatedAt: _u, cwd: _w, ...recipe } = a as AppDef;
+  const { id: _i, slug: _s, mcp: _m, agents: _a, fromFile: _f, webapp: _wa, public: _p, template: _t, createdAt: _c, updatedAt: _u, cwd: _w, ...recipe } = unset(a as AppDef);
   const models = modelNeeds(a);
   return { ...recipe, ...(models.length ? { requires: { ...(recipe.requires ?? {}), models } } : {}) } as unknown as Record<string, unknown>;
 }
@@ -341,6 +347,11 @@ function intake(db: DB, raw: Record<string, any>, named: string, files?: Record<
   const total = Object.entries(files ?? {}).reduce((n, [name, b]) => n + (recipe.assets?.[name] ? b.length : 0), 0);
   if (total > MEDIA_LIMITS.assets) problems.push(`${named}Its files are ${Math.round(total / 1048576)} MB together, over the ${MEDIA_LIMITS.assets >> 20} MB an app may have`);
   if (typeof raw.cwd === 'string' && raw.cwd.trim()) notes.push(`${named}It worked in the folder ${raw.cwd.trim()} where it was made: here each run gets a folder of its own`);
+  // A project a question starts from says which of yours others may reach: a file never sets it.
+  if ([recipe.fields, ...Object.values(recipe.flows ?? {}).map((f) => f.inputs ?? [])].some((fields) => fields.some((f) => f.type === 'project' && f.default))) {
+    Object.assign(recipe, unset(recipe));
+    notes.push(`${named}It started from a project where it was made: here none is set until you pick one in its settings`);
+  }
   if (recipe.mode && SKIP_ASKING.has(recipe.mode)) {
     notes.push(`${named}It asked to run with every step allowed (${recipe.mode}): here it starts in Auto, which goes ahead with routine steps and asks about the rest; change it in its settings if you trust it`);
     recipe.mode = undefined;

@@ -28954,7 +28954,6 @@
   "(not on here)": "(non activé ici)",
   "A plugin it needs is not on.": "Un plugin nécessaire n’est pas activé.",
   "A plugin's tool is \"plugin:<plugin>/<tool>\", not {0}": "L’outil d’un plugin s’écrit « plugin:<plugin>/<tool> », et non {0}",
-  "A public page cannot choose one of your projects": "Une page publique ne peut pas choisir l’un de vos projets",
   "It cannot be read: remove it and add it again.": "Impossible de le lire : retirez-le, puis ajoutez-le à nouveau.",
   "It could not be added": "Impossible de l’ajouter",
   "It does not come with Hydor: add it in Settings → Plugins from a link, a file or a folder.": "Il n’est pas fourni avec Hydor : ajoutez-le dans Paramètres → Plugins à partir d’un lien, d’un fichier ou d’un dossier.",
@@ -29005,5 +29004,10 @@
   "Add the plugin": "Ajouter le plugin",
   "Set the plugin up": "Configurer le plugin",
   "Turn the plugin on": "Activer le plugin",
-  "Check the form: {0}: there is no project “{1}”{2}": "Vérifiez le formulaire : {0} : il n’y a pas de projet « {1} »{2}"
+  "Check the form: {0}: a run started this way cannot choose a project. Leave it out, and the app uses the one it sets, if it sets one": "Vérifiez le formulaire : {0} : une exécution démarrée de cette façon ne peut pas choisir de projet. Ne l’indiquez pas, et l’app utilisera celui qu’elle définit, si elle en définit un",
+  "Check the form: {0}: there is no project “{1}” (you have {2})": "Vérifiez le formulaire : {0} : il n’y a pas de projet « {1} » (vous avez {2})",
+  "The only project a run started with an app’s key or by a webhook can use.": "Le seul projet que peut utiliser une exécution démarrée avec la clé d’une app ou par un webhook.",
+  "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "Vérifiez le formulaire : {0} : une exécution démarrée de cette façon ne peut pas choisir de projet, et l’app n’en définit aucun pour elle",
+  "Check the form: {0}: needed": "Vérifiez le formulaire : {0} : obligatoire",
+  "The folder of the project the app sets is not there": "Le dossier du projet défini par l’app est introuvable"
 }

@@ -28954,7 +28954,6 @@
   "(not on here)": "(no está activado aquí)",
   "A plugin it needs is not on.": "Un plugin que necesita no está activado.",
   "A plugin's tool is \"plugin:<plugin>/<tool>\", not {0}": "La herramienta de un plugin es \"plugin:<plugin>/<tool>\", no {0}",
-  "A public page cannot choose one of your projects": "Una página pública no puede elegir uno de tus proyectos",
   "It cannot be read: remove it and add it again.": "No se puede leer: quítalo y vuelve a añadirlo.",
   "It could not be added": "No se pudo añadir",
   "It does not come with Hydor: add it in Settings → Plugins from a link, a file or a folder.": "No viene con Hydor: añádelo en Configuración → Plugins desde un enlace, un archivo o una carpeta.",
@@ -29005,5 +29004,10 @@
   "Add the plugin": "Agregar el plugin",
   "Set the plugin up": "Configurar el plugin",
   "Turn the plugin on": "Activar el plugin",
-  "Check the form: {0}: there is no project “{1}”{2}": "Revisa el formulario: {0}: no hay ningún proyecto “{1}”{2}"
+  "Check the form: {0}: a run started this way cannot choose a project. Leave it out, and the app uses the one it sets, if it sets one": "Revisa el formulario: {0}: una ejecución iniciada de esta forma no puede elegir un proyecto. Omítelo y la app usará el que ella defina, si define alguno",
+  "Check the form: {0}: there is no project “{1}” (you have {2})": "Revisa el formulario: {0}: no hay ningún proyecto “{1}” (tienes {2})",
+  "The only project a run started with an app’s key or by a webhook can use.": "El único proyecto que puede usar una ejecución iniciada con la clave de una app o mediante un webhook.",
+  "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "Revisa el formulario: {0}: una ejecución iniciada de esta manera no puede elegir un proyecto, y la app no define ninguno para ella",
+  "Check the form: {0}: needed": "Revisa el formulario: {0}: obligatorio",
+  "The folder of the project the app sets is not there": "La carpeta del proyecto que define la app no existe"
 }

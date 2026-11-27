@@ -263,19 +263,19 @@ function routes(d: Deps) {
   d.scheduler?.useApps({
     id: (idOrSlug) => (idOrSlug.startsWith('tpl:') ? (templateById(idOrSlug.slice(4)) ? idOrSlug : undefined) : getApp(db, idOrSlug)?.id),
     name: (id) => (id.startsWith('tpl:') ? templateById(id.slice(4))?.name : getApp(db, id)?.name),
-    start: ({ app: id, inputs, test }) => {
+    start: ({ app: id, inputs, test, outside }) => {
       // A ready-made app ("tpl:<id>"), as it is: Explore's Update automatically.
       if (id.startsWith('tpl:')) {
         const t = templateById(id.slice(4));
         if (!t) throw new HttpError(404, 'Its app is gone');
         installedOr409(db, t);
-        const r = startRun({ app: id, slug: t.id, recipe: t, source: 'task', inputs });
+        const r = startRun({ app: id, slug: t.id, recipe: t, source: 'task', inputs, outside });
         return { id: r.id, ...(r.key ? { key: r.key } : {}) };
       }
       const a = getApp(db, id);
       if (!a) throw new HttpError(404, 'Its app is gone');
       if (!test) checkDaily(db, a);
-      const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'task', inputs });
+      const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'task', inputs, outside });
       return { id: r.id, ...(r.key ? { key: r.key } : {}) };
     },
     ended: (id) => {

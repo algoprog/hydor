@@ -34,7 +34,7 @@ import { checkDaily } from './api.ts';
 import { runCode } from './code.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, runVars, startRun, stopRun, uploadsDir, waitFor, WORK_DIR, type FlowRunner, type StartInput } from './runs.ts';
-import { closePluginServers, pluginTool } from './plugins.ts';
+import { closePluginServers, pluginServersWait, pluginTool } from './plugins.ts';
 import { aboutMe } from './me.ts';
 import { takeInAnswer } from './media.ts';
 import { callKey, callTool, firstLine, whatOf, whyOf } from './sturdy.ts';
@@ -391,6 +391,8 @@ async function follow(x: Exec, childId: string): Promise<RunRecord> {
 
 /** The run waits when one of its steps waits for the person (an approval, a question), and works otherwise. */
 function syncStatus(x: Exec) {
+  // A run that waits keeps no plugin server running for nothing.
+  pluginServersWait(x.run.id, x.waiting.size > 0);
   const r = getRun(db(), x.run.id);
   if (!r || !isActive(r.status)) return;
   const want = x.waiting.size ? 'waiting' : 'running';

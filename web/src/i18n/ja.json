@@ -28955,7 +28955,6 @@
   "(not on here)": "（ここではオフ）",
   "A plugin it needs is not on.": "必要なプラグインがオンになっていません。",
   "A plugin's tool is \"plugin:<plugin>/<tool>\", not {0}": "プラグインのツールは{0}ではなく「plugin:<plugin>/<tool>」の形式で指定します",
-  "A public page cannot choose one of your projects": "公開ページでは、自分のプロジェクトを選べません",
   "It cannot be read: remove it and add it again.": "読み込めません。一度取り除いてから、もう一度追加してください。",
   "It could not be added": "追加できませんでした",
   "It does not come with Hydor: add it in Settings → Plugins from a link, a file or a folder.": "Hydorには付属していません。「設定」→「プラグイン」で、リンク、ファイル、フォルダのいずれかから追加してください。",
@@ -29006,5 +29005,10 @@
   "Add the plugin": "プラグインを追加",
   "Set the plugin up": "プラグインを設定",
   "Turn the plugin on": "プラグインをオンにする",
-  "Check the form: {0}: there is no project “{1}”{2}": "フォームを確認してください：{0}：プロジェクト「{1}」はありません{2}"
+  "Check the form: {0}: a run started this way cannot choose a project. Leave it out, and the app uses the one it sets, if it sets one": "フォームを確認してください：{0}：この方法で開始した実行では、プロジェクトを選べません。指定を省くと、アプリで設定されたプロジェクトがある場合はそれが使われます",
+  "Check the form: {0}: there is no project “{1}” (you have {2})": "フォームを確認してください：{0}：「{1}」というプロジェクトはありません（あるプロジェクト：{2}）",
+  "The only project a run started with an app’s key or by a webhook can use.": "アプリのキーやWebhookで開始した実行が使える唯一のプロジェクトです。",
+  "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "フォームを確認してください：{0}：この方法で開始した実行ではプロジェクトを選べず、アプリでもプロジェクトは設定されません",
+  "Check the form: {0}: needed": "フォームを確認してください：{0}：入力が必要です",
+  "The folder of the project the app sets is not there": "アプリが設定するプロジェクトのフォルダがありません"
 }

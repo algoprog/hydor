@@ -35,6 +35,7 @@ import { librarySkills, setFolders } from '../skillpack/library.ts';
 import { createSpace } from '../spaces/index.ts';
 import { apps, problemsOf } from './index.ts';
 import { startRun, startRuns, saveResult, waitFor, WORK_DIR } from './runs.ts';
+import { setPluginIdle } from './plugins.ts';
 import * as store from './store.ts';
 import { useAppTool } from './use.ts';
 
@@ -78,6 +79,7 @@ const TOOLS = [
   { name: 'count', description: 'Counts letters.', inputSchema: { type: 'object', properties: { text: { type: 'string' } } }, annotations: { readOnlyHint: true } },
   { name: 'refuse', description: 'Always fails.', inputSchema: { type: 'object' } },
   { name: 'quit', description: 'Ends the server.', inputSchema: { type: 'object' } },
+  { name: 'slow', description: 'Answers after a while.', inputSchema: { type: 'object', properties: { ms: { type: 'number' } } } },
 ];
 const call = (name, a) => {
   if (name === 'say') {
@@ -97,6 +99,7 @@ process.stdin.on('data', (d) => {
     if (m.id === undefined) continue;
     if (m.method === 'initialize') send({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'fakevoice', version: '1' } } });
     else if (m.method === 'tools/list') send({ jsonrpc: '2.0', id: m.id, result: { tools: TOOLS } });
+    else if (m.method === 'tools/call' && m.params.name === 'slow') setTimeout(() => send({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: 'Done after a while.' }] } }), m.params.arguments.ms);
     else if (m.method === 'tools/call') send({ jsonrpc: '2.0', id: m.id, result: call(m.params.name, m.params.arguments) });
     else send({ jsonrpc: '2.0', id: m.id, error: { code: -32601, message: 'no' } });
   }
@@ -341,7 +344,7 @@ test('a plugin tool step fails in words: the tool’s own error, no such tool, a
   assert.equal(r.status, 'failed');
   assert.match(r.error!, /It will not\./);
   r = await run([{ id: 'no', do: 'tool', tool: 'plugin:fake-voice/sing' }]);
-  assert.match(r.error!, /The plugin fake-voice has no tool “sing” \(it has say, count, refuse, quit\)/);
+  assert.match(r.error!, /The plugin fake-voice has no tool “sing” \(it has say, count, refuse, quit, slow\)/);
   // A server that ended is started again for the next step.
   const before = starts().length;
   r = await run([
@@ -359,6 +362,81 @@ test('a plugin tool step fails in words: the tool’s own error, no such tool, a
   r = await ended(started.id);
   assert.match(r.error!, /The step needs the Fake voice plugin \(fake-voice\), which is turned off/);
   await call('POST', '/api/plugins/fake-voice/enable');
+});
+
+/** No server of the fake plugin is running (given a moment to end). */
+async function noneAlive(why: string) {
+  for (let i = 0; i < 200 && starts().some(alive); i++) await sleep(25);
+  assert.deepEqual(starts().filter(alive), [], why);
+}
+const until = async (what: () => unknown, why: string) => {
+  for (let i = 0; i < 400 && !what(); i++) await sleep(25);
+  assert.ok(what(), why);
+};
+const stepOf = (run: string, path: string) => store.listSteps(db, run).find((s) => s.path === path);
+
+test('a run that waits for the person keeps no plugin server; the next step starts it again', async () => {
+  await noneAlive('before');
+  const before = starts().length;
+  const a = flowApp([
+    { id: 'one', do: 'tool', tool: 'plugin:fake-voice/count', with: { text: 'a' } },
+    { id: 'ok', do: 'ask', question: 'Go on?' },
+    { id: 'two', do: 'tool', tool: 'plugin:fake-voice/count', with: { text: 'ab' } },
+  ]);
+  const r = start(a);
+  await until(() => store.getRun(db, r.id)!.status === 'waiting', 'it asks');
+  assert.equal(starts().length, before + 1, 'the first step started it');
+  await noneAlive('while it waits');
+  const answered = await call('POST', `/api/apps/runs/${r.id}/answer`, { step: 'ok', yes: true });
+  assert.equal(answered.status, 200, JSON.stringify(answered.body));
+  const done = await ended(r.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(starts().length, before + 2, 'the step after the wait started it again');
+  await noneAlive('after the run');
+});
+
+test('a call in hand is not stopped by another branch’s wait: its server stops when it ends', async () => {
+  const a = flowApp([
+    {
+      id: 'both',
+      do: 'parallel',
+      branches: [[{ id: 'ok', do: 'ask', question: 'Go on?' }], [{ id: 'long', do: 'tool', tool: 'plugin:fake-voice/slow', with: { ms: 700 } }]],
+    },
+  ]);
+  const r = start(a);
+  await until(() => store.getRun(db, r.id)!.status === 'waiting', 'it asks');
+  const long = () => store.listSteps(db, r.id).find((s) => s.path.endsWith('long'));
+  await until(() => long()?.status === 'done', `the call ends: ${long()?.error}`);
+  assert.equal((long()!.outputs as { text: string }).text, 'Done after a while.');
+  await noneAlive('after the call, while the run still waits');
+  const ask = store.listSteps(db, r.id).find((s) => s.kind === 'ask')!;
+  await call('POST', `/api/apps/runs/${r.id}/answer`, { step: ask.path, yes: true });
+  assert.equal((await ended(r.id)).status, 'done');
+});
+
+test('a server with no call for a while is stopped inside the run, and started again; a long call is left to end', async () => {
+  setPluginIdle(300);
+  try {
+    const before = starts().length;
+    const a = flowApp([
+      // Longer than the idle time: a call in hand is never stopped for it.
+      { id: 'one', do: 'tool', tool: 'plugin:fake-voice/slow', with: { ms: 800 } },
+      { id: 'work', do: 'agent', instructions: 'x' },
+      { id: 'two', do: 'tool', tool: 'plugin:fake-voice/count', with: { text: 'ab' } },
+    ]);
+    const r = start(a);
+    await until(() => stepOf(r.id, 'work')?.status === 'running', 'the agent step is at work');
+    assert.equal(stepOf(r.id, 'one')!.status, 'done', stepOf(r.id, 'one')!.error);
+    await noneAlive('idle');
+    assert.equal(store.getRun(db, r.id)!.status, 'running', 'the run is not waiting: only idle');
+    await agentAnswers(r.id, 'work', {});
+    const done = await ended(r.id);
+    assert.equal(done.status, 'done', done.error);
+    assert.equal(starts().length, before + 2);
+    assert.equal(starts().length - before, 2);
+  } finally {
+    setPluginIdle(10 * 60_000);
+  }
 });
 
 test('an agent step of an app that needs a plugin gets its MCP server, its skills and a word about it', async () => {
@@ -473,10 +551,141 @@ test('a project question: the run works in that project, its folder and its know
   for (let i = 0; i < 200 && !store.getRun(db, rows[1].id)!.key; i++) await sleep(25);
   sessions.end(store.getRun(db, rows[1].id)!.key!);
   await ended(rows[1].id);
-  assert.equal(refusal(() => startRun({ app: one.id, slug: one.slug, recipe: one, source: 'api', inputs: { sources: 'Whales' } })).message, 'Check the form: sources: there is no project “Whales”'.replace('sources', one.fields[0].label));
 
   assert.deepEqual(checkInputs(a.fields, { sources: tides.id }).errors, []);
   assert.match(problemsOf(db, { ...a, fields: [{ id: 'sources', label: 'Project', type: 'project', from: 'me.units' }] }).errors.join(), /About you has no project/);
+});
+
+test('only the person chooses a project: others get the one the app sets, or none', async () => {
+  const open = createSpace(db, { name: 'Open shelf' });
+  const secret = createSpace(db, { name: 'Private diary' });
+  const form = (extra: Record<string, unknown> = {}) => [{ id: 'where', label: 'Where', type: 'project', ...extra }, { id: 'note', label: 'Note', type: 'text' }];
+  const one = (extra: Record<string, unknown> = {}, p: Record<string, unknown> = {}) => app({ name: 'Notes', prompt: 'In {{project_name}}: {{note}}', fields: form(extra), ...p });
+  const plain = one();
+  const set = one({ default: open.id, remember: true });
+  const must = one({ required: true });
+  const opens = async (r: store.RunRecord) => {
+    await until(() => store.getRun(db, r.id)!.key, 'its session');
+    const made = sessions.made.find((m) => m.key === store.getRun(db, r.id)!.key)!;
+    sessions.end(made.key);
+    await ended(r.id);
+    return { project: r.project?.name, cwd: made.o.cwd as string, space: made.o.extra.space as string | undefined, prompt: made.o.prompt as string };
+  };
+  const as = (a: ReturnType<typeof app>, source: 'api' | 'web' | 'session' | 'task' | 'mcp', inputs: Record<string, unknown>, o: Record<string, unknown> = {}) => startRun({ app: a.id, slug: a.slug, recipe: a, source, inputs, ...o });
+  const refused = (fn: () => unknown, why = /a run started this way cannot choose a project/) => {
+    const e = refusal(fn);
+    assert.equal(e.status, 403, e.message);
+    assert.match(e.message, why);
+    for (const name of ['Open shelf', 'Private diary', 'Tides', 'Bees', open.id, secret.id, secret.folder]) assert.ok(!e.message.includes(name), `names nothing: ${e.message}`);
+    return e.message;
+  };
+
+  // The person: their pages, their sessions, their schedules, their own tokens.
+  for (const [source, o] of [['web', {}], ['session', {}], ['task', {}], ['mcp', {}], ['api', { signedIn: true }]] as const)
+    assert.equal((await opens(as(set, source, { where: 'Private diary' }, o))).project, 'Private diary', source);
+
+  // An app's key (the route the web apps and programs use), with a real key.
+  const { key } = store.createKey(db, set.id, 'a web app');
+  const byKey = async (a: ReturnType<typeof app>, k: string, inputs: Record<string, unknown>) => {
+    const res = await http.inject({ method: 'POST', url: `/api/apps/${a.slug}/run`, headers: { authorization: `Bearer ${k}` }, payload: { inputs } });
+    return { status: res.statusCode, body: res.json() as { id: string; error?: string } };
+  };
+  const saidById = (await byKey(set, key, { where: secret.id })).body.error!;
+  for (const where of [secret.id, 'Private diary', 'Nothing like it']) {
+    const res = await byKey(set, key, { where });
+    assert.deepEqual([res.status, res.body.error], [403, saidById], 'the same words whether there is such a project or not');
+  }
+  assert.ok(!/Private|Open shelf|diary/.test(saidById), saidById);
+  // The person's last answer is not taken for it: left out, it is the app's own.
+  as(set, 'web', { where: secret.id });
+  const left = await byKey(set, key, { note: 'x' });
+  assert.equal(left.status, 200, left.body.error);
+  assert.equal(store.getRun(db, left.body.id)!.project?.id, open.id);
+  assert.equal((await opens(store.getRun(db, left.body.id)!)).cwd, open.folder);
+  // The default itself, by its id or name: fine. None at all: a folder of its own.
+  assert.equal((await opens(as(set, 'api', { where: open.id }))).project, 'Open shelf');
+  assert.equal((await opens(as(set, 'api', { where: 'open shelf' }))).project, 'Open shelf');
+  const none = await opens(as(plain, 'api', {}));
+  assert.deepEqual([none.project, none.space], [undefined, undefined]);
+  assert.ok(none.cwd.startsWith(WORK_DIR));
+  refused(() => as(plain, 'api', { where: open.id }));
+  // A question that is needed, and the app sets none: nothing a key can send starts it.
+  assert.match(refusal(() => as(must, 'api', {})).message, /Where: needed/);
+  refused(() => as(must, 'api', { where: open.id }));
+  // Not even by the person's last answer, where the question remembers one.
+  const remembers = one({ required: true, remember: true });
+  as(remembers, 'web', { where: secret.id });
+  refused(() => as(remembers, 'api', {}), /the app sets none/);
+  // A default that is not a project here (deleted, or from another computer) is none, for anyone.
+  const gone = one({ default: 'spgone' });
+  assert.equal((await opens(as(gone, 'api', {}))).project, undefined);
+  assert.equal((await opens(as(gone, 'web', {}))).project, undefined);
+  refused(() => as(gone, 'api', { where: secret.id }));
+
+  // A public page: the default or nothing, and it works in no project at all.
+  const pub = (a: ReturnType<typeof app>, inputs: Record<string, unknown>) => startRun({ app: a.id, slug: a.slug, recipe: a, source: 'public', inputs, public: { model: 'm', web: false, capUsd: 1 } });
+  refused(() => pub(set, { where: secret.id }));
+  refused(() => pub(plain, { where: open.id }));
+  for (const inputs of [{}, { where: open.id }]) {
+    const r = pub(set, inputs);
+    assert.equal(r.project, undefined);
+    const o = await opens(r);
+    assert.deepEqual([o.space, o.cwd === open.folder], [undefined, false]);
+    assert.ok(!o.prompt.startsWith('In Open shelf'), o.prompt);
+  }
+
+  // A scheduled task whose answer a webhook call fills: the caller's, not the person's. (A literal one is the person's.)
+  const hook = scheduler.save({ name: 'Hook', schedule: { kind: 'webhook' }, app: { id: plain.id, inputs: { where: '{{body.where}}' } } } as any);
+  const send = (where: string) => scheduler.webhook(hook.hookPath!.split('/').pop()!, { body: { where }, raw: Buffer.from(where), headers: {}, query: {} });
+  await send(secret.id).catch(() => {});
+  await sleep(300);
+  assert.equal(store.listRuns(db, { app: plain.id, source: 'task' }).filter((r) => r.project).length, 0, 'no run of the task reached it');
+  const literal = scheduler.save({ name: 'Mine', schedule: { kind: 'daily', time: '09:00' }, app: { id: plain.id, inputs: { where: secret.id } } } as any);
+  await scheduler.runNow(literal.id);
+  await until(() => store.listRuns(db, { app: plain.id, source: 'task' }).some((r) => r.project?.id === secret.id), 'the person’s schedule chooses');
+  for (const r of store.listRuns(db, { app: plain.id, source: 'task' })) await opens(r);
+  refused(() => as(plain, 'task', { where: secret.id }, { outside: ['where'] }));
+  // A text answer from outside goes with the run to what it calls.
+  assert.equal((await opens(as(set, 'task', { note: 'x' }, { outside: ['note'] }))).project, 'Open shelf');
+  // Left out in a webhook's run: the app's own, not the person's last answer (which their own schedule takes).
+  as(set, 'web', { where: secret.id });
+  assert.equal((await opens(as(set, 'task', {}))).project, 'Private diary');
+  as(set, 'web', { where: secret.id });
+  const bare = scheduler.save({ name: 'Bare hook', schedule: { kind: 'webhook' }, app: { id: set.id, inputs: { note: 'x' } } } as any);
+  await scheduler.webhook(bare.hookPath!.split('/').pop()!, { body: {}, raw: Buffer.from('bare'), headers: {}, query: {} });
+  await until(() => store.listRuns(db, { app: set.id, source: 'task' }).some((r) => r.inputs.note === 'x' && r.status !== 'done'), 'the webhook’s run');
+  const hooked = store.listRuns(db, { app: set.id, source: 'task' }).find((r) => r.inputs.note === 'x' && r.status !== 'done')!;
+  assert.equal(hooked.project?.id, open.id);
+  await opens(hooked);
+
+  // A run of someone else's that calls another app: held the same way, but may pass on the project it works in.
+  const inner = one({}, { name: 'Inner' });
+  const outer = (given: string) => app({ name: 'Outer', fields: form({ default: open.id }), flow: { steps: [{ id: 'call', do: 'app', app: inner.slug, with: { where: given } }] } });
+  const reach = await ended(as(outer('{{note}}'), 'api', { note: secret.id }).id);
+  assert.equal(reach.status, 'failed');
+  assert.match(reach.error!, /a run started this way cannot choose a project/);
+  const passing = as(outer('{{where}}'), 'api', {});
+  await until(() => store.listRuns(db, { parent: passing.id }).some((r) => r.key), 'the called app runs');
+  const called = store.listRuns(db, { parent: passing.id })[0];
+  assert.equal(called.project?.id, open.id);
+  sessions.end(called.key!);
+  assert.equal((await ended(passing.id)).status, 'done');
+  // The same call from a run of the person's own chooses freely.
+  const mine = as(outer('{{note}}'), 'web', { note: secret.id });
+  await until(() => store.listRuns(db, { parent: mine.id }).some((r) => r.key), 'the called app runs');
+  const child = store.listRuns(db, { parent: mine.id })[0];
+  assert.equal(child.project?.id, secret.id);
+  sessions.end(child.key!);
+  await ended(mine.id);
+
+  // A file of an app never brings a project with it.
+  const exported = await http.inject({ method: 'GET', url: `/api/apps/${set.id}/export?as=json` });
+  assert.ok(!exported.body.includes(open.id), 'the export leaves it out');
+  const file = JSON.parse(exported.body);
+  file.app.fields[0].default = 'Private diary';
+  const installed = await call<{ app: { id: string; fields: { default?: string }[] }; error?: string }>('POST', '/api/apps/install', { package: file });
+  assert.equal(installed.status, 200, installed.body.error);
+  assert.equal(installed.body.app.fields[0].default, undefined);
 });
 
 for (const [name, fn] of tests) {
