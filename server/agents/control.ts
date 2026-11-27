@@ -191,7 +191,8 @@ export class CodexControl extends EventEmitter {
     try {
       const r = await this.call('account/read', {});
       const a = r?.account;
-      if (!a) return { agent: 'codex', loggedIn: false, detail: r?.requiresOpenaiAuth ? 'Not signed in' : undefined };
+      // A model provider of its own that asks for no OpenAI sign-in (config.toml) works with none.
+      if (!a) return { agent: 'codex', loggedIn: false, detail: r?.requiresOpenaiAuth ? 'Not signed in' : undefined, ...(r?.requiresOpenaiAuth === false ? { noSignInNeeded: true } : {}) };
       return { agent: 'codex', loggedIn: true, email: a.email ?? undefined, plan: a.planType ?? a.type, method: a.type === 'chatgpt' ? 'ChatGPT' : a.type };
     } catch (e) {
       return { agent: 'codex', loggedIn: false, error: (e as Error).message };

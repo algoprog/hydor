@@ -308,6 +308,7 @@ row('chat', 'New sessions use', 'choice', {
   choices: [
     { value: 'claude', label: 'Claude Code' },
     { value: 'codex', label: 'Codex' },
+    { value: 'custom', label: 'Custom' },
   ],
   read: { endpoint: chatEndpoints, pick: (_d, all) => (all.find((x) => x?.connected) ?? all[0])?.agent },
   write: { cur: true, apply: (api, v, cur) => chatApply(() => ({ agent: v }))(api, v, cur) },

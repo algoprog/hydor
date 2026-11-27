@@ -19,6 +19,8 @@ import { getRun } from './runs.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { localText, nextRuns, parseLocal } from './schedule.ts';
+import { isProgram, notSetUpMessage, programUsable } from '../../shared/programs.ts';
+import { programsNow } from '../agents/programs.ts';
 
 // ---- which sessions are runs ------------------------------------------------------------------------
 
@@ -242,6 +244,8 @@ function draftFrom(d: Deps, ctx: RunCtx, a: Record<string, any>, tz: string): Ta
   const agent = !want ? ctx.agent : acp ? 'acp' : (want as 'claude' | 'codex');
   const acpAgent = !want ? ctx.acpAgent : acp;
   if (agent === 'acp' && !acpAgents(d.db).some((x) => x.id === acpAgent)) throw new Error(`There is no agent “${want}”. Use claude, codex, or an ACP agent's id (console is Custom).`);
+  // A program known not to be signed in is not scheduled (this conversation's own is plainly working).
+  if (want && isProgram(want) && want !== ctx.agent && !programUsable(programsNow(), want)) throw new Error(notSetUpMessage(want));
   const same = agent === ctx.agent && acpAgent === ctx.acpAgent;
   const own = sessionExtra(d.db, ctx.key);
   // The model given, else Automatic where this conversation is on it (or, for another program, where it is offered), else this conversation's own. Never Automatic for a confidential session.

@@ -5,12 +5,13 @@ import { useState, type ReactNode, type RefObject } from 'react';
 import { AlarmClock, Archive, ArrowRightLeft, CheckCheck, CircleEllipsis, Copy, FileDiff, FileDown, FileText, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
 import type { Agent, SessionSummary } from '@shared/types';
 import { isConfidential } from '@shared/confidential';
+import { programUsable } from '@shared/programs';
 import { enc, post } from '../../lib/api';
 import { activityOf, isBusy } from '../../lib/activity';
 import { deleteSession, setFlags, settle } from '../../lib/flags';
 import { go } from '../../lib/nav';
 import { canReveal, reveal, revealLabel } from '../../lib/reveal';
-import { toast, toastError, useUI } from '../../lib/store';
+import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { useCatalog } from '../../components/AgentPickers';
 import { MenuBack, MenuItem, MenuSep, Popover, useConfirm } from '../../components/ui';
@@ -74,7 +75,10 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
   // Claude Code and Codex hand the conversation to each other, and to Custom once it has a model (a Codex
   // session open elsewhere is read-only here).
   const handsOff = !closed && (s.agent === 'claude' || (s.agent === 'codex' && (running || !s.external)));
-  const targets: { agent: Agent; acp?: string }[] = handsOff ? [{ agent: s.agent === 'claude' ? 'codex' : 'claude' }, ...(customReady ? [{ agent: 'acp' as const, acp: 'console' }] : [])] : [];
+  // The other program only when it is signed in here.
+  const programs = useApp((x) => x.boot?.programs);
+  const other: Agent = s.agent === 'claude' ? 'codex' : 'claude';
+  const targets: { agent: Agent; acp?: string }[] = handsOff ? [...(programUsable(programs, other) ? [{ agent: other }] : []), ...(customReady ? [{ agent: 'acp' as const, acp: 'console' }] : [])] : [];
   const resumeCmd = s.agent === 'claude' ? `cd ${s.cwd ?? '~'} && claude --resume ${s.id}` : `codex resume ${s.id}`;
 
   let items: ReactNode;

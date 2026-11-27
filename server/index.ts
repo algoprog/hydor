@@ -90,6 +90,8 @@ import { startMatch } from './arena/index.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
 import { setOneShotAccounts } from './oneshot.ts';
 import { dismissSignIn, initSignIn, markSignedIn, signInNeeds } from './signin.ts';
+import { initPrograms, notePrograms, programsChanged, programsSoon, programStatus, signedInBefore } from './agents/programs.ts';
+import { isProgram } from '../shared/programs.ts';
 import { limitsOf, limitSupport, oomKills, SessionMeter, setLimits, wrapRunner } from './resources.ts';
 import { setRunnerWrap } from './runner/client.ts';
 import { appWords } from './language/index.ts';
@@ -323,6 +325,8 @@ app.get('/api/bootstrap', async () => ({
   // The start page offers Automatic by them.
   tiers: tiersOf(db),
   team: teamOf(db),
+  // Whether Claude Code and Codex are signed in here: the start page and Settings offer only those that are.
+  programs: await programsSoon(),
 }));
 
 /** Checks for a newer version now (Settings → About). */
@@ -918,7 +922,11 @@ const atLimit = (agent: 'claude' | 'codex', id: string | undefined) => {
   return !!lim && (lim.resetsAt == null || lim.resetsAt > Date.now());
 };
 // Accounts found signed out and the prompts to sign in again (server/signin.ts) reach every page, and are named as people know them.
-initSignIn({ broadcast, nameOf: (agent, account) => sessions.accountName(agent, account) });
+initSignIn({ broadcast, nameOf: (agent, account) => sessions.accountName(agent, account), signedInBefore: (agent) => !isProgram(agent) || signedInBefore(agent) });
+// Whether Claude Code and Codex are signed in here (server/agents/programs.ts): read now, so the first page and the first
+// session's tools know.
+initPrograms({ db, accounts: (p) => accountPool(db, p), account: (p, id) => sessions.controlFor(p, id).account(), changed: (programs) => broadcast({ t: 'programs', programs }) });
+void programStatus().catch(() => {});
 const accountsToAsk = (agent: 'claude' | 'codex') => {
   const pool = autoSwitchOn(db) ? accountPool(db, agent) : [undefined];
   return [...pool.filter((id) => !atLimit(agent, id)), ...pool.filter((id) => atLimit(agent, id))].map((id) => ({ ...(id ? { account: id } : {}), env: accountEnv(db, agent, id) }));
@@ -1182,6 +1190,7 @@ app.get('/api/accounts', async () => {
   // Which Claude accounts have an API key for API credit ("main": the CLI's own sign-in).
   const apiKeys: Record<string, boolean> = { main: hasApiKey(db, undefined) };
   for (const a of extra) if (a.agent === 'claude') apiKeys[a.id] = hasApiKey(db, a.id);
+  notePrograms({ claude: [c, ...extra.filter((a) => a.agent === 'claude').map((a) => a.status)], codex: [x, ...extra.filter((a) => a.agent === 'codex').map((a) => a.status)] });
   return { claude: c, codex: x, ...Object.fromEntries(acp), extra, apiKeys };
 });
 
@@ -1228,6 +1237,7 @@ app.delete('/api/agent-accounts/:id', async (req) => {
   delete extraUsage[id];
   indexer.rootsChanged();
   broadcastAccounts();
+  programsChanged();
   return { ok: true };
 });
 function broadcastAccounts() {
@@ -1254,6 +1264,7 @@ app.post('/api/accounts/sign-in/:agent/check', async (req) => {
   if (account && accountById(db, account)?.agent !== agent) throw new HttpError(404, `No such ${ACCOUNT_AGENT_NAMES[agent]} account`);
   const signedIn = !!(await accountStatus(agent, account)).loggedIn;
   if (signedIn) markSignedIn(agent, account);
+  if (isProgram(agent)) programsChanged();
   return { signedIn, needs: signInNeeds() };
 });
 
@@ -1300,6 +1311,7 @@ app.post('/api/accounts/:agent/logout', async (req) => {
   if (isAcpAccountAgent(agent)) await acpControl(db, agent, account).logout();
   else if (agent === 'claude') await sessions.controlFor('claude', account).logout();
   else await sessions.controlFor('codex', account).logout();
+  if (isProgram(agent)) programsChanged();
   return { ok: true };
 });
 
@@ -1884,6 +1896,7 @@ const onFlow = (f: LoginFlow, account?: string) => {
   // Signed in again: its prompt goes and the sessions its sign-out stopped continue. Only a finished sign-in proves it:
   // a sign-in the service revoked can still read as signed in on this computer, so the accounts list clears nothing.
   if (f.state === 'done') markSignedIn(f.agent, account);
+  if (f.state === 'done' && isProgram(f.agent)) programsChanged();
 };
 claude.on('flow', (f: LoginFlow) => onFlow(f));
 codex.on('flow', (f: LoginFlow) => onFlow(f));

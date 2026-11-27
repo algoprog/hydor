@@ -28950,5 +28950,22 @@
   "1 run has none of these metrics: {0} reports {1} instead.": "1 ejecución no tiene ninguna de estas métricas: {0} informa {1} en su lugar.",
   "{0} runs have none of these metrics: {1} report no metrics.": "{0} ejecuciones no tienen ninguna de estas métricas: {1} no informan ninguna métrica.",
   "{0} runs have none of these metrics: {1} report no number for {2}.": "{0} ejecuciones no tienen ninguna de estas métricas: {1} no informan ningún número para {2}.",
-  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} ejecuciones no tienen ninguna de estas métricas: {1} informan {2} en su lugar."
+  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} ejecuciones no tienen ninguna de estas métricas: {1} informan {2} en su lugar.",
+  "Not set up": "Sin configurar",
+  "Not set up: sign in to it to set its tiers. Those saved stay as they are.": "Sin configurar: inicia sesión para definir sus niveles. Los guardados se quedan como están.",
+  "The app did not take the address it was given.": "La app no aceptó la dirección que se le dio.",
+  "This session continues once you sign in.": "Esta sesión continúa cuando inicies sesión.",
+  "backups, clean-up, updates": "copias de seguridad, limpieza, actualizaciones",
+  "building, compiling, packaging": "compilación y empaquetado",
+  "cleaning, converting, indexing, embedding data": "limpieza, conversión, indexación y generación de embeddings de datos",
+  "crawling, scraping, downloading, querying services, labelling or generating data": "rastreo, extracción web, descargas, consultas a servicios, etiquetado o generación de datos",
+  "research, reports, plots, statistics": "investigación, informes, gráficos, estadísticas",
+  "shipping, releasing, running servers": "publicación, lanzamientos, ejecución de servidores",
+  "test suites, type checks, linting": "conjuntos de pruebas, comprobaciones de tipos, linting",
+  "training, evaluation, sweeps, benchmarks": "entrenamiento, evaluación, barridos, benchmarks",
+  "writing or changing code, docs or translations, reviewing it": "escribir o modificar código, documentación o traducciones, y revisarlos",
+  "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "{0} no está configurado aquí: elige otro agente en «Se ejecuta en» o inicia sesión en él.",
+  "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "No has iniciado sesión en {0} aquí: inicia sesión en Configuración → Cuentas o elige otro agente.",
+  "· Not set up": "· Sin configurar",
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "No has iniciado sesión en {0} aquí: inicia sesión en Configuración → Agentes → Cuentas o elige otro agente."
 }

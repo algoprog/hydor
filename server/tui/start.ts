@@ -5,6 +5,7 @@
 // program's, its models' and its modes'.
 import path from 'node:path';
 import { agentMode, assistantExtra, type Assistant, type AssistantMode } from '../../shared/assistants.ts';
+import { agentToOpen, type ProgramStatus } from '../../shared/programs.ts';
 import type { AcpAgentDef, Agent, AgentCatalog, StartSettings } from '../../shared/types.ts';
 import { programOf, UsageError, type Opts } from './args.ts';
 import { type Conn } from './client.ts';
@@ -15,6 +16,8 @@ export interface Boot {
   defaultCwd: string;
   start?: StartSettings;
   acpAgents?: AcpAgentDef[];
+  /** Whether Claude Code and Codex are signed in there (missing on older servers). */
+  programs?: ProgramStatus;
 }
 
 /** What a new session starts with. */
@@ -96,9 +99,9 @@ export async function planStart(conn: Conn, o: Opts, boot: Boot, tiers: TiersSta
   if (named) prog = named;
   else if (assistant?.agent) prog = { agent: assistant.agent, acpAgent: assistant.acpAgent };
   else {
-    const k = start.agent;
-    prog = k === 'codex' ? { agent: 'codex' } : k?.startsWith('acp:') && k.length > 4 ? { agent: 'acp', acpAgent: k.slice(4) } : { agent: 'claude' };
-    if (prog.agent === 'acp' && boot.acpAgents && !boot.acpAgents.some((a) => a.id === prog.acpAgent)) prog = { agent: 'claude' };
+    // The start page's pick; with none, the first signed in of Claude Code and Codex, else Custom.
+    const open = agentToOpen(start.agent, boot.acpAgents, boot.programs);
+    prog = { agent: open.agent, ...(open.acp ? { acpAgent: open.acp } : {}) };
   }
   if (prog.agent === 'acp' && named && boot.acpAgents && !boot.acpAgents.some((a) => a.id === prog.acpAgent)) {
     throw new UsageError(`No agent program “${o.agent}”: use claude, codex, custom, or one of ${boot.acpAgents.map((a) => a.id).join(', ')}`);

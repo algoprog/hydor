@@ -1,6 +1,7 @@
 // Handing the page you are on to an agent to do something in it: Ask's Do (BrowserAsk.tsx). It gets a tab of its own at
 // your page, with your sign-ins on the site, only the browser, and asks before it sends, posts, deletes or pays. Only
 // Claude Code and Custom, the app's own agent, can be kept to one tab.
+import { programUsable } from '@shared/programs';
 import type { Agent } from '@shared/types';
 import { post } from '../../lib/api';
 import { agentKey, lastAgent, startSettings } from '../../lib/start';
@@ -26,10 +27,10 @@ export type Who = 'claude' | 'custom';
 /** The agents that can be kept to one tab: Claude Code and Hydor's own agent, Custom. */
 export const whoOf = (w: Who): { agent: Agent; acp: string | null } => (w === 'claude' ? { agent: 'claude', acp: null } : { agent: 'acp', acp: 'console' });
 
-/** Which of the two the start page last had (Claude Code unless it was Custom). */
+/** Which of the two the start page last had: Claude Code unless it was Custom, or Claude Code is not signed in here. */
 export const lastWho = (): Who => {
   const last = lastAgent();
-  return last.agent === 'acp' && last.acp === 'console' ? 'custom' : 'claude';
+  return (last.agent === 'acp' && last.acp === 'console') || !programUsable(useApp.getState().boot?.programs, 'claude') ? 'custom' : 'claude';
 };
 
 /**

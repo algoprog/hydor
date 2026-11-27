@@ -194,7 +194,7 @@ Auf einem Computer listet eine Spalte links sieben Bereiche auf, jeweils mit der
   - **Denkt mit**: **Automatisch**, **Schnell**, **Standard**, **Am besten** oder **Max**, jeweils mit einer Zeile dazu, wofür es gedacht ist (siehe [Womit ein Agent denkt: Leistungsstufen](#what-an-agent-thinks-with-tiers)).
   - **Ausführungsumgebung**: das Programm, das er vorschlägt und das mit ihm auf der Startseite ausgewählt wird.
     - **Beliebiger Agent** (Standard) behält das auf der Startseite ausgewählte Programm bei.
-    - **Claude Code**, **Codex**, **Custom** („Beliebiges Modell“) oder jeder Agent, den du unter [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents) hinzugefügt hast.
+    - **Claude Code**, **Codex**, **Custom** („Beliebiges Modell“) oder jeder Agent, den du unter [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents) hinzugefügt hast. Ein Claude Code oder Codex, bei dem du nicht angemeldet bist, zeigt **Nicht eingerichtet** und lässt sich nicht wählen.
     - Sobald du ein Programm auswählst, erscheint daneben ein Modellmenü mit den Modellen dieses Programms (bei Programmen, die eine Auswahl bieten); bleibt es unverändert, gilt das Standardmodell des Programms. Eine Leistungsstufe weiter oben wählt stattdessen das Modell aus.
   - **Berechtigungsmodus**: wann er dich zuerst fragt.
     - **Wie ausgewählt** (Standard): behält den auf der Startseite ausgewählten Modus bei.

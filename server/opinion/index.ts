@@ -5,7 +5,9 @@
 import fs from 'node:fs';
 import { isConfidential } from '../../shared/confidential.ts';
 import type { OpinionNote, OpinionOptions, Reviewer } from '../../shared/opinion.ts';
+import { isProgram, notSetUpMessage, programUsable } from '../../shared/programs.ts';
 import type { AgentModel, SessionSummary } from '../../shared/types.ts';
+import { programsNow } from '../agents/programs.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
@@ -56,9 +58,13 @@ export function reviewersFor(s: Pick<SessionSummary, 'agent' | 'model'>, models:
   return out;
 }
 
-/** The reviewers offered for a session: a confidential one's work goes only to another model on this computer (server/confidential). */
+/**
+ * The reviewers offered for a session: Claude and Codex only when signed in here, and a confidential session's work only
+ * to another model on this computer (server/confidential).
+ */
 function offered(s: SessionSummary, models: AgentModel[]): Reviewer[] {
-  const all = reviewersFor(s, models);
+  const signedIn = programsNow();
+  const all = reviewersFor(s, models).filter((r) => programUsable(signedIn, r.id));
   return isConfidential(s.extra) ? all.filter((r) => models.find((m) => m.id === r.id)?.local) : all;
 }
 
@@ -109,6 +115,7 @@ export async function startOpinion(d: Deps, key: string, o: { reviewer?: string;
   if (running(s) && turn.prompt.id === all.at(-1)?.prompt?.id) throw new HttpError(409, 'That turn is still running: ask once it ends');
   const models = customModels();
   const options = offered(s, models);
+  if (isProgram(o.reviewer) && !programUsable(programsNow(), o.reviewer)) throw new HttpError(409, notSetUpMessage(o.reviewer));
   const r = o.reviewer ? options.find((x) => x.id === o.reviewer) : options[0];
   if (!r && isConfidential(s.extra)) throw new HttpError(400, 'In a confidential session only a model on this computer, from another maker, may check the work, and there is none: add one in Settings → Models.');
   if (!r) throw new HttpError(400, o.reviewer ? 'That reviewer is not offered for this session: it would be the same company checking its own work' : 'There is no reviewer from another company');

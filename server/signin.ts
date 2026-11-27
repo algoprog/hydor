@@ -40,11 +40,13 @@ const listeners = new Set<SignedIn>();
 
 let send: (e: ServerEvent) => void = () => {};
 let nameOf: (agent: AccountAgent, account: string | undefined) => string = (agent, account) => (account ? 'an added account' : `your main ${agent} account`);
+let signedInBefore: (agent: AccountAgent) => boolean = () => true;
 
-/** The server's broadcast, and how accounts are named (index.ts). */
-export function initSignIn(o: { broadcast: (e: ServerEvent) => void; nameOf: (agent: AccountAgent, account: string | undefined) => string }) {
+/** The server's broadcast, how accounts are named, and which programs were ever signed in here (index.ts). */
+export function initSignIn(o: { broadcast: (e: ServerEvent) => void; nameOf: (agent: AccountAgent, account: string | undefined) => string; signedInBefore?: (agent: AccountAgent) => boolean }) {
   send = o.broadcast;
   nameOf = o.nameOf;
+  signedInBefore = o.signedInBefore ?? (() => true);
 }
 
 const tell = () => send({ t: 'signin', needs: signInNeeds() });
@@ -119,6 +121,7 @@ export function needSignIn(n: { agent: AccountAgent; account?: string; session?:
     sessions,
     at: Date.now(),
     ...(hiddenUntil && hiddenUntil > Date.now() ? { hiddenUntil } : {}),
+    ...(signedInBefore(n.agent) ? {} : { first: true }),
   });
   tell();
 }

@@ -5,6 +5,7 @@
 // the page's (agent, model, folder, project, spending cap). The API replaces a whole task when it saves one, so `edit`
 // reads the task, changes the fields named and sends it all.
 import path from 'node:path';
+import { firstUsableProgram, type ProgramStatus } from '../../../shared/programs.ts';
 import { scheduleText, type ScheduledTask, type TaskRun, type TaskSchedule, type WatchSpec } from '../../../shared/automations.ts';
 import { enc } from '../client.ts';
 import { modelLabel } from '../lines.ts';
@@ -378,11 +379,14 @@ export const tasks: Area = {
         if (!schedule) throw new UsageError('Say when it runs: --every 6h, --at 09:00, --cron "0 9 * * 1-5", --once "tomorrow 9:00", --webhook or --watch-feed/--watch-page/--watch-folder');
         const prompt = await promptOf(ctx, words, v);
         if (!prompt && !str(v, 'app')) throw new UsageError(`Say what the agent is asked: ${ctx.usage} "<prompt>", or --file <path>`);
-        const boot = await ctx.conn.api<{ defaultCwd?: string; home?: string }>('GET', '/api/bootstrap');
+        const boot = await ctx.conn.api<{ defaultCwd?: string; home?: string; programs?: ProgramStatus }>('GET', '/api/bootstrap');
+        // With no --agent: the first signed in of Claude Code and Codex, else Custom.
+        const who = firstUsableProgram(boot.programs);
         const body: Record<string, unknown> = {
           name: str(v, 'name') ?? truncate((prompt ?? str(v, 'app') ?? 'Task').split('\n')[0].trim(), 60),
           prompt: prompt ?? '',
-          agent: 'claude',
+          agent: who.agent,
+          ...(who.acp ? { acpAgent: who.acp } : {}),
           cwd: boot.defaultCwd ?? boot.home ?? '~',
           schedule,
         };

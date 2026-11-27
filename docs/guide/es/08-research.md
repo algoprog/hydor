@@ -69,7 +69,7 @@ No hay nada que activar: pídelo con palabras sencillas ("haz que tres subagente
 
 Para cada subagente de Hydor, el agente elige:
 
-- **El agente y el modelo**: Custom con cualquiera de sus modelos (desde [Configuración → Modelos](/settings?s=models)), Claude Code, Codex u otro agente que hayas añadido (Gemini CLI, OpenCode…). De forma predeterminada, un subagente de Hydor ejecuta el mismo agente que la sesión que lo inició. Un modelo más barato o local sirve para el trabajo en volumen; Claude Code o Codex sirven para una parte difícil.
+- **El agente y el modelo**: Custom con cualquiera de sus modelos (desde [Configuración → Modelos](/settings?s=models)), Claude Code, Codex u otro agente que hayas añadido (Gemini CLI, OpenCode…). De forma predeterminada, un subagente de Hydor ejecuta el mismo agente que la sesión que lo inició. Un modelo más barato o local sirve para el trabajo en volumen; Claude Code o Codex sirven para una parte difícil. A un agente solo se le ofrecen los programas en los que has iniciado sesión. Si pide un Claude Code o Codex en el que no has iniciado sesión (por su nombre, o como uno de tus agentes que se ejecuta en él), se le dice eso, y que Custom funciona, en lugar de recibir otro programa sin aviso.
 - **Un nivel** para su parte: **Rápido** para un trabajo pequeño y muy claro, **Estándar** para una tarea clara de tamaño medio (lo que recibe un subagente de Hydor cuando no se pide ninguno), **Mejor** para una parte difícil que se sostiene por sí sola; el modelo del nivel para ese programa viene de [Configuración → Modelos → Niveles](/settings?s=models&find=Tiers). Un subagente de Hydor nunca piensa con un nivel superior al de su sesión principal, y un agente tuyo puede limitar los niveles de sus subagentes a uno más bajo.
 - **Uno de tus agentes**, por nombre, en lugar de un subagente simple: trabaja con sus propias instrucciones, herramientas y nivel (consulta [Agentes que delegan trabajo a otros agentes](/guide/agents#agents-that-hand-work-to-other-agents)). Un agente que mantiene su propia conversación recibe el trabajo en su bandeja de entrada, y su respuesta llega cuando le toca.
 - **La carpeta**: la de la sesión principal, a menos que indique otra.
@@ -189,6 +189,8 @@ Solo un modelo de una empresa distinta a la del modelo que hizo el trabajo, de m
 - Una sesión de **Claude Code**, o cualquier sesión que use un modelo de Anthropic, puede ser comprobada por **Codex** (mediante el programa Codex) o por uno de los modelos de Custom que no sea de Anthropic.
 - Una sesión de **Codex**, o cualquier sesión que use un modelo de OpenAI, puede ser comprobada por **Claude** (Sonnet, mediante Claude Code) o por uno de los modelos de Custom que no sea de OpenAI.
 - Cualquier otra sesión (Custom u otro agente con un modelo de otro fabricante) puede ser comprobada por Claude, Codex o uno de los modelos de Custom de un fabricante distinto al del modelo de la sesión.
+
+Claude y Codex solo se ofrecen cuando has iniciado sesión en ellos.
 
 Los modelos de Custom son los que añadiste en [Configuración → Modelos](/settings?s=models). El revisor solo lee: Claude y Codex pueden abrir archivos de la carpeta de la sesión para comprobar algo concreto, pero no cambian nada. Además del turno en sí, el revisor ve tu primer mensaje de la sesión y tu mensaje anterior a ese turno, como contexto. Cuando los cambios son demasiado grandes para mostrarlos completos, se omite una parte, y la tarjeta lo indica.
 

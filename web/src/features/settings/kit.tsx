@@ -221,7 +221,7 @@ export function Select<T extends string>({
   wide,
 }: {
   value: T;
-  options: { value: T; label: ReactNode; hint?: ReactNode }[];
+  options: { value: T; label: ReactNode; hint?: ReactNode; disabled?: boolean }[];
   onChange: (v: T) => void;
   /** What it picks, for screen readers and over a phone's sheet. */
   label: string;
@@ -256,11 +256,12 @@ export function Select<T extends string>({
           <button
             key={o.value}
             type="button"
+            disabled={o.disabled}
             onClick={() => {
               setOpen(false);
               if (o.value !== value) onChange(o.value);
             }}
-            className={cx('flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-bg-2', o.value === value && 'bg-bg-2')}
+            className={cx('flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-bg-2 disabled:opacity-50 disabled:hover:bg-transparent', o.value === value && 'bg-bg-2')}
           >
             <span className="min-w-0 flex-1">
               <span className="block text-[13.5px] text-fg">{o.label}</span>

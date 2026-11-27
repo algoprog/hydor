@@ -16,6 +16,7 @@ import { appMcpTools } from './apps/mcp.ts';
 import { frameHtml } from './pages/kit.ts';
 import type { RunCtx, ToolOutput } from './features/types.ts';
 import type { SessionManager } from './sessions.ts';
+import { programRefusal } from './agents/programs.ts';
 
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 export const PAGE_SERVER = 'hydor';
@@ -216,7 +217,7 @@ function sessionTools(sessions: SessionManager, publicUrl: (key: string) => stri
     },
     {
       name: 'start_session',
-      description: 'Starts a new Claude Code or Codex session on this machine with a first message. Returns its key and a link the user can open.',
+      description: 'Starts a new Claude Code or Codex session on this machine with a first message; only a program signed in here (asked for another, it says so). Returns its key and a link the user can open.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -231,6 +232,8 @@ function sessionTools(sessions: SessionManager, publicUrl: (key: string) => stri
       run: async (a) => {
         if (a.agent !== 'claude' && a.agent !== 'codex') throw new Error('agent must be claude or codex');
         if (!String(a.prompt ?? '').trim()) throw new Error('prompt is empty');
+        const refused = await programRefusal(a.agent);
+        if (refused) throw new Error(refused);
         const key = await sessions.create({ agent: a.agent as Agent, prompt: String(a.prompt), cwd: a.cwd ? String(a.cwd) : '', model: a.model ? String(a.model) : undefined, worktree: !!a.worktree, remember: false });
         return `Started ${key}\nOpen: ${publicUrl(key)}`;
       },

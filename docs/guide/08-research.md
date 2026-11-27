@@ -69,7 +69,7 @@ There is nothing to switch on: ask in plain words ("have three subagents each re
 
 For each Hydor subagent, the agent picks:
 
-- **The agent and model**: Custom with any of its models (from [Settings → Models](/settings?s=models)), Claude Code, Codex, or another agent you added (Gemini CLI, OpenCode…). By default a Hydor subagent runs the same agent as the session that started it. A cheaper or local model suits bulk work; Claude Code or Codex suits a hard part.
+- **The agent and model**: Custom with any of its models (from [Settings → Models](/settings?s=models)), Claude Code, Codex, or another agent you added (Gemini CLI, OpenCode…). By default a Hydor subagent runs the same agent as the session that started it. A cheaper or local model suits bulk work; Claude Code or Codex suits a hard part. An agent is offered only the programs you are signed in to. Asked for a Claude Code or Codex you are not signed in to (by name, or as one of your agents that runs on it), it is told so, and that Custom works, instead of getting another program without notice.
 - **A tier** for its part: **Quick** for a small, very clear job, **Standard** for a clear task of medium size (what a Hydor subagent gets when none is asked for), **Best** for a hard part that stands on its own; the tier's model for that program comes from [Settings → Models → Tiers](/settings?s=models&find=Tiers). A Hydor subagent never thinks with a tier above its parent's own, and an agent of yours can cap its subagents' tiers lower.
 - **One of your agents**, by name, instead of a plain subagent: it works with its own instructions, tools and tier (see [Agents that hand work to other agents](/guide/agents#agents-that-hand-work-to-other-agents)). An agent that keeps a conversation of its own gets the work in its inbox instead, and its reply comes back when it gets to it.
 - **The folder**: the parent's, unless it names another.
@@ -189,6 +189,8 @@ Only a model from a different company than the one whose model did the work, so 
 - A **Claude Code** session, or any session running an Anthropic model, can be checked by **Codex** (through the Codex program) or by one of Custom's models that is not Anthropic's.
 - A **Codex** session, or any session running an OpenAI model, can be checked by **Claude** (Sonnet, through Claude Code) or by one of Custom's models that is not OpenAI's.
 - Any other session (Custom or another agent with another maker's model) can be checked by Claude, Codex, or one of Custom's models from a different maker than the session's model.
+
+Claude and Codex are offered only when you are signed in to them.
 
 Custom's models are the ones you added in [Settings → Models](/settings?s=models). The reviewer only reads: Claude and Codex may open files in the session's folder to check something specific, but they change nothing. Besides the turn itself, the reviewer sees your first message in the session and your message before that turn, for context. When the changes are too large to show in full, part of them is left out, and the card says so.
 

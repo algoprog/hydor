@@ -8,11 +8,12 @@ import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { ArrowUp, ChevronDown, ExternalLink, Image as ImageIcon, MonitorPlay, Quote, RotateCcw, ShieldCheck, Sparkles, WandSparkles, X } from 'lucide-react';
 import type { BrowserTab } from '@shared/browser';
+import { programUsable } from '@shared/programs';
 import { enc, post } from '../../lib/api';
 import { attachmentPayload, hostAttachment } from '../../lib/attachments';
 import { MOD } from '../../lib/format';
 import { openSession } from '../../lib/nav';
-import { toastError } from '../../lib/store';
+import { toastError, useApp } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, IconButton, MenuItem, Popover, Segmented, Throbber, useIsMobile } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
@@ -138,6 +139,7 @@ function DoAgent({ who, label, onPick }: { who: Who; label: string; onPick: (w: 
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const pick = whoOf(who);
+  const claude = useApp((s) => programUsable(s.boot?.programs, 'claude'));
   return (
     <>
       <button
@@ -156,7 +158,7 @@ function DoAgent({ who, label, onPick }: { who: Who; label: string; onPick: (w: 
         <ChevronDown size={12} className="shrink-0" />
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={220} title="Agent">
-        <MenuItem icon={<AgentIcon agent="claude" size={14} />} checked={who === 'claude'} onClick={() => (setOpen(false), onPick('claude'))}>
+        <MenuItem icon={<AgentIcon agent="claude" size={14} />} checked={who === 'claude'} disabled={!claude} hint={claude ? undefined : 'Not set up'} onClick={() => (setOpen(false), onPick('claude'))}>
           Claude Code
         </MenuItem>
         <MenuItem icon={<AgentIcon agent="acp" name="Custom" size={14} />} checked={who === 'custom'} onClick={() => (setOpen(false), onPick('custom'))}>

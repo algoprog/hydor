@@ -2,6 +2,7 @@
 // folder, memory, a spending cap), and what was picked in each place (a project, the new task folder, a folder):
 // kept on the server so the page opens that way again, on any device. Read from the bootstrap; a pick is kept
 // in this page at once and sent a moment later.
+import { agentToOpen, parseAgentKey } from '@shared/programs';
 import type { Agent, StartPlace, StartRun, StartSettings } from '@shared/types';
 import { put } from './api';
 import { onFeatureEvent } from './featureEvents';
@@ -13,14 +14,10 @@ export type StartPatch = { [K in Exclude<keyof StartSettings, 'runs' | 'places'>
   places?: Record<string, StartPlace | null>;
 };
 
+export { parseAgentKey };
+
 /** The start page's names for agents: 'claude', 'codex', 'acp:<id>'. */
 export const agentKey = (agent: Agent, acp?: string | null): string => (agent === 'acp' ? `acp:${acp ?? ''}` : agent);
-
-export function parseAgentKey(k: string | undefined): { agent: Agent; acp: string | null } | null {
-  if (k === 'claude' || k === 'codex') return { agent: k, acp: null };
-  if (k?.startsWith('acp:') && k.length > 4) return { agent: 'acp', acp: k.slice(4) };
-  return null;
-}
 
 /** Before the server kept them, the browser kept the agent and the assistant. */
 function fromBrowser(): StartSettings {
@@ -36,12 +33,13 @@ export function startSettings(): StartSettings {
   return { ...fromBrowser(), ...useApp.getState().boot?.start };
 }
 
-/** The agent picked last (Claude Code the first time, or when the one picked is gone); in `s` when given. */
+/**
+ * The agent picked last, in `s` when given: kept as picked even when its program has been signed out since (the picker
+ * says so). The first time, or when the one picked is gone: the first signed in of Claude Code and Codex, else Custom.
+ */
 export function lastAgent(s: StartSettings = startSettings()): { agent: Agent; acp: string | null } {
-  const a = parseAgentKey(s.agent);
-  const acp = useApp.getState().boot?.acpAgents;
-  if (a?.agent === 'acp' && acp && !acp.some((x) => x.id === a.acp)) return { agent: 'claude', acp: null };
-  return a ?? { agent: 'claude', acp: null };
+  const boot = useApp.getState().boot;
+  return agentToOpen(s.agent, boot?.acpAgents, boot?.programs);
 }
 
 function join<T extends StartSettings | StartPatch>(cur: T, p: StartPatch, keepNulls: boolean): T {

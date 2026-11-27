@@ -7,8 +7,9 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
 import { Copy, ExternalLink, Hash, Link2, MessageCircle, Send, Trash2, type LucideIcon } from 'lucide-react';
 import { slackManifest, SLACK_MANIFEST } from '@shared/chat-apps';
+import { PROGRAM_IDS, PROGRAM_LABEL, programUsable } from '@shared/programs';
 import { api, del, put, post } from '../../lib/api';
-import { toast, toastError } from '../../lib/store';
+import { toast, toastError, useApp } from '../../lib/store';
 import { Button, cx, IconButton, inputCls, MenuItem, MenuSep, Switch, Throbber, useConfirm } from '../../components/ui';
 import { EmptyRow, Group, MoreMenu, Notice, Row, Select, Stack } from './kit';
 import { LOCALE } from '../../i18n/locale';
@@ -26,7 +27,7 @@ interface ChatView {
   bot?: { username: string; name?: string };
   chats: { id: string | number; name: string; at: number; kind?: 'dm' | 'channel' }[];
   notify: boolean;
-  agent: 'claude' | 'codex';
+  agent: 'claude' | 'codex' | 'custom';
   /** One of your agents new sessions start as (an assistant's id); null: none. */
   as?: string | null;
   pairing?: { code: string; link?: string; until: number };
@@ -75,6 +76,7 @@ function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) =>
   const slack = id === 'slack';
   // Your agents (the Agents page), to start new sessions as one.
   const agents = useAssistantsState()?.assistants ?? [];
+  const programs = useApp((s) => s.boot?.programs);
 
   const change = async (body: Record<string, unknown>) => {
     setBusy(true);
@@ -263,7 +265,18 @@ function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) =>
       <Row
         label="New sessions use"
         hint="The agent a message starts when the chat is in no session"
-        control={<Select<'claude' | 'codex'> label="New sessions use" width={200} value={v.agent} onChange={(agent) => void change({ agent })} options={[{ value: 'claude', label: 'Claude Code' }, { value: 'codex', label: 'Codex' }]} />}
+        control={
+          <Select<'claude' | 'codex' | 'custom'>
+            label="New sessions use"
+            width={240}
+            value={v.agent}
+            onChange={(agent) => void change({ agent })}
+            options={[
+              ...PROGRAM_IDS.map((p) => ({ value: p, label: PROGRAM_LABEL[p], disabled: !programUsable(programs, p), hint: programUsable(programs, p) ? undefined : 'Not set up' })),
+              { value: 'custom' as const, label: 'Custom' },
+            ]}
+          />
+        }
       />
       <Row
         label="New sessions as"

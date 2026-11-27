@@ -12,10 +12,11 @@ import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
 import { ArrowRight, Bell, Blocks, Check, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, X } from 'lucide-react';
+import { programUsable } from '@shared/programs';
 import type { AccountAgent, AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { go, goApp } from '../../lib/nav';
-import { saveStart, startSettings } from '../../lib/start';
+import { agentKey, lastAgent, saveStart, startSettings } from '../../lib/start';
 import { desktopSystem, enablePush, pushState, systemNotices, systemNoticesState, testSystemNotice, turnOnSystemNotices, whenBack, type PushState } from '../../lib/notify';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { live } from '../../lib/ws';
@@ -210,8 +211,12 @@ function pickAgent(uses: Use[]) {
   const fits = (v: string) =>
     v === 'claude' ? uses.includes('claude') : v === 'codex' ? uses.includes('codex') : v === 'acp:console' ? uses.includes('openrouter') || uses.includes('local') : v.startsWith('acp:') && uses.includes('agents');
   if (cur && fits(cur)) return;
-  const next = ['claude', 'codex', 'acp:console', ...own.map((a) => `acp:${a.id}`)].find(fits);
-  if (!next || next === (cur || 'claude')) return;
+  // A program ticked but not signed in is passed over for the next ticked one.
+  const programs = useApp.getState().boot?.programs;
+  const ticked = ['claude', 'codex', 'acp:console', ...own.map((a) => `acp:${a.id}`)].filter(fits);
+  const next = ticked.find((v) => programUsable(programs, v)) ?? ticked[0];
+  const now = lastAgent();
+  if (!next || next === (cur || agentKey(now.agent, now.acp))) return;
   // Kept for the start page, which may open after this; an open one takes it at once.
   saveStart({ agent: next });
   window.dispatchEvent(new CustomEvent('wa:agent', { detail: next }));

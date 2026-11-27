@@ -11,7 +11,7 @@ import type { Agent, NotifyEvent } from '../../shared/types.ts';
 import { findAssistant } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import { download, TooBig, type ChatFile } from '../chatapps/files.ts';
-import { agentChoices, asCommand, defaultAgent, deliver, pressedAs, type ChatSide } from '../chatapps/start.ts';
+import { agentChoices, asCommand, chatAgent, chatProgram, defaultAgent, deliver, isChatProgram, pressedAs, type ChatSide } from '../chatapps/start.ts';
 import { deleteSecret, readSecret, saveSecret, vaultTables } from '../connections/vault.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
@@ -102,7 +102,7 @@ export const linkedChats = (db: DB) => readJson<TelegramChat[]>(db, 'telegram.ch
 const setChats = (db: DB, list: TelegramChat[]) => kvSet(db, 'telegram.chats', JSON.stringify(list));
 const tokenOf = (db: DB) => readSecret(db, TOKEN_NAME)?.value ?? null;
 const notifyOn = (db: DB) => kvGet(db, 'telegram.notify') !== '0';
-const agentFor = (db: DB): Agent => (kvGet(db, 'telegram.agent') === 'codex' ? 'codex' : 'claude');
+const programFor = (db: DB) => chatProgram(kvGet(db, 'telegram.agent'));
 /** The agent (an assistant's id) new sessions start as (Settings → Chat apps → Telegram): none for the program alone. */
 const ownAgent = (db: DB) => defaultAgent(db, kvGet(db, 'telegram.as'));
 /** The agent /as picked for a chat's next new session, until one starts. */
@@ -279,7 +279,7 @@ export const TELEGRAM_MAX = 20 * 1024 * 1024;
 /** The chat as server/chatapps/start.ts sees it: where its messages go, and how it is answered. */
 const side = (d: Deps, token: string, chat: number): ChatSide => ({
   app: 'Telegram',
-  program: agentFor(d.db),
+  program: chatAgent(programFor(d.db)),
   as: nextAs(d.db, chat) ?? ownAgent(d.db),
   tookAs: () => setNextAs(d.db, chat, null),
   current: () => currentOf(d.db, chat),
@@ -597,7 +597,7 @@ function view(d: Deps) {
     bot: bot ? { username: bot.username, name: bot.name } : undefined,
     chats: linkedChats(d.db),
     notify: notifyOn(d.db),
-    agent: agentFor(d.db),
+    agent: programFor(d.db),
     as: ownAgent(d.db) ?? null,
     pairing: pairing && Date.now() < pairing.until ? { code: pairing.code, link: bot?.username ? `https://t.me/${bot.username}?start=${pairing.code}` : undefined, until: pairing.until } : undefined,
   };
@@ -641,7 +641,7 @@ export const telegram: Feature = {
         restart();
       }
       if (typeof b.notify === 'boolean') kvSet(db, 'telegram.notify', b.notify ? '1' : '0');
-      if (b.agent === 'claude' || b.agent === 'codex') kvSet(db, 'telegram.agent', b.agent);
+      if (isChatProgram(b.agent)) kvSet(db, 'telegram.agent', b.agent);
       if (b.as === null || b.as === '') kvSet(db, 'telegram.as', '');
       else if (typeof b.as === 'string') {
         if (!findAssistant(db, b.as)) throw new HttpError(404, 'No such agent: the Agents page lists yours');

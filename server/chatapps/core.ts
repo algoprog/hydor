@@ -14,7 +14,7 @@ import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps, TurnInfo } from '../features/types.ts';
 import type { ChatFile } from './files.ts';
-import { agentChoices, asCommand, defaultAgent, deliver, pressedAs, type ChatSide } from './start.ts';
+import { agentChoices, asCommand, chatAgent, chatProgram, defaultAgent, deliver, isChatProgram, pressedAs, type ChatSide } from './start.ts';
 
 /** A button: `id` is what pressing it does (made by `button`), `url` opens a page instead. */
 export interface Btn {
@@ -110,7 +110,7 @@ export function chatApp(spec: ChatAppSpec) {
   const setLinked = (db: DB, list: LinkedChat[]) => kvSet(db, key('chats'), JSON.stringify(list));
   const isLinked = (db: DB, chat: string, user: string) => linked(db).some((c) => c.id === chat && c.user === user);
   const notifyOn = (db: DB) => kvGet(db, key('notify')) !== '0';
-  const agentFor = (db: DB): Agent => (kvGet(db, key('agent')) === 'codex' ? 'codex' : 'claude');
+  const programFor = (db: DB) => chatProgram(kvGet(db, key('agent')));
   const currentOf = (db: DB, chat: string): string | undefined => readJson<Record<string, string>>(db, key('current'), {})[chat];
   const setCurrent = (db: DB, chat: string, k: string | null) => {
     const all = readJson<Record<string, string>>(db, key('current'), {});
@@ -200,7 +200,7 @@ export function chatApp(spec: ChatAppSpec) {
   /** The chat as start.ts sees it: where its messages go, and how it is answered. */
   const side = (d: Deps, w: Wire, chat: string): ChatSide => ({
     app: label,
-    program: agentFor(d.db),
+    program: chatAgent(programFor(d.db)),
     as: nextAs(d.db, chat) ?? ownAgent(d.db),
     tookAs: () => setNextAs(d.db, chat, null),
     current: () => currentOf(d.db, chat),
@@ -365,7 +365,7 @@ export function chatApp(spec: ChatAppSpec) {
     connected: spec.connected(d),
     chats: linked(d.db),
     notify: notifyOn(d.db),
-    agent: agentFor(d.db),
+    agent: programFor(d.db),
     as: ownAgent(d.db) ?? null,
     pairing: pairing && Date.now() < pairing.until ? { code: pairing.code, until: pairing.until } : undefined,
   });
@@ -390,7 +390,7 @@ export function chatApp(spec: ChatAppSpec) {
       const b = (req.body ?? {}) as Record<string, unknown>;
       const did = await o.connect(b);
       if (typeof b.notify === 'boolean') kvSet(db, key('notify'), b.notify ? '1' : '0');
-      if (b.agent === 'claude' || b.agent === 'codex') kvSet(db, key('agent'), b.agent);
+      if (isChatProgram(b.agent)) kvSet(db, key('agent'), b.agent);
       if (b.as === null || b.as === '') kvSet(db, key('as'), '');
       else if (typeof b.as === 'string') {
         if (!findAssistant(db, b.as)) throw new HttpError(404, 'No such agent: the Agents page lists yours');

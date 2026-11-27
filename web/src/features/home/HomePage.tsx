@@ -10,6 +10,7 @@ import { isConfidential } from '@shared/confidential';
 import { placeKey } from '@shared/start';
 import { accountAgentOf } from '@shared/account-agents';
 import { AUTO_MODEL } from '@shared/tiers';
+import { PROGRAM_LABEL, isProgram, programUsable } from '@shared/programs';
 import { api } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
@@ -167,6 +168,8 @@ function StartComposer({
   // An ACP agent (Settings → More agents) when agent is 'acp'.
   const [acpId, setAcpId] = useState<string | null>(first.acp);
   const acpList = useApp((s) => s.boot?.acpAgents);
+  // Whether Claude Code and Codex are signed in here: one that is not cannot start (a pick of it stays, and says so).
+  const programs = useApp((s) => s.boot?.programs);
   const home = useApp((s) => s.boot?.home) ?? '';
   const cat = useCatalog(agent, acpId ?? undefined);
   const [cwd, setCwd] = useState(() => linkCwd ?? saved.cwd ?? useUI.getState().explorerRoot ?? useApp.getState().boot?.defaultCwd ?? '');
@@ -254,6 +257,12 @@ function StartComposer({
     setAgent(a);
     if (keep) saveStart({ agent: agentKey(a, id) });
   };
+  // Nothing picked anywhere: the first signed in of Claude Code and Codex (else Custom), also when that is heard late.
+  useEffect(() => {
+    if (startSettings().agent || link?.agent || isConfidential(extra) || programUsable(programs, agent)) return;
+    const next = lastAgent();
+    chooseAgent(next.agent, next.acp, false);
+  }, [programs]);
   // The tour sets the agent to one of those picked there.
   useEffect(() => {
     const pick = (e: Event) => {
@@ -388,10 +397,12 @@ function StartComposer({
   }, []);
 
   const acct = accounts.some((a) => a.id === account) ? account : undefined;
+  // The program picked is not signed in here: nothing starts on it, and the box says why.
+  const notSetUp = isProgram(agent) && !programUsable(programs, agent) ? PROGRAM_LABEL[agent] : null;
   // The session's page opens at once, with your message, while the server starts the agent (lib/starting.ts).
   const starting = useRef(false);
   const start = () => {
-    if (starting.current || !cwd || (confidential && local && !local.models.length)) return;
+    if (starting.current || !cwd || notSetUp || (confidential && local && !local.models.length)) return;
     starting.current = true;
     // Kept as it was used, the whole of it, for the next start, and as the picks of the place it starts in.
     saveStart(
@@ -577,7 +588,7 @@ function StartComposer({
     });
   };
   // Confidential with no model on this computer can't start: its option says how to get one.
-  const ready = !!cwd && !(confidential && local && !local.models.length);
+  const ready = !!cwd && !notSetUp && !(confidential && local && !local.models.length);
   const iconBtn = 'shrink-0 rounded-lg p-2 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg';
   return (
     <div>
@@ -739,6 +750,14 @@ function StartComposer({
           </SheetsOnPhone.Provider>
         </SettingLayout.Provider>
       </div>
+      {notSetUp && (
+        <div role="status" className="mt-2.5 px-1 text-center text-[12.5px] leading-snug text-fg-2">
+          {`${notSetUp} is not set up here: pick another agent under Runs on, or sign in to it.`}{' '}
+          <button type="button" onClick={() => go('/settings?s=accounts')} className="font-medium text-accent hover:underline">
+            Set up
+          </button>
+        </div>
+      )}
       {!mobile && (
         <div data-tour="home-hint" className="mt-2.5 text-center text-[12px] text-fg-3">
           Enter to start · Shift+Enter for a new line

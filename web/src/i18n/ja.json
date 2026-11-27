@@ -28951,5 +28951,22 @@
   "1 run has none of these metrics: {0} reports {1} instead.": "1件の実行には、次の指標がいずれもありません：{0}は代わりに{1}を報告しています。",
   "{0} runs have none of these metrics: {1} report no metrics.": "{0}件の実行には、次の指標がいずれもありません：{1}は指標を報告していません。",
   "{0} runs have none of these metrics: {1} report no number for {2}.": "{0}件の実行には、次の指標がいずれもありません：{1}は{2}の数値を報告していません。",
-  "{0} runs have none of these metrics: {1} report {2} instead.": "{0}件の実行には、次の指標がいずれもありません：{1}は代わりに{2}を報告しています。"
+  "{0} runs have none of these metrics: {1} report {2} instead.": "{0}件の実行には、次の指標がいずれもありません：{1}は代わりに{2}を報告しています。",
+  "Not set up": "未設定",
+  "Not set up: sign in to it to set its tiers. Those saved stay as they are.": "未設定です。ティアを設定するにはサインインしてください。保存済みのティアはそのまま残ります。",
+  "The app did not take the address it was given.": "アプリは指定されたアドレスを受け付けませんでした。",
+  "This session continues once you sign in.": "サインインすると、このセッションは続行されます。",
+  "backups, clean-up, updates": "バックアップ、クリーンアップ、更新",
+  "building, compiling, packaging": "ビルド、コンパイル、パッケージ化",
+  "cleaning, converting, indexing, embedding data": "データのクリーニング、変換、インデックス作成、埋め込み",
+  "crawling, scraping, downloading, querying services, labelling or generating data": "クロール、スクレイピング、ダウンロード、サービスへの問い合わせ、データのラベル付けや生成",
+  "research, reports, plots, statistics": "調査、レポート、グラフ、統計",
+  "shipping, releasing, running servers": "出荷、リリース、サーバーの運用",
+  "test suites, type checks, linting": "テストスイート、型チェック、リント",
+  "training, evaluation, sweeps, benchmarks": "学習、評価、スイープ、ベンチマーク",
+  "writing or changing code, docs or translations, reviewing it": "コード・ドキュメント・翻訳の作成や変更、そのレビュー",
+  "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "ここでは{0}が設定されていません。「実行環境」で別のエージェントを選ぶか、サインインしてください。",
+  "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "ここでは{0}にサインインしていません。「設定」→「アカウント」でサインインするか、別のエージェントを選んでください。",
+  "· Not set up": "· 未設定",
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "このマシンでは{0}にサインインしていません。「設定」→「エージェント」→「アカウント」でサインインするか、別のエージェントを選んでください。"
 }

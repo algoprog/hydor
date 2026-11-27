@@ -1,5 +1,5 @@
 // The app needs a Claude Code, Codex, Grok Build or Antigravity CLI account that is signed out, and nothing else could do the work: a card
-// asks to sign in again (SignInPrompt, above the toasts on every page; Not now hides it for an hour), and a session it
+// asks to sign in (again, unless that program was never signed in here) (SignInPrompt, above the toasts on every page; Not now hides it for an hour), and a session it
 // stopped says so in its message box (SignInBanner), whatever Not now said. Both open the same sign-in (LoginDialog).
 import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, LogIn } from 'lucide-react';
@@ -89,7 +89,7 @@ function Card({ need }: { need: SignInNeed }) {
         <div className="flex gap-2.5">
           <KeyRound size={15} className="mt-[3px] shrink-0 text-warn" />
           <div className="min-w-0 flex-1">
-            <div className="text-[13.5px] leading-snug font-medium">{`Sign in to ${program(need)} again`}</div>
+            <div className="text-[13.5px] leading-snug font-medium">{need.first ? `Sign in to ${program(need)}` : `Sign in to ${program(need)} again`}</div>
             <div className="mt-0.5 flex gap-1 text-[12.5px] leading-snug text-fg-2">
               <span translate="no" className="min-w-0 truncate font-medium text-fg">
                 {lead(need.name)}
@@ -156,7 +156,7 @@ export function SignInBanner({ need, className }: { need: SignInNeed; className?
         <span className="block font-medium">
           <span translate="no">{lead(need.name)}</span> is signed out
         </span>
-        <span className="block text-[12.5px] text-fg-2">This session continues once you sign in again.</span>
+        <span className="block text-[12.5px] text-fg-2">{need.first ? 'This session continues once you sign in.' : 'This session continues once you sign in again.'}</span>
       </span>
       <Button size="sm" variant="primary" icon={<LogIn size={14} />} onClick={start}>
         Sign in
