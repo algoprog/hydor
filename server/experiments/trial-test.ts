@@ -253,11 +253,18 @@ test('a trial’s answer: the time for a step, the estimate and what to ask for'
   assert.equal(quiet.estimateHours, undefined);
   assert.match(quiet.said, /It did not say how far it has to go\./);
   assert.deepEqual(quiet.ask, { gpuMemGb: 11 });
-  // One that ran to its end with all its steps may have cut itself short.
-  const done = trialAnswer({ ...r, status: 'done', why: undefined, tried: { last: { done: 20, total: 20, at: t + 20_000 } } });
-  assert.equal(done.estimateHours, undefined);
+  // One that ran to its end: the whole run takes about as long, with a quarter more to ask for.
+  const done = trialAnswer({ ...r, status: 'done', why: undefined, endedAt: t + 61_000, tried: { last: { done: 20, total: 20, at: t + 20_000 } } });
   assert.equal(done.finished, true);
-  assert.match(done.said, /cuts itself short when HYDOR_TRY is set/);
+  assert.ok(Math.abs(done.estimateHours! - 61 / 3600) < 1e-4, String(done.estimateHours));
+  assert.deepEqual(done.ask, { gpuMemGb: 11, hours: 0.1 });
+  assert.equal(done.said, 'It ran to its end in 61 s: the whole run takes about that long, unless your script shortens itself when it sees HYDOR_TRY. It peaked at 9.4 GB of GPU memory and 3.1 GB of memory. Ask for gpuMemGb 11 and hours 0.1.');
+  const long = trialAnswer({ ...r, status: 'done', why: undefined, endedAt: t + 480_000, tried: undefined, peak: undefined });
+  assert.deepEqual([long.estimateHours, long.ask], [0.133, { hours: 0.2 }], '8 minutes and a quarter more, up to a tenth of an hour');
+  // One that ended by itself with steps left: by its steps, not by how long it took.
+  const short = trialAnswer({ ...r, status: 'done', why: undefined });
+  assert.ok(Math.abs(short.estimateHours! - 10_010 / 3600) < 0.01, String(short.estimateHours));
+  assert.match(short.said, /^It ran to its end in 91 s\. .*A step takes about 2 s, and the whole run about 2 h 47 min\./);
   const failed = trialAnswer({ ...r, status: 'failed', why: 'Its command ended with exit code 1', firstError: { line: 3, text: 'KeyError: x', lines: [], from: 1, offset: 0 } });
   assert.equal(failed.ok, false);
   assert.equal(failed.ask, undefined);
@@ -308,7 +315,10 @@ test('a trial that fails at once gives its first error; one with no total says s
   const quiet = JSON.parse(textOf(await call('experiment_try', { command: 'echo "loss=1"', gpus: 0, seconds: 9999 })));
   assert.equal(quiet.seconds, 600);
   assert.equal(quiet.finished, true);
-  assert.equal(quiet.estimateHours, undefined);
+  assert.ok(quiet.estimateHours < 0.01, String(quiet.estimateHours));
+  assert.equal(quiet.ask.hours, 0.1);
+  assert.match(quiet.said, /^It ran to its end in \d+ s: the whole run takes about that long, unless your script shortens itself when it sees HYDOR_TRY\./);
+  assert.match(experimentTools(ctxOf()).find((x) => x.name === 'experiment_try')!.description, /A trial is the real command in the real folder, so it writes the command’s real output and checkpoint files: point them elsewhere/);
   const long = await job({ command: 'sleep 20', gpus: 0 });
   assert.equal((await http.inject({ method: 'GET', url: `/api/experiments/try/${long.id}` })).statusCode, 400);
   await http.inject({ method: 'POST', url: `/api/experiments/runs/${long.id}/stop`, payload: {} });

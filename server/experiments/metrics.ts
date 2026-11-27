@@ -442,7 +442,10 @@ export function tailLines(file: string, lines = 200, bytes = 256 * 1024): { text
   const from = Math.max(0, size - bytes);
   const { text } = readFrom(file, from, bytes);
   const all = tidyLog(from > 0 ? text.slice(text.indexOf('\n') + 1) : text).split('\n');
-  return { text: all.slice(-lines).join('\n'), size };
+  // The newline a file ends with is not a line of its own.
+  const ends = all.at(-1) === '';
+  if (ends) all.pop();
+  return { text: all.slice(-lines).join('\n') + (ends && all.length ? '\n' : ''), size };
 }
 
 /** A log as people read it: each line's last redraw (\r), no colour codes. */

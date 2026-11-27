@@ -24,7 +24,7 @@ import { createEvaluation } from './evaluations.ts';
 import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
 import { cleanJob, forgetLive, stopRun, submit, tick, useDeps } from './queue.ts';
-import { deleteRun, getRun, getRunWithEvents, keepRunFiles, resetRun, runFiles, runFolder } from './records.ts';
+import { deleteRun, getRun, getRunWithEvents, keepRunFiles, listRuns, resetRun, runFiles, runFolder } from './records.ts';
 import { experimentTools } from './tools.ts';
 import { setUsageReader } from './usage.ts';
 import { setGpuReader } from './gpus.ts';
@@ -474,7 +474,10 @@ test('too large to keep: it fails before starting once something changed, unless
 
   // A large checkpoint the command names is data: it does not make the code incomplete.
   const data = await queued('sh train.sh --ckpt model.ckpt', p.dir);
-  assert.deepEqual([data.queuedCode!.whole, data.notKept], [true, ['model.ckpt']]);
+  // (A checkpoint named by its flag is not listed at all; one named plainly is.)
+  assert.deepEqual([data.queuedCode!.whole, data.notKept, data.kept], [true, undefined, undefined]);
+  const plain = await queued('sh train.sh model.ckpt', p.dir);
+  assert.deepEqual([plain.queuedCode!.whole, plain.notKept], [true, ['model.ckpt']]);
   await stopRun(deps, data.id);
 });
 
@@ -656,12 +659,105 @@ test('the tools say what was kept, and experiment_get what ran', async () => {
     return JSON.parse(typeof out === 'string' ? out : out.text);
   };
   const run = await call('experiment_run', { command: 'sh train.sh', gpus: 0, when: 'night' });
-  assert.equal(run.code, `commit ${p.head().slice(0, 7)} with 1 changed file and 1 file not in git`);
+  assert.equal(run.code, `commit ${p.head().slice(0, 7)} with 1 changed file (train.sh) and 1 file not in git (extra.py)`);
   write(p.dir, 'train.sh', 'echo version=3\n');
   await runNow(getRun(db, run.id)!);
   const got = await call('experiment_get', { id: run.id });
   assert.deepEqual([got.run.codeAt, got.run.codeChanged, got.run.queuedCode], ['queued', ['train.sh'], run.code]);
   assert.ok(getRunWithEvents(db, run.id)!.events!.some((e) => /runs a copy of the code as it was queued/.test(e.text)));
+});
+
+/** A session's tools in a folder, as a step has them (no card). */
+const toolsIn = (cwd: string) => {
+  const ctx: RunCtx = { runId: 'flow-again', key: 'acp:flow-again', agent: 'acp', cwd, deps, step: true } as RunCtx;
+  const of = (name: string) => experimentTools(ctx).find((x) => x.name === name)!;
+  const call = async (name: string, a: Record<string, unknown>) => {
+    const out = await of(name).run(a, ctx);
+    const text = typeof out === 'string' ? out : out.text;
+    return typeof out !== 'string' && out.isError ? { refused: text } : JSON.parse(text);
+  };
+  return { of, call };
+};
+
+test('running a run again says which code when the folder has changed: never guessed', async () => {
+  const p = project();
+  const { of, call } = toolsIn(p.dir);
+  const first = await call('experiment_run', { command: 'sh train.sh', gpus: 0, group: 'again-code' });
+  await until(over(first.id), 'the first');
+  const short = p.head().slice(0, 7);
+  // Unchanged: nothing to say, and the list tells the rerun from the run.
+  const same = await call('experiment_run', { again: first.id });
+  assert.equal(same.code, `the folder as it is now: commit ${short}`);
+  await until(over(same.id), 'the same again');
+  write(p.dir, 'train.sh', 'echo version=2\ncat settings.yaml\n');
+  write(p.dir, 'settings.yaml', 'lr: 2\n');
+  const sentence = 'That run’s own code differs from the folder now (settings.yaml and 1 more): give code "own" to run what it ran, or "now" to run the folder as it is.';
+  const before = listRuns(db, { group: 'again-code' }).length;
+  assert.equal((await call('experiment_run', { again: first.id })).refused, sentence);
+  assert.equal((await call('experiment_run', { again: first.id, code: 'queued' })).refused, sentence);
+  assert.equal(listRuns(db, { group: 'again-code' }).length, before, 'nothing started');
+  const own = await call('experiment_run', { again: first.id, code: 'own' });
+  assert.equal(own.code, `its own: commit ${short}`);
+  await until(over(own.id), 'its own code');
+  assert.match(log(getRun(db, own.id)!), /version=1\nlr: 1/);
+  const events = getRunWithEvents(db, own.id)!.events!.map((e) => e.text);
+  assert.ok(events.includes('It runs its own code, as the run it repeats ran it: the folder has changed since'), events.join('\n'));
+  assert.ok(!events.some((e) => /had changed since it was queued/.test(e)), events.join('\n'));
+  const now = await call('experiment_run', { again: first.id, code: 'now' });
+  assert.equal(now.code, `the folder as it is now: commit ${short} with 2 changed files (settings.yaml, train.sh)`);
+  await until(over(now.id), 'the folder as it is');
+  assert.match(log(getRun(db, now.id)!), /version=2\nlr: 2/);
+  const listed = (await call('experiment_list', { group: 'again-code' })).runs as { id: string; againOf?: string; code?: string }[];
+  const row = (id: string) => listed.find((r) => r.id === id)!;
+  assert.deepEqual([row(first.id).againOf, row(same.id).againOf, row(own.id).againOf, row(now.id).againOf], [undefined, first.id, first.id, first.id]);
+  assert.deepEqual([row(first.id).code, row(own.id).code, row(now.id).code], [short, short, `${short} + 2 changed`]);
+  // The same folder named another way is still the same folder; another one has no own code to ask about.
+  assert.equal((await call('experiment_run', { again: first.id, cwd: `${p.dir}/sub/..` })).refused, sentence);
+  const other = project();
+  assert.equal((await call('experiment_run', { again: first.id, cwd: other.dir })).refused, undefined);
+  const said = of('experiment_run');
+  assert.match((said.inputSchema as any).properties.code.description, /With again .*"own" .*or "now".*a new file git does not track does not count|a new file git does not track does not count.*With again .*"own"/s);
+  assert.deepEqual((said.inputSchema as any).properties.code.enum, ['queued', 'now', 'own']);
+
+  // The copy it ran from is gone once slimmed away: the record says so, and Open its code makes it again.
+  await until(() => !!getRun(db, own.id)!.codeRemoved, 'the copy to be said gone');
+  const got = await call('experiment_get', { id: own.id });
+  assert.deepEqual([got.run.codeRemoved, got.run.codeDir], [true, undefined]);
+  assert.match(of('experiment_get').description, /codeRemoved true instead, and Open its code on the run’s page makes it again/);
+  const opened = (await http.inject({ method: 'POST', url: `/api/experiments/runs/${own.id}/code` })).json();
+  assert.match(read(opened.dir, 'train.sh'), /version=1/);
+});
+
+test('what a command writes, and its checkpoints, are not kept with the run as files it needs', async () => {
+  const p = project();
+  write(p.dir, 'results/wait/result.json', '{}\n');
+  write(p.dir, 'results/wait/ckpt.json', '{}\n');
+  write(p.dir, 'results/wait/log.txt', 'old\n');
+  write(p.dir, 'needed.json', '{}\n');
+  const { call } = toolsIn(p.dir);
+  const run = await call('experiment_run', { command: 'sh train.sh needed.json --out results/wait/result.json --ckpt results/wait/ckpt.json | tee results/wait/log.txt', gpus: 0, resume: 'sh train.sh --resume results/wait/ckpt.json' });
+  assert.equal(run.note, 'Not in git, kept with the run: needed.json');
+  await until(over(run.id), 'it');
+  assert.deepEqual(getRun(db, run.id)!.kept, ['needed.json']);
+  assert.equal((await call('experiment_get', { id: run.id })).kept, 'Not in git, kept with the run: needed.json');
+});
+
+test('experiment_get: as many lines as asked, and one that has just ended is closed before it is read', async () => {
+  const p = project();
+  const { call } = toolsIn(p.dir);
+  const counted = await submitJob('for i in 1 2 3 4 5 6 7 8 9 10; do echo "step=$i loss=0.$i"; done', p.dir);
+  await until(over(counted.id), 'it');
+  const lines = async (n: number) => (await call('experiment_get', { id: counted.id, lines: n })).log;
+  assert.equal(await lines(1), 'step=10 loss=0.10\n');
+  assert.equal((await lines(8)).trimEnd().split('\n').length, 8);
+  // It ends without the queue having looked: what is read says how it ended, with all its steps.
+  const r = await submitJob('echo "step=11 loss=0.5"; while [ ! -e go ]; do sleep 0.05; done; echo "step=20 loss=0.2"', p.dir);
+  await until(() => getRun(db, r.id)!.status === 'running' && /step=11/.test(log(r)), 'it to be going');
+  write(p.dir, 'go', '');
+  for (let i = 0; i < 200 && !fs.existsSync(path.join(runFolder(r.id), 'exit')); i++) await sleep(25);
+  const got = await call('experiment_get', { id: r.id });
+  assert.deepEqual([got.run.status, got.run.metrics.step, got.run.metrics.last.loss], ['done', 20, 0.2]);
+  assert.match(got.log, /step=20/);
 });
 
 let failed = 0;

@@ -21,11 +21,13 @@ assert.deepEqual(W.trialLines({ ...a, gpuMemGb: undefined, ask: undefined, estim
 // a small script never "used up to 0 GB"
 assert.equal(W.trialLines({ ...a, gpuMemGb: undefined, ask: undefined, ramGb: 0.012 })[1], 'It used up to 0.01 GB of memory.');
 assert.deepEqual([0.004, 0.012, 0.09, 0.096, 0.14, 3, 9.44].map(W.gb), ['0.01', '0.01', '0.09', '0.1', '0.1', '3', '9.4']);
-assert.deepEqual(W.trialLines({ ...a, finished: true, ran: 12, estimateHours: undefined, ramGb: undefined, gpuMemGb: undefined }), [
-  'It ran to its end in 12 s.',
+assert.deepEqual(W.trialLines({ ...a, finished: true, ran: 61, estimateHours: 61 / 3600, ramGb: undefined, gpuMemGb: undefined }), [
+  'It ran to its end in 61 s.',
   'It was over before its memory could be read.',
-  'If your script stops early when it sees HYDOR_TRY, the whole run takes longer.',
+  'The whole run takes about that long, unless your script shortens itself when it sees HYDOR_TRY.',
 ]);
+// One that ended with steps left to do says how long they would take.
+assert.equal(W.trialLines({ ...a, finished: true, stepSeconds: 2, steps: { done: 40, total: 5000 } })[2], 'The whole run should take about 3 h 20 min.');
 assert.deepEqual(W.trialLines({ ...a, ok: false, ran: 4 }), ['It failed after 4 s.']);
 assert.deepEqual(W.trialLines({ ...a, ok: undefined }), ['It was stopped before it started.']);
 

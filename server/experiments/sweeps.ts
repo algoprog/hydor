@@ -2,6 +2,7 @@
 // or a random sample of them, at most N), and the early stop: a run whose metric at a step is worse than the median
 // of the other runs at that step stops (the median stopping rule), so the sweep's GPU time goes to the runs that
 // may win. Also filling a command's placeholders and reading settings from a command, for every run.
+import { isOutputSetting } from '../../shared/experiment-outputs.ts';
 import type { MetricSeries } from '../../shared/experiments.ts';
 import { rng } from './stats.ts';
 import { valueAt } from './metrics.ts';
@@ -31,8 +32,9 @@ export function fillCommand(command: string, values: Record<string, Value>, quot
  * A metrics or scores file as a run writes it: {name} placeholders filled as the command's, {run} the run's id, and a
  * leading $HYDOR_RUN_DIR its own folder (`own`). A relative path stays relative to its cwd.
  */
-export function runFile(r: { id: string; params?: Record<string, Value>; seed?: number }, file: string, own: string): string {
-  const values = { ...r.params, ...(r.seed !== undefined ? { seed: r.seed } : {}), run: r.id };
+export function runFile(r: { id: string; command?: string; params?: Record<string, Value>; seed?: number }, file: string, own: string): string {
+  // The command's flags too: where it writes is no setting of the run, but {out} may still name it.
+  const values = { ...(r.command ? paramsOf(r.command, { outputs: true }) : {}), ...r.params, ...(r.seed !== undefined ? { seed: r.seed } : {}), run: r.id };
   return fillCommand(file, values, false).replace(/^\$(?:HYDOR_RUN_DIR|\{HYDOR_RUN_DIR\})(?=[/\\]|$)/, () => own);
 }
 
@@ -145,8 +147,10 @@ const asValue = (s: string): Value => (/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.t
 /**
  * Settings a command gives its program: --name value, --name=value, a flag alone (true), and name=value words
  * after the program (Hydra's overrides). Variables set before the program (CUDA_VISIBLE_DEVICES=1 python…) are not.
+ * Nor are the flags that say where it writes or which checkpoint it goes on from (shared/experiment-outputs.ts),
+ * unless `outputs` asks for them.
  */
-export function paramsOf(command: string): Record<string, Value> {
+export function paramsOf(command: string, o: { outputs?: boolean } = {}): Record<string, Value> {
   const words = shellWords(command);
   let i = 0;
   while (i < words.length && /^[A-Za-z_]\w*=/.test(words[i])) i++;
@@ -156,9 +160,10 @@ export function paramsOf(command: string): Record<string, Value> {
     const long = /^--([A-Za-z][\w.-]*)(?:=(.*))?$/s.exec(w);
     if (long) {
       const name = long[1];
-      if (long[2] !== undefined) out[name] = asValue(long[2]);
-      else if (i + 1 < words.length && (!words[i + 1].startsWith('-') || /^-\d/.test(words[i + 1]))) out[name] = asValue(words[++i]);
-      else out[name] = true;
+      let value: Value = true;
+      if (long[2] !== undefined) value = asValue(long[2]);
+      else if (i + 1 < words.length && (!words[i + 1].startsWith('-') || /^-\d/.test(words[i + 1]))) value = asValue(words[++i]);
+      if (o.outputs || !isOutputSetting(name, value)) out[name] = value;
       continue;
     }
     const hydra = /^\+{0,2}([A-Za-z_][\w./-]*)=(.+)$/s.exec(w);

@@ -8,7 +8,8 @@
 // finds), Markdown and CSV. Also: placing a table in a LaTeX file, replacing the one it made before.
 import fs from 'node:fs';
 import path from 'node:path';
-import { identicalNote, seedsFlatNote, TABLE_MARK, type ResultsCell, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord } from '../../shared/experiments.ts';
+import { checkpointsIn, sweptCheckpoint, withoutOutputs } from '../../shared/experiment-outputs.ts';
+import { identicalNote, seedsFlatNote, TABLE_MARK, type QueuedCode, type ResultsCell, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord } from '../../shared/experiments.ts';
 import { commandLabels, seedless } from './commands.ts';
 import { looseObject } from './metrics.ts';
 import { holm, mean, pairedBootstrap, pairedT, std, welch } from './stats.ts';
@@ -79,24 +80,37 @@ interface Row {
   key: string;
   label: string;
   runs: RunRecord[];
+  /** Rows by command: the command without what only says where it writes, and every whole command in the row. */
+  same?: string;
+  commands?: Set<string>;
 }
 
-/** The rows: by experiment or by command (in the order they first come) or by a setting's value (numbers in order). */
+/**
+ * The rows: by experiment or by command (in the order they first come) or by a setting's value (numbers in order). A
+ * row by command is told apart by its command without where it writes; its key is its first run's whole command.
+ */
 function rowsOf(spec: ResultsTableSpec, runs: RunRecord[]): Row[] {
   const by = spec.rows && spec.rows.startsWith('param:') ? spec.rows.slice(6) : null;
   const byCommand = spec.rows === 'command';
-  const keyOf = (r: RunRecord) => (byCommand ? seedless(r, seedOf(r)) : by ? (r.params?.[by] === undefined ? '—' : String(r.params[by])) : r.group || 'Other runs');
+  const keyOf = (r: RunRecord) => (by ? (r.params?.[by] === undefined ? '—' : String(r.params[by])) : r.group || 'Other runs');
   const rows = new Map<string, Row>();
   for (const r of runs) {
-    const k = keyOf(r);
+    const whole = byCommand ? seedless(r, seedOf(r)) : '';
+    const same = byCommand ? withoutOutputs(whole, { keepCheckpoints: sweptCheckpoint(r) }) : undefined;
+    const k = same ?? keyOf(r);
     let row = rows.get(k);
-    if (!row) rows.set(k, (row = { key: k, label: spec.labels?.[k] ?? (!by ? k : r.params?.[by] === undefined ? `${by} not set` : `${by} = ${k}`), runs: [] }));
+    if (!row) {
+      const key = byCommand ? whole : k;
+      rows.set(k, (row = { key, label: spec.labels?.[key] ?? (!by ? k : r.params?.[by] === undefined ? `${by} not set` : `${by} = ${k}`), runs: [], ...(byCommand ? { same, commands: new Set<string>() } : {}) }));
+    }
+    row.commands?.add(whole);
     row.runs.push(r);
   }
   const list = [...rows.values()];
   if (byCommand) {
-    const labels = commandLabels(list.map((x) => x.key));
-    list.forEach((x, i) => (x.label = spec.labels?.[x.key] ?? labels[i]));
+    const labels = commandLabels(list.map((x) => x.same!));
+    // Named by the caller under any of its whole commands (or as it reads without where it writes).
+    list.forEach((x, i) => (x.label = [...x.commands!, x.same!].map((c) => spec.labels?.[c]).find(Boolean) ?? labels[i]));
   }
   if (by) {
     const num = list.every((x) => x.key === '—' || Number.isFinite(Number(x.key)));
@@ -179,24 +193,134 @@ function digitsOf(c: ResultsColumn, cells: ResultsCell[]): number {
   return big < 1 ? 3 : big < 100 ? 2 : 1;
 }
 
-/** A results table from its spec and runs, kept under `id`. */
-export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: string; scores: (r: RunRecord) => ScoreMap | null; at?: number }): ResultsTable {
+// ---- what a table says about itself ------------------------------------------------------------------------------
+
+/** The most runs, or metrics, a note names. */
+const NAMED = 5;
+
+/**
+ * "a, b, c"; past the first `most`, "a, b, c, d, e (+3)". Names with commas and a count, no "and" or "more": a list
+ * is a value inside a sentence, and the page's translator leaves a value's words as they are.
+ */
+function listed(words: string[], more = 0, most = NAMED): string {
+  const shown = words.slice(0, most);
+  const rest = words.length - shown.length + more;
+  return `${shown.join(', ')}${rest ? ` (+${rest})` : ''}`;
+}
+
+/** How a note names each run: by its name, with its id when another has the same one. */
+function namer(runs: RunRecord[]): (r: RunRecord) => string {
+  const count = new Map<string, number>();
+  for (const r of runs) if (r.name) count.set(r.name, (count.get(r.name) ?? 0) + 1);
+  return (r) => (!r.name ? r.id : count.get(r.name)! > 1 ? `${r.name} (${r.id})` : r.name);
+}
+
+const metricsOf = (r: RunRecord) => Object.keys(r.metrics?.last ?? {});
+
+/** The runs without any of the columns' metrics, named, with what they report instead. */
+function withoutMetricsNote(runs: RunRecord[], cols: ResultsColumn[], name: (r: RunRecord) => string): string {
+  const asked = new Set(cols.map((c) => c.metric));
+  // Those that report the same are said together.
+  const alike = new Map<string, { what: string; runs: RunRecord[] }>();
+  for (const r of runs) {
+    const have = metricsOf(r);
+    // A metric asked for that is there and has no number to show (NaN, or no best).
+    const empty = have.filter((k) => asked.has(k));
+    const what = empty.length ? `no number for ${listed(empty)}` : have.length ? `${listed(have)} instead` : 'no metrics';
+    let g = alike.get(what);
+    if (!g) alike.set(what, (g = { what, runs: [] }));
+    g.runs.push(r);
+  }
+  let left = NAMED;
+  let unnamed = 0;
+  const said: string[] = [];
+  for (const g of alike.values()) {
+    const shown = g.runs.slice(0, left);
+    left -= shown.length;
+    if (!shown.length) unnamed += g.runs.length;
+    else said.push(`${listed(shown.map(name), g.runs.length - shown.length)} ${g.runs.length === 1 ? 'reports' : 'report'} ${g.what}`);
+  }
+  if (unnamed) said.push(`${unnamed} more ${unnamed === 1 ? 'reports' : 'report'} other metrics`);
+  return `${runs.length} run${runs.length === 1 ? ' has' : 's have'} none of these metrics: ${said.join('; ')}.`;
+}
+
+/** A metric's name as it reads whatever its case and separators: loss and LOSS, ndcg@10 and ndcg_at_10. */
+const loose = (metric: string) =>
+  metric
+    .toLowerCase()
+    .replace(/[_\s/-]at[_\s/-]?(?=\d)/g, '@')
+    .replace(/[_\s/@-]|\.(?!\d)|(?<!\d)\./g, '');
+
+/** A column's metric that some runs print written another way. */
+function otherSpellings(runs: RunRecord[], cols: ResultsColumn[]): string[] {
+  const out: string[] = [];
+  for (const metric of new Set(cols.map((c) => c.metric))) {
+    const others = new Set(runs.flatMap((r) => (r.metrics?.last?.[metric] !== undefined ? [] : metricsOf(r).filter((k) => k !== metric && loose(k) === loose(metric)))));
+    for (const other of others) out.push(`Some runs print “${other}”, not “${metric}”: a column takes a metric’s name exactly, upper and lower case and separators too.`);
+  }
+  return out;
+}
+
+/** What a run ran, when its record says: the code kept when it was queued, and what had changed if it ran the folder as it was at its start. */
+const ranCode = (r: RunRecord): { code: QueuedCode; changed: string } | null => (r.queuedCode ? { code: r.queuedCode, changed: r.codeAt === 'start' ? (r.codeChanged ?? []).join('\n') : '' } : null);
+
+/** Whether two kept codes differ: another commit, other changes, or a file both kept that is not the same. */
+const otherCode = (a: NonNullable<ReturnType<typeof ranCode>>, b: NonNullable<ReturnType<typeof ranCode>>) =>
+  a.changed !== b.changed || a.code.commit !== b.code.commit || a.code.patch !== b.code.patch || Object.entries(a.code.files).some(([file, sha]) => b.code.files[file] !== undefined && b.code.files[file] !== sha);
+
+/** That the rows' runs did not all run the same code: those that ran another than the first queued. */
+function codeNote(runs: RunRecord[], name: (r: RunRecord) => string): string {
+  const known = runs
+    .flatMap((r) => {
+      const ran = ranCode(r);
+      return ran ? [{ r, ran }] : [];
+    })
+    .sort((a, b) => a.ran.code.at - b.ran.code.at || a.r.createdAt - b.r.createdAt);
+  const later = known.slice(1).filter((x) => otherCode(known[0].ran, x.ran));
+  return later.length ? `The rows did not all run the same code: ${listed(later.map((x) => name(x.r)))} ran a later version than ${name(known[0].r)}.` : '';
+}
+
+/** Rows by command whose runs of one seed name different checkpoints, which did not keep them apart. */
+function checkpointNotes(rows: Row[]): string[] {
+  return rows.flatMap((row) => {
+    const bySeed = new Map<string, Set<string>>();
+    for (const r of row.runs) {
+      if (sweptCheckpoint(r)) continue;
+      const paths = checkpointsIn(seedless(r, seedOf(r))).join(', ');
+      const seed = seedOf(r) ?? '';
+      bySeed.set(seed, (bySeed.get(seed) ?? new Set()).add(paths));
+    }
+    const differ = [...new Set([...bySeed.values()].filter((x) => x.size > 1).flatMap((x) => [...x]))].filter(Boolean);
+    return differ.length ? [`${row.label}: its runs name different checkpoints (${listed(differ, 0, 3)}) and are averaged as one row. If they are different models, put each in an experiment of its own and make rows by experiment.`] : [];
+  });
+}
+
+/** A results table from its spec and runs, kept under `id`. `unfinished`: its experiment's runs that did not finish. */
+export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: string; scores: (r: RunRecord) => ScoreMap | null; at?: number; unfinished?: RunRecord[] }): ResultsTable {
   const cols = spec.columns.filter((c) => c.metric?.trim());
   const notes: string[] = [];
   // Runs that have not ended are left out; so are runs with none of the columns' metrics.
   const ended = all.filter((r) => r.status === 'done' || r.status === 'stopped' || r.status === 'failed' || r.status === 'lost');
+  const unfinished = o.unfinished ?? [];
+  const name = namer([...all, ...unfinished]);
   if (ended.length < all.length) notes.push(`${all.length - ended.length} run${all.length - ended.length === 1 ? ' has' : 's have'} not ended and ${all.length - ended.length === 1 ? 'is' : 'are'} left out.`);
+  if (unfinished.length) notes.push(`${unfinished.length} run${unfinished.length === 1 ? ' that did not finish is' : 's that did not finish are'} left out: ${listed(unfinished.map(name))}.`);
   const runs = ended.filter((r) => cols.some((c) => valueOf(r, c) !== undefined));
-  if (runs.length < ended.length) notes.push(`${ended.length - runs.length} run${ended.length - runs.length === 1 ? ' has' : 's have'} none of these metrics.`);
+  const without = ended.filter((r) => !runs.includes(r));
+  if (without.length) notes.push(withoutMetricsNote(without, cols, name));
+  notes.push(...otherSpellings(ended, cols));
   const rows = rowsOf(spec, runs);
+  const code = codeNote(runs, name);
+  if (code) notes.push(code);
+  if (spec.rows === 'command') notes.push(...checkpointNotes(rows));
   // Rows by a setting no run has would be one row of everything, read as so many seeds: that is said.
   const by = spec.rows?.startsWith('param:') ? spec.rows.slice(6) : null;
   if (by && runs.length && !runs.some((r) => r.params?.[by] !== undefined)) {
     const have = [...new Set(runs.flatMap((r) => Object.keys(r.params ?? {})))].sort();
     notes.push(`No run has a setting called “${by}”, so all ${runs.length} runs are one row and its spread is over runs, not seeds. ${have.length ? `Their settings are: ${have.join(', ')}.` : 'They have no settings: make rows by experiment, or start the runs with settings (params).'}`);
   }
-  // A row by command is long to write out: it may be named by its label too.
-  const asked = rows.find((r) => r.key === spec.baseline) ?? (spec.rows === 'command' ? rows.find((r) => r.label === spec.baseline) : undefined);
+  // A row by command is long to write out: it may be named by its label too, or by any of its commands.
+  const asked = rows.find((r) => r.key === spec.baseline) ?? (spec.rows === 'command' && spec.baseline ? rows.find((r) => r.label === spec.baseline || r.same === spec.baseline || r.commands!.has(spec.baseline!)) : undefined);
   const base = asked ?? rows[0];
   if (spec.baseline && base && !asked) notes.push(`There is no row “${spec.baseline}”: the first row is the baseline.`);
   const alpha = spec.alpha && spec.alpha > 0 && spec.alpha < 1 ? spec.alpha : 0.05;
@@ -263,7 +387,8 @@ export function makeTable(spec: ResultsTableSpec, all: RunRecord[], o: { id: str
     csv: '',
     madeAt,
     ...(notes.length ? { notes } : {}),
-    tests,
+    // A column nothing was tested in has none to say.
+    tests: tests.filter(Boolean),
   };
   const words = describe(table, base?.label, alpha);
   if (words.dagger) table.footnote = words.dagger;

@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { betterOf, experimentNoticeOf, tableMarks, type RunRecord } from '../../shared/experiments.ts';
+import { betterOf, experimentNoticeOf, tableMarks, type RunRecord, type RunStatus } from '../../shared/experiments.ts';
 import { keyNumbers } from '../../shared/metric-rank.ts';
 import { gather, noticeText, sawEnded, tellEnded } from './notices.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
@@ -36,7 +36,7 @@ import type { CreateOpts } from '../sessions.ts';
 import { commandWords, captureGit, KEEP_FILE, keepUntracked, localShell, pythonOf } from './capture.ts';
 import { endOfSlurm, hoursSaid, parseSacct, parseSbatch, parseSqueue, parseTestOnly, reasonWords, saveCluster, sbatchScript, setSsh, slurmTime, type Ssh } from './clusters.ts';
 import { chooseGpus, marginOf, parseApps, parseGpus, roomOn, setGpuReader, type GpuApp } from './gpus.ts';
-import { endAbout, whenWords } from './forecast.ts';
+import { endAbout, endsBy, estimateWords, forecast, whenWords } from './forecast.ts';
 import { setUsageReader } from './usage.ts';
 import { describeGroup, enableExperimentDescriptions, firstObject, redactCommand, redactSetting, timing as describeTiming } from './describe.ts';
 import { experiments } from './index.ts';
@@ -49,7 +49,9 @@ import { useMachines } from './remote.ts';
 import { holm, lgamma, pairedBootstrap, pairedT, tTwoSided, welch } from './stats.ts';
 import { earlyStop, expandSweep, fillCommand, paramsOf, placeholders, runFile, shellWords } from './sweeps.ts';
 import { insertTable, makeTable, parseScores } from './tables.ts';
-import { startSweep } from './api.ts';
+import { makeTable as makeTableRoute, startSweep } from './api.ts';
+import { attemptsOf } from '../../shared/experiment-attempts.ts';
+import { withoutOutputs } from '../../shared/experiment-outputs.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { createSpace } from '../spaces/index.ts';
 import { wordsForLang } from '../language/index.ts';
@@ -760,6 +762,87 @@ test('rows by a setting, labels, runs not ended left out; recompute after a run 
   assert.equal(recomputeTable(db, 'tnothere'), null);
 });
 
+test('a table says which runs it leaves out, what they report, how a metric is spelled, and runs that ran other code', () => {
+  const mk = (n: number, name: string, last: Record<string, number>, more: Partial<RunRecord> = {}) => ({ id: `tnot${String(n).padStart(4, '0')}`, name, status: 'done', createdAt: n, cwd: tmp, command: 'sh x.sh', metrics: { last }, ...more }) as RunRecord;
+  const table = (runs: RunRecord[], columns = [{ metric: 'loss', better: 'min' as const }], o: Record<string, unknown> = {}) => makeTable({ columns }, runs, { id: 'tnotes01', scores: () => null, ...o });
+  const runs = [mk(1, 'base', { loss: 1 }), ...[0.01, 0.2, 0.05].map((lr, i) => mk(2 + i, `lr ${lr}`, { LOSS: lr }))];
+  const t = table(runs);
+  assert.deepEqual(t.notes, [
+    '3 runs have none of these metrics: lr 0.01, lr 0.2, lr 0.05 report LOSS instead.',
+    'Some runs print “LOSS”, not “loss”: a column takes a metric’s name exactly, upper and lower case and separators too.',
+  ]);
+  const spelled = table([mk(1, 'a', { 'ndcg@10': 1 }), mk(2, 'b', { ndcg_at_10: 1 })], [{ metric: 'ndcg@10', better: 'min' }]);
+  assert.match(spelled.notes!.join(' '), /Some runs print “ndcg_at_10”, not “ndcg@10”/);
+  assert.doesNotMatch(table([mk(1, 'a', { f1: 1 }), mk(2, 'b', { acc: 1 })], [{ metric: 'f1', better: 'min' }]).notes!.join(' '), /Some runs print/);
+  // Up to five by name, then the count of the rest; those with nothing, or no number, are said so.
+  const many = table([mk(1, 'base', { loss: 1 }), ...Array.from({ length: 8 }, (_, i) => mk(2 + i, `r${i}`, { err: 1 }))]);
+  assert.equal(many.notes![0], '8 runs have none of these metrics: r0, r1, r2, r3, r4 (+3) report err instead.');
+  const mixed = table([mk(1, 'base', { loss: 1 }), mk(2, 'nan', { loss: NaN }), mk(3, 'quiet', {}), mk(4, 'quiet', {})]);
+  assert.equal(mixed.notes![0], '3 runs have none of these metrics: nan reports no number for loss; quiet (tnot0003), quiet (tnot0004) report no metrics.');
+  // The same code, and not.
+  const code = (patch: string, files: Record<string, string> = {}, at = 1): Partial<RunRecord> => ({ queuedCode: { at, commit: 'abc', patch, files, whole: true } });
+  const ran = (a: Partial<RunRecord>, b: Partial<RunRecord>) => (table([mk(1, 'first', { loss: 1 }, a), mk(2, 'second', { loss: 2 }, b)]).notes ?? []).filter((n) => /same code/.test(n));
+  assert.deepEqual(ran(code('p1'), code('p1', {}, 2)), []);
+  assert.deepEqual(ran(code('p1'), code('p2', {}, 2)), ['The rows did not all run the same code: second ran a later version than first.']);
+  assert.deepEqual(ran(code('p1', { 'a.py': '1' }), code('p1', { 'a.py': '2' }, 2)).length, 1);
+  assert.deepEqual(ran(code('p1', { 'a.py': '1' }), code('p1', { 'a.py': '1', 'new.py': '9' }, 2)), [], 'a new file is no change of what the first ran');
+  assert.deepEqual(ran(code('p1'), { ...code('p1', {}, 2), codeAt: 'start', codeChanged: ['x.sh'] }).length, 1, 'the folder as it was at its start');
+  assert.deepEqual(ran(code('p1'), {}), [], 'one whose code was not kept says nothing');
+  // No empty test entries: a column no row can be tested in adds none.
+  const two = makeTable({ columns: [{ metric: 'acc', better: 'max' }, { metric: 'other', better: 'max' }] }, [mk(1, 'a', { acc: 1 }, { group: 'g1' }), mk(2, 'b', { acc: 2, other: 1 }, { group: 'g2' })], { id: 'tnotes02', scores: () => null });
+  assert.deepEqual(two.tests, ['one seed is too few for a test']);
+});
+
+test('a group’s table counts the runs that did not finish; a table of runs named one by one does not', () => {
+  doneRun('tfin1aaaa', 'finishing', 1, { acc: 0.5 });
+  for (const [id, status, name] of [['tfin2aaaa', 'failed', 'lr 0.3'], ['tfin3aaaa', 'stopped', 'lr 1']] as const) insertRun(db, { id, spec: { command: 'x', cwd: tmp, group: 'finishing', name }, status, info: { folder: runFolder(id) } });
+  const spec = { group: 'finishing', columns: [{ metric: 'acc', better: 'max' as const }] };
+  assert.deepEqual(workOut(db, spec, 'tfin0001').notes, ['2 runs that did not finish are left out: lr 0.3, lr 1.']);
+  assert.equal(workOut(db, { runs: ['tfin1aaaa'], columns: spec.columns }, 'tfin0002').notes, undefined);
+  // With none finished, the refusal says so too.
+  assert.throws(() => makeTableRoute(deps, { group: 'finishing', columns: ['nothing'] }), /2 runs that did not finish are left out: lr 0\.3, lr 1\./);
+});
+
+test('where a command writes is no setting: not read, not a difference between rows or attempts, not in a label', async () => {
+  const at = (lr: number, more = '') => `python trial_train.py --lr ${lr} --out outputs/lr${lr}${more}/result.json --ckpt outputs/lr${lr}${more}/ckpt.json`;
+  assert.deepEqual(paramsOf(at(0.03)), { lr: 0.03 });
+  assert.deepEqual(paramsOf('python t.py --resume outputs/a/last.pt --logdir=runs --save_dir ck --log run.log'), {});
+  assert.deepEqual(paramsOf('python t.py --save_steps 500 --log_level info --pred_len 96 --outer_lr 1e-3 --checkpoint resnet50 --report_to wandb --save_metric eval/mrr'), { save_steps: 500, log_level: 'info', pred_len: 96, outer_lr: 0.001, checkpoint: 'resnet50', report_to: 'wandb', save_metric: 'eval/mrr' });
+  assert.equal(withoutOutputs(`${at(0.03)} 2> errors.txt > log.txt`), 'python trial_train.py --lr 0.03');
+  assert.equal(withoutOutputs('python t.py -o out/a.json --note "a > b" | tee -a train.log && echo --out x/y'), 'python t.py --note "a > b" && echo');
+  assert.equal(withoutOutputs('sh -o pipefail t.sh --pred_len 96'), 'sh -o pipefail t.sh --pred_len 96');
+  assert.equal(withoutOutputs('python t.py --out \\\n runs/a --lr 1').replace(/\s*\\\n/g, ''), 'python t.py --lr 1');
+  const spec = await cleanJob(db, { command: at(0.03), cwd: tmp, gpus: 0 });
+  assert.deepEqual(spec.params, { lr: 0.03 });
+  // A file named by a flag's name in the command still fills it.
+  assert.equal(runFile({ id: 'r1', command: 'x --out outputs/a', params: {} }, '{out}/metrics.jsonl', '/own'), 'outputs/a/metrics.jsonl');
+
+  // Rows by command, with records made before (their out and ckpt kept as settings).
+  const mk = (n: number, command: string, seed: number | undefined, acc: number) => ({ id: `tout${String(n).padStart(4, '0')}`, status: 'done', createdAt: n, cwd: tmp, group: 'outs', command, seed, params: paramsOf(command, { outputs: true }), metrics: { last: { acc } } }) as RunRecord;
+  const table = (list: RunRecord[], o: Record<string, unknown> = {}) => makeTable({ rows: 'command', columns: [{ metric: 'acc', better: 'max' }], ...o }, list, { id: 'toutrows', scores: () => null });
+  const trials = table([0.01, 0.03, 0.1].map((lr, i) => mk(i, at(lr), undefined, 0.5 + i / 10)));
+  assert.deepEqual(trials.rows.map((r) => r.label), ['--lr 0.01', '--lr 0.03', '--lr 0.1']);
+  assert.equal(trials.notes, undefined);
+  assert.equal(trials.rows[0].key, at(0.01), 'a row’s key is its first command, whole');
+  // Seeds that write to places of their own are one row each setting; the baseline and a name by any of its commands.
+  const seeds = [1, 2].flatMap((s) => [0.01, 0.03].map((lr, i) => mk(10 * s + i, `${at(lr, `/s${s}`)} --seed ${s}`, s, 0.5)));
+  const grouped = table(seeds, { baseline: seeds[1].command.replace(' --seed 1', ''), labels: { [seeds[2].command.replace(' --seed 2', '')]: 'Small' } });
+  assert.deepEqual(grouped.rows.map((r) => [r.label, r.runs.length]), [['Small', 2], ['--lr 0.03', 2]]);
+  assert.ok(!grouped.notes?.some((n) => /no row/i.test(n)), grouped.notes?.join(' '));
+  // Different checkpoints with the same seed are one row too, and the table says so.
+  const models = table([mk(1, 'python eval.py --ckpt models/a.pt --out res/a.json', undefined, 0.5), mk(2, 'python eval.py --ckpt models/b.pt --out res/b.json', undefined, 0.7)]);
+  assert.deepEqual(models.rows.map((r) => r.runs.length), [2]);
+  assert.equal(models.notes![0], 'python eval.py: its runs name different checkpoints (models/a.pt, models/b.pt) and are averaged as one row. If they are different models, put each in an experiment of its own and make rows by experiment.');
+  // A sweep over checkpoints keeps them apart.
+  const swept = table(['a', 'b'].map((m, i) => ({ ...mk(i, `python eval.py --ckpt models/${m}.pt`, undefined, 0.5), sweep: 'sw1', params: { ckpt: `models/${m}.pt` } })));
+  assert.deepEqual(swept.rows.map((r) => r.label), ['--ckpt models/a.pt', '--ckpt models/b.pt']);
+
+  // The same job into another folder, after one failed, is another attempt at it.
+  const one = (id: string, createdAt: number, command: string, status: RunStatus) => ({ id, status, command, cwd: tmp, group: 'att', createdAt, endedAt: createdAt + 1, params: paramsOf(command, { outputs: true }) });
+  const chain = attemptsOf([one('aaaa', 1, at(0.03), 'failed'), one('bbbb', 10, at(0.03, '-again'), 'done'), one('cccc', 20, at(0.1), 'done')]);
+  assert.deepEqual([chain.get('bbbb')?.retryOf, chain.get('cccc')], ['aaaa', undefined]);
+});
+
 test('a table goes into a LaTeX file: before \\end{document}, then in place of itself', () => {
   const t = workOut(db, { runs: ids, columns: cols, test: 'welch' }, 'tins0001');
   const doc = '\\documentclass{article}\n\\begin{document}\nHello.\n\\end{document}\n';
@@ -1114,7 +1197,7 @@ test('the tools: JSON answers; a step runs without asking, Plan mode refuses, a 
   assert.ok(!experimentTools(ctxOf()).some((t) => t.name === 'experiment_wait'), 'waiting hours is for steps');
   const run = await call('experiment_run', { command: 'echo "f1=0.5"', gpus: 0, group: 'tools', report: true }, step);
   const { id, status } = JSON.parse(run.text);
-  assert.ok(id && status === 'queued', run.text);
+  assert.ok(id && ['starting', 'running', 'done'].includes(status), run.text);
   assert.deepEqual(getRun(db, id)!.startedBy, { app: 'app1' });
   const waited = JSON.parse((await call('experiment_wait', { ids: [id], hours: 1 }, step)).text);
   assert.equal(waited.ended, true);
@@ -1157,6 +1240,71 @@ test('the tools: JSON answers; a step runs without asking, Plan mode refuses, a 
   const brief = onCallBrief(deps, getRun(db, id)!, 'stall', 'No new output for 31 minutes');
   assert.match(brief, /Never delete files or checkpoints\./);
   assert.match(brief, new RegExp(`experiment_run with again: "${id}"`));
+});
+
+test('experiment_run answers with what the run does by now, what it replaces and what it carries on with', async () => {
+  const step = ctxOf({ step: true, runId: 'flow-start', key: 'acp:flow-start', agent: 'acp' });
+  const run = async (a: Record<string, unknown>) => JSON.parse((await call('experiment_run', { gpus: 0, group: 'starts', ...a }, step)).text);
+  const going = await run({ command: 'sleep 3' });
+  assert.deepEqual([going.status, going.replaces, going.carriesOn], ['running', undefined, undefined]);
+  const bad = await run({ command: 'exit 1', resume: 'sleep 3' });
+  await until(ended(bad.id), 20_000, 'it to fail');
+  const fixed = await run({ command: 'sleep 3 && true', replaces: bad.id });
+  assert.deepEqual([fixed.status, fixed.replaces], ['running', bad.id]);
+  const on = await run({ again: bad.id, carryOn: true });
+  assert.deepEqual([on.carriesOn, on.runs, on.replaces], [true, 'sleep 3', bad.id]);
+  for (const x of [going, fixed, on]) await until(ended(x.id), 20_000, 'them to end');
+  const got = JSON.parse((await call('experiment_get', { id: on.id }, step)).text);
+  assert.deepEqual([got.run.ranResume, got.run.ran, got.run.carriesOn, got.run.command], [true, 'sleep 3', undefined, 'exit 1']);
+  assert.match(toolOf('experiment_run', step).description, /other code and settings files that git does not track or ignore \(\.py \.sh .*\), at most 1 MB a file and 5 MB a run/);
+});
+
+test('a failed run’s first error comes first in experiment_get and with it in experiment_list, under the record’s names', async () => {
+  const step = ctxOf({ step: true, runId: 'flow-err', key: 'acp:flow-err', agent: 'acp' });
+  const command = 'echo "Traceback (most recent call last):"; echo "  File x"; echo "KeyError: \'y\'"; exit 1';
+  const first = JSON.parse((await call('experiment_run', { command, gpus: 0, group: 'errs' }, step)).text);
+  await until(ended(first.id), 20_000, 'the first');
+  const second = JSON.parse((await call('experiment_run', { command, gpus: 0, group: 'errs', replaces: first.id }, step)).text);
+  await until(ended(second.id), 20_000, 'the second');
+  await call('experiment_note', { id: second.id, note: 'the same again' }, step);
+  const got = JSON.parse((await call('experiment_get', { id: second.id }, step)).text);
+  assert.deepEqual(Object.keys(got.run).slice(0, 5), ['id', 'name', 'status', 'why', 'firstError']);
+  assert.equal(got.run.firstError.text, "KeyError: 'y'");
+  assert.equal(got.chain.previous.error, "KeyError: 'y'");
+  const listed = JSON.parse((await call('experiment_list', { group: 'errs' }, step)).text).runs;
+  const one = listed.find((r: { id: string }) => r.id === second.id);
+  assert.deepEqual([one.error, one.retryOf, one.noteBy, one.retry_of, one.note_by], ["KeyError: 'y'", first.id, 'agent', undefined, undefined]);
+  assert.equal(listed.find((r: { id: string }) => r.id === first.id).replacedBy, second.id);
+  const said = toolOf('experiment_get', step).description;
+  for (const part of [/firstError/, /chain\.previous\.error/, /it does not mean the run was scored/, /queuedCode/, /codeFrom/, /ran \(the command it really ran\)/]) assert.match(said, part);
+});
+
+test('when a run ends, its log and its metrics file are read to their ends, however it ended', async () => {
+  const dir = path.join(tmp, 'last-read');
+  fs.mkdirSync(dir, { recursive: true });
+  // The last lines come with the warning of a stop, the metrics file’s without a newline.
+  fs.writeFileSync(
+    path.join(dir, 'train.sh'),
+    'trap \'echo "step=13 loss=0.13"; printf "{\\"step\\": 13, \\"dev\\": 0.9}" >> m.jsonl; exit 0\' INT\necho "step=11 loss=0.11"; echo \'{"step": 11, "dev": 0.5}\' > m.jsonl; touch ready\nwhile true; do sleep 0.2; done\n',
+  );
+  const r = await submit(deps, await cleanJob(db, { command: 'bash train.sh', cwd: dir, gpus: 0, metricsFile: 'm.jsonl', grace: 20 }));
+  await until(() => fs.existsSync(path.join(dir, 'ready')) && getRun(db, r.id)!.status === 'running', 20_000, 'it to be going');
+  await http.inject({ method: 'POST', url: `/api/experiments/runs/${r.id}/stop`, payload: {} });
+  await until(ended(r.id), 30_000, 'it to end');
+  const x = getRun(db, r.id)!;
+  assert.equal(x.status, 'stopped', x.why);
+  assert.deepEqual([x.metrics!.step, x.metrics!.last.loss, x.metrics!.last.dev], [13, 0.13, 0.9]);
+  // While it runs, what is read of it is as far on as its log, not as far as was last written down.
+  const live = await submit(deps, await cleanJob(db, { command: 'echo "step=1 acc=0.1"; while [ ! -e go ]; do sleep 0.1; done; echo "step=2 acc=0.2"; touch said; sleep 20', cwd: dir, gpus: 0 }));
+  await until(() => getRun(db, live.id)!.status === 'running', 20_000, 'it to run');
+  await tick();
+  fs.writeFileSync(path.join(dir, 'go'), '');
+  for (let i = 0; i < 100 && !fs.existsSync(path.join(dir, 'said')); i++) await sleep(50);
+  const view = JSON.parse((await call('experiment_get', { id: live.id }, ctxOf())).text);
+  assert.match(view.log, /step=2/);
+  assert.deepEqual([view.run.metrics.step, view.run.metrics.last.acc], [2, 0.2]);
+  await http.inject({ method: 'POST', url: `/api/experiments/runs/${live.id}/stop`, payload: {} });
+  await until(ended(live.id), 30_000, 'it to stop');
 });
 
 // ---- the message when runs end ---------------------------------------------------------------------------------------
@@ -1350,7 +1498,7 @@ test('the files a command names that git does not track are kept with the run, w
   assert.equal(fs.readFileSync(path.join(runFolder(r.id), 'untracked/controls/control.sh'), 'utf8'), fs.readFileSync(path.join(dir, 'controls/control.sh'), 'utf8'));
   assert.deepEqual(fs.readdirSync(path.join(runFolder(r.id), 'untracked')).sort(), ['controls', 'ignored.cfg', 'outside']);
   const got = JSON.parse((await call('experiment_get', { id: run.id }, step)).text);
-  assert.equal(got.note, words);
+  assert.deepEqual([got.kept, got.note], [words, undefined]);
   assert.equal(got.run.where, `local (this computer: ${os.hostname()})`, 'the tools call this computer "local"');
 });
 
@@ -1415,7 +1563,7 @@ test('files outside the run’s folder are kept too: from a worktree by an absol
     assert.deepEqual(fs.readdirSync(under).sort(), ['run-2.sh', 'run.sh', 'x.sh']);
     assert.equal(fs.readFileSync(path.join(under, 'run.sh'), 'utf8'), 'echo "acc=1"\n');
     assert.equal(fs.readFileSync(path.join(under, 'run-2.sh'), 'utf8'), 'echo twin\n');
-    assert.equal(JSON.parse((await call('experiment_get', { id: r.id }, step)).text).note, words);
+    assert.equal(JSON.parse((await call('experiment_get', { id: r.id }, step)).text).kept, words);
   } finally {
     process.env.HOME = was;
   }
@@ -2646,8 +2794,12 @@ test('about when a waiting run may start: by progress, by a time limit, or no te
   assert.equal(out.status, 'waiting');
   assert.ok(out.startsAbout === undefined && out.why.endsWith(NO_TELLING), `second in line, behind one that says nothing of its length: ${JSON.stringify(out)}`);
   const got = JSON.parse((await call('experiment_get', { id: b.id }, step)).text);
-  assert.equal(got.run.startsAbout, getRun(db, b.id)!.startsAbout);
-  assert.ok(got.run.startsAbout);
+  // For an agent: the moment with its zone (the person's: Tokyo), and how long from now.
+  assert.match(got.run.startsAbout, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+09:00$/);
+  assert.equal(Date.parse(got.run.startsAbout), Math.floor(getRun(db, b.id)!.startsAbout! / 1000) * 1000);
+  assert.match(got.run.startsIn, /^(about \d+ (minute|hour|day)s?|under a minute|any moment)$/);
+  const inList = JSON.parse((await call('experiment_list', { status: 'waiting' }, step)).text).runs.find((r: { id: string }) => r.id === b.id);
+  assert.deepEqual([inList.startsAbout, inList.startsIn], [got.run.startsAbout, got.run.startsIn]);
   await stop(b);
   assert.equal(getRun(db, b.id)!.startsAbout, undefined, 'a stopped run waits for nothing');
   await stop({ id: out.id } as RunRecord);
@@ -2656,12 +2808,23 @@ test('about when a waiting run may start: by progress, by a time limit, or no te
   const e = await held('fourth');
   await waits(c);
   await waits(e);
-  assert.match(why(c)!, /\. About .*, when “trainer” should end$/);
+  assert.match(why(c)!, /\. About .* at the latest, when “trainer” reaches its time limit$/);
   assert.ok(why(e)!.endsWith(NO_TELLING), why(e));
   const answer = JSON.parse((await call('experiment_run', { command: 'echo hi', gpus: 1, hours: 1, priority: 9, name: 'sure', cwd: tmp }, step)).text);
-  assert.ok(answer.status === 'waiting' && typeof answer.startsAbout === 'number', `first in line: ${JSON.stringify(answer)}`);
+  assert.ok(answer.status === 'waiting' && !Number.isNaN(Date.parse(answer.startsAbout)) && !!answer.startsIn, `first in line: ${JSON.stringify(answer)}`);
   kvSet(db, 'user.tz', '');
   await clearQueue();
+});
+
+test('a time that comes from another run’s time limit is said to be the latest, one from its progress as when it should end', () => {
+  const now = Date.UTC(2026, 0, 5, 10, 0);
+  const holder = (name: string, e: { end: number; atLimit: boolean }) => ({ id: name, ask: null, name, ...e });
+  const one = (e: { end: number; atLimit: boolean }) => forecast({ now, gpus: [{ gpu: card(0), others: 0, on: [holder('filler', e)] }], sharing: false, cpu: [], slots: 4, queue: [{ id: 'w', name: 'w', gpus: 1 }] }).get('w');
+  const limit = endsBy({ status: 'running', startedAt: now, hours: 1 }, now);
+  const progress = endsBy({ status: 'running', startedAt: now - 600_000, hours: 5, metrics: { last: {}, progress: { done: 50, total: 100, at: now } } }, now);
+  assert.deepEqual([limit.atLimit, progress.atLimit], [true, false]);
+  assert.equal(estimateWords(one(limit), now, 'UTC'), '. About 11:00 at the latest, when “filler” reaches its time limit');
+  assert.equal(estimateWords(one(progress), now, 'UTC'), '. About 10:10, when “filler” should end');
 });
 
 test('a place among the runs without a GPU: where the number is set, and about when one comes free', async () => {
@@ -2672,7 +2835,7 @@ test('a place among the runs without a GPU: where the number is set, and about w
   await waits(b);
   const x = getRun(db, b.id)!;
   close(x.startsAbout, getRun(db, a.id)!.startedAt! + 3_600_000, 1e-9);
-  assert.equal(x.why, `Waiting for one of your runs without a GPU to end (1 at most at once: Where runs go changes that). About ${whenWords(x.startsAbout!, Date.now())}, when “cpu one” should end`);
+  assert.equal(x.why, `Waiting for one of your runs without a GPU to end (1 at most at once: Where runs go changes that). About ${whenWords(x.startsAbout!, Date.now())} at the latest, when “cpu one” reaches its time limit`);
   await clearQueue();
 });
 

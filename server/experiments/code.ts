@@ -159,7 +159,7 @@ export interface Manifest {
 // ---- code or data ---------------------------------------------------------------------------------------------
 
 /** The endings that make a file git does not track code or settings (.json and .txt are not among them: results are written so). */
-const CODE_ENDINGS = ['py', 'sh', 'bash', 'yaml', 'yml', 'toml', 'cfg', 'ini', 'conf', 'jinja', 'j2', 'sql', 'r', 'jl', 'lua', 'js', 'ts', 'mjs'];
+export const CODE_ENDINGS = ['py', 'sh', 'bash', 'yaml', 'yml', 'toml', 'cfg', 'ini', 'conf', 'jinja', 'j2', 'sql', 'r', 'jl', 'lua', 'js', 'ts', 'mjs'];
 const CODE_LIKE = new RegExp(`\\.(${CODE_ENDINGS.join('|')})$`, 'i');
 /** The endings of data: a file with one is never code, tracked or not. */
 const DATA_LIKE = /\.(csv|tsv|jsonl|ndjson|log|out|parquet|feather|pkl|pickle|pt|pth|ckpt|safetensors|npy|npz|h5|hdf5|db|sqlite|sqlite3)$/i;
@@ -194,7 +194,7 @@ const commandsOf = (s: Pick<JobSpec, 'command' | 'resume'>) => (s.resume ? [s.co
 export function outputsOf(spec: Spec, top: string, id: string, folder: string): Outputs {
   const cwd = real(path.resolve(spec.cwd));
   const home = os.homedir();
-  const own = [spec.metricsFile, spec.scoresFile].flatMap((f) => (f ? [runFile({ id, params: spec.params, seed: spec.seed }, f, folder)] : []));
+  const own = [spec.metricsFile, spec.scoresFile].flatMap((f) => (f ? [runFile({ id, command: spec.command, params: spec.params, seed: spec.seed }, f, folder)] : []));
   const out: Outputs = { files: [], dirs: [] };
   for (const word of [...commandsOf(spec).flatMap((c) => commandOutputs(c)), ...own]) {
     const abs = path.resolve(cwd, word.replace(/^(~|\$HOME|\$\{HOME\})(?=$|\/)/, home));
@@ -234,15 +234,22 @@ export function identityOf(m: Manifest): QueuedCode {
     files: Object.fromEntries(kept.map((f) => [f.path, f.sha])),
     whole: isWhole(m),
     changed: Object.keys(m.changed).length,
+    changedFiles: Object.keys(m.changed).slice(0, SAID),
   };
 }
 
+/** How many files of each kind the line about the kept code names. */
+const SAID = 3;
+
 const count = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
-/** For agents: what was kept, in a few words ("commit 1a2b3c4 with 3 changed files and 1 file not in git"). */
+/** " (a.py, b.py and 3 more)": the first of `all` files, by name; nothing when none is known. */
+const named = (some: string[], all: number) => (some.length ? ` (${some.slice(0, SAID).join(', ')}${all > Math.min(some.length, SAID) ? ` and ${all - Math.min(some.length, SAID)} more` : ''})` : '');
+
+/** For agents: what was kept, in a few words ("commit 1a2b3c4 with 1 changed file (train.py) and 1 file not in git (prep.py)"). */
 export function codeWords(q: QueuedCode): string {
-  const files = Object.keys(q.files).length;
-  const parts = [q.changed ? count(q.changed, 'changed file') : '', files ? `${count(files, 'file')} not in git` : ''].filter(Boolean);
+  const files = Object.keys(q.files);
+  const parts = [q.changed ? `${count(q.changed, 'changed file')}${named(q.changedFiles ?? [], q.changed)}` : '', files.length ? `${count(files.length, 'file')} not in git${named(files, files.length)}` : ''].filter(Boolean);
   const words = `commit ${q.commit.slice(0, 7)}${parts.length ? ` with ${parts.join(' and ')}` : ''}`;
   return q.whole ? words : `${words}. It could not all be kept (too large): if what was not kept changes before it starts, and something else does too, it fails rather than run other code. code: "now" runs the folder as it is then`;
 }

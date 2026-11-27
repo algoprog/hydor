@@ -120,11 +120,14 @@ export function trialAnswer(r: RunRecord, log = '', now = Date.now()): TrialAnsw
     else if (r.startedAt && last.done > 0 && last.at - r.startedAt >= 5000) step = (last.at - r.startedAt) / 1000 / last.done;
   }
   let estimate: number | undefined;
-  // A command that ended by itself with all its steps done may have cut itself short: nothing to estimate from that.
+  // How long it takes by its steps, when it did not do them all.
   if (step !== undefined && last && last.total > 0 && !failed && !(r.status === 'done' && last.done >= last.total)) {
     const startup = first && r.startedAt ? Math.max(0, (first.at - r.startedAt) / 1000 - first.done * step) : 0;
     estimate = (startup + last.total * step) / 3600;
   }
+  // One that ran to its end otherwise: the whole run takes about as long as it did.
+  const asLong = estimate === undefined && r.status === 'done' && !!r.startedAt;
+  if (asLong) estimate = Math.max(0, (r.endedAt ?? now) - r.startedAt!) / 3_600_000;
   const ask: NonNullable<TrialAnswer['ask']> = {};
   if (!failed && gpuMemGb > 0) ask.gpuMemGb = askGb(gpuMemGb);
   if (estimate !== undefined) ask.hours = askHours(estimate);
@@ -136,13 +139,15 @@ export function trialAnswer(r: RunRecord, log = '', now = Date.now()): TrialAnsw
   else if (!r.startedAt) said = 'It was stopped before it started.';
   else
     said = [
-      r.status === 'done' ? `It ran to its end in ${ran} s.` : r.why?.startsWith('Tried for') ? 'It got going.' : `It was stopped after ${ran} s.`,
-      peaks ? `It peaked at ${peaks}.` : 'It was over before its memory could be read.',
-      estimate !== undefined
-        ? `A step takes about ${stepWords(step!)}, and the whole run ${aboutWords(estimate * 3600)}.`
+      asLong
+        ? `It ran to its end in ${ran} s: the whole run takes about that long, unless your script shortens itself when it sees HYDOR_TRY.`
         : r.status === 'done'
-          ? 'If the command cuts itself short when HYDOR_TRY is set, the whole run takes longer.'
-          : 'It did not say how far it has to go.',
+          ? `It ran to its end in ${ran} s.`
+          : r.why?.startsWith('Tried for')
+            ? 'It got going.'
+            : `It was stopped after ${ran} s.`,
+      peaks ? `It peaked at ${peaks}.` : 'It was over before its memory could be read.',
+      asLong ? '' : estimate !== undefined ? `A step takes about ${stepWords(step!)}, and the whole run ${aboutWords(estimate * 3600)}.` : 'It did not say how far it has to go.',
       ask.gpuMemGb !== undefined || ask.hours !== undefined
         ? `Ask for ${[ask.gpuMemGb !== undefined ? `gpuMemGb ${ask.gpuMemGb}` : '', ask.hours !== undefined ? `hours ${ask.hours}` : ''].filter(Boolean).join(' and ')}.`
         : '',

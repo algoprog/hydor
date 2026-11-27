@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronLeft, ClipboardCopy, Download, FileText, RefreshCw } from 'lucide-react';
 import type { ResultsTable, ResultsTableSpec, RunRecord } from '@shared/experiments';
 import { betterOf } from '@shared/experiments';
+import { isOutputSetting } from '@shared/experiment-outputs';
 import { api, post } from '../../lib/api';
 import { LOCALE } from '../../i18n/locale';
 import { go } from '../../lib/nav';
@@ -228,7 +229,10 @@ export function TableDialog({ start, onClose }: { start: TableStart | null; onCl
     setMetrics(m);
     if (!start?.table && pool.length) setChosen((c) => (c.length ? c : m.slice(0, 3).map((metric) => ({ metric, better: betterOf(metric, pool[0]?.better) }))));
   }, [pool, start]);
-  const settings = useMemo(() => [...new Set(pool.flatMap((r) => Object.keys(r.params ?? {})))].filter((k) => new Set(pool.map((r) => String(r.params?.[k]))).size > 1), [pool]);
+  const settings = useMemo(
+    () => [...new Set(pool.flatMap((r) => Object.entries(r.params ?? {}).flatMap(([k, v]) => (isOutputSetting(k, v, !!r.sweep) ? [] : [k]))))].filter((k) => new Set(pool.map((r) => String(r.params?.[k]))).size > 1),
+    [pool],
+  );
 
   const spec = useMemo((): ResultsTableSpec | null => {
     if (!start || !chosen.length) return null;

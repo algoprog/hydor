@@ -136,6 +136,9 @@ function OwnCode({ r, going, open }: { r: RunRecord; going: boolean; open?: () =
         <p className={line}>
           {r.codeAt === 'start' ? (
             <span>{going ? 'It runs the folder as it was when it started. It had changed since it was queued:' : 'It ran the folder as it was when it started. It had changed since it was queued:'}</span>
+          ) : r.codeFrom ? (
+            // Queued with another run's code, which the folder had left behind before it was queued.
+            <span>{going ? 'It runs its own code, as the run it repeats ran it. The folder has changed since:' : 'It ran its own code, as the run it repeats ran it. The folder had changed since:'}</span>
           ) : (
             <span>{going ? 'It runs the code as it was when it was queued. The folder had changed since:' : 'It ran the code as it was when it was queued. The folder had changed since:'}</span>
           )}{' '}

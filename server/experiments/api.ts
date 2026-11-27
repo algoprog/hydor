@@ -14,7 +14,7 @@ import { files } from './local.ts';
 import { readFrom, tailLines, tidyLog } from './metrics.ts';
 import { agentBaseEnv } from '../env.ts';
 import { codeReader, differences, enough, makeCopy, manifestOf, NoCopy, repoOf } from './code.ts';
-import { cleanJob, seriesNow, submit, takesCode, type Place, placeOf } from './queue.ts';
+import { cleanJob, metricsNow, seriesNow, submit, takesCode, type Place, placeOf } from './queue.ts';
 import { getRun, getRunWithEvents, getTable, listRuns, newId, runFiles, runFolder, saveSweep, saveTable, systemSeriesOf, withAttempts, updateRun, workOut, type RunQuery, type RunInfo } from './records.ts';
 import { machinesRuns, remoteMachine } from './remote.ts';
 import { expandSweep, fillCommand, placeholders, settingsLine, type Value } from './sweeps.ts';
@@ -72,7 +72,9 @@ export async function runView(d: Deps, id: string, lines = 300): Promise<RunView
   const t = lines > 0 ? tailLines(files(r.folder ?? runFolder(r.id)).log, Math.min(lines, 5000)) : { text: '', size: 0 };
   const system = systemSeriesOf(d.db, r.id);
   const folderFiles = ACTIVE.includes(r.status) ? undefined : await runFiles([r.id]);
-  return { run: r, series: seriesNow(d, r.id), log: t.text, logSize: t.size, ...(Object.keys(system).length ? { system } : {}), ...(folderFiles ? { folderFiles } : {}), ...chainOf(d, r) };
+  // Read after the log, so that they are no further behind than it.
+  const metrics = metricsNow(d, r);
+  return { run: { ...r, ...(metrics ? { metrics } : {}) }, series: seriesNow(d, r.id), log: t.text, logSize: t.size, ...(Object.keys(system).length ? { system } : {}), ...(folderFiles ? { folderFiles } : {}), ...chainOf(d, r) };
 }
 
 /**

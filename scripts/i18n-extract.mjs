@@ -496,6 +496,33 @@ for (const s of [
   "Welch's t-test over {0} seeds",
 ])
   add(s, 'server/experiments/tables.ts');
+// What a results table says about the runs behind it (the notes of server/experiments/tables.ts), built from values too:
+// the clauses of what the runs without the metrics report are each a pattern of their own.
+for (const s of [
+  '1 run has none of these metrics: {0}.',
+  '{0} runs have none of these metrics: {1}.',
+  // When they all report the same, the page has that one clause only inside the sentence: each reading whole.
+  '1 run has none of these metrics: {0} reports {1} instead.',
+  '1 run has none of these metrics: {0} reports no metrics.',
+  '1 run has none of these metrics: {0} reports no number for {1}.',
+  '{0} runs have none of these metrics: {1} report {2} instead.',
+  '{0} runs have none of these metrics: {1} report no metrics.',
+  '{0} runs have none of these metrics: {1} report no number for {2}.',
+  '{0} reports {1} instead',
+  '{0} report {1} instead',
+  '{0} reports no metrics',
+  '{0} report no metrics',
+  '{0} reports no number for {1}',
+  '{0} report no number for {1}',
+  '{0} more reports other metrics',
+  '{0} more report other metrics',
+  '1 run that did not finish is left out: {0}.',
+  '{0} runs that did not finish are left out: {1}.',
+  'Some runs print “{0}”, not “{1}”: a column takes a metric’s name exactly, upper and lower case and separators too.',
+  'The rows did not all run the same code: {0} ran a later version than {1}.',
+  '{0}: its runs name different checkpoints ({1}) and are averaged as one row. If they are different models, put each in an experiment of its own and make rows by experiment.',
+])
+  add(s, 'server/experiments/tables.ts');
 // Runs that wait for the night: why one waits, and why a cluster takes none, which the pages show as the run's reason or in a
 // toast (the constants of server/experiments/night.ts), and the box a refused time names (queue.ts).
 for (const m of fs.readFileSync(path.join(ROOT, 'server/experiments/night.ts'), 'utf8').matchAll(/^(?:export )?const NIGHT_\w+ = ('(?:[^'\\]|\\.)*');$/gm)) for (const s of literals(m[1])) add(s, 'server/experiments/night.ts');
@@ -532,6 +559,9 @@ for (const s of [
   // The same with the clock written as one ("las 14:20"), and a weekday's whole reading: a weekday's own entry has the
   // capital of a label, which Spanish, French and Portuguese do not write inside a sentence.
   'About {0}:{1}, when “{2}” should end',
+  // The same when that end is the other run's time limit.
+  'About {0} at the latest, when “{1}” reaches its time limit',
+  'About {0}:{1} at the latest, when “{2}” reaches its time limit',
   'It expects to start about {0}:{1}',
   'starts about {0}:{1}',
   ...['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].flatMap((day) => [`{0}:{1} on ${day}`, `About {0}:{1} on ${day}`]),

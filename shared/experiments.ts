@@ -104,8 +104,9 @@ export interface QueuedCode {
   files: Record<string, string>;
   /** False when the patch was cut, or code or settings were too large to keep. */
   whole: boolean;
-  /** How many tracked files had changes not committed. */
+  /** How many tracked files had changes not committed, and the first of them. */
   changed?: number;
+  changedFiles?: string[];
 }
 
 /** The seconds of warning before a stop: what a run gets unless it says, and the least and most it may ask for. */
@@ -291,6 +292,8 @@ export interface RunRecord extends JobSpec {
   codeChanged?: string[];
   /** It ran from a copy of the code as queued: the folder there that stands for its own. */
   codeDir?: string;
+  /** That copy is gone: it was slimmed away when the run ended (Open its code makes one again). */
+  codeRemoved?: boolean;
   /** The command as it ran in its copy, with the variables pointed there before it, when that is not as it was given. */
   ranAs?: string;
   /** The copy made to look at its code (Open its code), once it has ended or when it ran in its folder. */
@@ -442,7 +445,7 @@ export interface ResultsTable {
   footnote?: string;
   /** What to know about it: runs left out, a test that could not be made, comparisons the seeds say little of. */
   notes?: string[];
-  /** Each column's test as made: "Welch's t-test over 3 seeds", "paired t-test over 200 examples"… */
+  /** The tests as made, in the columns' order (a column nothing was tested in has none): "Welch's t-test over 3 seeds", "paired t-test over 200 examples"… */
   tests?: string[];
 }
 

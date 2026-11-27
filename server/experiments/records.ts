@@ -298,7 +298,7 @@ export function resetRun(db: DB, id: string, why: string, o: { carry?: boolean }
   const row = db.prepare('select info, metrics from exp_runs where id = ?').get(id) as { info: string | null; metrics: string | null } | undefined;
   if (!row) return;
   const was = parse<RunInfo>(row.info, {});
-  const { gpuIds: _g, shared: _sh, startsAbout: _sa, waitingSince: _w, outputAt: _o, stopping: _s, nightStop: _n, exitCode: _e, patchPath, kept, notKept, codeAt: _ca, codeChanged: _cc, codeDir: _cd, codeView: _cv, leftInCopy: _lc, ranAs: _ra, environment: _v, sealed: _se, scores: _sc, peak: _pk, gpuTotalGb: _gt, others: _ot, memoryLimitGb: _ml, memoryLow: _mw, firstError: _fe, tried: _tr, hardStopAt: _h, carriesOn: _c, ranResume: _rr, ...rest } = was;
+  const { gpuIds: _g, shared: _sh, startsAbout: _sa, waitingSince: _w, outputAt: _o, stopping: _s, nightStop: _n, exitCode: _e, patchPath, kept, notKept, codeAt: _ca, codeChanged: _cc, codeDir: _cd, codeRemoved: _cr, codeView: _cv, leftInCopy: _lc, ranAs: _ra, environment: _v, sealed: _se, scores: _sc, peak: _pk, gpuTotalGb: _gt, others: _ot, memoryLimitGb: _ml, memoryLow: _mw, firstError: _fe, tried: _tr, hardStopAt: _h, carriesOn: _c, ranResume: _rr, ...rest } = was;
   // The code kept when it was queued stays: it starts from that again.
   const info: RunInfo = { ...(was.queuedCode ? { ...rest, patchPath, kept, notKept } : rest), ...(o.carry ? { carriesOn: true } : {}) };
   const metrics = o.carry ? parse<RunRecord['metrics'] | null>(row.metrics, null) : null;
@@ -662,9 +662,17 @@ export function runsOfSpec(db: DB, spec: ResultsTableSpec, had?: Set<string>): R
   return all.filter((r) => !away.has(r.id) || had?.has(r.id));
 }
 
+/** The runs of a group's table that did not finish, which it leaves out (none when the runs were named one by one). */
+function unfinishedOfSpec(db: DB, spec: ResultsTableSpec): RunRecord[] {
+  if (spec.runs?.length || !spec.group) return [];
+  const all = listRuns(db, { group: spec.group, status: ['stopped', 'failed', 'lost'], limit: 2000, oldest: true }).filter((r) => !isFinalRun(r));
+  const away = putAway(db, all);
+  return all.filter((r) => !away.has(r.id));
+}
+
 /** Makes a table from its spec and the runs as they are now (kept under `id` when given, else a new one: not saved). */
 export function workOut(db: DB, spec: ResultsTableSpec, id = newId('t'), had?: Set<string>): ResultsTable {
-  return makeTable(spec, runsOfSpec(db, spec, had), { id, scores: readScores });
+  return makeTable(spec, runsOfSpec(db, spec, had), { id, scores: readScores, unfinished: unfinishedOfSpec(db, spec) });
 }
 
 /** The same table worked out again from its runs as they are now (null when it is gone). */

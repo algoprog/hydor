@@ -12,20 +12,29 @@ export const TELL_AFTER_MS = 6 * 3_600_000;
 const OVERDUE_MS = 5 * 60_000;
 const HOUR = 3_600_000;
 
-/** About when a running run should end: by its progress, or its time limit, whichever comes first; Infinity: unknown. */
-export function endAbout(r: Pick<RunRecord, 'status' | 'metrics' | 'startedAt' | 'hours'>, now: number): number {
-  const limit = r.hours && r.startedAt ? r.startedAt + r.hours * HOUR : Infinity;
-  const left = progressOf(r)?.left;
-  const byProgress = left !== undefined ? r.metrics!.progress!.at + left : Infinity;
-  const end = Math.min(limit, byProgress < now - OVERDUE_MS ? Infinity : byProgress);
-  return Math.max(end, now);
-}
-
-/** A run of yours on a GPU, until when. */
-export interface Holder extends Occupant {
+/** About when something that holds a place should end; `atLimit`: that is its time limit, so at the latest. */
+export interface Ending {
   end: number;
   name: string;
+  atLimit?: boolean;
 }
+
+/**
+ * About when a running run should end: by its progress, or its time limit, whichever comes first (`atLimit`: the limit,
+ * so it may well end sooner); Infinity: unknown.
+ */
+export function endsBy(r: Pick<RunRecord, 'status' | 'metrics' | 'startedAt' | 'hours'>, now: number): { end: number; atLimit: boolean } {
+  const limit = r.hours && r.startedAt ? r.startedAt + r.hours * HOUR : Infinity;
+  const left = progressOf(r)?.left;
+  let byProgress = left !== undefined ? r.metrics!.progress!.at + left : Infinity;
+  if (byProgress < now - OVERDUE_MS) byProgress = Infinity;
+  return { end: Math.max(Math.min(limit, byProgress), now), atLimit: Number.isFinite(limit) && limit <= byProgress };
+}
+
+export const endAbout = (r: Parameters<typeof endsBy>[0], now: number): number => endsBy(r, now).end;
+
+/** A run of yours on a GPU, until when. */
+export interface Holder extends Occupant, Ending {}
 
 export interface GpuState {
   gpu: GpuNow;
@@ -77,8 +86,9 @@ export function freeBy(states: GpuState[], w: Want, sharing: boolean, now: numbe
 export interface Forecast {
   /** About when it may start. */
   at?: number;
-  /** The run whose end lets it. */
+  /** The run whose end lets it, and whether that end is its time limit. */
   because?: string;
+  atLimit?: boolean;
   /** It waits on runs that do not say how far they have to go. */
   unknown?: boolean;
 }
@@ -88,7 +98,7 @@ export interface Forecast {
  * free in their order (one that has waited long keeps the later ones from the GPUs). A run in line with no time limit
  * is taken to hold what it gets for an unknown time.
  */
-export function forecast(o: { now: number; gpus: GpuState[]; sharing: boolean; cpu: { end: number; name: string }[]; slots: number; queue: Want[] }): Map<string, Forecast> {
+export function forecast(o: { now: number; gpus: GpuState[]; sharing: boolean; cpu: Ending[]; slots: number; queue: Want[] }): Map<string, Forecast> {
   const states = o.gpus.map((s) => ({ ...s, on: [...s.on] }));
   let cpu = [...o.cpu];
   const out = new Map<string, Forecast>();
@@ -99,17 +109,18 @@ export function forecast(o: { now: number; gpus: GpuState[]; sharing: boolean; c
     for (const h of cpu) if (h.end < next) next = h.end;
     if (!Number.isFinite(next)) break;
     t = Math.max(t, next);
-    const freed = new Map<number, string>();
-    let last: string | undefined;
+    const freed = new Map<number, Ending>();
+    let last: Ending | undefined;
     for (const s of states) {
       for (const h of s.on)
         if (h.end <= t) {
-          freed.set(s.gpu.index, h.name);
-          last = h.name;
+          freed.set(s.gpu.index, h);
+          last = h;
         }
       s.on = s.on.filter((h) => h.end > t);
     }
-    const slot = cpu.find((h) => h.end <= t)?.name;
+    const slot = cpu.find((h) => h.end <= t);
+    const after = (x: Ending | undefined): Forecast => ({ at: t, because: x?.name, ...(x?.atLimit ? { atLimit: true } : {}) });
     cpu = cpu.filter((h) => h.end > t);
     let kept = false;
     for (const w of o.queue) {
@@ -117,8 +128,8 @@ export function forecast(o: { now: number; gpus: GpuState[]; sharing: boolean; c
       const end = w.hours ? t + w.hours * HOUR : Infinity;
       if (!w.gpus) {
         if (cpu.length >= o.slots) continue;
-        cpu.push({ end, name: w.name });
-        out.set(w.id, { at: t, because: slot });
+        cpu.push({ end, name: w.name, atLimit: !!w.hours });
+        out.set(w.id, after(slot));
         continue;
       }
       if (kept) continue;
@@ -129,8 +140,8 @@ export function forecast(o: { now: number; gpus: GpuState[]; sharing: boolean; c
       if (fit.length >= w.gpus) {
         const chosen = fit.slice(0, w.gpus).map((x) => x.s);
         const because = chosen.map((s) => freed.get(s.gpu.index)).find(Boolean) ?? last ?? slot;
-        for (const s of chosen) s.on.push({ id: w.id, ask: askOf(w), end, name: w.name });
-        out.set(w.id, { at: t, because });
+        for (const s of chosen) s.on.push({ id: w.id, ask: askOf(w), end, name: w.name, atLimit: !!w.hours });
+        out.set(w.id, after(because));
       } else if (w.since !== undefined && t - w.since >= NEXT_AFTER_MS) kept = true;
     }
   }
@@ -174,6 +185,10 @@ export function whenWords(at: number, now: number, tz?: string): string {
 
 /** What a waiting run's reason goes on with. */
 export function estimateWords(f: Forecast | undefined, now: number, tz?: string): string {
-  if (f?.at !== undefined) return `. About ${whenWords(f.at, now, tz)}${f.because ? `, when “${f.because}” should end` : ''}`;
+  if (f?.at !== undefined) {
+    const when = `. About ${whenWords(f.at, now, tz)}`;
+    if (!f.because) return when;
+    return f.atLimit ? `${when} at the latest, when “${f.because}” reaches its time limit` : `${when}, when “${f.because}” should end`;
+  }
   return f?.unknown ? '. No telling when: those runs do not say how far they have to go' : '';
 }

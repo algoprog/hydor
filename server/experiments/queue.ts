@@ -27,7 +27,7 @@ import { describeAfterSubmit } from './describe.ts';
 import { stampRun } from './evaluations.ts';
 import { KILLED_WHY, memoryNearLimit, oomWords, scanLog } from './failures.ts';
 import { askOf, chooseGpus, gpuList, gpusVia, othersOn, readGpus, roomOn, type GpuReading, type Others } from './gpus.ts';
-import { endAbout, estimateWords, forecast, freeBy, gpuCountWords, NEXT_AFTER_MS, TELL_AFTER_MS, waitedWords, whenWords, type Forecast, type GpuState, type Holder, type Want } from './forecast.ts';
+import { endsBy, estimateWords, forecast, freeBy, gpuCountWords, NEXT_AFTER_MS, TELL_AFTER_MS, waitedWords, whenWords, type Ending, type Forecast, type GpuState, type Holder, type Want } from './forecast.ts';
 import { projectFor } from './project.ts';
 import { endUsage, sampleRuns, startUsage } from './usage.ts';
 import { aliveLocal, exitOf, files, startLocal, stopLocal, wrapperScript } from './local.ts';
@@ -721,6 +721,31 @@ function readLocal(r: RunRecord, L: Live, all = false) {
   }
 }
 
+/**
+ * The metrics of a run going here, with its log and metrics file read to where they end now (the record's are written
+ * every ten seconds), so that they agree with the end of its log. Any other run's are its record's.
+ */
+export function metricsNow(d: Deps, r: RunRecord): RunRecord['metrics'] {
+  if (r.status !== 'running' || r.remote || placeOf(r.where).kind !== 'local') return r.metrics;
+  const L = liveOf(d, r);
+  readLocal(r, L, true);
+  const now = L.tracker.snapshot();
+  return r.metrics || Object.keys(now.last).length || now.progress ? now : undefined;
+}
+
+/**
+ * Before a run going here is read: when it has ended meanwhile (it left its exit code), the queue is waited for to
+ * close its record (at most `ms`), so that what is read says so.
+ */
+export async function catchUp(d: Deps, id: string, ms = 10_000): Promise<void> {
+  const until = Date.now() + ms;
+  for (;;) {
+    const r = getRun(d.db, id);
+    if (!r || r.remote || r.status !== 'running' || placeOf(r.where).kind !== 'local' || exitOf(r.folder ?? runFolder(r.id)) === null || Date.now() >= until) return;
+    await lookedAt(until - Date.now());
+  }
+}
+
 /** Writes down a run's metrics and where its reading got to, when due (or now), and tells the pages. */
 function save(d: Deps, r: RunRecord, L: Live, now = false) {
   const t = Date.now();
@@ -919,7 +944,9 @@ export function onCallBrief(d: Deps, r: RunRecord, kind: WatchKind, text: string
     `Command: ${r.command}`,
     r.resume ? `To carry on from its last checkpoint: ${r.resume} (experiment_run with again and carryOn: true runs that)` : '',
     `Folder: ${r.cwd}${place.kind === 'cluster' ? ` (on the cluster ${whereWords(d.db, r)}, reached with ssh ${getCluster(d.db, place.id)?.host ?? ''})` : ''}`,
-    r.codeDir ? `The folder had changed since it was queued, so it ran from a copy of the code as queued: ${r.codeDir} (the paths in its log are the copy’s; running it again with experiment_run takes the folder as it is now).` : '',
+    r.codeDir
+      ? `${r.codeFrom ? 'It ran its own code, as the run it repeats ran it, from a copy, as the folder differs' : 'The folder had changed since it was queued, so it ran from a copy of the code as queued'}: ${r.codeRemoved ? 'the copy was removed when it ended' : r.codeDir} (the paths in its log are the copy’s; to run it again with experiment_run, give code "own" for what it ran or "now" for the folder as it is).`
+      : '',
     r.ranAs ? `Run as: ${r.ranAs}` : '',
     `Where: ${whereWords(d.db, r)}${r.gpus ? `; it asked for ${r.gpus} GPU${r.gpus === 1 ? '' : 's'}${r.gpuMemGb ? ` with ${r.gpuMemGb} GB free each` : ''}` : ''}`,
     `Status: ${r.status}${r.why ? ` (${r.why})` : ''}${r.startedAt ? `; started ${new Date(r.startedAt).toISOString()}` : ''}${r.exitCode !== undefined && r.exitCode !== null ? `; exit code ${r.exitCode}` : ''}`,
@@ -1157,8 +1184,10 @@ async function sweepEnding(d: Deps, sweep: string, morning = false) {
 
 /** A run ended (with its exit code; null: it went missing). Its last output is read, its metrics kept, you told. */
 async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { missing?: string; why?: string; oom?: boolean; preempted?: boolean; noExitCode?: boolean } = {}) {
+  // Its log and its metrics file to their ends, a last line without a newline too, before the record is closed.
   if (placeOf(r.where).kind === 'local') readLocal(r, L, true);
   if (L.carry) consume(L, '\n', 'log');
+  if (L.fileCarry) consume(L, '\n', 'file');
   // What its last output said (NaN, divergence) is noticed before its end is.
   await watchOutput(d, { ...r, status: 'done' }, L);
   await endUsage(d.db, r);
@@ -1291,6 +1320,8 @@ async function fromCopy(d: Deps, r: RunRecord): Promise<string[]> {
     addEvent(d.db, r.id, { kind: 'note', text: `Its copy could not be tidied after it ran (${(e as Error).message}): what it made stays there` });
   }
   if (left.length) addEvent(d.db, r.id, { kind: 'note', text: `Left in its copy, as its folder has its own: ${left.slice(0, 5).join(', ')}${left.length > 5 ? ` and ${left.length - 5} more` : ''}` });
+  // Nothing stayed: the record says the copy it names is no longer there.
+  if (!fs.existsSync(r.codeDir)) updateRun(d.db, r.id, { info: { codeRemoved: true } });
   return left;
 }
 
@@ -1418,15 +1449,16 @@ async function startWaiting(d: Deps, night: string | null, settings: Experiments
   const sharing = settings.shareGpus;
   // Your runs on each GPU, and those without one, each with when it should end.
   const on = new Map<number, Holder[]>();
-  const cpu: { end: number; name: string }[] = [];
-  const takes = (r: RunRecord, ids: number[], end: number) => {
-    for (const i of ids) on.set(i, [...(on.get(i) ?? []), { id: r.id, ask: askOf(r), end, name: r.name ?? r.id }]);
-    if (!r.gpus) cpu.push({ end, name: r.name ?? r.id });
+  const cpu: Ending[] = [];
+  const takes = (r: RunRecord, ids: number[], { end, atLimit }: { end: number; atLimit: boolean }) => {
+    for (const i of ids) on.set(i, [...(on.get(i) ?? []), { id: r.id, ask: askOf(r), end, atLimit, name: r.name ?? r.id }]);
+    if (!r.gpus) cpu.push({ end, atLimit, name: r.name ?? r.id });
   };
-  for (const r of going) takes(r, r.gpuIds ?? [], endAbout(r, now));
+  for (const r of going) takes(r, r.gpuIds ?? [], endsBy(r, now));
   const onAtFirst = new Map(on);
   const goingIds = new Set(going.map((r) => r.id));
   const endIfStarted = (r: RunRecord) => (r.hours ? now + r.hours * 3_600_000 : Infinity);
+  const started = (r: RunRecord) => ({ end: endIfStarted(r), atLimit: !!r.hours });
   const slots = settings.cpuSlots;
   let free = slots - going.filter((r) => !r.gpus).length;
   let reading: GpuReading | null = null;
@@ -1470,7 +1502,7 @@ async function startWaiting(d: Deps, night: string | null, settings: Experiments
     if (!need) {
       if (free > 0) {
         free--;
-        takes(r, [], endIfStarted(r));
+        takes(r, [], started(r));
         await begin(d, r, []);
         came = null;
         use = ceilingUse(d.db);
@@ -1497,7 +1529,7 @@ async function startWaiting(d: Deps, night: string | null, settings: Experiments
     const pick = chooseGpus(reading.gpus, need, r.gpuMemGb, new Set([...taken, ...against.flatMap((k) => [...k.gpus])]), how);
     if ('ids' in pick) {
       const shared = pick.ids.flatMap((gpu) => (on.get(gpu)?.length ? [{ gpu, runs: on.get(gpu)!.map((h) => h.id) }] : []));
-      takes(r, pick.ids, endIfStarted(r));
+      takes(r, pick.ids, started(r));
       await begin(d, r, pick.ids, reading, shared);
       came = null;
       use = ceilingUse(d.db);
@@ -1593,7 +1625,7 @@ async function launch(d: Deps, r: RunRecord, o: { gpuIds: number[]; reading?: Gp
     cwd = copy.cwd;
     env = { ...env, ...there.env, HYDOR_CODE_DIR: copy.cwd };
     updateRun(d.db, r.id, { info: { ...recordOfCode(code, folder), ...differ, codeAt: 'queued', codeDir: copy.cwd, ranAs: ranAs(commandOf(r), there) } });
-    addEvent(d.db, r.id, { kind: 'note', text: 'The folder had changed since it was queued: it runs a copy of the code as it was queued' });
+    addEvent(d.db, r.id, { kind: 'note', text: r.codeFrom ? 'It runs its own code, as the run it repeats ran it: the folder has changed since' : 'The folder had changed since it was queued: it runs a copy of the code as it was queued' });
   } else if (code && !changed.length) {
     const kept = await keepNewlyNamed(code, r, folder).catch(() => code);
     updateRun(d.db, r.id, { info: { ...recordOfCode(kept, folder), codeAt: 'queued' } });
@@ -1871,7 +1903,9 @@ async function followCluster(d: Deps, r: RunRecord) {
       if (c.kind === 'slurm') addEvent(d.db, r.id, { kind: 'note', text: `It had not left ${r.grace ?? GRACE.default} seconds after the warning, so it was stopped hard` });
     }
   }
-  await readThere(d, r, c.host, L, state.ended);
+  let more = await readThere(d, r, c.host, L, state.ended);
+  // One that ended is read to the end of its log and its metrics file, however much is left.
+  for (let i = 0; state.ended && more && i < 50; i++) more = await readThere(d, r, c.host, L, true);
   if (!state.ended) {
     if (state.status === 'running' && r.status !== 'running') {
       updateRun(d.db, r.id, { status: 'running', why: null, startedAt: Date.now(), info: { startsAbout: undefined, startsGuess: undefined } });
@@ -1909,9 +1943,9 @@ function wholeChars(buf: Buffer): Buffer {
 /**
  * A run's new output on a cluster, in one call: its log from where the last look stopped (copied here as it comes) and,
  * when it names a metrics file, that file's new part (from its start again if it became shorter). A file that is not
- * there is nothing new.
+ * there is nothing new. True when a piece came full, so that more may follow.
  */
-async function readThere(d: Deps, r: RunRecord, host: string, L: Live, ended: boolean) {
+async function readThere(d: Deps, r: RunRecord, host: string, L: Live, ended: boolean): Promise<boolean> {
   const dir = r.remoteDir!;
   const most = ended ? 8 << 20 : 1 << 20;
   let script = `tail -c +${L.log + 1} ${q(`${dir}/log.txt`)} 2>/dev/null | head -c ${most} | base64 | tr -d '\\n'`;
@@ -1922,9 +1956,11 @@ async function readThere(d: Deps, r: RunRecord, host: string, L: Live, ended: bo
   const got = await runSsh(host, script, { timeoutMs: 60_000 });
   const [log, metrics] = got.out.split('@@\n');
   // A call cut short could leave half a chunk: only a whole answer is taken.
-  if (got.code !== 0) return;
+  if (got.code !== 0) return false;
+  let full = false;
   if (log?.trim()) {
     const chunk = wholeChars(Buffer.from(log.trim(), 'base64'));
+    full = chunk.length >= most - 3;
     try {
       fs.mkdirSync(r.folder ?? runFolder(r.id), { recursive: true });
       fs.appendFileSync(files(r.folder ?? runFolder(r.id)).log, chunk);
@@ -1933,12 +1969,13 @@ async function readThere(d: Deps, r: RunRecord, host: string, L: Live, ended: bo
     consume(L, chunk.toString('utf8'), 'log');
   }
   const m = /^(\d+)\n([\s\S]*)$/.exec(metrics ?? '');
-  if (!m) return;
+  if (!m) return full;
   const from = Number(m[1]);
   if (from < L.file) L.fileCarry = '';
   const chunk = wholeChars(Buffer.from(m[2].trim(), 'base64'));
   L.file = from + chunk.length;
   if (chunk.length) consume(L, chunk.toString('utf8'), 'file');
+  return full || chunk.length >= most - 3;
 }
 
 /** A cluster run's per-example scores (the file it named, else scores.jsonl in its folder there), copied here when it ends. */

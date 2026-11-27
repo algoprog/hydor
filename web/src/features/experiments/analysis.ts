@@ -2,6 +2,7 @@
 // into sections (dev, train, …), smoothing a curve, plotting one metric along another, the metrics that matter most
 // across an experiment, the hyperparameters that differ between its runs, and how strongly each goes with a metric.
 import { betterOf, type MetricSeries, type RunRecord } from '@shared/experiments';
+import { isOutputSetting } from '@shared/experiment-outputs';
 import { metricScore, metricsOf, num, rankMetrics } from './api';
 
 /** Runs drawn on the charts at once, at most: one colour each, in the charts' fixed order, never cycled. */
@@ -295,10 +296,13 @@ export function paramsOf(r: RunRecord): Record<string, string | number | boolean
 /** Names of hyperparameters that only say where a run writes or what it is called (out, output_dir, run_name…): never shown by default. */
 export const OUTPUT_PARAM = /^(out|output|outdir|out_dir|output_dir|save_dir|save_path|logdir|log_dir|checkpoint_dir|ckpt_dir|run_name|name|exp_name|wandb_name|wandb_project)$/i;
 
-/** Every hyperparameter the runs have, in the order they first come (the newest run's order first). */
+/**
+ * Every hyperparameter the runs have, in the order they first come (the newest run's order first). One that only says
+ * where a run writes or which checkpoint it goes on from (kept with runs recorded before) is not one.
+ */
 export function allParams(runs: RunRecord[]): string[] {
   const seen = new Set<string>();
-  for (const r of [...runs].sort((a, b) => b.createdAt - a.createdAt)) for (const k of Object.keys(paramsOf(r))) seen.add(k);
+  for (const r of [...runs].sort((a, b) => b.createdAt - a.createdAt)) for (const [k, v] of Object.entries(paramsOf(r))) if (!isOutputSetting(k, v, !!r.sweep)) seen.add(k);
   return [...seen];
 }
 

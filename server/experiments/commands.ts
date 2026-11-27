@@ -43,12 +43,14 @@ const flagWords = (name: string, value: unknown, command: string) => {
 
 /**
  * A name for each of these commands (all different) by what tells them apart: the script when the scripts differ,
- * else the flags that differ, else the command cut at 60 characters.
+ * else the flags that differ, else the command cut at 60 characters. The commands are given without what only says
+ * where they write (shared/experiment-outputs.ts), so no label names that.
  */
 export function commandLabels(commands: string[]): string[] {
   const scripts = commands.map(scriptOf);
   const byScript = new Set(scripts).size > 1;
-  const flags = commands.map((c) => paramsOf(c));
+  // Whatever flags are left in them tell them apart.
+  const flags = commands.map((c) => paramsOf(c, { outputs: true }));
   const labels = commands.map((command, i): string => {
     // The others this one is not told apart from yet: all of them, or those running the same script.
     const same = commands.flatMap((_, j) => (!byScript || scripts[j] === scripts[i] ? [j] : []));

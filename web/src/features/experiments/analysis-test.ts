@@ -160,11 +160,18 @@ const run = (more: Partial<RunRecord> & { last?: Record<string, number>; curves?
   const a = run({ params: { lr: 0.1, mode: 'a', out: '/x/1', same: 3 }, seed: 1 });
   const b = run({ params: { lr: 0.01, mode: 'a', out: '/x/2', same: 3, extra: true }, seed: 1 });
   const ps = A.allParams([a, b]);
-  assert.deepEqual([...ps].sort(), ['extra', 'lr', 'mode', 'out', 'same', 'seed']);
+  assert.deepEqual([...ps].sort(), ['extra', 'lr', 'mode', 'same', 'seed'], 'where a run writes is no hyperparameter');
   assert.equal(ps[0], 'lr', 'the newest run’s order first') ;
   assert.deepEqual(A.differingParams([a, b]).sort(), ['extra', 'lr'], 'output names and a seed that is the same are left out; a missing one differs');
   assert.deepEqual(A.differingParams([a]), []);
   assert.deepEqual(A.paramsOf(a).seed, 1);
+  // A trial's runs recorded before: their out and ckpt are neither shown as hyperparameters nor compared.
+  const old = [0.01, 0.03].map((lr) => run({ params: { lr, out: `outputs/lr${lr}/result.json`, ckpt: `outputs/lr${lr}/ckpt.json` } }));
+  assert.deepEqual(A.differingParams(old), ['lr']);
+  assert.deepEqual(A.allParams(old), ['lr']);
+  // Settings that only look like them stay; so do the checkpoints a sweep varies.
+  assert.deepEqual(A.allParams([run({ params: { save_steps: 500, log_level: 'info', pred_len: 96, checkpoint: 'resnet50', save_metric: 'val/mrr' } })]).sort(), ['checkpoint', 'log_level', 'pred_len', 'save_metric', 'save_steps']);
+  assert.deepEqual(A.differingParams(['a', 'b'].map((m) => run({ sweep: 'sw1', params: { ckpt: `models/${m}.pt`, out: `res/${m}.json` } }))), ['ckpt']);
   assert.equal(A.paramText(0.5), '0.5');
   assert.equal(A.paramText(true), 'true');
   assert.equal(A.paramText(false), 'false');

@@ -5,9 +5,10 @@
 // another attempt at it (its `from`: Run again, or an agent's `replaces`), or, with nothing said, that is the very same
 // job (command, folder, where, seed, settings, variables) queued after it had ended. A run that finished is never
 // replaced: running it again is a repeat. The runs of such a chain show as one row, the latest of them.
+import { isOutputSetting, sweptCheckpoint, withoutOutputs } from './experiment-outputs.ts';
 import { isTrialRun, type RunRecord } from './experiments.ts';
 
-type Run = Pick<RunRecord, 'id' | 'status' | 'command' | 'cwd' | 'createdAt'> & Partial<Pick<RunRecord, 'group' | 'from' | 'endedAt' | 'seed' | 'env' | 'params' | 'where' | 'tags' | 'stopping'>>;
+type Run = Pick<RunRecord, 'id' | 'status' | 'command' | 'cwd' | 'createdAt'> & Partial<Pick<RunRecord, 'group' | 'from' | 'endedAt' | 'seed' | 'env' | 'params' | 'where' | 'tags' | 'stopping' | 'sweep'>>;
 
 /** What a listed run is told about its chain. */
 export interface Attempt {
@@ -29,8 +30,15 @@ const chained = (r: Run) => !isTrialRun({ tags: r.tags, env: r.env }) && !(r.tag
 
 const sorted = (o: Record<string, unknown> | undefined) => JSON.stringify(Object.entries(o ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)));
 
-/** The very same job: what a run is told apart by when nothing says which run it follows. Numbers and seeds count as written. */
-const sameJob = (r: Run) => JSON.stringify([r.group, r.command.trim().replace(/[ \t]+/g, ' '), r.cwd, r.where ?? 'local', r.seed ?? null, sorted(r.env), sorted(r.params)]);
+/**
+ * The very same job: what a run is told apart by when nothing says which run it follows. Numbers and seeds count as
+ * written; where it writes and which checkpoint it goes on from do not count (experiment-outputs.ts).
+ */
+const sameJob = (r: Run) => {
+  const command = withoutOutputs(r.command, { keepCheckpoints: sweptCheckpoint(r) }).replace(/[ \t]+/g, ' ');
+  const params = Object.fromEntries(Object.entries(r.params ?? {}).filter(([k, v]) => !isOutputSetting(k, v, !!r.sweep)));
+  return JSON.stringify([r.group, command, r.cwd, r.where ?? 'local', r.seed ?? null, sorted(r.env), sorted(params)]);
+};
 
 /** Each run's place in its chain, by id; runs of no chain are left out. The runs given are those of one computer. */
 export function attemptsOf(runs: Run[]): Map<string, Attempt> {

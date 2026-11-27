@@ -182,7 +182,7 @@ test('a note is one line of at most 500 characters, says who wrote it, and an ag
   assert.ok(!(await call('experiment_note', { id: 'no11', note: 'ran on the old split of May' })).isError, 'its own it may change');
   assert.ok((await call('experiment_note', { id: 'nope', note: 'x' })).isError);
   const listed = JSON.parse((await call('experiment_list', { group: 'notes' })).text).runs[0];
-  assert.deepEqual([listed.note, listed.note_by], ['ran on the old split of May', 'agent']);
+  assert.deepEqual([listed.note, listed.noteBy], ['ran on the old split of May', 'agent']);
   assert.equal(JSON.parse((await call('experiment_get', { id: 'no11' })).text).run.note, 'ran on the old split of May');
   // A call from inside the app is an agent's.
   made({ id: 'no22', group: 'notes' });

@@ -6,6 +6,7 @@
 // refuses), or it is an agent on call, whose rules the user gave. The card says the GPU hours a start may use; a
 // budget the user gave the session (experiment_budget) starts what stays within it without one (budget.ts).
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { TEST_READABLE, type EvalScore, type EvalSpec, type Evaluation } from '../../shared/evaluations.ts';
 import { canBeReplaced } from '../../shared/experiment-attempts.ts';
@@ -15,15 +16,15 @@ import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { RunCtx, RunTool, ToolOutput } from '../features/types.ts';
 import { confirmChange, modeOf } from '../guide/api.ts';
-import { makeTable, runView, startSweep } from './api.ts';
+import { codeStatus, makeTable, runView, startSweep } from './api.ts';
 import { budgetNow, claimBudget, costLine, giveBudget, gpuHoursOf, heldNow, overWords, refuseAtCeiling } from './budget.ts';
 import { allowedFolder, ChangedError, check, cleanSpec, createEvaluation, evaluationsFor, getEvaluation, getScore, listed, listScores, measure, mustEvaluation, rootFor, startScore, testReadable, waitScore } from './evaluations.ts';
 import type { Candidate, Evolution } from '../../shared/evolve.ts';
 import { candidateDetail, candidatesOf, checkEvolveSpec, EVOLVE, listEvolutions, mustEvolution, startEvolution } from './evolve.ts';
-import { cleanJob, codeTaken, lookedAt, onCallSession, placeOf, placesLine, runAgain, sentToCluster, settingsOf, stopRun, submit, waitRuns, whereWords } from './queue.ts';
+import { catchUp, cleanJob, codeTaken, lookedAt, onCallSession, placeOf, placesLine, runAgain, sentToCluster, settingsOf, stopRun, submit, waitRuns, whereWords } from './queue.ts';
 import { NIGHT_CLUSTER, nightZone, tonightMore, tonightWords, type NightCode } from './night.ts';
-import { codeWords } from './code.ts';
-import { keepUntracked, keptWords, localShell } from './capture.ts';
+import { CODE_ENDINGS, codeWords } from './code.ts';
+import { KEEP_ALL, KEEP_FILE, keepUntracked, keptWords, localShell } from './capture.ts';
 import { agentBaseEnv } from '../env.ts';
 import { sawEnded } from './notices.ts';
 import { cleanNote, patchRun } from './marks.ts';
@@ -36,7 +37,8 @@ const json = (v: unknown): string => JSON.stringify(v, null, 1);
 /** The files a run on this computer names that git does not track, in a sentence: as kept, or (not started yet) as they will be. */
 async function notInGit(r: RunRecord): Promise<string> {
   if (r.remote || (r.where && r.where !== 'local') || isScoringRun(r)) return '';
-  if (r.queuedCode || (r.status !== 'queued' && r.status !== 'waiting')) return keptWords(r);
+  // (One starting may not have recorded them yet.)
+  if (r.queuedCode || (r.status !== 'queued' && r.status !== 'waiting' && r.status !== 'starting')) return keptWords(r);
   return keptWords(await keepUntracked(localShell(r.cwd, { ...agentBaseEnv(), ...r.env }), r.command, r.cwd, null).catch(() => ({ kept: [], notKept: [] })));
 }
 
@@ -54,23 +56,81 @@ function tonight(ctx: RunCtx, where: string | undefined): string {
   return tonightWords(settingsOf(ctx.deps.db), p.kind === 'machine' ? (remoteMachine(p.id)?.name ?? p.id) : undefined);
 }
 
-/** What was kept of a run's code when it was queued, in the answer's own short field. */
-function codeKept(r: RunRecord | null | undefined): { code?: string } {
+/** What was kept of a run's code when it was queued, in the answer's own short field. `again`: it is a run started again. */
+function codeKept(r: RunRecord | null | undefined, again = false): { code?: string } {
   if (!r?.queuedCode) return {};
   const kept = codeWords(r.queuedCode);
-  return { code: r.code === 'now' ? `the folder as it is when it starts (code: "now"); as queued: ${kept}` : kept };
+  if (r.codeFrom) return { code: `its own: ${kept}` };
+  if (r.code === 'now') return { code: `the folder as it is when it starts (code: "now"); as queued: ${kept}` };
+  return { code: again ? `the folder as it is now: ${kept}` : kept };
 }
 
-/** What experiment_run answers with. */
-async function started(put: RunRecord, ctx: RunCtx): Promise<string> {
-  // One that has to wait here says why, and about when it may start: known once the queue has looked. One the ceiling
-  // on agents' GPU hours holds is held at once.
+/** A moment as ISO 8601 with its offset, on the person's clock: "2026-11-27T21:56:00+02:00". */
+function isoWith(at: number, tz?: string): string {
+  const whole = Math.floor(at / 1000) * 1000;
+  let parts: Intl.DateTimeFormatPart[];
+  const o: Intl.DateTimeFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
+  try {
+    parts = new Intl.DateTimeFormat('en-US', { ...o, timeZone: tz }).formatToParts(whole);
+  } catch {
+    parts = new Intl.DateTimeFormat('en-US', o).formatToParts(whole);
+  }
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  const clock = `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`;
+  const off = Math.round((Date.parse(`${clock}Z`) - whole) / 60_000);
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${clock}${off < 0 ? '-' : '+'}${two(Math.floor(Math.abs(off) / 60))}:${two(Math.abs(off) % 60)}`;
+}
+
+/** "about 3 minutes", "about 5 hours": how long from now. */
+function fromNow(ms: number): string {
+  if (ms <= 0) return 'any moment';
+  if (ms < 60_000) return 'under a minute';
+  const many = (n: number, one: string) => `about ${n} ${one}${n === 1 ? '' : 's'}`;
+  const m = Math.round(ms / 60_000);
+  if (m < 90) return many(m, 'minute');
+  return m < 48 * 60 ? many(Math.round(m / 60), 'hour') : many(Math.round(m / 1440), 'day');
+}
+
+/** When a waiting run may start, for an agent, whose clock may be in another zone than the reason's words. */
+function startsFields(db: RunCtx['deps']['db'], r: Pick<RunRecord, 'status' | 'startsAbout'>): { startsAbout?: string; startsIn?: string } {
+  return r.status === 'waiting' && r.startsAbout ? { startsAbout: isoWith(r.startsAbout, nightZone(db)), startsIn: fromNow(r.startsAbout - Date.now()) } : {};
+}
+
+/** A run's code in a few characters: its commit, and how many tracked files had changes not committed. */
+function shortCode(r: RunRecord): string | undefined {
+  // One that ran the folder as it was at its start, which had changed, ran what was read then.
+  const q = r.codeAt === 'start' && r.codeChanged?.length ? undefined : r.queuedCode;
+  const commit = q?.commit ?? r.commit;
+  if (!commit) return undefined;
+  const changed = q ? (q.changed ? ` + ${q.changed} changed` : '') : r.dirty ? ' + changed' : '';
+  return `${commit.slice(0, 7)}${changed}`;
+}
+
+const andMore = (files: string[]) => `${files[0]}${files.length > 1 ? ` and ${files.length - 1} more` : ''}`;
+
+/**
+ * A run started again whose folder has changed since says which code it takes: never guessed. Why it is refused, or
+ * null. `asked`: the code given; `moved`: it is started in another folder or place, where its own code does not go.
+ */
+async function whichCode(ctx: RunCtx, prev: RunRecord, asked: unknown, moved: boolean): Promise<string | null> {
+  if (asked === 'own' || asked === 'now' || (asked === undefined && moved)) return null;
+  if (asked !== undefined && asked !== 'queued') return 'With again, code is "own" (what that run ran) or "now" (the folder as it is).';
+  const st = await codeStatus(ctx.deps, prev.id);
+  if (!st.differs) return asked === 'queued' ? 'With again, code is "own" (what that run ran) or "now" (the folder as it is).' : null;
+  const how = st.own ? 'give code "own" to run what it ran, or "now" to run the folder as it is' : 'and cannot be put back as it was: give code "now" to run the folder as it is';
+  return `That run’s own code differs from the folder now (${andMore(st.changed)})${st.own ? ':' : ''} ${how}.`;
+}
+
+/** What experiment_run answers with. `replaces`: the run it was said to take the place of; `carryOn`: asked to carry on. */
+async function started(put: RunRecord, ctx: RunCtx, o: { replaces?: string; carryOn?: boolean; again?: boolean } = {}): Promise<string> {
+  // What it does by now: it has started, or it waits (why, and about when it may start), known once the queue has
+  // looked. One the ceiling on agents' GPU hours holds is held at once.
   await codeTaken(put.id);
   let r = heldNow(ctx.deps, getRun(ctx.deps.db, put.id) ?? put);
-  if (r.status === 'queued' && placeOf(put.where).kind === 'local' && !put.remote) {
+  if ((r.status === 'queued' || r.status === 'starting') && !r.held && placeOf(put.where).kind === 'local' && !put.remote) {
     await lookedAt(3000);
-    const now = getRun(ctx.deps.db, put.id);
-    if (now?.status === 'waiting') r = now;
+    r = getRun(ctx.deps.db, put.id) ?? r;
   }
   // One for a cluster is sent first: a cluster that refuses it says so now, and one that takes it says about when it starts.
   if (put.status === 'queued' && placeOf(put.where).kind === 'cluster') {
@@ -83,7 +143,11 @@ async function started(put: RunRecord, ctx: RunCtx): Promise<string> {
   const peak = r.gpus && !r.gpuMemGb && !r.remote && (r.where ?? 'local') === 'local' ? lastPeak(ctx.deps.db, r.command, r.cwd, { not: r.id }) : undefined;
   const note = [isHeld(r) ? HELD_NOTE : '', git, peak ? peakNote(peak) : ''].filter(Boolean).join(' ');
   const gpuHours = gpuHoursOf(ctx.deps.db, r);
-  return json({ id: r.id, gpuHours, status: r.status, ...(r.why ? { why: r.why } : {}), ...(r.status === 'waiting' && r.startsAbout ? { startsAbout: r.startsAbout } : {}), ...(r.when ? { when: r.when, starts: tonight(ctx, where), ...nightMore(ctx, where, r) } : {}), ...codeKept(r), name: r.name, page: `/experiments/${r.id}`, ...(note ? { note } : {}) });
+  // The run whose place it takes: the earlier attempt it now stands for, or the one named that is still stopping.
+  const replaces = withAttempts(ctx.deps.db, [r])[0].retryOf ?? (o.replaces && getRun(ctx.deps.db, o.replaces)?.stopping ? o.replaces : undefined);
+  const carries = (r.carriesOn || o.carryOn) && r.resume ? { carriesOn: true, runs: r.resume } : {};
+  const ahead = r.status === 'queued' || r.status === 'waiting';
+  return json({ id: r.id, gpuHours, status: r.status, ...(r.why ? { why: r.why } : {}), ...startsFields(ctx.deps.db, r), ...(replaces ? { replaces } : {}), ...carries, ...(r.when ? { when: r.when, ...(ahead ? { starts: tonight(ctx, where), ...nightMore(ctx, where, r) } : {}) } : {}), ...codeKept(r, o.again), name: r.name, page: `/experiments/${r.id}`, ...(note ? { note } : {}) });
 }
 
 const failed = (e: unknown): ToolOutput => ({ text: (e as Error)?.message ?? String(e), isError: true });
@@ -181,18 +245,23 @@ const brief = (db: RunCtx['deps']['db'], r: RunRecord, titles?: Map<string, stri
   ...(r.group && titles?.get(r.group) ? { experiment_title: titles.get(r.group) } : {}),
   status: r.status,
   ...(r.why ? { why: r.why } : {}),
+  ...(r.firstError && (r.status === 'failed' || r.status === 'lost') ? { error: r.firstError.text.slice(0, 300) } : {}),
   where: whereWords(db, r),
   ...(r.params && Object.keys(r.params).length ? { params: r.params } : {}),
   ...(r.seed !== undefined ? { seed: r.seed } : {}),
+  ...startsFields(db, r),
+  ...(shortCode(r) ? { code: shortCode(r) } : {}),
   metrics: r.metrics ?? { last: {} },
   ...(r.when ? { when: r.when } : {}),
   ...(r.startedAt ? { startedAt: r.startedAt } : {}),
   ...(r.endedAt ? { endedAt: r.endedAt } : {}),
-  ...(r.note ? { note: r.note, note_by: r.noteBy ?? 'user' } : {}),
+  ...(r.note ? { note: r.note, noteBy: r.noteBy ?? 'user' } : {}),
   ...(r.starredAt ? { starred: true } : {}),
-  ...(r.retryOf ? { attempt: r.attempt, retry_of: r.retryOf } : {}),
-  ...(r.replacedBy ? { replaced_by: r.replacedBy } : {}),
-  ...(r.restartedAs ? { started_again_as: r.restartedAs } : {}),
+  ...(r.retryOf ? { attempt: r.attempt, retryOf: r.retryOf } : {}),
+  // Started again from a run it is no other attempt at (one that finished, say).
+  ...(r.from && !r.retryOf ? { againOf: r.from } : {}),
+  ...(r.replacedBy ? { replacedBy: r.replacedBy } : {}),
+  ...(r.restartedAs ? { restartedAs: r.restartedAs } : {}),
   ...sealChanged(r),
 });
 
@@ -220,7 +289,7 @@ const JOB_PROPS = (ctx: RunCtx) => {
       type: 'string',
       enum: ['queued', 'now'],
       description:
-        'Which code runs when files in the folder change while it waits (a folder in a git repository, on this computer or another of your machines; not a cluster). "queued" (the default): by default the code as it is when you call this is what runs, even if you change files while it waits: if the folder has changed by then, it runs from a copy of that code, with data linked in: everything git does not track that is not code, what the command writes, and tracked data files such as .csv or .pt ($HYDOR_CODE_DIR is the copy, $HYDOR_PROJECT_DIR the folder; what it writes into folders that are new shows in the folder when it ends). "now": it runs the folder as it is when the run starts.',
+        'Which code runs when files in the folder change while it waits (a folder in a git repository, on this computer or another of your machines; not a cluster). "queued" (the default): by default the code as it is when you call this is what runs, even if you change files while it waits: if the folder has changed by then, it runs from a copy of that code, with data linked in: everything git does not track that is not code, what the command writes, and tracked data files such as .csv or .pt ($HYDOR_CODE_DIR is the copy, $HYDOR_PROJECT_DIR the folder; what it writes into folders that are new shows in the folder when it ends). "now": it runs the folder as it is when the run starts. A change is one to a file git tracks, or to an untracked code or settings file kept when it was queued: a new file git does not track does not count.',
     },
     name: { type: 'string', description: 'A short name for the run (default: its script).' },
     group: { type: 'string', description: 'The experiment it belongs to: runs of one experiment are listed and compared together.' },
@@ -231,7 +300,7 @@ const JOB_PROPS = (ctx: RunCtx) => {
     gpus: { type: 'number', description: 'GPUs it needs (0 for none; default 1 on a computer with GPUs, else 0). It waits until that many are free for it.' },
     gpuMemGb: { type: 'number', description: 'Free memory each GPU needs, in GB. Give it when you know it: on this computer the run may then share a GPU with other runs that said theirs, when it fits (unless sharing is turned off). Left out, it waits for a GPU to itself that is almost all free.' },
     alone: { type: 'boolean', description: 'Its GPUs to itself: no other run goes on them while it runs, whatever memory it asks for (timing and speed measurements).' },
-    params: { type: 'object', description: 'Its settings, kept with the run and compared in tables ({ "lr": 0.0003 }); --name value pairs in the command are read too. {name} placeholders in the command are filled from them.' },
+    params: { type: 'object', description: 'Its settings, kept with the run and compared in tables ({ "lr": 0.0003 }); --name value pairs in the command are read too (not output or checkpoint paths). {name} placeholders in the command are filled from them.' },
     seed: { type: 'number', description: 'Its seed (fills {seed} in the command; also read from --seed).' },
     tags: { type: 'array', items: { type: 'string' } },
     metricsFile: { type: 'string', description: 'A file it writes metrics to as JSON lines (relative to cwd; {run} is the run’s id, and it may start with $HYDOR_RUN_DIR/, the run’s own folder). Metrics are also read from its output: key=value pairs and JSON objects on a line.' },
@@ -275,7 +344,7 @@ function runTool(ctx: RunCtx): RunTool {
   return {
     name: 'experiment_run',
     description:
-      'Start a long job (training, an evaluation) in Experiments’ queue instead of running it in the foreground: it waits for free GPUs (or a place among the jobs without one), runs on its own (in tmux, so it outlives this session), and is recorded: the commit and a patch of changes not committed, the files the command names that git does not track, its settings and seed, the environment, its log and the metrics it prints. Each run has $HYDOR_RUN (its id) and $HYDOR_RUN_DIR (its own folder) in its environment: per-example scores written to $HYDOR_RUN_DIR/scores.jsonl are kept with it without being named. Returns at once with the run’s id and gpuHours ({ atMost: from its time limit, or about: from how long the same command took last }). In a git repository its code is kept as it is when you call this, and that is what runs, so you may go on editing the folder for the next one (see code). Write results into files git does not track or ignores (or name them with an output flag such as --out, or redirect with >), since a run that rewrites tracked code or settings makes later queued runs take a copy. Never start runs on the user’s GPUs unless they asked for it. Before a run of more than a few minutes on a GPU, try it first with experiment_try, and give it a time limit (hours) so the person sees what it may cost; before a plan of several runs, ask once with experiment_budget. When the person’s limit on agents’ GPU hours is reached, the run is held, not started (the answer says so): tell them, and start no more. With again: a run’s id, it runs that run again with the changes you give. A run that failed, went missing or was stopped and is started again should say so (again, or replaces with its id when you write the command anew), so the page shows them as one row with its attempts. A training that saves checkpoints should give resume; the run gets a warning (Ctrl-C) and grace seconds before the app stops it, and one that carries on (again with carryOn, a night run’s next start, one lost or preempted) runs the same kept code as before. A run for a SLURM cluster is checked with the cluster before it is sent: the answer says at once why it would be refused; when it is accepted, why may give the cluster’s cautious guess of when it would start (often far later than it does: do not plan on it).',
+      'Start a long job (training, an evaluation) in Experiments’ queue instead of running it in the foreground: it waits for free GPUs (or a place among the jobs without one), runs on its own (in tmux, so it outlives this session), and is recorded: the commit and a patch of changes not committed; on this computer or another of your machines (not a cluster), in a git repository, copies of the files git does not track that the command names, in its folder or outside it (ignored ones too; not what it writes, such as a --out file, nor its checkpoints), and of the folder’s other code and settings files that git does not track or ignore (' + CODE_ENDINGS.map((e) => `.${e}`).join(' ') + '), at most ' + `${KEEP_FILE / 1024 / 1024} MB a file and ${KEEP_ALL / 1024 / 1024} MB a run` + ', never one that looks like it holds a key or a password; its settings and seed (a flag that only says where it writes, or which checkpoint it goes on from, such as --out outputs/a or --resume last.pt, is not read as a setting), the environment, its log and the metrics it prints. Answers with its status after a short look (starting, running, or waiting with why, startsAbout, an ISO time with its zone, and startsIn), replaces (the run whose place it takes) and, for one that carries on, carriesOn and runs (the command it runs). Each run has $HYDOR_RUN (its id) and $HYDOR_RUN_DIR (its own folder) in its environment: per-example scores written to $HYDOR_RUN_DIR/scores.jsonl are kept with it without being named. Returns at once with the run’s id and gpuHours ({ atMost: from its time limit, or about: from how long the same command took last }). In a git repository its code is kept as it is when you call this, and that is what runs, so you may go on editing the folder for the next one (see code). Write results into files git does not track or ignores (or name them with an output flag such as --out, or redirect with >), since a run that rewrites tracked code or settings makes later queued runs take a copy. Never start runs on the user’s GPUs unless they asked for it. Before a run of more than a few minutes on a GPU, try it first with experiment_try, and give it a time limit (hours) so the person sees what it may cost; before a plan of several runs, ask once with experiment_budget. When the person’s limit on agents’ GPU hours is reached, the run is held, not started (the answer says so): tell them, and start no more. With again: a run’s id, it runs that run again with the changes you give; when the folder’s code has changed since, say which it runs with code ("own": what that run ran; "now": the folder as it is), and the answer’s code says which it runs. A run that failed, went missing or was stopped and is started again should say so (again, or replaces with its id when you write the command anew), so the page shows them as one row with its attempts. A training that saves checkpoints should give resume; the run gets a warning (Ctrl-C) and grace seconds before the app stops it, and one that carries on (again with carryOn, a night run’s next start, one lost or preempted) runs the same kept code as before. A run for a SLURM cluster is checked with the cluster before it is sent: the answer says at once why it would be refused; when it is accepted, why may give the cluster’s cautious guess of when it would start (often far later than it does: do not plan on it).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -284,6 +353,11 @@ function runTool(ctx: RunCtx): RunTool {
         replaces: { type: 'string', description: 'A run’s id: this run is another attempt at that failed, lost or stopped run (a fixed command, less memory…), so the page shows them as one row with its attempts. Not for a run that finished.' },
         carryOn: { type: 'boolean', description: 'With again, for a run that has a resume command: go on from its last checkpoint with that command, with the code that run ran, instead of starting over.' },
         ...JOB_PROPS(ctx),
+        code: {
+          type: 'string',
+          enum: ['queued', 'now', 'own'],
+          description: `${JOB_PROPS(ctx).code.description} With again it is another choice: "own" (the code that run ran) or "now" (the folder as it is now). Left out is fine while the folder’s code is the same as that run’s own; when it differs the call is refused until you say which, and "queued" is not for again.`,
+        },
       },
     },
     async run(a, ctx) {
@@ -296,7 +370,7 @@ function runTool(ctx: RunCtx): RunTool {
           const prev = getRun(db, a.again.trim());
           if (!prev) throw new HttpError(404, `There is no run ${a.again}`);
           if (isScoringRun(prev)) throw new HttpError(400, 'That run scored an evaluation: score it again with evaluation_score.');
-          const { again: _a, replaces: _r, ...changes } = a;
+          const { again: _a, replaces: _r, code: asked, ...changes } = a;
           const night = (changes.when ?? prev.when) === 'night';
           const where = String(changes.where ?? (prev.remote ? `m:${prev.remote.machine}` : (prev.where ?? 'local')));
           if (night && placeOf(where).kind === 'cluster') return failed(NIGHT_CLUSTER);
@@ -304,9 +378,14 @@ function runTool(ctx: RunCtx): RunTool {
           const carryOn = changes.carryOn === true;
           if (carryOn && !carry) return failed('That run has no command to carry on with: give resume, or leave carryOn out.');
           // A training must not change code between its checkpoints.
-          if (carryOn && changes.code === 'now') return failed('Carrying on runs the code the run ran: leave code out, or leave carryOn out to start over with the folder as it is now.');
+          if (carryOn && asked === 'now') return failed('Carrying on runs the code the run ran: leave code out, or leave carryOn out to start over with the folder as it is now.');
+          if (carryOn && asked === 'queued') return failed('Carrying on runs the code the run ran: leave code out, or give code "own".');
           // As it would start: its job with the changes, for what it may use.
           const next = await cleanJob(db, { ...specOf(prev), where, ...changes });
+          // Which code, said rather than guessed (carrying on has only its own).
+          const moved = where !== (prev.remote ? `m:${prev.remote.machine}` : (prev.where ?? 'local')) || path.resolve(next.cwd) !== path.resolve(prev.cwd);
+          const unsaid = carryOn ? null : await whichCode(ctx, prev, asked || undefined, moved);
+          if (unsaid) return failed(unsaid);
           const cost = costOf(db, next, { needsHours: true });
           const no = await mayRun(
             ctx,
@@ -316,8 +395,9 @@ function runTool(ctx: RunCtx): RunTool {
           );
           if (no) return failed(no);
           try {
-            const r = await runAgain(ctx.deps, prev.id, { ...changes, ...(onCall ? { onCall } : {}) }, startedBy(ctx));
-            return started(r, ctx);
+            // "now": the folder as it is, also for a run that was told to take it as it is at its start.
+            const r = await runAgain(ctx.deps, prev.id, { ...changes, ...(asked === 'now' ? { code: undefined } : {}), ...(onCall ? { onCall } : {}) }, startedBy(ctx), { own: asked === 'own' });
+            return started(r, ctx, { replaces: from, carryOn, again: true });
           } finally {
             cost.done?.();
           }
@@ -334,7 +414,7 @@ function runTool(ctx: RunCtx): RunTool {
         if (no) return failed(no);
         try {
           const r = await submit(ctx.deps, spec, { startedBy: startedBy(ctx), ...(from ? { from } : {}) });
-          return started(r, ctx);
+          return started(r, ctx, { replaces: from });
         } finally {
           cost.done?.();
         }
@@ -349,7 +429,7 @@ function tryTool(ctx: RunCtx): RunTool {
   const props = JOB_PROPS(ctx);
   return {
     name: 'experiment_try',
-    description: `Try a command before the real run, on this computer: the same command in the same folder and environment, for at most ${TRY_SECONDS.default} seconds (seconds: ${TRY_SECONDS.min} to ${TRY_SECONDS.max}), then stopped, with HYDOR_TRY=1 and HYDOR_TRY_SECONDS in its environment so a script that knows them can cut itself short. It waits in the queue for a GPU as the real run would, and is kept out of experiments’ lists. Answers as JSON: ok (it got going) or firstError (where it first went wrong), the most GPU memory and resident memory it held, the time for a step and how many there are when the output says, estimateHours for the whole run, ask ({ gpuMemGb, hours } to give the real run) and said, a sentence. Give the real run ask.hours as its time limit, so the person sees what it may cost. A trial counts as a run for the GPU hours allowed to agents: at their limit it is held, not tried. Never start runs on the user’s GPUs unless they asked for it.`,
+    description: `Try a command before the real run, on this computer: the same command in the same folder and environment, for at most ${TRY_SECONDS.default} seconds (seconds: ${TRY_SECONDS.min} to ${TRY_SECONDS.max}), then stopped, with HYDOR_TRY=1 and HYDOR_TRY_SECONDS in its environment so a script that knows them can cut itself short. It waits in the queue for a GPU as the real run would, and is kept out of experiments’ lists. A trial is the real command in the real folder, so it writes the command’s real output and checkpoint files: point them elsewhere for the trial if a later run must not find them. Answers as JSON: ok (it got going) or firstError (where it first went wrong), the most GPU memory and resident memory it held, the time for a step and how many there are when the output says, estimateHours for the whole run (for a command that ran to its end without steps left to do: how long it took), ask ({ gpuMemGb, hours } to give the real run) and said, a sentence. Give the real run ask.hours as its time limit, so the person sees what it may cost. A trial counts as a run for the GPU hours allowed to agents: at their limit it is held, not tried. Never start runs on the user’s GPUs unless they asked for it.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -389,7 +469,8 @@ function tryTool(ctx: RunCtx): RunTool {
         if (held?.held) return json({ ...readTrial(db, id), ...(gpuHours ? { gpuHours } : {}), page: `/experiments/${id}`, note: HELD_NOTE });
         await waitTrial(ctx.deps, id, CALL_MS - (Date.now() - began), ctx.signal);
         const answer = readTrial(db, id);
-        return json({ ...answer, ...(gpuHours ? { gpuHours } : {}), page: `/experiments/${id}`, ...(answer.over ? {} : { note: `It has not ended: experiment_try with id "${id}" waits for it again; experiment_stop stops it.` }) });
+        const now = getRun(db, id);
+        return json({ ...answer, ...(now ? startsFields(db, now) : {}), ...(gpuHours ? { gpuHours } : {}), page: `/experiments/${id}`, ...(answer.over ? {} : { note: `It has not ended: experiment_try with id "${id}" waits for it again; experiment_stop stops it.` }) });
       } catch (e) {
         return failed(e);
       }
@@ -478,7 +559,7 @@ function sweepTool(ctx: RunCtx): RunTool {
 const LIST: RunTool = {
   name: 'experiment_list',
   annotations: { readOnlyHint: true },
-  description: 'List runs of Experiments, newest first: their id, name, experiment (group) and its title when it has one (experiment_title), status (and why it waits or failed), where, settings, seed, metrics ({ last, best, step, repeated: the metrics printed more than once, which have curves (the others it printed once: settings, results), progress?: { done, total } while a phase is under way }) and when they started and ended. Also note (and note_by: the user’s or an agent’s: what to know about the run), starred (the ones that count), and, for attempts at the same thing, attempt, retry_of (the failed or stopped run it follows) and replaced_by (the later attempt that took its place). Runs the user archived (put aside, themselves or their whole experiment) are left out unless archived is true.',
+  description: 'List runs of Experiments, newest first: their id, name, experiment (group) and its title when it has one (experiment_title), status (and why it waits or failed), error (a failed or lost run’s first error line), where, settings, seed, metrics ({ last, best, step, repeated: the metrics printed more than once, which have curves (the others it printed once: settings, results), progress?: { done, total } while a phase is under way }) and when they started and ended. Also note (and noteBy: the user’s or an agent’s: what to know about the run), starred (the ones that count), and, for attempts at the same thing, attempt, retryOf (the failed or stopped run it follows) and replacedBy (the later attempt that took its place); restartedAs (the run the app started to carry on from this one). These are named as in experiment_get’s record. againOf: the run it was started again from, when it is no other attempt at it (a rerun of one that finished). code: its commit in short and how many files had changes not committed ("5f4b941 + 1 changed"). For a waiting run, startsAbout (an ISO time with its zone) and startsIn. Runs the user archived (put aside, themselves or their whole experiment) are left out unless archived is true.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -564,21 +645,44 @@ const NOTE: RunTool = {
 const GET: RunTool = {
   name: 'experiment_get',
   annotations: { readOnlyHint: true },
-  description: 'Read one run of Experiments: its whole record (command, folder, where, GPUs, commit, branch, changes, settings, seed, environment, metrics, exit code, its events: what the agent on call saw and did) and the end of its log. Also what was said of it (note and noteBy, starredAt, archivedAt) and, when it is one of several attempts at the same thing, retryOf, replacedBy, attempt and chain (the run before it and the one that took its place). For its code: queuedCode (what was kept when it was queued), codeAt ("queued": it ran that; "start": the folder as it was when it started), codeChanged (the files that differed from what was queued when it started), codeDir (the copy it ran from, when it did), ranAs (the command as it ran there, with the paths pointed at the copy, when that differs from command) and leftInCopy (what stayed in that copy, because the folder had its own; the rest of the copy is removed when it ends). codeFrom: the run whose code it runs. For stopping and carrying on: resume and grace as given, ranResume (it ran resume, from a checkpoint), carriesOn (its next start will), restartedAs (the run the app started to carry on from this one, lost or preempted) and autoResumes (how often it has done so in this chain).',
+  description: 'Read one run of Experiments: its whole record (command, folder, where, GPUs, commit, branch, changes, settings, seed, environment, metrics, exit code, its events: what the agent on call saw and did) and the end of its log (a run here is read up to now, and closed first when it has just ended). For a waiting run, startsAbout (an ISO time with its zone) and startsIn. For a failed or lost run, firstError (after its id, name, status and why): where its log first went wrong (line, text and the lines around it). Also what was said of it (note and noteBy, starredAt, archivedAt) and, when it is one of several attempts at the same thing, retryOf, replacedBy, attempt and chain (previous: the run before it, next: the one that took its place, each with its status, why and, when it failed, error: chain.previous.error is what went wrong the time before). sealed: the run started in the folder of an evaluation, and whether that evaluation’s sealed files were as sealed then (ok, changed; sealChanged when one was not); it does not mean the run was scored. For its code: commit, branch, dirty; queuedCode (what was kept when it was queued); codeAt ("queued": it ran that; "start": the folder as it was when it started), codeChanged (the files that differed from what was queued when it started), codeDir (the copy it ran from, when it did; once it has ended the copy is slimmed down to what stayed in it, and when nothing did it is gone: codeRemoved true instead, and Open its code on the run’s page makes it again), ranAs (the command as it ran there, with the paths pointed at the copy, when that differs from command) and leftInCopy (what stayed in that copy, because the folder had its own; the rest of the copy is removed when it ends); codeFrom (the run whose code it runs); kept and notKept (the files not in git copied with it, and those too large to), also said in a sentence in kept at the top level. For stopping and carrying on: resume and grace as given, ranResume (it ran resume, from a checkpoint) with ran (the command it really ran), carriesOn (its next start will; not on one that has ended), restartedAs (the run the app started to carry on from this one, lost or preempted) and autoResumes (how often it has done so in this chain).',
   inputSchema: { type: 'object', properties: { id: { type: 'string' }, lines: { type: 'number', description: 'Lines of the log’s end (default 100, at most 2000).' } }, required: ['id'] },
   async run(a, ctx) {
     try {
       const id = String(a.id ?? '').trim();
       const kept = getRun(ctx.deps.db, id);
       if (kept && isFinalRun(kept)) return failed(FINAL_RUN);
+      // One here that has just ended is closed first, so that what is read says so.
+      await catchUp(ctx.deps, id);
       const v = await runView(ctx.deps, id, Math.min(Math.max(Number(a.lines) || 100, 0), 2000));
       // It has been read since it ended: the message that would tell this session of it leaves it out.
       if (!ACTIVE.includes(v.run.status)) sawEnded(ctx.deps, ctx.key, [id]);
-      const note = await notInGit(v.run);
+      const keptSaid = await notInGit(v.run);
       // A run that kept files says that none was left out, rather than leaving the field out.
       const notKept = v.run.kept?.length ? { notKept: v.run.notKept ?? [] } : {};
       const code = v.run.queuedCode ? { queuedCode: codeWords(v.run.queuedCode) } : {};
-      return json({ run: { ...v.run, ...notKept, ...code, where: whereWords(ctx.deps.db, v.run), ...sealChanged(v.run) }, ...(v.chain ? { chain: v.chain } : {}), ...(note ? { note } : {}), log: v.log });
+      // What went wrong comes first, not far down the record.
+      const { id: rid, name, status, why, firstError, ranResume, carriesOn, codeDir, codeRemoved, startsAbout, ...rest } = v.run;
+      // A copy slimmed away when it ended is not named (one from before records said so is looked for).
+      const gone = !!codeRemoved || (!!codeDir && !v.run.remote && !ACTIVE.includes(status) && !fs.existsSync(codeDir));
+      const run = {
+        id: rid,
+        name,
+        status,
+        why,
+        firstError,
+        ...rest,
+        ...startsFields(ctx.deps.db, { status, startsAbout }),
+        ...(gone ? { codeRemoved: true } : codeDir ? { codeDir } : {}),
+        ...(ranResume ? { ranResume, ...(rest.resume ? { ran: rest.resume } : {}) } : {}),
+        // One that has ended has no next start.
+        ...(carriesOn && ACTIVE.includes(status) ? { carriesOn } : {}),
+        ...notKept,
+        ...code,
+        where: whereWords(ctx.deps.db, v.run),
+        ...sealChanged(v.run),
+      };
+      return json({ run, ...(v.chain ? { chain: v.chain } : {}), ...(keptSaid ? { kept: keptSaid } : {}), log: v.log });
     } catch (e) {
       return failed(e);
     }
@@ -612,7 +716,7 @@ const STOP: RunTool = {
 const TABLE: RunTool = {
   name: 'experiment_table',
   description:
-    'Make a results table from runs of Experiments: a row per experiment (group), per command with its seed taken out ("command": what tells runs of different scripts or flags apart when their settings do not) or per value of a setting ("param:lr"), the runs of a row averaged over seeds (mean ± std), the best of each column in bold, each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired over seeds when they share seeds, else Welch’s t-test; Holm-corrected), † on cells significantly better than the baseline and ‡ on those significantly worse. Each tested cell has verdict, to be read with its p (pAdj: after the correction): "better" or "worse" says the test found that difference, in the direction the metric is better in; "same" says it found none (not that the two are equal). A row whose per-example scores are the baseline’s on every example is "same", with no p, and a note says so. When the seeds barely change a number and there are no per-example scores, it is not tested and the table’s notes say so. Runs have per-example scores when they wrote $HYDOR_RUN_DIR/scores.jsonl (each run’s own folder) or named a scoresFile. Returns it as LaTeX (booktabs, with a “% hydor:table <id>” line that lets the numbers be checked again later: keep it), Markdown and CSV.',
+    'Make a results table from runs of Experiments: a row per experiment (group), per command with its seed and what only says where it writes taken out ("command": what tells runs of different scripts or flags apart when their settings do not; output flags, redirections and --ckpt, --checkpoint or --resume paths do not make rows differ) or per value of a setting ("param:lr"), the runs of a row averaged over seeds (mean ± std), the best of each column in bold, each row tested against the baseline (paired over examples when the runs kept per-example scores, else paired over seeds when they share seeds, else Welch’s t-test; Holm-corrected), † on cells significantly better than the baseline and ‡ on those significantly worse. Each tested cell has verdict, to be read with its p (pAdj: after the correction): "better" or "worse" says the test found that difference, in the direction the metric is better in; "same" says it found none (not that the two are equal). A row whose per-example scores are the baseline’s on every example is "same", with no p, and a note says so. When the seeds barely change a number and there are no per-example scores, it is not tested and the table’s notes say so. Runs have per-example scores when they wrote $HYDOR_RUN_DIR/scores.jsonl (each run’s own folder) or named a scoresFile. Returns it as LaTeX (booktabs, with a “% hydor:table <id>” line that lets the numbers be checked again later: keep it), Markdown and CSV. Read its notes: they name the runs left out (without these metrics, or, for a group, not finished) and say when the rows did not all run the same code.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -667,7 +771,7 @@ const WAIT: RunTool = {
       .slice(0, 16)}`;
     const w = await waitRuns(ctx.deps, { ids, group: a.group ? String(a.group) : undefined, tag: a.tag ? String(a.tag) : undefined }, { hours, key, signal: ctx.signal });
     sawEnded(ctx.deps, ctx.key, w.runs.filter((r) => !ACTIVE.includes(r.status)).map((r) => r.id));
-    return json({ ended: w.ended, ...(w.ended ? {} : { note: `Not all had ended after ${hours} h.` }), runs: w.runs.filter((r) => !isFinalRun(r)).map((r) => ({ ...brief(ctx.deps.db, r), events: getRunWithEvents(ctx.deps.db, r.id)?.events?.slice(-5) })) });
+    return json({ ended: w.ended, ...(w.ended ? {} : { note: `Not all had ended after ${hours} h.` }), runs: withAttempts(ctx.deps.db, w.runs).filter((r) => !isFinalRun(r)).map((r) => ({ ...brief(ctx.deps.db, r), events: getRunWithEvents(ctx.deps.db, r.id)?.events?.slice(-5) })) });
   },
 };
 

@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { OUTPUT_FLAG, outputPaths } from '../../shared/experiment-outputs.ts';
 import { isSecret, UPLOADS } from '../agent/permissions.ts';
 import { config } from '../config.ts';
 import { secretIn } from '../memory/secrets.ts';
@@ -150,8 +151,6 @@ export function commandWords(command: string): string[] {
     .map((w) => w.word);
 }
 
-/** A flag whose value the command writes to: -o…, --out…, --save…, --log…, and their kin. */
-const OUTPUT_FLAG = /^(-o[\w.-]*|--(?:out|save|log|result|dump|report|write|pred|export|checkpoint|ckpt)[\w.-]*)(?:=(.*))?$/s;
 
 /**
  * The words a command names as what it writes: the target of a redirection (>, >>, 2>, &>), what tee is given, and
@@ -338,7 +337,8 @@ export function readToKeep(names: string[], at: string): { data: Buffer; size: n
 /**
  * The files a command names (its words that are files) that git does not have: those under the folder it runs in that
  * are not tracked, or ignored, and the person's own files outside it (an absolute path, one with .., ~; outsideToKeep
- * says which). A link that leads out of the folder is left alone. Nothing outside a git repository.
+ * says which). A link that leads out of the folder is left alone, as are what the command writes and its checkpoints
+ * (shared/experiment-outputs.ts: an earlier run's results are not what this one needs). Nothing outside a git repository.
  */
 export async function untrackedNamed(sh: Shell, command: string, cwd: string): Promise<Named[]> {
   const repo = await sh('git rev-parse --is-inside-work-tree 2>/dev/null', { timeoutMs: 10_000 });
@@ -347,10 +347,13 @@ export async function untrackedNamed(sh: Shell, command: string, cwd: string): P
   const root = real(here);
   const found = new Map<string, string>();
   const away = new Map<string, Outside>();
+  const where = (w: string) => path.resolve(here, /^~(?=$|\/)/.test(w) ? os.homedir() + w.slice(1) : w);
+  const writes = new Set(outputPaths(command).map(where));
   for (const word of commandWords(command)) {
     for (const w of word.includes('=') ? [word, word.slice(word.indexOf('=') + 1)] : [word]) {
       if (!w || w.length > 1000 || found.size + away.size >= 200) continue;
-      const abs = path.resolve(here, /^~(?=$|\/)/.test(w) ? os.homedir() + w.slice(1) : w);
+      const abs = where(w);
+      if (writes.has(abs)) continue;
       try {
         const at = fs.realpathSync(abs);
         if (!fs.statSync(at).isFile()) continue;

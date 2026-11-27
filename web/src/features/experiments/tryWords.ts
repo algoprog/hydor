@@ -31,10 +31,12 @@ export function trialLines(a: TrialAnswer): string[] {
       : a.ramGb
         ? fill(tr('It used up to {0} GB of memory.'), gb(a.ramGb))
         : tr('It was over before its memory could be read.');
-  const time = a.estimateHours
-    ? fill(tr('The whole run should take about {0}.'), lengthWords(a.estimateHours))
-    : a.finished
-      ? tr('If your script stops early when it sees HYDOR_TRY, the whole run takes longer.')
+  // One that ran to its end without steps left to do: the estimate is how long it took.
+  const asLong = a.finished && !(a.stepSeconds !== undefined && a.steps && a.steps.done < a.steps.total);
+  const time = asLong
+    ? tr('The whole run takes about that long, unless your script shortens itself when it sees HYDOR_TRY.')
+    : a.estimateHours
+      ? fill(tr('The whole run should take about {0}.'), lengthWords(a.estimateHours))
       : tr('It did not say how far it has to go.');
   return [first, memory, time];
 }
