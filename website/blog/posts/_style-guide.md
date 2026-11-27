@@ -10,7 +10,7 @@ order: 99
 
 This draft is built only with `--drafts`. It shows what each piece of a post looks like, so a writer can see whether a
 paragraph, a figure or a table is doing its job. Paragraphs are plain words, in the second person, in short sentences:
-[a link](/docs/) is underlined in the water colour, **bold** marks the name of a button, *italics* are rare, and
+[a link](/docs/) is in the water colour and underlined only under the pointer, **bold** marks the name of a button, *italics* are rare, and
 `inline code` is for file names and settings, such as `HYDOR_SITE_OUT`.
 
 A second paragraph, to show the spacing between two: the text column is 720 pixels wide, set at 18 pixels with a

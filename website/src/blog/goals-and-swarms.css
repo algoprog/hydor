@@ -136,7 +136,7 @@
 [data-fig^="goals-and-swarms-"] .gs-yc p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--fg); }
 [data-fig^="goals-and-swarms-"] .gs-yc p.gs-yc-j { font-size: 13px; color: var(--fg-3); }
 [data-fig^="goals-and-swarms-"] .gs-yc-j i { margin-right: 6px; font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-[data-fig^="goals-and-swarms-"] .gs-yc a { margin-top: auto; font-size: 13px; font-weight: 600; color: var(--w2); text-decoration: underline; text-decoration-color: rgb(56 189 248 / 0.4); text-underline-offset: 3px; }
+[data-fig^="goals-and-swarms-"] .gs-yc a { margin-top: auto; font-size: 13px; font-weight: 600; color: var(--w2); text-decoration-color: rgb(56 189 248 / 0.4); text-underline-offset: 3px; }
 [data-fig^="goals-and-swarms-"] .gs-yc a:hover { text-decoration-color: currentColor; }
 [data-fig^="goals-and-swarms-"] .gs-rise { animation: gs-in 0.6s var(--ease) both; }
 

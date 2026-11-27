@@ -763,8 +763,7 @@
 }
 
 .post-body a {
-  color: var(--fg);
-  text-decoration: underline;
+  color: var(--w2);
   text-decoration-color: rgba(56, 189, 248, 0.7);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 0.2em;

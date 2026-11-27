@@ -50,7 +50,7 @@
 [data-fig^="research-with-agents-"] .rw-card.rw-in { animation: rw-in 0.5s var(--ease) both; }
 [data-fig^="research-with-agents-"] .rw-verdict { font-size: 13px; padding: 3px 12px; }
 [data-fig^="research-with-agents-"] .rw-paper { margin: 10px 0 8px; color: var(--fg); font-size: 14px; line-height: 1.45; }
-[data-fig^="research-with-agents-"] .rw-paper a { color: var(--w2); text-decoration: underline; text-decoration-color: rgb(56 189 248 / 0.4); text-underline-offset: 3px; font-weight: 600; }
+[data-fig^="research-with-agents-"] .rw-paper a { color: var(--w2); text-decoration-color: rgb(56 189 248 / 0.4); text-underline-offset: 3px; font-weight: 600; }
 [data-fig^="research-with-agents-"] .rw-card dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 0; }
 [data-fig^="research-with-agents-"] .rw-card dt { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3); padding-top: 2px; }
 [data-fig^="research-with-agents-"] .rw-card dd { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--fg-2); }
@@ -132,7 +132,7 @@
 [data-fig^="research-with-agents-"] .rw-seq { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 [data-fig^="research-with-agents-"] .rw-terms { margin: 6px 0 0; font-family: var(--mono); font-size: 15px; color: var(--fg); }
 [data-fig^="research-with-agents-"] .rw-found { margin-top: 10px; padding: 10px 14px; border: 1px solid var(--rw-ok); border-radius: 10px; background: rgb(94 234 212 / 0.05); animation: rw-in 0.5s var(--ease) both; }
-[data-fig^="research-with-agents-"] .rw-found a { color: var(--w2); font-family: var(--mono); font-weight: 600; text-decoration: underline; text-decoration-color: rgb(56 189 248 / 0.4); text-underline-offset: 3px; }
+[data-fig^="research-with-agents-"] .rw-found a { color: var(--w2); font-family: var(--mono); font-weight: 600; text-decoration-color: rgb(56 189 248 / 0.4); text-underline-offset: 3px; }
 [data-fig^="research-with-agents-"] .rw-found b { color: var(--fg); }
 [data-fig^="research-with-agents-"] .rw-found p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--fg-3); }
 
