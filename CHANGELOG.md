@@ -3,6 +3,25 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.118.1 · 27 November 2026
+
+What a real agent tripped on when it used 0.118.0's experiment tools, put right.
+
+- **Run again, for agents**: an agent that runs a run again now says which code it means, the run's own or the
+  folder as it is now. When the two differ and it has not said, it is asked, never guessed for: before, it silently
+  got the folder as it is. The page's **Run again** already offered the choice.
+- **Results tables explain themselves**: a note names the runs that have none of the metrics asked for and what
+  they report instead, says when two metric names differ only in spelling, counts the runs left out because they
+  did not finish, and says when the rows did not all run the same code. Rows are named by the settings that differ:
+  output and checkpoint paths are no longer taken for settings.
+- **Try it first** on a command that runs to its end says how long the whole run takes and what time limit to ask
+  for.
+- **A waiting run** whose start is known only from another run's time limit says "at the latest", and agents get
+  the time with its time zone.
+- **Smaller things**: when an agent starts a run, the answer says whether it runs or waits and why; a failed run's
+  record leads with its first error; a run's last lines of metrics are read when it ends; a command's old output
+  files are no longer listed as kept with the run.
+
 ## 0.118.0 · 27 November 2026
 
 Experiments you can leave to agents and still follow: a morning brief for each research project, runs tried before
