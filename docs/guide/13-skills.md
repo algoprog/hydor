@@ -75,7 +75,7 @@ Every skill of the library and of Claude Code and Codex has a switch at the end 
 
 - A library skill (built in, yours or a plugin's) turned off is left out for every agent, in every project that doesn't switch it on for itself.
 - Claude Code keeps its own choice in its settings, by the skill's name; Codex keeps it in its own configuration.
-- Custom follows these switches too. It reads both agents' folders, and has a skill there only while it is on for the agent whose folder it is in: Claude Code for `.claude/skills`, Codex for `.codex/skills` and `.agents/skills`. A skill switched off is not in its list, is not named as one that fits, and is not brought in by keywords. A project's switch counts first. A Custom session already going keeps its list until its agent starts again.
+- Custom follows these switches too. It reads both agents' folders, and has a skill there only while it is on for the agent whose folder it is in: Claude Code for `.claude/skills`, Codex for `.codex/skills` and `.agents/skills`. A skill switched off is not in its list, is not named as one that fits, and is not brought in by keywords. A project's switch counts first. A Custom session already going keeps its list until its agent starts again. A switch you change in Codex itself, rather than here, is picked up in the background, so the first session you start after the change may not have it yet.
 
 The switches here are for every session. A project can switch any skill the other way for its own sessions, on its **Skills** tab: see [Turn a skill on or off for this project](/guide/projects#turn-a-skill-on-or-off-for-this-project). Then the skill's row here says so: "Off in Thesis", or "On in 2 projects".
 

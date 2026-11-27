@@ -67,6 +67,7 @@ import { PART_FRAME_HTML } from './pages/slides.ts';
 import { movedPdfNotes } from './pdfnotes/index.ts';
 import { annotateKept, keptFilesDeleted, keptFilesMoved } from './spaces/kept-files.ts';
 import * as setup from './setup.ts';
+import { switchSkill } from './skillpack/codexOff.ts';
 import { standAll } from './openForms.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
 import { onDesktop, tellDesktop } from './desktop.ts';
@@ -1527,7 +1528,7 @@ app.post('/api/setup/skills', async (req) => {
 });
 app.post('/api/setup/skills/toggle', async (req) => {
   const b = body(req);
-  await setup.setSkillEnabled(codex, agentOf(b.agent), String(b.name ?? ''), String(b.path ?? ''), !!b.enabled);
+  await switchSkill(db, codex, agentOf(b.agent), String(b.name ?? ''), String(b.path ?? ''), !!b.enabled);
   return { ok: true };
 });
 app.post('/api/setup/skills/delete', async (req) => {

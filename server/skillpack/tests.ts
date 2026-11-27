@@ -16,6 +16,7 @@ import Fastify from 'fastify';
 import { skillLoaded, type SkillProposal } from '../../shared/skillpack.ts';
 import type { ServerEvent } from '../../shared/types.ts';
 import { findSkills, skillsFor, systemPrompt } from '../agent/prompt.ts';
+import type { CodexControl } from '../agents/control.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT, config } from '../config.ts';
 import { openDb } from '../db.ts';
@@ -24,6 +25,7 @@ import { notesOf } from '../notes.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import type { SessionManager } from '../sessions.ts';
 import { createSpace } from '../spaces/index.ts';
+import { askCodexAgain, codexOff, codexOffSettled, codexOffTiming, keptCodexOff, switchSkill } from './codexOff.ts';
 import { lineDiff } from './diff.ts';
 import { skillpack } from './index.ts';
 import { composeSkill, folders, librarySkills, parseSkill, setFolders, skillText, syncView, viewSkills, visibleSkills } from './library.ts';
@@ -258,86 +260,233 @@ await test('what each agent is given: a plugin folder, an extra skills folder, a
   assert.equal(claude?.instructions, undefined, 'nothing added to Claude Code’s system prompt');
 });
 
-await test("Custom has none of Claude Code's and Codex's own skills that are switched off, unless the project switches one on", async () => {
-  const home = path.join(root, 'switch-home');
-  const proj = path.join(root, 'switch-project');
-  const skill = (dir: string, name: string, description: string, more = '') => {
-    const file = path.join(dir, name, 'SKILL.md');
-    write(file, `---\nname: ${name}\ndescription: ${description}\n${more}---\n\n# ${name}\n\nThe steps of ${name}.\n`);
-    return file;
-  };
-  const hives = skill(path.join(home, '.codex', 'skills'), 'hive-inspection', 'Use when logging beehive inspections and honey harvests.', 'triggers: [beehive]\n');
-  skill(path.join(home, '.claude', 'skills'), 'kiln-firing', 'Use when planning a pottery kiln firing schedule and glazes.');
-  const shared = skill(path.join(proj, '.agents', 'skills'), 'tide-tables', 'Use when reading tide tables.');
-  fs.mkdirSync(path.join(root, 'switch-sp'), { recursive: true });
-  const sp = createSpace(db, { name: 'Apiary', folder: path.join(root, 'switch-sp') });
-  // What Codex reports to Settings → Skills, with each skill on or off as it keeps them.
-  const codexOn = new Map([
-    [hives, false],
-    [shared, false],
-  ]);
-  let answers = true;
-  Object.assign(sessions, {
-    controlFor: () => ({
-      call: async () => {
-        if (!answers) throw new Error('no answer');
-        return { data: [{ skills: [...codexOn].map(([p, enabled]) => ({ name: path.basename(path.dirname(p)), path: p, enabled, scope: 'user' })), errors: [] }] };
-      },
-    }),
-  });
-  const claudeSettings = path.join(home, '.claude', 'settings.json');
+/**
+ * A home and a project with skills of the agents' own (hive-inspection in ~/.codex, kiln-firing in ~/.claude,
+ * tide-tables in the project's .agents), and a stand-in for Codex that keeps which of its two are on, counts how often
+ * it is asked for them, and answers, fails or hangs.
+ */
+async function ownSkillsWorld(name: string, run: (w: Awaited<ReturnType<typeof makeWorld>>) => Promise<void>) {
+  const w = await makeWorld(name);
   const before = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR, HYDOR_SKILL_DIRS: process.env.HYDOR_SKILL_DIRS, HYDOR_SKILLS_OFF: process.env.HYDOR_SKILLS_OFF };
-  Object.assign(process.env, { HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: path.join(home, '.claude') });
-  const ALL = ['hive-inspection', 'kiln-firing', 'tide-tables'];
-  /** What a Custom session starting in the project is given: the names its skills list has, and those named as fitting (in its context). */
-  let starts = 0;
-  const start = async (extra: Record<string, unknown> = {}) => {
-    const hints: string[] = [];
-    let list: string[] = [];
-    for (const prompt of ['Log my beehive inspections and honey harvests', 'Plan the pottery kiln firing schedule and glazes']) {
-      const key = `acp:switch-${++starts}`;
-      const given = await skillpack.spawn!({ key, cwd: proj, runId: 'r', resume: false, agent: 'acp', acpAgent: 'console', extra, prompt }, deps);
-      Object.assign(process.env, given!.env);
-      hints.push(String(await skillpack.context!({ key, cwd: proj, extra }, deps)));
-      list = findSkills(proj)
-        .map((k) => k.name)
-        .filter((n) => ALL.includes(n))
-        .sort();
-    }
-    return { list, hinted: ALL.filter((n) => hints.join('\n').includes(`- ${n}: `)) };
-  };
+  const timing = { ...codexOffTiming };
+  Object.assign(process.env, { HOME: w.home, USERPROFILE: w.home, CLAUDE_CONFIG_DIR: path.join(w.home, '.claude') });
+  Object.assign(sessions, { controlFor: () => w.control });
+  db.prepare('delete from kv where k = ?').run('skillpack.codexOff');
+  askCodexAgain();
   try {
-    write(claudeSettings, JSON.stringify({ skillOverrides: { 'kiln-firing': 'off' } }));
-    assert.deepEqual(await start(), { list: [], hinted: [] }, 'all off');
-    // Keywords bring in no skill that is off either.
-    sessions.items.set('acp:off', [{ kind: 'user', id: 'o1', seq: 0, text: 'Time to check on the beehive before winter' }]);
-    assert.doesNotMatch(String(await skillpack.context!({ key: 'acp:off', cwd: proj, extra: {} }, deps)), /<skill name="hive-inspection"/);
-    answers = false;
-    assert.deepEqual((await start()).list, [], 'Codex not answering: what it said last holds');
-    answers = true;
-    // The project's switches come before the agents' own.
-    setSpaceSwitch(db, sp.id, { name: 'hive-inspection', agent: 'codex', on: true });
-    setSpaceSwitch(db, sp.id, { name: 'kiln-firing', agent: 'claude', on: true });
-    assert.deepEqual(await start({ space: sp.id }), { list: ['hive-inspection', 'kiln-firing'], hinted: ['hive-inspection', 'kiln-firing'] });
-    // Switched on in the agents' own settings.
-    codexOn.set(hives, true);
-    codexOn.set(shared, true);
-    write(claudeSettings, '{}');
-    assert.deepEqual(await start(), { list: ALL, hinted: ['hive-inspection', 'kiln-firing'] });
-    sessions.items.set('acp:on', [{ kind: 'user', id: 'o2', seq: 0, text: 'Time to check on the beehive before winter' }]);
-    assert.match(String(await skillpack.context!({ key: 'acp:on', cwd: proj, extra: {} }, deps)), /<skill name="hive-inspection"/);
-    // And a project can switch one off that is on.
-    setSpaceSwitch(db, sp.id, { name: 'hive-inspection', agent: 'codex', on: false });
-    assert.deepEqual(await start({ space: sp.id }), { list: ['kiln-firing', 'tide-tables'], hinted: ['kiln-firing'] });
+    await run(w);
   } finally {
-    clearSpaceSwitches(db, sp.id);
+    w.answer();
+    await codexOffSettled();
+    askCodexAgain();
+    Object.assign(codexOffTiming, timing);
+    db.prepare('delete from kv where k = ?').run('skillpack.codexOff');
     delete (sessions as { controlFor?: unknown }).controlFor;
     for (const [k, v] of Object.entries(before)) {
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;
     }
   }
-});
+}
+
+async function makeWorld(name: string) {
+  const home = path.join(root, `${name}-home`);
+  const proj = path.join(root, `${name}-project`);
+  const skill = (dir: string, id: string, description: string, more = '') => {
+    const file = path.join(dir, id, 'SKILL.md');
+    write(file, `---\nname: ${id}\ndescription: ${description}\n${more}---\n\n# ${id}\n\nThe steps of ${id}.\n`);
+    return file;
+  };
+  const hives = skill(path.join(home, '.codex', 'skills'), 'hive-inspection', 'Use when logging beehive inspections and honey harvests.', 'triggers: [beehive]\n');
+  skill(path.join(home, '.claude', 'skills'), 'kiln-firing', 'Use when planning a pottery kiln firing schedule and glazes.');
+  const tides = skill(path.join(proj, '.agents', 'skills'), 'tide-tables', 'Use when reading tide tables.');
+  const codexOn = new Map([
+    [hives, false],
+    [tides, false],
+  ]);
+  const hanging: (() => void)[] = [];
+  const w = {
+    home,
+    proj,
+    hives,
+    tides,
+    codexOn,
+    asked: 0,
+    mode: 'answers' as 'answers' | 'fails' | 'hangs',
+    control: {
+      call: async (method: string, params: any) => {
+        if (method === 'skills/config/write') return void codexOn.set(params.path, params.enabled);
+        w.asked++;
+        if (w.mode === 'fails') throw new Error('codex not found');
+        // What it knows when asked, said when it gets round to it.
+        const said = { data: [{ skills: [...codexOn].map(([p, enabled]) => ({ name: path.basename(path.dirname(p)), path: p, enabled, scope: 'user' })), errors: [] }] };
+        if (w.mode === 'hangs') await new Promise<void>((done) => hanging.push(done));
+        return said;
+      },
+    } as unknown as CodexControl,
+    /** Answers what hangs. */
+    answer: () => hanging.splice(0).forEach((done) => done()),
+    /** Time has passed: Codex is asked again and has answered. */
+    codexSays: async () => {
+      askCodexAgain();
+      await codexOff(db, () => w.control, proj);
+      await codexOffSettled();
+    },
+    /** What an agent starting in the project is given. */
+    spawn: (agent: 'codex' | 'acp', acpAgent?: string, o: { key?: string; prompt?: string; extra?: Record<string, unknown> } = {}) =>
+      skillpack.spawn!({ key: o.key, cwd: proj, runId: 'r', resume: false, agent, acpAgent, extra: o.extra ?? {}, prompt: o.prompt }, deps),
+    /** The skills' names Custom's list has, of the three, once it is given `env`. */
+    list: (env: Record<string, string> | undefined) => {
+      Object.assign(process.env, env);
+      return findSkills(proj)
+        .map((k) => k.name)
+        .filter((n) => ALL.includes(n))
+        .sort();
+    },
+  };
+  return w;
+}
+
+const ALL = ['hive-inspection', 'kiln-firing', 'tide-tables'];
+const PROMPTS = ['Log my beehive inspections and honey harvests', 'Plan the pottery kiln firing schedule and glazes'];
+const named = (hints: string[]) => ALL.filter((n) => hints.join('\n').includes(`- ${n}: `));
+const BEEHIVE = 'Time to check on the beehive before winter';
+
+await test("Custom has none of Claude Code's and Codex's own skills that are switched off, unless the project switches one on", () =>
+  ownSkillsWorld('switch', async (w) => {
+    fs.mkdirSync(path.join(root, 'switch-sp'), { recursive: true });
+    const sp = createSpace(db, { name: 'Apiary', folder: path.join(root, 'switch-sp') });
+    const claudeSettings = path.join(w.home, '.claude', 'settings.json');
+    /** What a Custom session starting in the project is given: the names its skills list has, and those named as fitting (in its context). */
+    let starts = 0;
+    const start = async (extra: Record<string, unknown> = {}) => {
+      await w.codexSays();
+      const hints: string[] = [];
+      let list: string[] = [];
+      for (const prompt of PROMPTS) {
+        const key = `acp:switch-${++starts}`;
+        const given = await w.spawn('acp', 'console', { key, extra, prompt });
+        list = w.list(given!.env);
+        hints.push(String(await skillpack.context!({ key, cwd: w.proj, extra }, deps)));
+      }
+      return { list, hinted: named(hints) };
+    };
+    try {
+      write(claudeSettings, JSON.stringify({ skillOverrides: { 'kiln-firing': 'off' } }));
+      assert.deepEqual(await start(), { list: [], hinted: [] }, 'all off');
+      // Keywords bring in no skill that is off either.
+      sessions.items.set('acp:off', [{ kind: 'user', id: 'o1', seq: 0, text: BEEHIVE }]);
+      assert.doesNotMatch(String(await skillpack.context!({ key: 'acp:off', cwd: w.proj, extra: {} }, deps)), /<skill name="hive-inspection"/);
+      w.mode = 'fails';
+      assert.deepEqual((await start()).list, [], 'Codex not answering: what it said last holds');
+      w.mode = 'answers';
+      // The project's switches come before the agents' own.
+      setSpaceSwitch(db, sp.id, { name: 'hive-inspection', agent: 'codex', on: true });
+      setSpaceSwitch(db, sp.id, { name: 'kiln-firing', agent: 'claude', on: true });
+      assert.deepEqual(await start({ space: sp.id }), { list: ['hive-inspection', 'kiln-firing'], hinted: ['hive-inspection', 'kiln-firing'] });
+      // Switched on in the agents' own settings.
+      w.codexOn.set(w.hives, true);
+      w.codexOn.set(w.tides, true);
+      write(claudeSettings, '{}');
+      assert.deepEqual(await start(), { list: ALL, hinted: ['hive-inspection', 'kiln-firing'] });
+      sessions.items.set('acp:on', [{ kind: 'user', id: 'o2', seq: 0, text: BEEHIVE }]);
+      assert.match(String(await skillpack.context!({ key: 'acp:on', cwd: w.proj, extra: {} }, deps)), /<skill name="hive-inspection"/);
+      // And a project can switch one off that is on.
+      setSpaceSwitch(db, sp.id, { name: 'hive-inspection', agent: 'codex', on: false });
+      assert.deepEqual(await start({ space: sp.id }), { list: ['kiln-firing', 'tide-tables'], hinted: ['kiln-firing'] });
+    } finally {
+      clearSpaceSwitches(db, sp.id);
+    }
+  }));
+
+await test('no turn waits for Codex: what is kept answers, and Codex is asked at most once a minute for a folder', () =>
+  ownSkillsWorld('turns', async (w) => {
+    const turn = async (key: string) => {
+      sessions.items.set(key, [{ kind: 'user', id: key, seq: 0, text: BEEHIVE }]);
+      return String(await skillpack.context!({ key, cwd: w.proj, extra: {} }, deps));
+    };
+    assert.deepEqual(w.list((await w.spawn('acp', 'console'))!.env), ['kiln-firing'], 'the first start waited for the answer');
+    assert.equal(w.asked, 1);
+    assert.doesNotMatch(await turn('acp:turn-1'), /<skill name="hive-inspection"/);
+    await w.spawn('acp', 'console');
+    assert.equal(w.asked, 1, 'neither a turn nor a start asks again within the minute');
+    // A minute on, with a Codex that is slow: a turn and a start take what is kept, and one question is in the air.
+    askCodexAgain();
+    w.mode = 'hangs';
+    assert.doesNotMatch(await turn('acp:turn-2'), /<skill name="hive-inspection"/);
+    askCodexAgain();
+    assert.deepEqual(w.list((await w.spawn('acp', 'console'))!.env), ['kiln-firing']);
+    assert.equal(w.asked, 2);
+  }));
+
+await test('with nothing ever kept, a start waits only a moment, and a Codex that fails is not asked again at once', () =>
+  ownSkillsWorld('none', async (w) => {
+    codexOffTiming.wait = 50;
+    w.mode = 'hangs';
+    const t0 = Date.now();
+    assert.deepEqual(w.list((await w.spawn('acp', 'console'))!.env), ALL, 'not known yet: on');
+    assert.ok(Date.now() - t0 < 2000);
+    w.answer();
+    await codexOffSettled();
+    assert.deepEqual(w.list((await w.spawn('acp', 'console'))!.env), ['kiln-firing'], 'the late answer was kept');
+    db.prepare('delete from kv where k = ?').run('skillpack.codexOff');
+    askCodexAgain();
+    w.mode = 'fails';
+    w.asked = 0;
+    await w.spawn('acp', 'console');
+    await codexOffSettled();
+    await w.spawn('acp', 'console');
+    sessions.items.set('acp:none', [{ kind: 'user', id: 'n1', seq: 0, text: BEEHIVE }]);
+    await skillpack.context!({ key: 'acp:none', cwd: w.proj, extra: {} }, deps);
+    assert.equal(w.asked, 1);
+  }));
+
+await test('a Codex skill switched in Hydor is kept at once, also over an answer asked for before the switch', () =>
+  ownSkillsWorld('toggle', async (w) => {
+    w.codexOn.set(w.hives, true);
+    w.codexOn.set(w.tides, true);
+    const given = async () => w.list((await w.spawn('acp', 'console'))!.env);
+    assert.deepEqual(await given(), ALL);
+    await switchSkill(db, w.control, 'codex', 'hive-inspection', w.hives, false);
+    assert.equal(w.codexOn.get(w.hives), false, 'Codex is told');
+    assert.deepEqual([...keptCodexOff(db)!], [fs.realpathSync(w.hives)]);
+    assert.deepEqual(await given(), ['kiln-firing', 'tide-tables']);
+    await switchSkill(db, w.control, 'codex', 'hive-inspection', w.hives, true);
+    assert.deepEqual(await given(), ALL);
+    assert.equal(w.asked, 1, 'without asking Codex again');
+    askCodexAgain();
+    w.mode = 'hangs';
+    await given();
+    await switchSkill(db, w.control, 'codex', 'hive-inspection', w.hives, false);
+    w.answer();
+    await codexOffSettled();
+    assert.deepEqual([...keptCodexOff(db)!], [fs.realpathSync(w.hives)]);
+  }));
+
+await test("Codex's sessions, and other agents', hear of no skill switched off as fitting", () =>
+  ownSkillsWorld('hints', async (w) => {
+    fs.mkdirSync(path.join(root, 'hints-sp'), { recursive: true });
+    const sp = createSpace(db, { name: 'Orchard', folder: path.join(root, 'hints-sp') });
+    const hinted = async (agent: 'codex' | 'acp', acpAgent?: string, extra: Record<string, unknown> = {}) => {
+      const hints: string[] = [];
+      for (const prompt of PROMPTS) hints.push(...((await w.spawn(agent, acpAgent, { prompt, extra }))?.notes ?? []));
+      return named(hints);
+    };
+    try {
+      assert.deepEqual(await hinted('codex'), [], 'off in Codex');
+      assert.deepEqual(await hinted('acp', 'gemini'), ['kiln-firing']);
+      setSpaceSwitch(db, sp.id, { name: 'hive-inspection', agent: 'codex', on: true });
+      assert.deepEqual(await hinted('codex', undefined, { space: sp.id }), ['hive-inspection'], 'the project’s switch comes first');
+      w.codexOn.set(w.hives, true);
+      await w.codexSays();
+      assert.deepEqual(await hinted('codex'), ['hive-inspection']);
+      assert.deepEqual(await hinted('acp', 'gemini'), ['hive-inspection', 'kiln-firing']);
+      setSpaceSwitch(db, sp.id, { name: 'hive-inspection', agent: 'codex', on: false });
+      assert.deepEqual(await hinted('codex', undefined, { space: sp.id }), []);
+    } finally {
+      clearSpaceSwitches(db, sp.id);
+    }
+  }));
 
 console.log('triggers');
 
