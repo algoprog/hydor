@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
-import { answerSchema, APP_COLORS, APP_ICONS, checkAnswer, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, questionLine, toCsv } from '../../shared/apps.ts';
+import { answerSchema, APP_COLORS, APP_ICONS, checkAnswer, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, questionLine, setProgramDefault, toCsv } from '../../shared/apps.ts';
 import { cardFieldProblems } from '../../shared/app-cards.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_ONLY_TOOLS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
@@ -27,7 +27,6 @@ import { builderTools } from './builder.ts';
 import { initAppEdits, noteUserEdit, takeAppEdits } from './edits.ts';
 import { isInternal } from '../internal.ts';
 import { checkRun, tryExamples } from './examples.ts';
-import { isTier } from '../../shared/tiers.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -82,6 +81,10 @@ import {
   type RunRecord,
 } from './store.ts';
 import { templateById } from './templates.ts';
+import { cleanPick, isRunWith, pickOver, picksSomething, RUN_WITH, type AppPick, type SentPick } from '../../shared/app-run-with.ts';
+import { isProgram, programUsable } from '../../shared/programs.ts';
+import { defaultProgramNow, programRefusal, programStatus } from '../agents/programs.ts';
+import { keepPick, lookAgain, readyPick, runsWithView, runWithSetting, setRunWith } from './runwith.ts';
 import { agentsMay, builtinsOf, isInstalled, setAgents, setInstalled } from './builtins.ts';
 import { allowApp, allowedApps } from './allowed.ts';
 import { aboutMe, changeAboutMe, forgetAnswers, startsFor } from './me.ts';
@@ -186,7 +189,9 @@ export function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; error
 
 /** The app's settings from the builder: a recipe, and whether other agents and the public get it. */
 function saveInput(db: Deps['db'], b: any, prev?: AppDef) {
-  const { recipe, errors, warnings } = problemsOf(db, b?.recipe ?? b);
+  const sent = b?.recipe ?? b;
+  // A change that names no program keeps the app's own.
+  const { recipe, errors, warnings } = problemsOf(db, prev && sent && typeof sent === 'object' && sent.agent === undefined ? { ...sent, agent: prev.agent, acpAgent: prev.acpAgent } : sent);
   if (errors.length) throw new HttpError(400, errors.length === 1 ? errors[0] : `Fix these first: ${errors.join('; ')}`);
   const pub = b?.public && typeof b.public === 'object' ? b.public : undefined;
   if (pub?.on && !(pub.model ?? prev?.public.model)) throw new HttpError(400, 'Pick the model public runs use (one of Custom’s)');
@@ -235,6 +240,8 @@ function routes(d: Deps) {
   const { app, db, sessions } = d;
   // The models apps need from a provider are read from (and added to) Settings → Models.
   setModelsHere(d.models ?? null);
+  // A recipe that names no program (a new app) runs with the first one signed in here.
+  setProgramDefault(defaultProgramNow);
   ensureTables(db);
   ensureDataTables(db);
   // The pictures, videos and files apps show, at addresses a view's frame (and a public page) can reach.
@@ -259,18 +266,20 @@ function routes(d: Deps) {
   d.scheduler?.useApps({
     id: (idOrSlug) => (idOrSlug.startsWith('tpl:') ? (templateById(idOrSlug.slice(4)) ? idOrSlug : undefined) : getApp(db, idOrSlug)?.id),
     name: (id) => (id.startsWith('tpl:') ? templateById(id.slice(4))?.name : getApp(db, id)?.name),
-    start: ({ app: id, inputs, test }) => {
+    start: async ({ app: id, inputs, test }) => {
       // A ready-made app ("tpl:<id>"), as it is: Explore's Update automatically.
       if (id.startsWith('tpl:')) {
         const t = templateById(id.slice(4));
         if (!t) throw new HttpError(404, 'Its app is gone');
         installedOr409(db, t);
+        await lookAgain(db, { app: id, recipe: t, source: 'task' });
         const r = startRun({ app: id, slug: t.id, recipe: t, source: 'task', inputs });
         return { id: r.id, ...(r.key ? { key: r.key } : {}) };
       }
       const a = getApp(db, id);
       if (!a) throw new HttpError(404, 'Its app is gone');
       if (!test) checkDaily(db, a);
+      await lookAgain(db, { app: a.id, recipe: a, source: 'task' });
       const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'task', inputs });
       return { id: r.id, ...(r.key ? { key: r.key } : {}) };
     },
@@ -342,6 +351,53 @@ function routes(d: Deps) {
     const b = req.body;
     if (!b || typeof b !== 'object' || Array.isArray(b)) throw new HttpError(400, 'Send the fields to change, as { "units": "metric" }');
     return changeAboutMe(db, b);
+  });
+
+  // ---- which program runs the ready-made apps ----
+
+  /** Settings → Apps → "Ready-made apps run with": its value, whether each choice is usable, and what Automatic takes now. */
+  const runWithShown = async () => {
+    const status = await programStatus();
+    return {
+      value: runWithSetting(db),
+      options: RUN_WITH.map((o) => ({ ...o, usable: o.value === 'auto' || o.value === 'custom' || programUsable(status, o.value) })),
+      automatic: defaultProgramNow().agent,
+    };
+  };
+  app.get('/api/apps/run-with', async () => runWithShown());
+  app.put('/api/apps/run-with', async (req) => {
+    const value = (req.body as { value?: unknown } | undefined)?.value;
+    if (!isRunWith(value)) throw new HttpError(400, `value: ${RUN_WITH.map((o) => o.value).join(', ')}`);
+    const why = isProgram(value) && value !== runWithSetting(db) ? await programRefusal(value) : null;
+    if (why) throw new HttpError(409, why);
+    setRunWith(db, value);
+    d.broadcast({ t: 'feature', id: 'apps', data: { runWith: value } });
+    return runWithShown();
+  });
+
+  /** The choice kept for a ready-made app: its program, model, effort and mode, for every run of it that picks nothing itself. */
+  const ready = (id: string): AppTemplate => {
+    if (!id.startsWith('tpl:')) throw new HttpError(400, 'Only a ready-made app (tpl:<id>) keeps a choice: an app of your own saves its program in its recipe');
+    return builtinOf(id);
+  };
+  app.put('/api/apps/:id/run-with', async (req) => {
+    const t = ready((req.params as { id: string }).id);
+    const b = (req.body ?? {}) as SentPick;
+    if (b.agent !== 'claude' && b.agent !== 'codex' && b.agent !== 'acp') throw new HttpError(400, 'agent: claude, codex or acp (with acpAgent; "console" is Custom)');
+    await programStatus();
+    const pick: AppPick = cleanPick(pickOver(t, readyPick(db, t).pick, b))!;
+    const why = await programRefusal(pick.agent);
+    if (why) throw new HttpError(409, why);
+    keepPick(db, t.id, pick);
+    d.broadcast({ t: 'feature', id: 'apps', data: { runWith: `tpl:${t.id}` } });
+    return { runsWith: runsWithView(db, t) };
+  });
+  app.delete('/api/apps/:id/run-with', async (req) => {
+    const t = ready((req.params as { id: string }).id);
+    keepPick(db, t.id, null);
+    d.broadcast({ t: 'feature', id: 'apps', data: { runWith: `tpl:${t.id}` } });
+    await programStatus();
+    return { runsWith: runsWithView(db, t) };
   });
 
   app.get('/api/apps/pins', async () => ({ ids: pinsOf(db) }));
@@ -452,7 +508,11 @@ function routes(d: Deps) {
     };
     // What its questions start from (About you, the last answers), for its form.
     const starts = (id: string, r: AppRecipe) => (r.fields.some((f) => f.from || f.remember) ? { starts: startsFor(db, r.fields, id) } : {});
-    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template), ...ownPage(`tpl:${template.id}`, template), ...starts(`tpl:${template.id}`, template) };
+    if (template) {
+      // How it runs now (the choice kept for it, else the setting), with the sign-ins read.
+      await programStatus();
+      return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template), runsWith: runsWithView(db, template), ...ownPage(`tpl:${template.id}`, template), ...starts(`tpl:${template.id}`, template) };
+    }
     const today = dayStart();
     const own = ownPage(a!.id, a!);
     return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), secrets: secretsOf(db, a!), ...own, ...starts(a!.id, a!) };
@@ -639,12 +699,12 @@ function routes(d: Deps) {
     // A test of a recipe not saved yet runs on its own ("test").
     const { app: a, template } = id === 'test' && b.recipe ? { app: null, template: null } : recipeOf(db, id);
     let recipe: AppRecipe = a ?? template ?? cleanRecipe(b.recipe);
-    // A test from the builder runs the recipe as it is on screen; a template takes the agent picked on its page.
-    if (b.recipe && typeof b.recipe === 'object') recipe = cleanRecipe(b.recipe);
-    // A model given wins; a tier given in its place replaces the template's model and tier for this run; neither: the program's own default.
-    else if (template && typeof b.agent === 'string') recipe = cleanRecipe({ ...template, agent: b.agent, acpAgent: b.acpAgent, model: b.model, tier: b.model ? undefined : b.tier, mode: b.mode, effort: b.effort });
-    else if (template && (b.model || isTier(b.tier))) recipe = cleanRecipe({ ...template, model: b.model, tier: b.model ? undefined : b.tier });
-    if (b.recipe && typeof b.recipe === 'object') {
+    // A test from the builder runs the recipe as it is on screen.
+    const onScreen = !!b.recipe && typeof b.recipe === 'object';
+    if (onScreen) recipe = cleanRecipe(b.recipe);
+    // A ready-made app as it is: what this run picks for itself (program, model, effort), if anything (runwith.ts).
+    const pick = template && !onScreen && picksSomething(b) ? (b as SentPick) : undefined;
+    if (onScreen) {
       const { errors } = problemsOf(db, b.recipe);
       if (errors.length) throw new HttpError(400, errors.length === 1 ? errors[0] : `Fix these first: ${errors.join('; ')}`);
     }
@@ -653,15 +713,20 @@ function routes(d: Deps) {
     if (a) checkDaily(db, a);
     // Keys it needs, given on its form: to the vault first.
     if (b.secrets && typeof b.secrets === 'object' && saveAppSecrets(db, recipe, b.secrets, { allow: Array.isArray(b.allow) ? b.allow : [] }).length) keysChanged();
-    const r = startRun({
+    const ran = {
       app: a?.id ?? (template ? `tpl:${template.id}` : 'test'),
-      slug: a?.slug ?? template?.id ?? 'test',
       recipe,
-      source: b.source === 'test' ? 'test' : b.source === 'screen' ? 'screen' : 'web',
+      source: b.source === 'test' ? ('test' as const) : b.source === 'screen' ? ('screen' as const) : ('web' as const),
+      flow: typeof b.flow === 'string' && b.flow && b.flow !== 'run' ? (b.flow as string) : undefined,
+      pick,
+      settled: onScreen,
+    };
+    await lookAgain(db, ran);
+    const r = startRun({
+      ...ran,
+      slug: a?.slug ?? template?.id ?? 'test',
       inputs: b.inputs && typeof b.inputs === 'object' ? b.inputs : {},
       files: b.files && typeof b.files === 'object' ? b.files : undefined,
-      // Another of its flows, by name (a screen's form or button).
-      flow: typeof b.flow === 'string' && b.flow && b.flow !== 'run' ? b.flow : undefined,
       // The language the page is in, which the run writes in.
       lang: typeof b.lang === 'string' ? b.lang : undefined,
       // The flows half of a web app: the person signed in to Hydor is who it acts for, as a proven person is recorded (not for a test of a recipe on screen, which acts for nobody).
@@ -713,7 +778,7 @@ function routes(d: Deps) {
       }
     }
     if (a && !test) checkDaily(db, a);
-    return startRun({ app: old.app, slug, recipe, source: test ? 'test' : 'web', inputs: { ...old.inputs, ...changes }, ...(Object.keys(files).length ? { files } : {}), ...(old.lang ? { lang: old.lang } : {}) });
+    return startRun({ app: old.app, slug, recipe, source: test ? 'test' : 'web', settled: true, inputs: { ...old.inputs, ...changes }, ...(Object.keys(files).length ? { files } : {}), ...(old.lang ? { lang: old.lang } : {}) });
   };
 
   app.get('/api/apps/runs/:runId', async (req) => {
@@ -844,7 +909,10 @@ function routes(d: Deps) {
     const a = old.app.startsWith('tpl:') || old.app === 'test' ? null : getApp(db, old.app);
     if (old.app.startsWith('tpl:')) installedOr409(db, templateById(old.app.slice(4)));
     // From its view: a new run with the same answers but those given, the app as it is now, its files along.
-    if (b.inputs && typeof b.inputs === 'object' && !Array.isArray(b.inputs)) return { run: runView(againWith(old, a, b.inputs as Record<string, unknown>)) };
+    if (b.inputs && typeof b.inputs === 'object' && !Array.isArray(b.inputs)) {
+      await lookAgain(db, { app: old.app, recipe: a ?? old.recipe, source: 'web', settled: true });
+      return { run: runView(againWith(old, a, b.inputs as Record<string, unknown>)) };
+    }
     if (isActive(old.status)) throw new HttpError(409, 'It is still running');
     let recipe: AppRecipe = a ?? old.recipe;
     if (b.recipe && typeof b.recipe === 'object') {
@@ -860,11 +928,13 @@ function routes(d: Deps) {
     if (formOf(recipe, old.flow).some((f) => f.type === 'file' && old.inputs[f.id])) throw new HttpError(400, 'Its files do not come along: run it again from its form');
     const test = old.source === 'test' || !!b.recipe;
     if (a && !test) checkDaily(db, a);
+    await lookAgain(db, { app: old.app, recipe, source: test ? 'test' : 'web', flow: old.flow ?? undefined, settled: true });
     const r = startRun({
       app: old.app,
       slug: a?.slug ?? (old.app.startsWith('tpl:') ? old.app.slice(4) : 'test'),
       recipe,
       source: test ? 'test' : 'web',
+      settled: true,
       inputs: old.inputs,
       ...(old.flow ? { flow: old.flow } : {}),
       // In the language it wrote in.
@@ -1032,6 +1102,7 @@ function routes(d: Deps) {
     if (!Array.isArray(b.rows)) throw new HttpError(400, 'Send the rows');
     const max = a.limits.runsPerDay;
     if (max && usageSince(db, a.id, dayStart()).runs + b.rows.length > max) throw new HttpError(429, `That is more runs than the app’s limit of ${max} a day allows (Limits in its settings)`);
+    await lookAgain(db, { app: a.id, recipe: a, source: 'batch' });
     return { batch: startBatch(db, { app: a.id, slug: a.slug, recipe: a, rows: b.rows as Record<string, unknown>[], concurrency: b.concurrency, name: b.name }) };
   });
 

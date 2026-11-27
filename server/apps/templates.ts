@@ -3923,8 +3923,9 @@ return { summary: String(input.summary || '').trim() + '\n\n' + tested, files, n
  * page: explore.ts), the apps for keeping up with a research field (Paper radar and the rest: templates-research.ts),
  * those for papers (reading, writing and presenting them: templates-papers.ts), the apps for everyday things (the
  * weather, sports, food, films and games, plans, charts: templates-more.ts), the lab's (labelling, research sprints,
- * sweeps, the weekly report and the lab notebook: templates-lab.ts), then the blocks. They run with Claude Code unless
- * their page picks another agent.
+ * sweeps, the weekly report and the lab notebook: templates-lab.ts), then the blocks. The program that runs one is
+ * settled for each run (runwith.ts): what the run picks, the choice kept for it, the setting; `agent` here is only the
+ * program a model named by name would be for.
  */
 const ALL: Draft[] = [...T.filter((t) => !t.block), EXPLORE, ...RESEARCH, ...PAPERS, ...MORE, ...LAB, ...T.filter((t) => t.block)];
 const UIS = { ...VIEWS, ...MORE_VIEWS, ...RESEARCH_VIEWS, ...PAPER_VIEWS, ...LAB_VIEWS, [EXPLORE.id]: EXPLORE_UI };

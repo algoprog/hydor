@@ -19,6 +19,7 @@ import type { Deps } from '../features/types.ts';
 import { checkDaily, waitSeconds } from './api.ts';
 import { answerRun, flowsOf, keyRun, keyStep, KEY_STATUS, questionOf, type KeyRun } from './keyrun.ts';
 import { isFlowRun, startRun, stopRun, waitFor, watchRuns } from './runs.ts';
+import { lookAgain } from './runwith.ts';
 import { stepsOf } from './flow.ts';
 import { Limiter, persistLimits } from './limits.ts';
 import { appOfKey, dayStart, getApp, getRun, KEY_PREFIX, listRuns, usageSince, type RunRecord } from './store.ts';
@@ -115,6 +116,7 @@ export function keyRoutes(d: Deps, link: (key: string) => string) {
       const going = listRuns(db, { app: a.id, source: 'api', status: ['queued', 'starting', 'running', 'waiting'], limit: 500 }).length;
       if (today.spent + going * (a.limits.capUsd ?? 0) >= linked.dailyCapUsd) throw new HttpError(429, `The web app has spent what it may in a day ($${linked.dailyCapUsd}: its Settings), or its runs still going may.`);
     }
+    await lookAgain(db, { app: a.id, recipe: a, source: 'api', flow: flow && flow !== 'run' ? flow : undefined });
     const r = startRun({
       app: a.id,
       slug: a.slug,

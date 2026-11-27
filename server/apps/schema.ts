@@ -113,7 +113,7 @@ export function appSchema(): Record<string, unknown> {
       color: { enum: Object.keys(APP_COLORS) },
       category: str('Its group on the Apps page'),
       assistant: str('An assistant’s id, which its agents work as'),
-      agent: { enum: ['claude', 'codex', 'acp'], description: 'Who does the work: Claude Code, Codex, or Custom (acp)' },
+      agent: { enum: ['claude', 'codex', 'acp'], description: 'Who does the work: Claude Code, Codex, or Custom (acp). Leave it out unless the person asks for one: a new app takes the first signed in here, a saved one keeps its own, and a run on one not signed in is refused' },
       acpAgent: str('acp: which one ("console" = Custom)'),
       model: str('Its agent’s model'),
       tier: { enum: ['quick', 'standard', 'best', 'max'], description: 'The tier its agent thinks with (Settings → Models → Tiers) instead of a model by name: "quick", "standard", "best" or "max". It follows the table as models change and works whichever program runs it. Pick the lowest that does the job well: quick for short clear jobs (a summary, formatting, a look-up), standard for most, best for research and hard reasoning, max rarely. A model by name wins over it' },

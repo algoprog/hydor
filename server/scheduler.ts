@@ -13,6 +13,7 @@ import { DRY_RUN_NOTE } from '../shared/outbox.ts';
 import { OUTCOME_LABEL, runHead, scheduleText, watchText, type RunOutcome, type RunStatus, type RunTrigger, type ScheduledTask, type TaskApp, type TaskExtra, type TaskRun, type TaskSchedule, type WatchSpec } from '../shared/automations.ts';
 import type { NotifyEvent } from '../shared/types.ts';
 import { acpAgents } from './agents/acp.ts';
+import { defaultProgramNow } from './agents/programs.ts';
 import { HttpError } from './auth.ts';
 import type { DB } from './db.ts';
 import type { TurnInfo } from './features/types.ts';
@@ -76,7 +77,7 @@ export interface AppRunner {
   /** The template's name; undefined when there is none of that id. */
   name(id: string): string | undefined;
   /** Starts a run of it with these answers: the run, and its session when one agent does it. */
-  start(o: { app: string; inputs: Record<string, string>; test: boolean }): { id: string; key?: string };
+  start(o: { app: string; inputs: Record<string, string>; test: boolean }): { id: string; key?: string } | Promise<{ id: string; key?: string }>;
   /** How a run of it ended; null while it goes on, undefined when there is no such run. */
   ended(id: string): AppRunEnd | null | undefined;
 }
@@ -368,13 +369,16 @@ export class Scheduler extends EventEmitter {
       if (!id) throw new HttpError(400, 'There is no such app');
       app.id = id;
     }
-    const agent = input.agent === 'claude' || input.agent === 'codex' || input.agent === 'acp' ? input.agent : app ? 'claude' : null;
+    const named = input.agent === 'claude' || input.agent === 'codex' || input.agent === 'acp' ? input.agent : null;
+    // A template's task that names no program takes the first signed in here (the run itself goes by the template's).
+    const fallback = !named && app ? defaultProgramNow() : null;
+    const agent = named ?? fallback?.agent ?? null;
     const cwd = home(String(input.cwd ?? '').trim() || (app ? '~' : ''));
     if (!name || (!prompt && !app) || !agent || !cwd) throw new HttpError(400, app ? 'A task needs a name' : 'A task needs a name, a prompt, an agent and a folder');
     if (!fs.existsSync(cwd)) throw new HttpError(400, `There is no folder ${cwd}`);
     let acpAgent: string | undefined;
     if (agent === 'acp') {
-      acpAgent = String(input.acpAgent ?? '');
+      acpAgent = String(input.acpAgent ?? fallback?.acpAgent ?? '');
       if (!acpAgents(this.db).some((a) => a.id === acpAgent)) throw new HttpError(400, 'Pick which agent runs it');
     }
     const fl = input.failLimit;
@@ -971,7 +975,7 @@ export class Scheduler extends EventEmitter {
       } else if (app && answers) {
         if (!this.apps) throw new Error('Apps are not on here');
         // Its run ends when the template's does (appRunEnded); it has no session of its own to watch.
-        const started = this.apps.start({ app: app.id, inputs: answers, test });
+        const started = await this.apps.start({ app: app.id, inputs: answers, test });
         setRun(this.db, runId, { app_run: started.id });
         key = started.key;
       } else if (r.target || (standingKey = await this.standingOf(r))) {

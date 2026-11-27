@@ -115,9 +115,9 @@ const readyLine = (t: AppTemplate) => {
 /** How many lines of a code step a ready-made app shows unless asked for all. */
 const CODE_LINES = 40;
 
-/** A ready-made app as app_save takes it, each code step's program cut to its first lines unless `whole`. */
-function readyRecipe(t: AppTemplate, whole: boolean): { recipe: AppRecipe; cut: number } {
-  const recipe = JSON.parse(JSON.stringify(cleanRecipe(t))) as AppRecipe;
+/** A ready-made app as app_save takes it, each code step's program cut to its first lines unless `whole`. It names no program: a copy takes the first signed in. */
+function readyRecipe(t: AppTemplate, whole: boolean): { recipe: Omit<AppRecipe, 'agent' | 'acpAgent'>; cut: number } {
+  const { agent: _agent, acpAgent: _acp, ...recipe } = JSON.parse(JSON.stringify(cleanRecipe(t))) as AppRecipe;
   let cut = 0;
   if (whole) return { recipe, cut };
   for (const f of [recipe.flow, ...Object.values(recipe.flows ?? {})])
@@ -250,7 +250,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
           const t = TEMPLATES.find((x) => x.id === id);
           if (!t) return { text: `There is no ready-made app “${id}”: app_get with ready: true lists them`, isError: true };
           const { recipe, cut } = readyRecipe(t, !!a.code);
-          return JSON.stringify({ id: `tpl:${t.id}`, said: `A ready-made app, to build like: its recipe is as app_save takes it. Make the user's own app with app_save (a new one), never by changing this one.${cut ? ` ${cut} code step${cut > 1 ? 's are' : ' is'} cut to the first ${CODE_LINES} lines: code: true gives them whole.` : ''}`, recipe }, null, 1);
+          return JSON.stringify({ id: `tpl:${t.id}`, said: `A ready-made app, to build like: its recipe is as app_save takes it. Make the user's own app with app_save (a new one), never by changing this one. It names no program (agent): leave it so, and the new app runs with the first signed in here.${cut ? ` ${cut} code step${cut > 1 ? 's are' : ' is'} cut to the first ${CODE_LINES} lines: code: true gives them whole.` : ''}`, recipe }, null, 1);
         }
         if (!a.app) return JSON.stringify({ apps: listApps(db).map(lineOf) }, null, 1);
         const app = find(a.app);
@@ -417,7 +417,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         type: 'object',
         properties: {
           app: { ...APP, description: 'The app to change; none: a new one.' },
-          recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form; a question that asks about the person, as their units, currency, country, diet or research fields, says from: "me.units" and starts from what they keep in About you; remember: true starts one from their last answer), language ("person": its model and agent steps write in the person\'s language; set it on every new app), prompt (a task for one agent) or flow (its steps), answer, ui (its view: how its answer looks and what a click there does; app_guide\'s API topic, Apps: views), data, memory, requires, flows, examples, tools, limits, agent, model, tier ("quick", "standard", "best" or "max": the tier its agent thinks with, Settings → Models → Tiers, instead of a model by name; it follows the table and works whichever program runs it; pick the lowest that does the job well: quick for short clear jobs, standard for most, best for research and hard reasoning, max rarely; a model by name wins; an agent step has its own), mode…' },
+          recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form; a question that asks about the person, as their units, currency, country, diet or research fields, says from: "me.units" and starts from what they keep in About you; remember: true starts one from their last answer), language ("person": its model and agent steps write in the person\'s language; set it on every new app), prompt (a task for one agent) or flow (its steps), answer, ui (its view: how its answer looks and what a click there does; app_guide\'s API topic, Apps: views), data, memory, requires, flows, examples, tools, limits, agent (leave it out: a new app runs with the first signed in of Claude Code, Codex and Custom, a saved one keeps its own; name one only when the person asks, and a run on one not signed in is refused), model, tier ("quick", "standard", "best" or "max": the tier its agent thinks with, Settings → Models → Tiers, instead of a model by name; it follows the table and works whichever program runs it; pick the lowest that does the job well: quick for short clear jobs, standard for most, best for research and hard reasoning, max rarely; a model by name wins; an agent step has its own), mode…' },
           patch: { type: 'object', description: 'Merged into the app as saved (or into recipe).' },
           step: { type: 'object', description: 'One step: { id, …its fields } changes it; { id, remove: true } removes it; a new id adds it (after: the step it follows; none: at the end).' },
           assets: { type: 'object', additionalProperties: { type: ['string', 'null'] }, description: 'Its own files by name ("cover.jpg"): a path on this computer, an https:// address or a data: address, kept with the app; null removes one.' },
@@ -436,6 +436,8 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         if (prev?.graph && raw.graph === undefined) raw = { ...raw, graph: prev.graph };
         if (a.patch && typeof a.patch === 'object') raw = mergePatch(raw, a.patch) as Record<string, any>;
         if (a.step && typeof a.step === 'object') raw = withStep(raw, a.step as Record<string, unknown>);
+        // A change that names no program keeps the app's own.
+        if (prev && raw.agent === undefined) raw = { ...raw, agent: prev.agent, acpAgent: prev.acpAgent };
         if (!prev && !a.recipe && !a.patch) return { text: 'Give the app to make (recipe), or the one to change (app)', isError: true };
         // Its own files: kept first, then named in its assets.
         if (a.assets && typeof a.assets === 'object' && !Array.isArray(a.assets)) {
@@ -505,7 +507,8 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         const app = a.app ? find(a.app) : null;
         let recipe: AppRecipe | null = app;
         if (a.recipe && typeof a.recipe === 'object') {
-          const { recipe: r, errors } = help.problemsOf(a.recipe);
+          const sent = a.recipe as Record<string, unknown>;
+          const { recipe: r, errors } = help.problemsOf(app && sent.agent === undefined ? { ...sent, agent: app.agent, acpAgent: app.acpAgent } : sent);
           if (errors.length) return { text: `It cannot run yet:\n- ${errors.join('\n- ')}`, isError: true };
           recipe = r;
         }

@@ -9,6 +9,7 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { checkedInputs, launchQueued, onFinished, startRun, stopRun } from './runs.ts';
 import { getBatch, insertBatch, insertRun, listRuns, runningBatches, setBatchStatus, updateRun } from './store.ts';
+import { settle } from './runwith.ts';
 
 export const MAX_ROWS = 500;
 export const MAX_CONCURRENCY = 6;
@@ -20,6 +21,9 @@ export function startBatch(db: DB, o: { app: string; slug: string; recipe: AppRe
   const rows = o.rows.slice(0, MAX_ROWS + 1);
   if (!rows.length) throw new HttpError(400, 'There are no rows to run');
   if (rows.length > MAX_ROWS) throw new HttpError(400, `At most ${MAX_ROWS} rows at a time`);
+  // A program that is not signed in refuses the whole batch, before any row is queued.
+  const { why } = settle(db, { app: o.app, recipe: o.recipe, source: 'batch' });
+  if (why) throw new HttpError(409, why);
   const concurrency = Math.max(1, Math.min(Math.round(Number(o.concurrency) || 2), MAX_CONCURRENCY));
   const id = insertBatch(db, { app: o.app, name: o.name?.slice(0, 120), concurrency, total: rows.length });
   slugs.set(id, o.slug);

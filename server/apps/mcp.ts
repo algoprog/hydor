@@ -9,6 +9,7 @@ import type { ToolOutput } from '../features/types.ts';
 import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
 import { stepsOf } from './flow.ts';
 import { isFlowRun, startRun, waitFor } from './runs.ts';
+import { lookAgain } from './runwith.ts';
 import { getRun, listApps } from './store.ts';
 
 interface ExternalTool {
@@ -62,6 +63,7 @@ export function appMcpTools(): ExternalTool[] {
     async run(args) {
       const { wait, ...inputs } = args ?? {};
       checkDaily(db, a);
+      await lookAgain(db, { app: a.id, recipe: a, source: 'mcp' });
       const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'mcp', inputs });
       const done = await waitFor(r.id, waitSeconds(wait, 120) * 1000);
       return answerText(done ?? r);

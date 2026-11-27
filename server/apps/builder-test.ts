@@ -195,7 +195,8 @@ test('app_get: tpl:<id> gives a ready-made app whole, its long programs cut to 4
   assert.ok(cutCode.some((s: any) => /… \d+ more lines \(app_get with code: true gives them all\)/.test(s.code)));
   assert.match(cut.said, /cut to the first 40 lines/);
   const whole = JSON.parse(text(await tools.app_get.run({ app: `tpl:${long!.id}`, code: true }, ctx)));
-  assert.deepEqual(whole.recipe, JSON.parse(JSON.stringify(cleanRecipe(long!))));
+  const { agent: _agent, acpAgent: _acp, ...unnamed } = JSON.parse(JSON.stringify(cleanRecipe(long!)));
+  assert.deepEqual(whole.recipe, unnamed, 'it names no program: a copy takes the first signed in');
   assert.ok(failed(await tools.app_get.run({ app: 'tpl:no-such-app' }, ctx)));
   // The user's own apps are listed as before.
   assert.ok(Array.isArray(JSON.parse(text(await tools.app_get.run({}, ctx))).apps));

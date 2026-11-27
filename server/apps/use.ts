@@ -29,6 +29,7 @@ import { allowApp, allowedApps } from './allowed.ts';
 import { checkDaily } from './api.ts';
 import { builtinsForAgents } from './builtins.ts';
 import { askRun, startRun, waitFor, whyNoAsks } from './runs.ts';
+import { lookAgain, settle } from './runwith.ts';
 import { byWords, FIND_K, FIND_MAX, findApps } from './search.ts';
 import { words } from '../memory/store.ts';
 import { getApp, getRun, listApps, updateRun, type RunRecord } from './store.ts';
@@ -605,6 +606,11 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
         const near = now.length > NAMED ? (await findApps(db, now, String(args.app ?? ''), 8)).found.map((f) => f.u) : now;
         return { text: `There is no app “${String(args.app ?? '')}” for agents to run here. ${now.length > NAMED ? 'Some with names like it' : 'The apps'}: ${near.map((x) => `"${x.ref}" (${x.recipe.name})`).join(', ') || 'none'}.${now.length > NAMED ? ' find_apps finds the others.' : ''}`, isError: true };
       }
+      // A program that is not signed in: said before the card asks the user anything.
+      const asked = { app: u.app, recipe: u.recipe, source: 'session' as const };
+      await lookAgain(db, asked);
+      const { why } = settle(db, asked);
+      if (why) return { text: `${u.recipe.name} could not start: ${why}`, isError: true };
       const raw = args.inputs && typeof args.inputs === 'object' && !Array.isArray(args.inputs) ? (args.inputs as Record<string, unknown>) : {};
       let got = intake(u.recipe.fields, raw, c.cwd);
       // What the questions it left out start from: About you, the user's last answers.

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppBatch, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunAsk, RunProgress, RunStepView } from '@shared/apps';
 import type { EnvView } from '@shared/app-manifest';
+import { withPick, type RunsWithView } from '@shared/app-run-with';
 import { isActive } from '@shared/apps';
 import { api, enc } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
@@ -55,6 +56,8 @@ export interface AppDetail {
   /** A ready-made app: installed, and whether agents in sessions may run it. */
   installed?: boolean;
   agents?: boolean;
+  /** A ready-made app: what a run that picks nothing takes now (the choice kept for it, else the setting). */
+  runsWith?: RunsWithView;
   keys?: AppKey[];
   usage?: Usage;
   publicUsage?: Usage;
@@ -182,3 +185,9 @@ export function useRunDetail(id: string) {
 export const money = (n?: number | null) => (n == null ? '' : n === 0 ? '$0' : n < 0.01 ? '<$0.01' : `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`);
 
 export const SOURCE_LABEL: Record<AppRun['source'], string> = { web: 'From the form', test: 'Test run', api: 'From the API', mcp: 'From another agent', public: 'Public page', batch: 'Row', step: 'A step of another run', app: 'From another app', screen: 'From its screen', task: 'From a scheduled task', chat: 'A conversation on its screen', session: 'From a session' };
+
+/** A ready-made app's recipe as a copy of it starts: with the program it runs with now (the choice kept for it, else the setting). */
+export async function readyCopy(id: string): Promise<AppTemplate> {
+  const r = await api<AppDetail>(`/api/apps/tpl:${enc(id)}`);
+  return r.runsWith ? withPick(r.template!, r.runsWith.pick) : r.template!;
+}

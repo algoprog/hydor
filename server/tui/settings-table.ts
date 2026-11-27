@@ -876,6 +876,17 @@ row('assistants', 'Task folders', 'text', {
   note: 'A full path or one starting with ~/; an empty value goes back to the default.',
 });
 row('apps', 'About you', 'page', { note: 'Its fields (where you live, units, currency, diet, research fields…) are set on the page, one row each.' });
+row('apps', 'Ready-made apps run with', 'choice', {
+  choices: [
+    { value: 'auto', label: 'Automatic' },
+    { value: 'claude', label: 'Claude Code' },
+    { value: 'codex', label: 'Codex' },
+    { value: 'custom', label: 'Custom' },
+  ],
+  read: rd('/api/apps/run-with', 'value'),
+  write: put('/api/apps/run-with', (v) => ({ value: v })),
+  note: 'A program not signed in here is refused. A choice kept on a ready-made app’s own page comes first.',
+});
 row('apps', 'Run without asking', 'list', {
   items: 'the apps agents run without asking first, by their ids (tpl:<id> for a ready-made app, as this shows them)',
   check: (v) => ((v as string[]).find((i) => !/^\S+$/.test(i)) ? 'An app is named by its id, with no spaces (tpl:<id> for a ready-made one)' : null),

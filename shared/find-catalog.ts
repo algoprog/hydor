@@ -327,6 +327,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where new task folders go, for sessions started without a folder'],
   // Capabilities › Apps
   ['apps', 'About you', 'profile personal details preferences me myself where I live home city country language units metric imperial currency diet vegetarian allergies household family people at home streaming services netflix teams sports research fields topics venues conferences journals author orcid openalex compute gpu', 'What apps start their questions from, so they don’t ask every time'],
+  ['apps', 'Ready-made apps run with', 'ready-made templates app program agent claude code codex custom automatic default model which runs them', 'The program that runs the ready-made apps: Automatic, Claude Code, Codex or Custom'],
   ['apps', 'Run without asking', 'auto approve allow always permission ask before agent runs app trust', 'The apps agents run for you without asking first; remove one to be asked again'],
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],

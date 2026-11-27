@@ -1026,12 +1026,17 @@ export function cleanFields(raw: unknown): AppField[] {
   });
 }
 
+let unnamed: () => { agent: Agent; acpAgent?: string } = () => ({ agent: 'claude' });
+/** What a recipe that names no program runs on: the server says (the first signed in here), as it starts. */
+export const setProgramDefault = (f: () => { agent: Agent; acpAgent?: string }) => void (unnamed = f);
+
 /** A recipe from anything (a form, the helper model, an API call): known fields only, within bounds. */
 export function cleanRecipe(raw: any): AppRecipe {
   const r = raw && typeof raw === 'object' ? raw : {};
   const fields = cleanFields(r.fields);
   const answer = cleanAnswer(r.answer);
-  const agent: Agent = r.agent === 'codex' || r.agent === 'acp' ? r.agent : 'claude';
+  const none = r.agent === 'claude' || r.agent === 'codex' || r.agent === 'acp' ? null : unnamed();
+  const agent: Agent = none ? none.agent : r.agent;
   const flow = cleanFlow(r.flow).flow;
   const data = cleanData(r.data).data;
   const requires = cleanRequires(r.requires).requires;
@@ -1051,7 +1056,7 @@ export function cleanRecipe(raw: any): AppRecipe {
     category: opt(r.category, 30),
     assistant: opt(r.assistant, 80),
     agent,
-    acpAgent: agent === 'acp' ? str(r.acpAgent, 80) || 'console' : undefined,
+    acpAgent: agent === 'acp' ? str(r.acpAgent, 80) || none?.acpAgent || 'console' : undefined,
     model: opt(r.model, 160),
     ...(isTier(r.tier) ? { tier: r.tier as Tier } : {}),
     effort: opt(r.effort, 40),

@@ -1148,8 +1148,12 @@ agents that speak ACP and take MCP servers.
   by name (Edit → Who does it, a step's What it thinks with, or Change beside a ready-made app's "runs with": the
   Model menu lists Quick, Standard, Best and Max first, each with the model it means now for that program, then the
   models by name; a tier follows Settings → Models → Tiers and works whichever program runs the app, a model by name
-  wins, an agent step's own pick replaces the app's; a ready-made app's page remembers the program and mode for all of them,
-  and the model, tier and effort for each app on its own, only once changed there); the agents that build apps pick
+  wins, an agent step's own pick replaces the app's). A ready-made app takes what a run picks, else the program, model,
+  effort and mode kept for it on its page (Keep for this app, on the server, for every device and for scheduled tasks,
+  agents and the API; Back to default forgets it), else Settings → Apps → Ready-made apps run with (Automatic: the first
+  of Claude Code, Codex and Custom signed in here), and thinks with its own tier on that program. A new app of yours
+  starts on the first program signed in. A run that needs a Claude Code or Codex not signed in here does not start, and
+  says which and where to change it. The agents that build apps pick
   the lowest tier that does the job well, and so do the ready-made apps with an agent step (Best for Deep research
   report, Reproduce a paper and Research sprint, Standard for most, Quick for Document Q&A's look; no step names a tier,
   so what you pick on the page reaches all of an app's agents). Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card

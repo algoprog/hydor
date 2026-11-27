@@ -24,7 +24,8 @@ import { FolderChip } from '../../components/FolderPicker';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, Popover, Section, Segmented, Switch, Throbber, useMediaQuery } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
-import { appPath, useRunEvents, type RunDetail } from './api';
+import { appPath, readyCopy, useRunEvents, type RunDetail } from './api';
+import { firstUsableProgram } from '@shared/programs';
 import { AppIcon, ICONS } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { ResultView, RunBody } from './Result';
@@ -218,10 +219,16 @@ const BLANK: AppRecipe = {
   language: 'person',
 };
 
+/** A new app, run by the first signed in of Claude Code and Codex, else Custom. */
+const blank = (): AppRecipe => {
+  const p = firstUsableProgram(useApp.getState().boot?.programs);
+  return { ...BLANK, agent: p.agent, acpAgent: p.acp ?? undefined };
+};
+
 // Every part of the recipe, so a save keeps what this page does not show yet (its data, memory, needs, other flows).
 const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
-  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions, language } = a;
-  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions, language };
+  const { name, icon, color, description, category, assistant, agent, acpAgent, model, tier, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions, language } = a;
+  return { name, icon, color, description, category, assistant, agent, acpAgent, model, tier, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions, language };
 };
 
 /** A text box that grows with what is written in it, and with how narrow it is. `base`: its look, the kit's field unless given. */
@@ -691,7 +698,7 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
 
 /** `embedded`: beside a session's conversation (`session`), where an agent builds it: no way back, a save stays here, and a step can be asked about there. */
 export function BuilderPage({ id, template, from, turn, embedded, session }: { id?: string; template?: string; from?: string; turn?: string; embedded?: boolean; session?: string }) {
-  const [recipe, setRecipe] = useState<AppRecipe | null>(id || template || from ? null : BLANK);
+  const [recipe, setRecipe] = useState<AppRecipe | null>(() => (id || template || from ? null : blank()));
   const [saved, setSaved] = useState<AppDef | null>(null);
   // The version on screen as it was loaded or saved here: what differs from it is not saved yet.
   const loaded = useRef('');
@@ -732,7 +739,7 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
   useEffect(() => {
     if (id)
       api<{ app: AppDef }>(`/api/apps/${enc(id)}`).then((r) => load(r.app), (e) => (toastError(e), embedded || go('/apps')));
-    else if (template) api<{ template: AppTemplate }>(`/api/apps/tpl:${enc(template)}`).then((r) => setRecipe(recipeOf(r.template)), (e) => (toastError(e), setRecipe(BLANK)));
+    else if (template) readyCopy(template).then((t) => setRecipe(recipeOf(t)), (e) => (toastError(e), setRecipe(blank())));
     else if (from)
       post<{ recipe: AppRecipe; note?: string; parts?: DraftPart[] }>('/api/apps/draft', { key: from, ...(turn ? { turn: Number(turn) } : {}) }).then(
         (r) => {
@@ -741,7 +748,7 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
           if (r.note) setNote(r.note);
           if (r.parts?.length) setParts(r.parts);
         },
-        (e) => (toastError(e), setRecipe(BLANK)),
+        (e) => (toastError(e), setRecipe(blank())),
       );
     // The tools its agents may be allowed (not those only steps have).
     api<{ tools: { name: string; description: string; stepOnly?: boolean }[] }>('/api/apps/tools').then((r) => setTools(r.tools.filter((t) => !t.stepOnly)), () => setTools([]));
@@ -1118,6 +1125,7 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
           <Fold icon={<Bot size={16} />} title="Who does it" summary={whoLine} sub="The agent, its model and mode. Runs go ahead without anyone watching, so pick a mode that does not stop to ask (Auto, or one that allows edits).">
             <div className="flex flex-wrap items-center gap-1">
               <AgentPicker
+                usableOnly
                 agent={recipe.agent}
                 acpId={recipe.acpAgent ?? null}
                 acpList={acpList}

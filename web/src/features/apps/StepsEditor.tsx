@@ -9,6 +9,7 @@ import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
 import type { AgentStep, DataOp, Flow, Step, StepKind, ValueOp } from '@shared/app-manifest';
 import { allSteps, BUILTIN_VALUES, checkFlow, cleanFlow, givesOf, labelOf, RESCUED, STEP_KINDS, STEP_TOOLS, titleOf, VALUE_OPS } from '@shared/app-manifest';
 import { api, post } from '../../lib/api';
+import { readyCopy } from './api';
 import { toastError } from '../../lib/store';
 import { BlockChips } from './Blocks';
 import { GraphEditor } from './GraphEditor';
@@ -1302,7 +1303,8 @@ export function StepsEditor({ recipe, onChange, onAsk, appId, view: given, onPar
       let a: AppDef;
       if ('slug' in b) a = b as AppDef;
       else {
-        a = (await post<{ app: AppDef }>('/api/apps', { recipe: b, template: b.id })).app;
+        // Made yours with the program it runs with now.
+        a = (await post<{ app: AppDef }>('/api/apps', { recipe: await readyCopy(b.id), template: b.id })).app;
         setApps((x) => [...x, a]);
       }
       // Its questions the template's own form has by the same name are given; the rest are to fill in.

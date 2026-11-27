@@ -1,7 +1,8 @@
 // An app's page (or a template's): its form and Run, its past runs, runs over the rows of a CSV, and
 // how to reach it from outside (API keys, other agents, the public page), and whether agents in your sessions
-// may run it. A template runs as it is, with the agent and model picked here, or becomes an app of your own;
-// one you uninstalled shows what it is, to install it again.
+// may run it. A template runs as it is, with the choice kept for it (else Settings → Apps' program) or the agent and
+// model picked here for one run, or becomes an app of your own; one you uninstalled shows what it is, to install it
+// again.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppWindow, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Plus, RefreshCw, SlidersHorizontal, Trash2, TriangleAlert } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
@@ -34,7 +35,8 @@ import { openWebApp, webAppPath } from '../webapps/api';
 import { DownloadDialog, EnvLine } from './Install';
 import { AppScreen } from './Screen';
 import { AppView } from './View';
-import { PROGRAM_KEY, startingProgram, startingThinks, thinksKey, thinksToKeep } from './pick';
+import { programsOf, samePick, withPick, type AppPick, type RunsWithView } from '@shared/app-run-with';
+import { isProgram, PROGRAM_LABEL, programUsable } from '@shared/programs';
 import { Schedules } from './Schedules';
 import { ShareTab } from './Share';
 import { tr } from '../../i18n/runtime';
@@ -151,7 +153,7 @@ function LatestRuns({ id, recipe, template }: { id: string; recipe: AppDef | App
   );
 }
 
-function RunTab({ id, recipe, template, again, given, agents, secrets, starts = {} }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; given?: Record<string, string>; agents?: ReactNode; secrets?: KeyState[]; starts?: Record<string, string> }) {
+function RunTab({ id, recipe, template, again, given, agents, secrets, starts = {}, runsWith }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; given?: Record<string, string>; agents?: ReactNode; secrets?: KeyState[]; starts?: Record<string, string>; runsWith?: RunsWithView }) {
   // The keys it needs: those the vault lacks are asked for here, and saved there as it starts (not those only its other flows need).
   const [keyStates, setKeyStates] = useState<KeyState[]>(keysFor(secrets));
   useEffect(() => setKeyStates(keysFor(secrets)), [secrets]);
@@ -176,19 +178,47 @@ function RunTab({ id, recipe, template, again, given, agents, secrets, starts = 
   const [files, setFiles] = useState<FormFiles>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  // A ready-made app runs with the program and mode last used for one, and the model, tier and effort last changed on this
-  // app's own page, else its own (pick.ts).
+  // A ready-made app starts on what a run of it takes by itself: the choice kept for it on the server, else Settings →
+  // Apps' program. What is picked here is for this run, until it is kept for the app.
   const [picking, setPicking] = useState(false);
-  const program = startingProgram(localStorage.getItem(PROGRAM_KEY), recipe);
-  const thinks = startingThinks(template ? localStorage.getItem(thinksKey(id)) : null, recipe);
-  const [agent, setAgent] = useState<Agent>(template ? program.agent : recipe.agent);
-  const [acpAgent, setAcpAgent] = useState<string | null>(template ? program.acpAgent : (recipe.acpAgent ?? null));
-  const [model, setModel] = useState<string | null>(template ? thinks.model : (recipe.model ?? null));
+  const [saved, setSaved] = useState(template ? runsWith : undefined);
+  const first: AppPick = saved?.pick ?? recipe;
+  const [agent, setAgent] = useState<Agent>(first.agent);
+  const [acpAgent, setAcpAgent] = useState<string | null>(first.acpAgent ?? null);
+  const [model, setModel] = useState<string | null>(first.model ?? null);
   // The tier it thinks with in place of a model by name; a model named wins.
-  const [tier, setTier] = useState<Tier | null>(template ? thinks.tier : recipe.model ? null : (recipe.tier ?? null));
-  const [effort, setEffort] = useState<string | null>(template ? thinks.effort : (recipe.effort ?? null));
-  const [mode, setMode] = useState<string | null>(template ? program.mode : (recipe.mode ?? null));
+  const [tier, setTier] = useState<Tier | null>(first.model ? null : (first.tier ?? null));
+  const [effort, setEffort] = useState<string | null>(first.effort ?? null);
+  const [mode, setMode] = useState<string | null>(first.mode ?? null);
   const acpList = useApp((s) => s.boot?.acpAgents) ?? [];
+  const now: AppPick = { agent, acpAgent: agent === 'acp' ? (acpAgent ?? 'console') : undefined, model: model ?? undefined, tier: model ? undefined : (tier ?? undefined), effort: effort ?? undefined, mode: mode ?? undefined };
+  // As it is sent: a model of null with no tier is the program's own default.
+  const sent = { ...now, model: model ?? null };
+  const changed = !!saved && !samePick(now, saved.pick);
+  const take = (p: AppPick) => {
+    setAgent(p.agent);
+    setAcpAgent(p.acpAgent ?? null);
+    setModel(p.model ?? null);
+    setTier(p.model ? null : (p.tier ?? null));
+    setEffort(p.effort ?? null);
+    setMode(p.mode ?? null);
+  };
+  // Keeps the pick for this app (null: back to the default), for every device and for runs that do not come from here.
+  const keep = async (pick: typeof sent | null) => {
+    try {
+      const path = `/api/apps/${enc(id)}/run-with`;
+      const r = pick ? await put<{ runsWith: RunsWithView }>(path, pick) : await del<{ runsWith: RunsWithView }>(path);
+      setSaved(r.runsWith);
+      take(r.runsWith.pick);
+    } catch (e) {
+      toastError(e);
+    }
+  };
+  // A program the run needs that is not signed in here: said before Run (the server refuses it too).
+  const programs = useApp((s) => s.boot?.programs);
+  const out = programsOf({ agent, acpAgent: now.acpAgent, flow: recipe.flow, flows: recipe.flows })
+    .map((p) => p.agent)
+    .find((a) => !programUsable(programs, a));
   const run = async () => {
     const errs = formErrors(recipe.fields, values, files);
     setErrors(errs);
@@ -197,14 +227,8 @@ function RunTab({ id, recipe, template, again, given, agents, secrets, starts = 
     if (Object.keys(errs).length || lacking.length) return toast(lacking.length && !Object.keys(errs).length ? 'Add the key it needs first' : 'Fill in the questions marked first', 'error');
     setBusy(true);
     try {
-      const pick = template ? { agent, acpAgent: agent === 'acp' ? acpAgent : undefined, model: model ?? undefined, tier: model ? undefined : (tier ?? undefined), effort: effort ?? undefined, mode: mode ?? undefined } : {};
-      if (template) {
-        localStorage.setItem(PROGRAM_KEY, JSON.stringify({ agent, acpAgent: agent === 'acp' ? acpAgent : undefined, mode: mode ?? undefined }));
-        const keep = thinksToKeep({ model, tier, effort }, recipe);
-        if (keep) localStorage.setItem(thinksKey(id), JSON.stringify(keep));
-        else localStorage.removeItem(thinksKey(id));
-      }
-      const r = await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), ...pick, ...keysBody(keys), lang: currentLang() });
+      // Only what differs from the app's own way of running is sent: else the server settles it.
+      const r = await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), ...(changed ? sent : {}), ...keysBody(keys), lang: currentLang() });
       // Answers to keep in About you, for every app: once the run has started.
       const about = Object.fromEntries(recipe.fields.filter((f) => keepable(f) && !keepOff.has(f.id)).map((f) => [fromField(f.from)!, values[f.id]]));
       if (Object.keys(about).length) await put('/api/apps/me', about).catch(() => {});
@@ -275,7 +299,8 @@ function RunTab({ id, recipe, template, again, given, agents, secrets, starts = 
                   setAgent(a);
                   setAcpAgent(aid);
                   setModel(null);
-                  if (!tierProgram(a, aid ?? undefined)) setTier(null);
+                  // A model named was the other program's: the app's tier takes its place.
+                  setTier(tierProgram(a, aid ?? undefined) ? (tier ?? recipe.tier ?? null) : null);
                   setEffort(null);
                   setMode(null);
                 }}
@@ -290,6 +315,43 @@ function RunTab({ id, recipe, template, again, given, agents, secrets, starts = 
               />
               <EffortPicker agent={agent} acp={acpAgent ?? undefined} model={model} tier={tier} value={effort} onChange={setEffort} />
               <ModePicker agent={agent} acp={acpAgent ?? undefined} value={mode ?? (agent === 'acp' && acpAgent !== 'console' ? null : 'auto')} onChange={setMode} />
+            </div>
+          )}
+          {saved && (picking || changed || saved.from === 'kept') && (
+            <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line px-5 py-2 text-[12.5px] text-fg-3 sm:px-6">
+              {changed ? (
+                <>
+                  <span>For this run only</span>
+                  <button type="button" onClick={() => void keep(sent)} className="font-medium text-accent hover:underline">
+                    Keep for this app
+                  </button>
+                  <button type="button" onClick={() => take(saved.pick)} className="font-medium text-accent hover:underline">
+                    Undo
+                  </button>
+                </>
+              ) : saved.from === 'kept' ? (
+                <>
+                  <span>Kept for this app</span>
+                  <button type="button" onClick={() => void keep(null)} className="font-medium text-accent hover:underline">
+                    Back to default
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span>The default for ready-made apps</span>
+                  <button type="button" onClick={() => go(`/settings?s=apps&find=${enc('Ready-made apps run with')}`)} className="font-medium text-accent hover:underline">
+                    Change it in Settings
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {isProgram(out) && (
+            <div role="status" className="border-t border-line px-5 py-2.5 text-[12.5px] leading-snug text-warn sm:px-6">
+              {template ? `${PROGRAM_LABEL[out]} is not signed in here: pick another program under Change, or sign in to it.` : `${PROGRAM_LABEL[out]} is not signed in here: pick another program in Edit, or sign in to it.`}{' '}
+              <button type="button" onClick={() => go('/settings?s=accounts')} className="font-medium text-accent hover:underline">
+                Set up
+              </button>
             </div>
           )}
           <div className="flex flex-wrap items-center gap-3 border-t border-line px-5 py-3.5 sm:px-6">
@@ -821,7 +883,8 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
   const ownedId = async (): Promise<string | null> => {
     if (!template) return d?.app?.id ?? id;
     try {
-      return (await post<{ app: { id: string } }>('/api/apps', { recipe, template: id.slice(4) })).app.id;
+      // The copy takes the program the ready-made one runs with now.
+      return (await post<{ app: { id: string } }>('/api/apps', { recipe: recipe && d?.runsWith ? withPick(recipe, d.runsWith.pick) : recipe, template: id.slice(4) })).app.id;
     } catch (e) {
       toastError(e);
       return null;
@@ -1062,7 +1125,7 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                 <AppScreen app={d.app} />
               </div>
             ) : (
-              (tab === 'run' || template) && <RunTab key={`${id}:${JSON.stringify(given)}:${d ? 1 : 0}`} id={id} recipe={recipe} template={template} again={again} given={given} agents={agentsCard} secrets={d?.secrets} starts={d?.starts} />
+              (tab === 'run' || template) && <RunTab key={`${id}:${JSON.stringify(given)}:${d ? 1 : 0}`} id={id} recipe={recipe} template={template} again={again} given={given} agents={agentsCard} secrets={d?.secrets} starts={d?.starts} runsWith={d?.runsWith} />
             )}
             {tab === 'runs' && !template && <RunsTab id={id} app={recipe} def={d?.app} />}
             {tab === 'rows' && d?.app && <BatchTab app={d.app} />}

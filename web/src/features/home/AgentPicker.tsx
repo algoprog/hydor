@@ -44,6 +44,7 @@ export function AgentPicker({
   onPick,
   label,
   localOnly,
+  usableOnly,
 }: {
   agent: Agent;
   acpId: string | null;
@@ -51,6 +52,8 @@ export function AgentPicker({
   onPick: (agent: Agent, acpId: string | null) => void;
   label?: string;
   localOnly?: boolean;
+  /** A program not signed in here is left out (but the one picked now, which says so): an app's own program. */
+  usableOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
@@ -70,7 +73,7 @@ export function AgentPicker({
   const row = (p: Program): ReactNode =>
     programUsable(programs, p) ? (
       <OptionRow icon={<AgentIcon agent={p} size={15} />} label={PROGRAM_LABEL[p]} hint={HINT[p]} selected={agent === p} onClick={() => pick(p)} />
-    ) : (
+    ) : usableOnly && agent !== p ? null : (
       <NotSetUpRow program={p} selected={agent === p} onSetUp={() => (setOpen(false), go('/settings?s=accounts'))} />
     );
   return (

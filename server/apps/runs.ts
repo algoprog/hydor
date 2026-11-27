@@ -12,6 +12,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { SessionExtra } from '../../shared/features.ts';
+import type { SentPick } from '../../shared/app-run-with.ts';
+import { settle } from './runwith.ts';
 import type { AnswerField, AppDef, AppRecipe, AppRun, RunAsk, RunPerson, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
 import { signedInPerson } from './keyroutes.ts';
 import { ACTIVE, checkInputs, fillTemplate, inputsLine, isActive } from '../../shared/apps.ts';
@@ -228,6 +230,10 @@ export interface StartInput {
   person?: RunPerson | null;
   /** A short reference of the caller's own (an app's key: the id of the row the run belongs to), kept with the run and used to list them. */
   ref?: string;
+  /** A ready-made app's run: the program, model and effort it picks for itself; without, the choice kept for the app, else the setting (runwith.ts). */
+  pick?: SentPick;
+  /** Its recipe's program is settled already (a test of a recipe on screen, a run again of an earlier one): taken as it is. */
+  settled?: boolean;
 }
 
 /** The questions a run answers: the template's form, or the inputs of the flow it runs. */
@@ -251,11 +257,15 @@ const OWNER_SOURCES: RunSource[] = ['web', 'session', 'chat', 'screen', 'app', '
 const ownerOf = (o: StartInput): RunPerson | undefined => (OWNER_SOURCES.includes(o.source) && !o.public && !o.visitor ? signedInPerson({ id: o.app } as AppDef) : undefined);
 
 /** Creates the run and starts its session in the background (unless it waits in line). */
-export function startRun(o: StartInput): RunRecord {
-  if (o.flow && !o.recipe.flows?.[o.flow]) throw new HttpError(400, `The app has no flow “${o.flow}”${o.recipe.flows ? ` (it has ${Object.keys(o.recipe.flows).join(', ')})` : ''}`);
+export function startRun(input: StartInput): RunRecord {
+  if (input.flow && !input.recipe.flows?.[input.flow]) throw new HttpError(400, `The app has no flow “${input.flow}”${input.recipe.flows ? ` (it has ${Object.keys(input.recipe.flows).join(', ')})` : ''}`);
+  // Which program runs it, settled here for every way a run starts.
+  const settled = settle(d().db, input);
+  const o: StartInput = { ...input, recipe: settled.recipe };
   // An agent step's run has no form of its own: its step's flow filled its task.
   const { values, errors } = checkedInputs(o.recipe, o.inputs, !!o.public, o.files, o.flow, o.source === 'step' ? undefined : o.app);
   if (errors.length) throw new HttpError(400, `Check the form: ${errors.join('; ')}`);
+  if (settled.why) throw new HttpError(409, settled.why);
   // The keys it needs, before it starts (an agent step's run goes by its app's; a public run cannot use them).
   if (!o.public && o.source !== 'step') {
     needSecrets(d().db, o.recipe, o.flow ?? 'run');

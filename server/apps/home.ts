@@ -12,6 +12,7 @@
 import type { AppField, AppRecipe } from '../../shared/apps.ts';
 import { answerOf, cleanDays, TIME_OF_DAY } from '../../shared/apps.ts';
 import type { ScheduledTask } from '../../shared/automations.ts';
+import { defaultProgramNow } from '../agents/programs.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Scheduler } from '../scheduler.ts';
@@ -129,7 +130,7 @@ export function saveHome(db: DB, scheduler: Scheduler | undefined, id: string, r
         ...(t ? { id: t.id } : {}),
         name: t?.name ?? recipe.name,
         prompt: '',
-        agent: 'claude',
+        ...defaultProgramNow(),
         cwd: '~',
         schedule: { kind: 'daily', time: daily.time, ...(daily.days ? { days: daily.days } : {}) },
         app: { id, inputs: own },

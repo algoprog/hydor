@@ -1,14 +1,16 @@
-// Settings → Apps: About you (AboutYou.tsx), what apps start their questions from; then the apps agents run for you
-// without asking first. An agent that wants to run one of your apps asks on the app's card in the conversation;
+// Settings → Apps: About you (AboutYou.tsx), what apps start their questions from; which program runs the ready-made
+// apps; then the apps agents run for you without asking first. An agent that wants to run one of your apps asks on the app's card in the conversation;
 // "Always run it" there puts the app here. Remove one and agents ask again; add one to skip the question before the
 // first time.
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import { api, enc, put } from '../../lib/api';
 import { tr } from '../../i18n/runtime';
-import { toastError } from '../../lib/store';
+import { toastError, useApp } from '../../lib/store';
 import { cx, IconButton, Popover, Throbber } from '../../components/ui';
-import { EmptyRow, Group, Row, Stack } from '../settings/kit';
+import { RUN_WITH, type RunWith } from '@shared/app-run-with';
+import { isProgram, PROGRAM_LABEL, programUsable } from '@shared/programs';
+import { EmptyRow, Group, Row, Select, Stack } from '../settings/kit';
 import { AppIcon } from './AppIcon';
 import { AboutYou } from './AboutYou';
 
@@ -66,6 +68,48 @@ function AddApp({ others, onAdd }: { others: AppRef[]; onAdd: (a: AppRef) => voi
   );
 }
 
+/** "Ready-made apps run with": a program for those with no choice kept of their own; one not signed in cannot be picked. */
+function ReadyRunsWith() {
+  const programs = useApp((s) => s.boot?.programs);
+  const [value, setValue] = useState<RunWith | null>(null);
+  useEffect(() => {
+    let live = true;
+    api<{ value: RunWith }>('/api/apps/run-with')
+      .then((r) => live && setValue(r.value))
+      .catch(toastError);
+    return () => {
+      live = false;
+    };
+  }, []);
+  const set = (v: RunWith) => put<{ value: RunWith }>('/api/apps/run-with', { value: v }).then((r) => setValue(r.value), toastError);
+  const usable = (v: RunWith) => programUsable(programs, v);
+  return (
+    <Group title="Ready-made apps">
+      <Row
+        label="Ready-made apps run with"
+        hint="A program you keep on an app’s own page comes first."
+        info="Automatic takes the first of Claude Code, Codex and Custom signed in here. Each app thinks with its own tier, with the model Settings → Models → Tiers names for the program. Apps of your own run with the program picked in their settings."
+        control={
+          <Select<RunWith>
+            label="Ready-made apps run with"
+            value={value ?? 'auto'}
+            disabled={!value}
+            onChange={set}
+            options={RUN_WITH.map((o) => ({
+              value: o.value,
+              label: o.label,
+              disabled: !usable(o.value),
+              hint: usable(o.value) ? undefined : 'Not set up: sign in to it under Settings → Agents → Accounts.',
+            }))}
+          />
+        }
+      >
+        {value && isProgram(value) && !usable(value) && <div className="text-[12.5px] leading-snug text-warn">{`${PROGRAM_LABEL[value]} is not signed in here: ready-made apps that need it will not run.`}</div>}
+      </Row>
+    </Group>
+  );
+}
+
 export function AllowedSettings() {
   const [st, setSt] = useState<Allowed | null>(null);
   useEffect(() => {
@@ -87,6 +131,7 @@ export function AllowedSettings() {
   return (
     <Stack>
       <AboutYou />
+      <ReadyRunsWith />
       <Group
         title="Run without asking"
         info="When an agent wants to run one of your apps, it first asks on the app’s card in the conversation: Run it, Always run it, or Don’t run. Apps listed here run without that question; the card still shows when the app needs details the request left out. Remove an app to be asked again."

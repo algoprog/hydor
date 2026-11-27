@@ -5,10 +5,17 @@ import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { ScheduledTask, TaskDraft } from '@shared/automations';
 import type { AppDef } from '@shared/apps';
+import { firstUsableProgram } from '@shared/programs';
 import { api } from '../../lib/api';
 import { useApp } from '../../lib/store';
 import { Button } from '../../components/ui';
 import { draftOf, TaskEditor, TaskRow } from '../settings/TasksSettings';
+
+/** The first signed in of Claude Code and Codex, else Custom (the app's runs go by the app's own program). */
+const programNow = () => {
+  const p = firstUsableProgram(useApp.getState().boot?.programs);
+  return { agent: p.agent, ...(p.acp ? { acpAgent: p.acp } : {}) };
+};
 
 export function Schedules({ app }: { app: AppDef }) {
   const [tasks, setTasks] = useState<ScheduledTask[] | null>(null);
@@ -27,7 +34,7 @@ export function Schedules({ app }: { app: AppDef }) {
   const fresh = (): TaskDraft => ({
     name: app.name,
     prompt: '',
-    agent: 'claude',
+    ...programNow(),
     cwd: useApp.getState().boot?.home ?? '~',
     schedule: { kind: 'daily', time: '09:00', days: [1, 2, 3, 4, 5] },
     app: { id: app.id, inputs: Object.fromEntries(app.fields.filter((f) => f.default).map((f) => [f.id, f.default!])) },

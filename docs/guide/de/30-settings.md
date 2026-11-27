@@ -351,6 +351,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 [Einstellungen → Apps](/settings?s=apps): Was Apps über dich wissen und welche ohne Nachfrage laufen. Mehr dazu unter [Apps](/guide/apps).
 
 - [**Über dich**](/settings?s=apps&find=About%20you): Wovon Apps ihre Fragen ausgehen, damit sie nicht jedes Mal fragen.
+- [**Ready-made apps run with**](/settings?s=apps&find=Ready-made%20apps%20run%20with): The program that runs the ready-made apps: Automatic, Claude Code, Codex or Custom.
 - [**Ohne Rückfrage ausführen**](/settings?s=apps&find=Run%20without%20asking): Apps, die Agenten ohne vorherige Rückfrage für dich ausführen. Entferne eine App, damit wieder gefragt wird.
 
 ### Custom
