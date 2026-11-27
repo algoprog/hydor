@@ -3,6 +3,63 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.118.0 · 27 November 2026
+
+Experiments you can leave to agents and still follow: a morning brief for each research project, runs tried before
+they are queued, failures that say what went wrong, GPUs shared, and an experiment's page that tells its story.
+
+- **A project's Research tab**: a project with runs, findings or an evaluation gets a **Research** tab that reads
+  like a morning brief. **Waiting for you** comes first: a question an agent asked, a baseline to measure, sealed
+  files that differ, a goal that reached its score, a search the app paused, each with its buttons. **Since you last
+  looked** is the news: findings, the runs that ended (several that failed the same way are one line), how far each
+  search got. **Where it stands** draws every score against the baseline with the best so far as a stepped line.
+  **Running and waiting** says what is at work and about when the rest will start, and **This week** what it used.
+- **Try it first**: beside **Start** in New run, **Try it first** runs the command for 90 seconds and tells you
+  whether it starts, how much memory it used and about how long the whole run should take; **Use these** fills in
+  what to ask for. Agents try a command first too.
+- **Failures that say what went wrong**: a failed run's page leads with **Where it first went wrong** (the first
+  error in its log, with **Open the log at line …**), and **Ask an agent why** opens a session with the request
+  written. "It ran out of memory" is said only when it did, with how much the GPU held and what other programs had
+  taken. The charts gain a **System** section: GPU memory and use, processor and memory over time.
+- **Runs share a GPU**: runs that say how much memory they need go on one GPU when it fits (**A GPU to itself**
+  under More options keeps one alone; **Where runs go** turns sharing off). A waiting run says what it waits for and
+  about when it should start, names the other program that holds a GPU, is not overtaken once it has waited twenty
+  minutes, and you are told once when one has waited six hours. Runs without a GPU: half your processor's cores at
+  once, not four.
+- **An experiment's story**: a run started again after it failed shows as one row with its attempts ("4th attempt")
+  folded under it. Runs can be starred, given a note (agents leave notes too) and archived without deleting
+  anything, several at once; a whole experiment can be archived. The findings that say what an experiment showed sit
+  at the top of its page, and **Ask an agent to write it** asks for one when there is none.
+- **A run keeps the code it was queued with**: a run that waits (for a GPU, for the night) runs the code as it was
+  when you queued it, even if the folder changed meanwhile. It then starts from a copy of that code, with your data
+  and outputs still in your folder, and its page says which files had changed. Files a command writes (after
+  `--out`, a redirection, or data such as `.csv`) are never taken for code. **Run again** offers **Its own code** or
+  **The folder as it is now**, and **Open its code** shows what a run ran.
+- **What agents may spend**: an agent's approval card says how many GPU hours a run may use ("At most 24 GPU hours
+  (4 GPUs × 6 h)"). An agent can ask once for a budget for a whole plan, and its runs then start without a card
+  each. **Where runs go** has a ceiling, **Agents' runs: at most … GPU hours in seven days**: once it is reached,
+  agents' runs wait for you (**Let it run**, **Change the limit…**), a long search waits too, and you are told once
+  a day. Runs you start yourself are never held back.
+- **Carry on after a stop**: a run the app stops (its time limit, the night's end) is warned first and gets 30
+  seconds, or what you set, to save a checkpoint. Give a run the command that goes on from its last checkpoint (**To
+  carry on after a stop**, under More options) and a night run continues the next night instead of starting over, a
+  run lost in a restart is started again, and **Run again** offers **Carry on from where it stopped**, always with
+  the code the run began with.
+- **Clusters**: a SLURM cluster is asked before a job is sent, so a request it would refuse (a wrong partition or
+  account, too long a time limit, more than a node has) fails at once with the reason in plain words and the
+  cluster's own line. A time limit holds on plain SSH machines too, a run's metrics file is read there, a job that
+  reached the cluster's time limit says so, and a stopped job shows as stopped in seconds, not a minute. A run on a
+  plain SSH machine now shows as finished when it ends: it used to stay "running" forever. Tried on a real SLURM
+  cluster.
+- **Deleting a run says what goes**: the window names the files the run wrote into its own folder and offers **Keep
+  those files** when they are large. A run belongs to the project of the session that started it. A results table
+  can have **A row per command**. A sweep on another machine is stopped early from here as on this computer.
+- **Smaller things**: a web app reached through Hydor's own address keeps its cookies, so its own sign-in works;
+  Jobs' tags name the broad kind of work (experiments, builds, data collection…); **Is this new?** marks a paper
+  found only as a preprint; an evaluation's chart keeps its last date inside it on a phone and names the baseline in
+  the row of dates; run notices are in your language on a phone and in the system's notifications; the paper check's
+  findings are translated in full.
+
 ## 0.117.0 · 26 November 2026
 
 Web apps you can put online, a Jobs section for long work, everything a project keeps as files in its folder, and
