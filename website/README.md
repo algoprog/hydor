@@ -201,9 +201,11 @@ records). Publish it again after each release, so the page names the new version
 
 - `img/app-*.webp`, `trip-app.webp` (the Trip planner's answer in a chat, on its map) and `library-slides.webp` (the
   trip's slides in the Library's editor) are whole windows of the desktop app (with the Browser in the rail) in its dark
-  theme, all 1280×800 (and a phone's screen), taken from the demo copy with made-up data that the guide's screenshot
-  tool runs. `shots.mjs` lists them; take them again when the app's look changes (build the app in a worktree first, as
-  `scripts/guide-shots/README.md` says):
+  theme, all 1280×800 (and a phone's screen; `app-research-tab.webp`, the top of a project's Research tab, is
+  1440×900, so that it reaches Where it stands), taken from the demo copy with made-up data that the guide's screenshot
+  tool runs. `app-swarm.webp` and the Research tab's add their own data when they are taken. `shots.mjs` lists them;
+  take them again when the app's look changes (build the app in a worktree first, as `scripts/guide-shots/README.md`
+  says):
 
   ```bash
   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app --shots website/shots.mjs --themes dark --out website/src/img

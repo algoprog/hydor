@@ -2405,3 +2405,73 @@ export async function blogResearch(ctx) {
   }
   return { researchProject: project, evaluation, evolution: EVOLUTION };
 }
+
+// ---- a swarm at work (the website's picture of one) -----------------------------------------------------
+
+/**
+ * A swarm on a bug nobody can reproduce, for the website's picture of one: a lead in the shop's folder, four members
+ * from four angles (one finished, three at work), their cards in the lead's conversation and what they posted to the
+ * board. Only the website's shot calls it, so the guide's pictures show what they did. Returns the lead's key and what
+ * the pages are to be told is running (`live`, as `overrides` gives it): no agent runs here.
+ */
+export async function websiteSwarm({ home, db, api, sessions }) {
+  const cwd = sessions.checkout.cwd;
+  const projects = path.join(home, '.claude/projects');
+  const now = Date.now();
+  const at = (min) => now - min * MIN;
+  const lead = new Transcript({ cwd, at: at(14), branch: 'main' });
+  const members = [
+    { title: 'Reproduce it under load', state: 'working', brief: 'Reproduce the double charge: many checkouts at once, on a slow network.', first: 'I’ll run many checkouts against the test shop with a slow network and count the charges.' },
+    { title: 'Read the retry code', state: 'working', brief: 'Read how a payment is retried, and find a way it could charge twice.', first: 'I’ll follow a payment from the button to the provider, and every retry on the way.' },
+    { title: 'Check the payment webhooks', state: 'working', brief: 'Check whether a webhook that arrives twice can place or charge an order twice.', first: 'I’ll read the webhook handler and what it does with an event it has seen before.' },
+    { title: 'Bisect the last commits', state: 'done', brief: 'Find whether a recent commit started the double charges.', first: 'I’ll go through the recent commits that touch checkout and payments.' },
+  ].map((m, i) => ({ ...m, since: 11.6 - i * 0.4 })).map((m) => ({ ...m, t: new Transcript({ cwd, at: at(m.since), branch: 'main' }) }));
+  const row = db.prepare(
+    `insert into app_sessions (key, agent, created_by_app, extra, created_at, updated_at) values (?, 'claude', 1, ?, ?, ?)
+     on conflict(key) do update set created_by_app = 1, extra = excluded.extra, created_at = excluded.created_at, updated_at = excluded.updated_at`,
+  );
+  row.run(lead.key, JSON.stringify({ swarm: true }), at(14), at(1));
+  members.forEach((m) => row.run(m.t.key, JSON.stringify({ parent: lead.key }), at(m.since), at(1)));
+  for (const m of members) {
+    m.t.user(m.brief);
+    m.t.wait(20_000).say([m.first], { out: 120 });
+    m.t.title(m.title).save(projects);
+  }
+  const prompt = lead.entry('user', { message: { role: 'user', content: 'A few customers are charged twice at checkout, and nobody can reproduce it. Find out why.' } });
+  lead.wait(40_000);
+  lead.say(['I’ll come at this from four angles that don’t overlap: reproduce it, read the retry code, check the payment webhooks, and bisect the last commits. Each member posts what it finds to the board.'], { out: 220 });
+  lead.wait(8 * MIN);
+  const done = members[3];
+  lead.entry('user', { message: { role: 'user', content: `[Reply from the Hydor subagent "${done.title}" (${done.t.key}, Claude Code · claude-opus-5-5)]\n\nNone of the last 40 commits that touch checkout or payments starts it: the cause is older than that.` } });
+  lead.wait(20_000);
+  lead.say(['So it is not new. The retry code is the most likely angle now: I’ve asked the load test to force a timeout after a charge has gone through.'], { out: 140 });
+  lead.title('Why are some customers charged twice?').save(projects);
+  for (let i = 0; i < 60; i++) {
+    const list = await api('GET', '/api/sessions?limit=300');
+    const have = new Set((list.sessions ?? list).map((s) => s.key));
+    if ([lead, ...members.map((m) => m.t)].every((t) => have.has(t.key))) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  // Their cards in the lead's conversation, as start_child_session leaves them.
+  const note = db.prepare("insert into session_notes (id, key, kind, at, anchor, data) values (?, ?, 'child', ?, ?, ?)");
+  members.forEach((m, i) => {
+    const data = { child: m.t.key, agent: 'claude', model: 'opus', label: 'Claude Code · opus', title: m.title, brief: m.brief, cwd, startedAt: at(m.since) };
+    note.run(`demoswarm${i}`, lead.key, at(m.since), prompt.uuid, JSON.stringify(data));
+  });
+  // The board (the app makes its tables when it is first read).
+  await api('GET', `/api/swarm/${encodeURIComponent(lead.key)}`);
+  const post = db.prepare('insert into swarm_posts (swarm, author, recipient, kind, body, at) values (?, ?, ?, ?, ?, ?)');
+  const [load, retry, hooks, bisect] = members.map((m) => m.t.key);
+  const say = (min, from, kind, text, to = null) => post.run(lead.key, from, to, kind, text, at(min));
+  say(9, load, 'progress', 'Running 500 checkouts against the test shop with a slow network. No double charge yet.');
+  say(7, bisect, 'finding', 'None of the last 40 commits on checkout or payments starts it: the cause is older.');
+  say(6, hooks, 'question', 'A repeated webhook is skipped by its event id. Should I check the order id too?', lead.key);
+  say(5, lead.key, 'note', 'Yes. See whether a retried charge arrives as a new event.', hooks);
+  say(3, retry, 'finding', '`pay()` makes a new idempotency key on every try, so a retry after a timeout charges again (`src/checkout/pay.ts`).');
+  say(2, lead.key, 'note', 'Force a timeout after the charge has gone through: that should show it.', load);
+  say(1, load, 'finding', 'With a timeout forced after the charge, 20 of 20 orders were charged twice.');
+  const running = (since) => ({ live: { status: 'working', startedAt: at(since), turnStartedAt: at(since), pendingApprovals: 0, model: 'opus', effort: 'high', mode: 'default', contextTokens: 52_300, contextWindow: 200_000 }, overlay: { items: [], patches: {}, approvals: [] } });
+  const live = { [lead.key]: running(12) };
+  for (const m of members) if (m.state === 'working') live[m.t.key] = running(m.since);
+  return { key: lead.key, live };
+}

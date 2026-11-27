@@ -233,6 +233,8 @@ async function main() {
       await p.cookie('wa_session', cookie, base);
       // Made afresh for each picture, so a card has waited seconds, not the minutes the run takes.
       const fake = overrides(sessions, Date.now(), shot.goal, shot.jobs);
+      // What only this shot adds to the demo (setup), and which sessions it is to show at work.
+      if (shot.setup) Object.assign(fake.live, await shot.setup(ctx));
       await p.initScript(pageScript(theme, fake.live, !!fake.jobs));
       if (LIST?.desktop && !shot.phone) await p.initScript(DESKTOP);
       await route(p, api, fake, sessions);

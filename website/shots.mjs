@@ -6,8 +6,13 @@
 //
 //   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app --shots website/shots.mjs --themes dark --out website/src/img
 //
-// after building the app in a worktree as scripts/guide-shots/README.md says.
+// after building the app in a worktree as scripts/guide-shots/README.md says. The last two shots add their own data to
+// the demo when they are taken (a swarm at work; the findings of the retriever's project), after the others.
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import { sleep } from '../scripts/guide-shots/cdp.mjs';
+import { blogResearch, websiteSwarm } from '../scripts/guide-shots/demo.mjs';
+import { SHOTS as RESEARCH_SHOTS } from './blog/shots/research-with-agents.mjs';
 import { appsMakeShot, bringInShot, boardShot, browserShot, cardsShot, deckShot, experimentsShot, goalShot, suggestShot, tripShot } from '../scripts/guide-shots/readme-shots.mjs';
 
 export { prepare } from '../scripts/guide-shots/readme-shots.mjs';
@@ -36,6 +41,57 @@ const whole = (id, where, { settle = 2000, width, height, phone, typed } = {}) =
   },
 });
 
+/** The demo's database, for what a shot adds to it. */
+async function withDb(ctx, work) {
+  const Database = createRequire(import.meta.url)('better-sqlite3');
+  const db = new Database(path.join(ctx.home, '.hydor', 'hydor.db'));
+  db.pragma('busy_timeout = 5000');
+  try {
+    return await work({ ...ctx, db });
+  } finally {
+    db.close();
+  }
+}
+
+/** A swarm's board over its lead's session: the members, each from its own angle, and what they posted. */
+const swarmShot = (id) => {
+  let made = null;
+  return {
+    id,
+    async setup(ctx) {
+      made ??= await withDb(ctx, websiteSwarm);
+      return made.live;
+    },
+    async take(p, ctx) {
+      await ctx.go(`/s/${encodeURIComponent(made.key)}`, { settle: 2500 });
+      await p.click(`js:[...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === 'Board').pop()`, { wait: 1500 });
+      await p.waitFor(`document.body.innerText.includes('20 of 20 orders')`, { what: 'the posts' });
+      await p.park();
+      await sleep(600);
+      return p.shot(ctx.file);
+    },
+  };
+};
+
+/**
+ * The top of a project's Research tab (the blog's shot of the whole of it, in a window 16:10 and a little wider than the
+ * others' so that it reaches Where it stands).
+ */
+const researchTabShot = (id) => {
+  const tab = RESEARCH_SHOTS.find((s) => s.id === 'research-tab');
+  let more = null;
+  return {
+    id,
+    width: 1440,
+    height: 900,
+    async setup(ctx) {
+      more ??= await withDb(ctx, blogResearch);
+      return {};
+    },
+    take: (p, ctx) => tab.take(p, { ...ctx, ...more }),
+  };
+};
+
 export const SHOTS = [
   whole('app-start', '/', { typed: 'Plan a 4-day trip to Lisbon in May: two adults, mid-range hotels, lots of walking.' }),
   whole('app-session', (ctx) => session(ctx, 'checkout'), { settle: 2500 }),
@@ -60,4 +116,8 @@ export const SHOTS = [
   cardsShot('app-cards'),
   // The desktop app's own Browser page, with an article open and tabs in a group.
   browserShot('app-browser'),
+  // A project's Research tab: what waits for you, the news, and where the score stands.
+  researchTabShot('app-research-tab'),
+  // A swarm at work: its board, with the members and what they posted.
+  swarmShot('app-swarm'),
 ];
