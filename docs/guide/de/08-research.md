@@ -190,7 +190,7 @@ Es kommen nur Modelle anderer Anbieter infrage, damit kein Anbieter seine eigene
 - **Codex**-Sitzungen und andere Sitzungen mit OpenAI-Modell können von **Claude**, Sonnet über Claude Code, oder einem Custom-Modell außerhalb von OpenAI geprüft werden.
 - Andere Sitzungen mit Custom oder weiteren Agenten und Modellen anderer Anbieter können Claude, Codex oder ein Custom-Modell eines jeweils anderen Anbieters verwenden.
 
-Claude und Codex werden nur angeboten, wenn du bei ihnen angemeldet bist.
+Claude und Codex werden nur angeboten, wenn du bei ihnen angemeldet bist (ebenso die Modelle ihrer Abos). Ohne das jeweils andere Programm ist der vorgeschlagene Prüfer eines deiner Custom-Modelle von einem anderen Anbieter: eines, das die Leistungsstufe **Am besten**, **Max** oder **Standard** von Custom nennt, sofern es eines gibt. Gibt es auch kein Modell eines anderen Anbieters, füge eines in [Einstellungen → Modelle](/settings?s=models) hinzu.
 
 Custom bietet deine unter [Einstellungen → Modelle](/settings?s=models) hinzugefügten Modelle an. Die Prüfung liest nur. Claude und Codex dürfen gezielt Dateien im Sitzungsordner öffnen, verändern aber nichts. Zusätzlich zum Durchlauf sehen sie deine erste Sitzungsnachricht und deine Nachricht unmittelbar vor dem Durchlauf. Zu große Änderungen werden nur teilweise übergeben; die Karte weist darauf hin.
 
@@ -220,7 +220,7 @@ Die Nachricht nennt Prüfer, Befunde mit Schweregrad und Dateien und bittet den 
 
 ## Modelle in der Arena vergleichen
 
-Die Modell-Arena sendet denselben Auftrag gleichzeitig an zwei oder drei Modelle. Du vergleichst Antworten und behältst die beste. Deine Auswahl zählt für eine Bewertung, die zeigt, welche Modelle deine Aufgaben am besten lösen.
+Die Modell-Arena sendet denselben Auftrag gleichzeitig an zwei oder drei Modelle. Du vergleichst Antworten und behältst die beste. Ein Claude Code oder Codex, bei dem du nicht angemeldet bist, wird nicht angeboten. Deine Auswahl zählt für eine Bewertung, die zeigt, welche Modelle deine Aufgaben am besten lösen.
 
 ### Einen Vergleich starten
 

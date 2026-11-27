@@ -551,7 +551,7 @@ There is no separate staging step: each file has a box that puts it in the next 
 
 To commit, at the bottom of the list:
 
-1. Write a summary of the change, and a description if it needs one. Or click **Write message**: a model reads the changes you ticked and drafts both, in the style of the repository's recent commits (Claude when Claude Code is signed in, Codex otherwise).
+1. Write a summary of the change, and a description if it needs one. Or click **Write message**: the [helper model](/settings?s=models&find=Helper%20model) reads the changes you ticked and drafts both, in the style of the repository's recent commits.
 2. Click **Commit**, or **Commit & push** to send it to the remote straight away (that publishes the branch if the remote doesn't have it yet). Ctrl+Enter commits too.
 
 Only the ticked files go in, even if others were staged elsewhere.
@@ -638,7 +638,7 @@ To open one:
 1. In the session's menu (⋯), choose **Folder and code** → **Open a pull request**.
 2. The dialog shows the branch and where it goes (`my-branch → main on owner/repo`), how many commits and files it holds, and whether the branch is pushed ("the branch is pushed when you open it" if not).
 3. If there are uncommitted changes, tick **Commit the … uncommitted changes first, with the title as the message** to include them. Otherwise they stay out. (It's ticked for you when the branch has no commits yet.)
-4. Write a title and a description (Markdown), or click **Write it for me**: a model reads the commits, the changes and the task the session was given, and writes both. It needs at least one commit.
+4. Write a title and a description (Markdown), or click **Write it for me**: the [helper model](/settings?s=models&find=Helper%20model) reads the commits, the changes and the task the session was given, and writes both. It needs at least one commit.
 5. Tick **Draft** to open it as a draft. (Gitea marks a draft with "WIP:" before the title.)
 6. Click **Open pull request**. The app pushes the branch, opens the pull request, links it to the session and opens it in a new tab.
 
@@ -665,7 +665,7 @@ Each changed file shows its status letter (A added, M changed, D deleted, R rena
 
 - Tick **Viewed** on a file you've read: it folds away and counts towards "… of … viewed". The mark lasts until the file changes again, and is kept in this browser.
 - On a wide screen, a list of the files sits on the left with a progress bar: click a file to jump to it.
-- **Guide me through it**: a model reads the changes and writes a short summary, an order that is easy to follow (the core idea first, then what uses it, tests and documentation last) and a note on each file about what changed and what to look at closely. Then **Guided order** and **By path** switch between that order and the files by name. The guide is kept for exactly these changes, so it is there next time until the branch changes.
+- **Guide me through it**: the [helper model](/settings?s=models&find=Helper%20model) reads the changes and writes a short summary, an order that is easy to follow (the core idea first, then what uses it, tests and documentation last) and a note on each file about what changed and what to look at closely. Then **Guided order** and **By path** switch between that order and the files by name. The guide is kept for exactly these changes, so it is there next time until the branch changes.
 - **Reload** reads the changes again.
 
 New files git doesn't track yet are shown when they are small text files. Binary files say "A binary file: no text changes to show."
@@ -706,7 +706,7 @@ Suggestions work only at a shell's prompt, not inside a program such as an edito
 
 ### Ask for a command in words
 
-Type what you want in plain words at the prompt, such as `find the biggest files here`, press Ctrl+Space and pick **Write a command for "find the biggest files here"**. A model (Claude when Claude Code is signed in, Codex otherwise) writes up to three commands that fit your shell and folder, each with a short note on what it does. Pick one to put it on the line, read it, and press Enter yourself to run it.
+Type what you want in plain words at the prompt, such as `find the biggest files here`, press Ctrl+Space and pick **Write a command for "find the biggest files here"**. The [helper model](/settings?s=models&find=Helper%20model) writes up to three commands that fit your shell and folder, each with a short note on what it does. Pick one to put it on the line, read it, and press Enter yourself to run it.
 
 ### On a phone
 

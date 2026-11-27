@@ -8,7 +8,7 @@ import { LANGS } from '../../shared/i18n.ts';
 import { cleanLang } from '../../shared/write.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
-import { helper, helperModelId, helperOptions } from '../helper.ts';
+import { helper, helperName } from '../helper.ts';
 import { userLang } from '../language/index.ts';
 
 type Ask = { system: string; prompt: string; signal?: AbortSignal };
@@ -30,15 +30,10 @@ export const PALETTE_SYSTEM = [
   'The words must read well on the background (strong contrast); the accents should go together and suit the mood.',
 ].join(' ');
 
-const name = (db: DB) => {
-  const id = helperModelId(db);
-  return id === 'auto' ? 'Claude' : (helperOptions(db).options.find((x) => x.value === id)?.label ?? id);
-};
-
 async function ask(db: DB, q: Ask, maxTokens: number): Promise<{ text: string; model: string }> {
   try {
     if (helperForTests) return { text: await helperForTests(q), model: 'the test helper' };
-    return { text: await helper(db, { ...q, timeoutMs: 60_000, maxTokens }), model: name(db) };
+    return { text: await helper(db, { ...q, timeoutMs: 60_000, maxTokens }), model: helperName(db) };
   } catch (e) {
     if (q.signal?.aborted) throw new HttpError(409, 'It was stopped');
     throw e instanceof HttpError ? e : new HttpError(502, `The helper model did not answer: ${(e as Error).message}`);

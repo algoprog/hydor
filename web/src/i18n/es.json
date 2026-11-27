@@ -29024,5 +29024,19 @@
   "The only project a run started with an app’s key or by a webhook can use.": "El único proyecto que puede usar una ejecución iniciada con la clave de una app o mediante un webhook.",
   "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "Revisa el formulario: {0}: una ejecución iniciada de esta manera no puede elegir un proyecto, y la app no define ninguno para ella",
   "Check the form: {0}: needed": "Revisa el formulario: {0}: obligatorio",
-  "The folder of the project the app sets is not there": "La carpeta del proyecto que define la app no existe"
+  "The folder of the project the app sets is not there": "La carpeta del proyecto que define la app no existe",
+  "About {0} min, then the agent starts. The rest builds in the background, with {1}.": "Unos {0} min y luego empieza el agente. El resto se construye en segundo plano, con {1}.",
+  "Add a model": "Agregar un modelo",
+  "Claude Haiku through Claude Code": "Claude Haiku mediante Claude Code",
+  "Could not reach a model.": "No se pudo conectar con ningún modelo.",
+  "Custom has no model yet: add one, or set up Claude Code or Codex.": "Custom todavía no tiene ningún modelo: agrega uno o configura Claude Code o Codex.",
+  "Custom: {0}.": "Custom: {0}.",
+  "No model from another company here: add one from another maker in Settings → Models, or set up Claude Code or Codex.": "Aquí no hay ningún modelo de otra empresa: agrega uno de otro fabricante en Configuración → Modelos, o configura Claude Code o Codex.",
+  "No model here sees pictures: add one that does in Settings → Models.": "Ningún modelo de aquí ve imágenes: agrega uno que pueda en Configuración → Modelos.",
+  "No model to do this with: add one in Settings → Models, or set up Claude Code or Codex in Settings → Agents → Accounts.": "No hay ningún modelo con el que hacer esto: agrega uno en Configuración → Modelos, o configura Claude Code o Codex en Configuración → Agentes → Cuentas.",
+  "No model yet: add one here, or set up Claude Code or Codex": "Todavía no hay ningún modelo: agrega uno aquí o configura Claude Code o Codex",
+  "Set up Claude Code or Codex": "Configurar Claude Code o Codex",
+  "Through Codex": "Mediante Codex",
+  "{0}, one of Custom’s models": "{0}, uno de los modelos de Custom",
+  "A cheap model through OpenRouter when you have a key, else Claude Haiku, else a model of yours that sees images": "Un modelo económico a través de OpenRouter si tienes una clave; si no, Claude Haiku; y si no, un modelo tuyo que vea imágenes"
 }

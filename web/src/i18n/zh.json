@@ -30861,5 +30861,19 @@
   "The only project a run started with an app’s key or by a webhook can use.": "这是用应用密钥或通过 webhook 启动的运行唯一能使用的项目。",
   "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "请检查表单：{0}：以这种方式启动的运行无法选择项目，应用也没有为它指定项目",
   "Check the form: {0}: needed": "请检查表单：{0}：必填",
-  "The folder of the project the app sets is not there": "应用指定的项目的文件夹不存在"
+  "The folder of the project the app sets is not there": "应用指定的项目的文件夹不存在",
+  "About {0} min, then the agent starts. The rest builds in the background, with {1}.": "大约 {0} 分钟后智能体开始工作。其余部分会在后台用 {1} 继续构建。",
+  "Add a model": "添加模型",
+  "Claude Haiku through Claude Code": "通过 Claude Code 使用 Claude Haiku",
+  "Could not reach a model.": "无法连接到任何模型。",
+  "Custom has no model yet: add one, or set up Claude Code or Codex.": "Custom 还没有模型：请添加一个，或设置 Claude Code 或 Codex。",
+  "Custom: {0}.": "Custom：{0}。",
+  "No model from another company here: add one from another maker in Settings → Models, or set up Claude Code or Codex.": "这里没有其他公司的模型：请在“设置 → 模型”中添加一个其他厂商的模型，或设置 Claude Code 或 Codex。",
+  "No model here sees pictures: add one that does in Settings → Models.": "这里没有能看图片的模型：请在“设置 → 模型”中添加一个。",
+  "No model to do this with: add one in Settings → Models, or set up Claude Code or Codex in Settings → Agents → Accounts.": "没有可用来完成此操作的模型：请在“设置 → 模型”中添加一个，或在“设置 → 智能体 → 账户”中设置 Claude Code 或 Codex。",
+  "No model yet: add one here, or set up Claude Code or Codex": "还没有模型：在这里添加一个，或设置 Claude Code 或 Codex",
+  "Set up Claude Code or Codex": "设置 Claude Code 或 Codex",
+  "Through Codex": "通过 Codex",
+  "{0}, one of Custom’s models": "{0}，Custom 的模型之一",
+  "A cheap model through OpenRouter when you have a key, else Claude Haiku, else a model of yours that sees images": "如果你有密钥，就用通过 OpenRouter 调用的低价模型；否则用 Claude Haiku；再否则用你自己的一个能看图片的模型"
 }

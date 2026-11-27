@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Swords } from 'lucide-react';
 import type { SessionExtra } from '@shared/features';
 import { ARENA_MAX, arenaOf, contenderId, type Contender } from '@shared/arena';
+import { programUsable } from '@shared/programs';
 import type { SessionSummary } from '@shared/types';
 import { AgentIcon } from '../../components/AgentIcon';
 import { useCatalog } from '../../components/AgentPickers';
@@ -25,18 +26,20 @@ function useChoices(): Contender[] {
   const codex = useCatalog('codex');
   const custom = useCatalog('acp', 'console');
   const acps = useApp((s) => s.boot?.acpAgents) ?? [];
+  // A Claude Code or Codex not signed in here is not offered: no match could run on it.
+  const programs = useApp((s) => s.boot?.programs);
   return useMemo(() => {
     const out: Contender[] = [];
     const of = (agent: Contender['agent'], cat: typeof claude, acpAgent?: string) => {
       const models = (cat?.models ?? []).filter((m) => m.value !== 'default');
       for (const m of models.slice(0, 5)) out.push({ agent, model: m.value, ...(acpAgent ? { acpAgent } : {}) });
     };
-    of('claude', claude);
-    of('codex', codex);
+    if (programUsable(programs, 'claude')) of('claude', claude);
+    if (programUsable(programs, 'codex')) of('codex', codex);
     of('acp', custom, 'console');
     for (const a of acps.filter((x) => !x.builtin)) out.push({ agent: 'acp', acpAgent: a.id });
     return out;
-  }, [claude, codex, custom, acps]);
+  }, [claude, codex, custom, acps, programs]);
 }
 
 /** On the start page, under Options: one model, or the same prompt on one or two more, side by side. Not kept for the next start. */
@@ -46,6 +49,7 @@ function ArenaStartOption({ value, onChange }: { value: SessionExtra; onChange: 
   const [q, setQ] = useState('');
   const name = useContenderName();
   const choices = useChoices();
+  const programs = useApp((s) => s.boot?.programs);
   const picked = arenaOf(value) ?? [];
   const ids = new Set(picked.map(contenderId));
   const set = (next: Contender[]) => {
@@ -60,7 +64,7 @@ function ArenaStartOption({ value, onChange }: { value: SessionExtra; onChange: 
   const turnOn = () => {
     let last: Contender[] = [];
     try {
-      last = arenaOf({ arena: { with: JSON.parse(localStorage.getItem(LAST) ?? '[]') } }) ?? [];
+      last = (arenaOf({ arena: { with: JSON.parse(localStorage.getItem(LAST) ?? '[]') } }) ?? []).filter((c) => programUsable(programs, c.agent));
     } catch {}
     set(last.length ? last : choices.slice(0, 1));
   };

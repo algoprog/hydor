@@ -190,7 +190,7 @@ Uniquement un modèle d’une société différente de celle dont le modèle a f
 - Une session **Codex**, ou toute session exécutant un modèle OpenAI, peut être vérifiée par **Claude** (Sonnet, via Claude Code) ou par l’un des modèles de Custom qui n’est pas d’OpenAI.
 - Toute autre session (Custom ou un autre agent avec le modèle d’un autre éditeur) peut être vérifiée par Claude, Codex, ou l’un des modèles de Custom d’un éditeur différent de celui du modèle de la session.
 
-Claude et Codex ne sont proposés que lorsque vous y êtes connecté.
+Claude et Codex ne sont proposés que lorsque vous y êtes connecté (de même que les modèles de leurs forfaits). Sans l’autre programme, le relecteur suggéré est l’un de vos modèles Custom d’un autre éditeur : un modèle que désigne le niveau **Meilleur**, **Max** ou **Standard** de Custom, lorsqu’il y en a un. S’il n’y a pas non plus de modèle d’un autre éditeur, ajoutez-en un dans [Paramètres → Modèles](/settings?s=models).
 
 Les modèles de Custom sont ceux que vous avez ajoutés dans [Paramètres → Modèles](/settings?s=models). Le relecteur ne fait que lire : Claude et Codex peuvent ouvrir des fichiers du dossier de la session pour vérifier un point précis, mais ils ne modifient rien. Outre le tour lui-même, le relecteur voit votre premier message dans la session et votre message précédant ce tour, pour le contexte. Quand les modifications sont trop volumineuses pour être montrées en entier, une partie est omise, et la carte l’indique.
 
@@ -220,7 +220,7 @@ Le message nomme le relecteur, liste chaque point avec sa gravité et son fichie
 
 ## Comparer des modèles dans l’arène
 
-L’arène des modèles envoie la même demande à deux ou trois modèles à la fois, pour que vous puissiez comparer leurs réponses côte à côte et garder la meilleure. Chaque réponse que vous gardez compte pour une note qui montre quels modèles gagnent sur vos propres tâches.
+L’arène des modèles envoie la même demande à deux ou trois modèles à la fois, pour que vous puissiez comparer leurs réponses côte à côte et garder la meilleure. Un Claude Code ou un Codex auquel vous n’êtes pas connecté n’est pas proposé. Chaque réponse que vous gardez compte pour une note qui montre quels modèles gagnent sur vos propres tâches.
 
 ### Démarrer un match
 

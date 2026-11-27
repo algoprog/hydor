@@ -29025,5 +29025,19 @@
   "The only project a run started with an app’s key or by a webhook can use.": "アプリのキーやWebhookで開始した実行が使える唯一のプロジェクトです。",
   "Check the form: {0}: a run started this way cannot choose a project, and the app sets none for it": "フォームを確認してください：{0}：この方法で開始した実行ではプロジェクトを選べず、アプリでもプロジェクトは設定されません",
   "Check the form: {0}: needed": "フォームを確認してください：{0}：入力が必要です",
-  "The folder of the project the app sets is not there": "アプリが設定するプロジェクトのフォルダがありません"
+  "The folder of the project the app sets is not there": "アプリが設定するプロジェクトのフォルダがありません",
+  "About {0} min, then the agent starts. The rest builds in the background, with {1}.": "約{0}分でエージェントが開始します。残りは{1}を使ってバックグラウンドで構築されます。",
+  "Add a model": "モデルを追加",
+  "Claude Haiku through Claude Code": "Claude Code経由のClaude Haiku",
+  "Could not reach a model.": "モデルに接続できませんでした。",
+  "Custom has no model yet: add one, or set up Claude Code or Codex.": "Customにはまだモデルがありません。モデルを追加するか、Claude CodeまたはCodexをセットアップしてください。",
+  "Custom: {0}.": "Custom：{0}。",
+  "No model from another company here: add one from another maker in Settings → Models, or set up Claude Code or Codex.": "ここには他社のモデルがありません。「設定」→「モデル」で別の提供元のモデルを追加するか、Claude CodeまたはCodexをセットアップしてください。",
+  "No model here sees pictures: add one that does in Settings → Models.": "画像を読み取れるモデルがありません。「設定」→「モデル」で対応するモデルを追加してください。",
+  "No model to do this with: add one in Settings → Models, or set up Claude Code or Codex in Settings → Agents → Accounts.": "この操作に使えるモデルがありません。「設定」→「モデル」でモデルを追加するか、「設定」→「エージェント」→「アカウント」でClaude CodeまたはCodexをセットアップしてください。",
+  "No model yet: add one here, or set up Claude Code or Codex": "まだモデルがありません。ここで追加するか、Claude CodeまたはCodexをセットアップしてください",
+  "Set up Claude Code or Codex": "Claude CodeまたはCodexをセットアップ",
+  "Through Codex": "Codex経由",
+  "{0}, one of Custom’s models": "{0}（Customのモデルの1つ）",
+  "A cheap model through OpenRouter when you have a key, else Claude Haiku, else a model of yours that sees images": "キーがあればOpenRouter経由の安価なモデル、なければClaude Haiku、それもなければ画像を認識できる手持ちのモデル"
 }

@@ -551,7 +551,7 @@ Não há uma etapa separada de staging: cada arquivo tem uma caixa que o inclui 
 
 Para fazer um commit, na parte de baixo da lista:
 
-1. Escreva um resumo da alteração e, se precisar, uma descrição. Ou clique em **Escrever mensagem**: um modelo lê as alterações que você marcou e redige os dois, no estilo dos commits recentes do repositório (o Claude quando o Claude Code está conectado, o Codex nos demais casos).
+1. Escreva um resumo da alteração e, se precisar, uma descrição. Ou clique em **Escrever mensagem**: o [modelo auxiliar](/settings?s=models&find=Helper%20model) lê as alterações que você marcou e redige os dois, no estilo dos commits recentes do repositório.
 2. Clique em **Commit**, ou em **Commit e push** para enviá-lo ao remoto de uma vez (isso publica o branch se o remoto ainda não o tiver). Ctrl+Enter também faz o commit.
 
 Só os arquivos marcados entram, mesmo que outros tenham sido adicionados à área de stage em outro lugar.
@@ -638,7 +638,7 @@ Para abrir um:
 1. No menu da sessão (⋯), escolha **Pasta e código** → **Abrir um pull request**.
 2. A caixa de diálogo mostra o branch e para onde ele vai (`my-branch → main on owner/repo`), quantos commits e arquivos ele tem e se o branch já foi enviado ("o branch é enviado quando você abrir" se não).
 3. Se houver alterações sem commit, marque **Fazer commit das … alterações sem commit antes, com o título como mensagem** para incluí-las. Caso contrário, elas ficam de fora. (Já vem marcado quando o branch ainda não tem commits.)
-4. Escreva um título e uma descrição (Markdown), ou clique em **Escrever para mim**: um modelo lê os commits, as alterações e a tarefa dada à sessão, e escreve os dois. É preciso ao menos um commit.
+4. Escreva um título e uma descrição (Markdown), ou clique em **Escrever para mim**: o [modelo auxiliar](/settings?s=models&find=Helper%20model) lê os commits, as alterações e a tarefa dada à sessão, e escreve os dois. É preciso ao menos um commit.
 5. Marque **Rascunho** para abri-lo como rascunho. (O Gitea marca um rascunho com "WIP:" antes do título.)
 6. Clique em **Abrir pull request**. O app envia o branch, abre o pull request, o vincula à sessão e o abre em uma nova aba.
 
@@ -665,7 +665,7 @@ Cada arquivo alterado mostra a letra de status (A adicionado, M alterado, D excl
 
 - Marque **Visto** em um arquivo que você já leu: ele se recolhe e conta para "… de … vistos". A marca dura até o arquivo mudar de novo e fica guardada neste navegador.
 - Em uma tela larga, uma lista dos arquivos fica à esquerda com uma barra de progresso: clique em um arquivo para ir até ele.
-- **Guiar-me pela revisão**: um modelo lê as alterações e escreve um resumo curto, uma ordem fácil de seguir (a ideia central primeiro, depois o que a usa, testes e documentação por último) e uma nota em cada arquivo sobre o que mudou e no que prestar atenção. Depois, **Ordem guiada** e **Por caminho** alternam entre essa ordem e os arquivos por nome. O guia é guardado para exatamente estas alterações, então ele estará lá da próxima vez até o branch mudar.
+- **Guiar-me pela revisão**: o [modelo auxiliar](/settings?s=models&find=Helper%20model) lê as alterações e escreve um resumo curto, uma ordem fácil de seguir (a ideia central primeiro, depois o que a usa, testes e documentação por último) e uma nota em cada arquivo sobre o que mudou e no que prestar atenção. Depois, **Ordem guiada** e **Por caminho** alternam entre essa ordem e os arquivos por nome. O guia é guardado para exatamente estas alterações, então ele estará lá da próxima vez até o branch mudar.
 - **Recarregar** lê as alterações de novo.
 
 Arquivos novos que o git ainda não rastreia aparecem quando são arquivos de texto pequenos. Arquivos binários dizem "Um arquivo binário: não há alterações de texto para mostrar."
@@ -706,7 +706,7 @@ As sugestões funcionam apenas no prompt de um shell, não dentro de um programa
 
 ### Pedir um comando em palavras
 
-Digite o que você quer em palavras simples no prompt, como `encontrar os maiores arquivos aqui`, pressione Ctrl+Espaço e escolha **Escrever um comando para "encontrar os maiores arquivos aqui"**. Um modelo (o Claude quando o Claude Code está conectado, ou o Codex caso contrário) escreve até três comandos que combinam com o seu shell e a sua pasta, cada um com uma breve nota sobre o que faz. Escolha um para colocá-lo na linha, leia-o e pressione Enter você mesmo para executá-lo.
+Digite o que você quer em palavras simples no prompt, como `encontrar os maiores arquivos aqui`, pressione Ctrl+Espaço e escolha **Escrever um comando para "encontrar os maiores arquivos aqui"**. O [modelo auxiliar](/settings?s=models&find=Helper%20model) escreve até três comandos que combinam com o seu shell e a sua pasta, cada um com uma breve nota sobre o que faz. Escolha um para colocá-lo na linha, leia-o e pressione Enter você mesmo para executá-lo.
 
 ### No celular
 

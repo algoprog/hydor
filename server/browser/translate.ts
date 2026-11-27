@@ -14,7 +14,7 @@ import { BROWSING_KEY, isTranslateLang, langName, type BrowsingPrefs, type TabTr
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
-import { helper, helperModelId, helperOptions, helperParallel } from '../helper.ts';
+import { helper, helperModelId, helperName, helperParallel } from '../helper.ts';
 import { browsingPrefs } from './browsing.ts';
 import { detectLanguage } from './langdetect.ts';
 import { browserOf, viewOf } from './session.ts';
@@ -229,8 +229,9 @@ export class PageTranslations {
     this.modelName =
       o.model ??
       (() => {
-        const id = helperModelId(db);
-        return id === 'auto' ? 'Claude Haiku' : (helperOptions(db).options.find((x) => x.value === id)?.label ?? id);
+        const name = helperName(db);
+        // Automatic asks Claude's Haiku while Claude Code is signed in.
+        return helperModelId(db) === 'auto' && name === 'Claude' ? 'Claude Haiku' : name;
       });
     this.pollMs = o.pollMs ?? 1500;
     this.retryMs = o.retryMs ?? 2500;

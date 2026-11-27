@@ -2,7 +2,8 @@
 // images: a picture is shown to it (a smaller copy), a video as ten of its frames on one picture (frames.ts), with
 // what it was made from as a hint; a sound, which it cannot hear, is described from what it was made from (its
 // prompt, its words, its model) alone. Settings → Images, video and audio picks the model and where it runs: the app's choice
-// (a cheap vision model through OpenRouter when a key is set, else Claude Haiku through Claude Code), any
+// (a cheap vision model through OpenRouter when a key is set, else Claude Haiku through Claude Code when it
+// is signed in, else one of your models that sees images), any
 // vision model in OpenRouter's catalog, Claude through the Claude Code sign-in, or one of the models added in
 // Settings → Models (Ollama, vLLM, an endpoint). Without one, the title and description come from the prompt.
 import fs from 'node:fs';
@@ -21,6 +22,8 @@ import { userLang } from '../language/index.ts';
 import { loadConfig } from '../models/config.ts';
 import { catalog, OPENROUTER_URL, search } from '../models/openrouter.ts';
 import { askClaude, askClaudeAbout } from '../oneshot.ts';
+import { programStatus } from '../agents/programs.ts';
+import { seeingModel } from '../helper.ts';
 import { frameGrid, still } from './frames.ts';
 import { filesOf } from './store.ts';
 
@@ -172,14 +175,20 @@ export async function captionWriter(db: DB, d: Pick<Deps, 'models'>): Promise<Wr
     if (info && !info.vision) return { why: `${info.label} does not see images: pick one that does.` };
     return viaChat(openrouterModel(id, info?.label ?? id, key), 'openrouter', d);
   };
+  const claudeIn = async () => claudeOk() && (await programStatus()).claude;
   switch (c.provider) {
-    case 'auto':
+    case 'auto': {
       if (key) return openrouter('');
-      if (claudeOk()) return claude('haiku');
+      if (await claudeIn()) return claude('haiku');
+      // Without Claude Code signed in: one of Custom's models that sees images, as the helper would pick.
+      const own = seeingModel(db);
+      if (own) return viaChat(own, own.provider === 'ollama' || own.provider === 'vllm' || own.provider === 'openrouter' ? own.provider : 'endpoint', d);
       return { why: 'No model that sees images: add an OpenRouter key, or pick one in Settings → Images, video and audio.' };
+    }
     case 'openrouter':
       return openrouter(c.model);
     case 'claude':
+      if (!(await programStatus()).claude) return { why: 'Claude Code is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another model in Settings → Images, video and audio.' };
       return claude(c.model);
     default: {
       const list = localModels(d, c.provider);

@@ -551,7 +551,7 @@ Il n’y a pas d’étape d’indexation distincte : chaque fichier a une case q
 
 Pour commiter, en bas de la liste :
 
-1. Rédigez un résumé de la modification, et une description si elle en a besoin. Ou cliquez sur **Rédiger le message** : un modèle lit les modifications que vous avez cochées et rédige les deux, dans le style des derniers commits du dépôt (Claude quand Claude Code est connecté, Codex sinon).
+1. Rédigez un résumé de la modification, et une description si elle en a besoin. Ou cliquez sur **Rédiger le message** : le [modèle d’appoint](/settings?s=models&find=Helper%20model) lit les modifications que vous avez cochées et rédige les deux, dans le style des derniers commits du dépôt.
 2. Cliquez sur **Commit**, ou sur **Commiter et pousser** pour l’envoyer tout de suite au serveur distant (cela publie la branche si le serveur distant ne l’a pas encore). Ctrl+Entrée valide aussi le commit.
 
 Seuls les fichiers cochés sont inclus, même si d’autres avaient été indexés ailleurs.
@@ -638,7 +638,7 @@ Pour en ouvrir une :
 1. Dans le menu de la session (⋯), choisissez **Dossier et code** → **Ouvrir une pull request**.
 2. La boîte de dialogue affiche la branche et sa destination (`my-branch → main on owner/repo`), le nombre de commits et de fichiers qu’elle contient, et si la branche est poussée (« la branche est poussée à l’ouverture » si ce n’est pas le cas).
 3. S’il y a des modifications non commitées, cochez **Commit the … uncommitted changes first, with the title as the message** pour les inclure. Sinon, elles restent à l’écart. (La case est cochée d’office quand la branche n’a encore aucun commit.)
-4. Rédigez un titre et une description (en Markdown), ou cliquez sur **Rédiger pour moi** : un modèle lit les commits, les modifications et la tâche confiée à la session, et rédige les deux. Il faut au moins un commit.
+4. Rédigez un titre et une description (en Markdown), ou cliquez sur **Rédiger pour moi** : le [modèle d’appoint](/settings?s=models&find=Helper%20model) lit les commits, les modifications et la tâche confiée à la session, et rédige les deux. Il faut au moins un commit.
 5. Cochez **Brouillon** pour l’ouvrir comme brouillon. (Gitea marque un brouillon avec « WIP: » avant le titre.)
 6. Cliquez sur **Ouvrir la pull request**. L’app pousse la branche, ouvre la pull request, la lie à la session et l’ouvre dans un nouvel onglet.
 
@@ -665,7 +665,7 @@ Chaque fichier modifié affiche sa lettre d’état (A ajouté, M modifié, D su
 
 - Cochez **Vu** sur un fichier que vous avez lu : il se replie et compte dans « … sur … vus ». La marque dure jusqu’à ce que le fichier change de nouveau, et elle est conservée dans ce navigateur.
 - Sur un grand écran, une liste des fichiers s’affiche à gauche avec une barre de progression : cliquez sur un fichier pour y aller.
-- **Guidez-moi** : un modèle lit les modifications et rédige un court résumé, un ordre facile à suivre (l’idée centrale d’abord, puis ce qui l’utilise, les tests et la documentation en dernier) et une note sur chaque fichier indiquant ce qui a changé et ce qu’il faut examiner de près. Ensuite, **Ordre guidé** et **Par chemin** permettent de passer de cet ordre aux fichiers classés par nom. Le guide est conservé pour ces modifications précises : il est donc là la prochaine fois, jusqu’à ce que la branche change.
+- **Guidez-moi** : le [modèle d’appoint](/settings?s=models&find=Helper%20model) lit les modifications et rédige un court résumé, un ordre facile à suivre (l’idée centrale d’abord, puis ce qui l’utilise, les tests et la documentation en dernier) et une note sur chaque fichier indiquant ce qui a changé et ce qu’il faut examiner de près. Ensuite, **Ordre guidé** et **Par chemin** permettent de passer de cet ordre aux fichiers classés par nom. Le guide est conservé pour ces modifications précises : il est donc là la prochaine fois, jusqu’à ce que la branche change.
 - **Recharger** relit les modifications.
 
 Les nouveaux fichiers que git ne suit pas encore sont affichés lorsqu’il s’agit de petits fichiers texte. Les fichiers binaires indiquent « Fichier binaire : aucune modification de texte à afficher. »
@@ -706,7 +706,7 @@ Les suggestions ne fonctionnent qu’à l’invite d’un shell, pas dans un pro
 
 ### Demander une commande avec des mots
 
-Tapez ce que vous voulez en langage courant à l’invite, par exemple `trouver les fichiers les plus gros ici`, appuyez sur Ctrl+Espace et choisissez **Écrire une commande pour « trouver les fichiers les plus gros ici »**. Un modèle (Claude quand Claude Code est connecté, Codex sinon) écrit jusqu’à trois commandes adaptées à votre shell et à votre dossier, chacune accompagnée d’une courte note sur ce qu’elle fait. Choisissez-en une pour la placer sur la ligne, lisez-la, puis appuyez vous-même sur Entrée pour l’exécuter.
+Tapez ce que vous voulez en langage courant à l’invite, par exemple `trouver les fichiers les plus gros ici`, appuyez sur Ctrl+Espace et choisissez **Écrire une commande pour « trouver les fichiers les plus gros ici »**. Le [modèle d’appoint](/settings?s=models&find=Helper%20model) écrit jusqu’à trois commandes adaptées à votre shell et à votre dossier, chacune accompagnée d’une courte note sur ce qu’elle fait. Choisissez-en une pour la placer sur la ligne, lisez-la, puis appuyez vous-même sur Entrée pour l’exécuter.
 
 ### Sur téléphone
 

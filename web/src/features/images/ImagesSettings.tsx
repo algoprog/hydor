@@ -315,7 +315,7 @@ function ModelRow({ label, picked, onChange, onAuto, name, org, id, facts, creat
 // ---- captions ------------------------------------------------------------------------------------------------
 
 const PROVIDERS: { id: CaptionProvider; label: string; hint: string }[] = [
-  { id: 'auto', label: 'Automatic', hint: 'A cheap model through OpenRouter when you have a key, else Claude Haiku' },
+  { id: 'auto', label: 'Automatic', hint: 'A cheap model through OpenRouter when you have a key, else Claude Haiku, else a model of yours that sees images' },
   { id: 'openrouter', label: 'OpenRouter', hint: 'Any model in its catalog that sees images, with your key' },
   { id: 'claude', label: 'Claude', hint: 'Through your Claude Code sign-in' },
   { id: 'ollama', label: 'Ollama', hint: 'A model on this computer that sees images' },
