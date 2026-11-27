@@ -23,7 +23,7 @@
 - **Custom**：应用自带的智能体，可用于任何模型：来自 OpenRouter、Ollama 或 vLLM 的模型。参见 [Custom，应用自带的智能体](/guide/custom)。
 - 你添加的任何其他支持 ACP 的智能体（Gemini CLI、OpenCode、Qwen Code、Goose……），其名称下方会显示它的命令。
 
-你没有登录的 Claude Code 或 Codex 会以灰色列出，并标明**未设置**：它无法被选中，旁边的**配置**会打开[设置 → 智能体 → 账户](/settings?s=accounts)，你可以在那里登录。如果某个地方之前已经选了它，这个选择会保留：**运行于**会显示它并标明**未设置**，输入框下方有一行说明原因，在你登录或改选其他项之前，什么都不会启动。Hydor 绝不会替你换成别的程序。第一次、在你还没有做过任何选择时，如果你已登录 Claude Code，**运行于**就是 Claude Code，否则是 Codex，再否则是 Custom。
+你没有登录的 Claude Code 或 Codex 会以灰色列出，并标明**未设置**：它无法被选中，旁边的**配置**会打开[设置 → 智能体 → 账户](/settings?s=accounts)，你可以在那里登录。如果某个地方之前已经选了它，这个选择会保留：**运行于**会显示它并带一个琥珀色圆点（指针移上去时显示**未设置**），输入框下方有一行说明原因，在你登录或改选其他项之前，什么都不会启动。Hydor 绝不会替你换成别的程序。第一次、在你还没有做过任何选择时，如果你已登录 Claude Code，**运行于**就是 Claude Code，否则是 Codex，再否则是 Custom。
 
 当**运行于**为 Custom 而 Custom 还没有模型时（没有添加任何模型，也没有登录 Claude 或 ChatGPT 套餐），输入框下方会有一行文字说明这一点，并且消息无法发送：**添加模型**会打开[设置 → 智能体 → 模型](/settings?s=models)，**设置 Claude Code 或 Codex** 会打开[设置 → 智能体 → 账户](/settings?s=accounts)。
 

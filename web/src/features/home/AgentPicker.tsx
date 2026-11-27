@@ -89,7 +89,13 @@ export function AgentPicker({
             <span className="inline-flex items-center gap-1.5">
               <AgentIcon agent={agent} name={acp?.name} size={13} className="shrink-0" />
               {name}
-              {unusable && <span className="text-warn">· Not set up</span>}
+              {/* A dot, not words: the chip keeps its width (the line under the box says why and how to set it up). */}
+              {unusable && (
+                <span className="inline-flex items-center" title="Not set up">
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-warn" />
+                  <span className="sr-only">Not set up</span>
+                </span>
+              )}
             </span>
           }
         />
