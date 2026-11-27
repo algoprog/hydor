@@ -405,12 +405,13 @@ export function MenuLabel({ children }: { children: ReactNode }) {
 }
 
 /** Compact option row for pickers: one line, name + value, description as tooltip. */
-export function OptionRow({ label, hint, selected, onClick, icon }: { label: ReactNode; hint?: string; selected?: boolean; onClick: () => void; icon?: ReactNode }) {
+export function OptionRow({ label, hint, selected, onClick, icon, disabled }: { label: ReactNode; hint?: string; selected?: boolean; onClick: () => void; icon?: ReactNode; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       title={hint}
-      className={cx('flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-bg-2', selected && 'bg-bg-2')}
+      className={cx('flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-bg-2 disabled:opacity-50 disabled:hover:bg-transparent', selected && 'bg-bg-2')}
     >
       {icon && <span className="mt-0.5 shrink-0 text-fg-3">{icon}</span>}
       <span className="min-w-0 flex-1">
@@ -681,7 +682,7 @@ export function useConfirm() {
 
 // ---- segmented ------------------------------------------------------------------------
 
-export function Segmented<T extends string>({ value, options, onChange, size = 'md' }: { value: T; options: { value: T; label: ReactNode; icon?: ReactNode }[]; onChange: (v: T) => void; size?: 'sm' | 'md' }) {
+export function Segmented<T extends string>({ value, options, onChange, size = 'md' }: { value: T; options: { value: T; label: ReactNode; icon?: ReactNode; disabled?: boolean; title?: string }[]; onChange: (v: T) => void; size?: 'sm' | 'md' }) {
   // The chosen option's pill glides to the next one (placed at once the first time).
   const box = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number; glide: boolean } | null>(null);
@@ -714,10 +715,12 @@ export function Segmented<T extends string>({ value, options, onChange, size = '
           data-seg={o.value}
           type="button"
           onClick={() => onChange(o.value)}
+          disabled={o.disabled}
+          title={o.title}
           className={cx(
             'relative inline-flex items-center gap-1.5 rounded-lg font-medium whitespace-nowrap transition-colors duration-200',
             size === 'sm' ? 'h-7 px-2.5 text-[12.5px]' : 'h-8 px-3 text-[13px]',
-            value === o.value ? 'text-fg' : 'text-fg-3 hover:text-fg',
+            value === o.value ? 'text-fg' : o.disabled ? 'text-fg-3 opacity-45' : 'text-fg-3 hover:text-fg',
           )}
         >
           {o.icon}

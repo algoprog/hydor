@@ -28,6 +28,7 @@ import { costWords, teamInstructions } from './team.ts';
 import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { CUT_BY_RESTART } from '../agents/acp.ts';
+import { initPrograms, programStatus, resetPrograms } from '../agents/programs.ts';
 import { catchUp, CHILD_INSTRUCTIONS, children, findModel, liftsAt, LONG_REPLY, OWN_SUBAGENTS_NOTE, reportTurn, resultMessage } from './index.ts';
 import { mergeTables } from '../features/registry.ts';
 import type { SpawnAdditions } from '../features/types.ts';
@@ -1293,6 +1294,41 @@ test('after a restart, a queue of what agents sent each other (or the goal loop 
   assert.equal(queueGoesOn([round, batch, report], {}), true);
   assert.equal(queueGoesOn([batch], { stoppedAll: 3000 }), false, 'a Stop all after it still holds it');
   assert.equal(betweenAgents('Swarm board · 2 new posts (typed by hand)'), false);
+});
+
+// ---- programs not signed in --------------------------------------------------------------------------
+
+test('a Hydor subagent is never started on a Claude Code or Codex not signed in: said why, and that custom works; none offered', async () => {
+  // account() faked: Claude Code signed out, Codex signed in.
+  let signedIn: Agent[] = ['codex'];
+  initPrograms({ db, accounts: () => [undefined], account: async (p) => ({ agent: p, loggedIn: signedIn.includes(p) }) });
+  try {
+    await programStatus();
+    const k = 'acp:programs-lead';
+    sessions.add(k, { agent: 'acp', acpAgent: 'console', model: 'ollama/llama3', live: 'working', mode: 'edits', title: 'Custom lead', items: [user('Fix it')] });
+    const t = tool(k, 'start_child_session');
+    assert.match(t.description, /, Codex for a hard part\./);
+    assert.match(t.description, /Claude Code is not signed in here: do not ask for it\./);
+    assert.match((t.inputSchema as any).properties.agent.description, /custom \(the app’s own agent: name the model\), codex, or/);
+    assert.doesNotMatch((t.inputSchema as any).properties.model.description, /Claude Code|claude or codex/);
+    const before = sessions.created.length;
+    await assert.rejects(call(k, 'start_child_session', { brief: 'Do the hard part.', agent: 'claude' }), /^Error: Claude Code is not signed in here, so no Hydor subagent can run on it\. agent: "custom" works \(name one of its models\)\./);
+    // One of the user's agents that runs on it, likewise.
+    const reviewer = saveAssistant(db, { name: 'Signed-out reviewer', instructions: 'Review.', agent: 'claude' });
+    await assert.rejects(call(k, 'start_child_session', { brief: 'Review it.', as: reviewer.name }), /Signed-out reviewer runs on Claude Code, which is not signed in here/);
+    assert.equal(sessions.created.length, before, 'nothing started');
+    // A Custom parent with no agent named stays on Custom, whatever is signed in.
+    await call(k, 'start_child_session', { brief: 'Count the files.' });
+    assert.equal(sessions.created.at(-1)!.acpAgent, 'console');
+    await call(k, 'start_child_session', { brief: 'On Codex.', agent: 'codex' });
+    assert.equal(sessions.created.at(-1)!.agent, 'codex');
+    // Signed in from a terminal since: read again before refusing.
+    signedIn = ['claude', 'codex'];
+    await call(k, 'start_child_session', { brief: 'On Claude Code now.', agent: 'claude' });
+    assert.equal(sessions.created.at(-1)!.agent, 'claude');
+  } finally {
+    resetPrograms();
+  }
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

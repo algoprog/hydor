@@ -7,6 +7,7 @@ import { Brain, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Compass, 
 import { ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, type AgentDraft, type Assistant, type AssistantsState, type ToolKind } from '@shared/assistants';
 import type { TaskSchedule } from '@shared/automations';
 import type { ConnectionView } from '@shared/connections';
+import { programUsable } from '@shared/programs';
 import { tierLabel, TIERS, type Tier } from '@shared/tiers';
 import type { Agent } from '@shared/types';
 import { api, enc, post, put } from '../../lib/api';
@@ -69,12 +70,14 @@ function programName(d: Draft, acp: { id: string; name: string }[]): string {
 function AgentChoice({ d, set }: { d: Draft; set: (p: Draft) => void }) {
   const acp = useApp((s) => s.boot?.acpAgents) ?? [];
   const label = !d.agent ? 'Any agent' : programName(d, acp);
+  const programs = useApp((s) => s.boot?.programs);
   const opt = (agent: Agent | undefined, acpAgent: string | undefined, name: string, hint: string, close: () => void) => (
     <OptionRow
       key={`${agent}:${acpAgent ?? ''}`}
       icon={agent ? <AgentIcon agent={agent} name={name} size={14} /> : undefined}
       label={name}
-      hint={hint}
+      hint={programUsable(programs, agent) ? hint : 'Not set up'}
+      disabled={!programUsable(programs, agent)}
       selected={d.agent === agent && (agent !== 'acp' || d.acpAgent === acpAgent)}
       onClick={() => {
         set({ agent, acpAgent, model: undefined });

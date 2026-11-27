@@ -390,6 +390,15 @@ test('Automatic: nothing could do it, so the user is asked to sign in, and the e
   assert.deepEqual(signin.signInNeeds(), []);
 });
 
+test('a program never signed in here is asked for as a first sign-in, one that was as signing in again', () => {
+  signin.resetSignIn();
+  signin.initSignIn({ broadcast: () => {}, nameOf: () => 'an account', signedInBefore: (agent) => agent === 'codex' });
+  signin.needSignIn({ agent: 'claude', task: 'titles' });
+  signin.needSignIn({ agent: 'codex', task: 'titles' });
+  assert.deepEqual(Object.fromEntries(signin.signInNeeds().map((n) => [n.agent, n.first])), { claude: true, codex: undefined });
+  signin.resetSignIn();
+});
+
 // ---- run ---------------------------------------------------------------------------------------------
 
 for (const [name, fn] of tests) {

@@ -30801,5 +30801,12 @@
   "shipping, releasing, running servers": "αποστολή, κυκλοφορία, εκτέλεση διακομιστών",
   "test suites, type checks, linting": "σουίτες δοκιμών, έλεγχοι τύπων, linting",
   "training, evaluation, sweeps, benchmarks": "εκπαίδευση, αξιολόγηση, σαρώσεις παραμέτρων, δοκιμές επιδόσεων",
-  "writing or changing code, docs or translations, reviewing it": "συγγραφή ή τροποποίηση κώδικα, τεκμηρίωσης ή μεταφράσεων, έλεγχός τους"
+  "writing or changing code, docs or translations, reviewing it": "συγγραφή ή τροποποίηση κώδικα, τεκμηρίωσης ή μεταφράσεων, έλεγχός τους",
+  "Not set up": "Δεν έχει ρυθμιστεί",
+  "Not set up: sign in to it to set its tiers. Those saved stay as they are.": "Δεν έχει ρυθμιστεί: συνδεθείτε για να ορίσετε τις βαθμίδες του. Όσες έχουν αποθηκευτεί παραμένουν ως έχουν.",
+  "This session continues once you sign in.": "Αυτή η συνεδρία θα συνεχιστεί μόλις συνδεθείτε.",
+  "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "Ο πράκτορας {0} δεν έχει ρυθμιστεί εδώ: επιλέξτε άλλον πράκτορα στο «Τρέχει σε» ή συνδεθείτε σε αυτόν.",
+  "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "Δεν έχει γίνει σύνδεση στον πράκτορα {0} εδώ: συνδεθείτε από τις Ρυθμίσεις → Λογαριασμοί ή επιλέξτε άλλον πράκτορα.",
+  "· Not set up": "· Δεν έχει ρυθμιστεί",
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Δεν έχει γίνει σύνδεση στο {0} εδώ: συνδεθείτε από τις Ρυθμίσεις → Πράκτορες → Λογαριασμοί ή επιλέξτε άλλον πράκτορα."
 }

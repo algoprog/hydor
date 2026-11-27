@@ -194,7 +194,7 @@ En una computadora, una columna a la izquierda enumera siete secciones, cada una
   - **Piensa con**: **Automático**, **Rápido**, **Estándar**, **Mejor** o **Máximo**, cada uno con una línea sobre para qué sirve (consulta [Con qué piensa un agente: niveles](#what-an-agent-thinks-with-tiers)).
   - **Se ejecuta en**: el programa que sugiere, que se elige junto con él en la página de inicio.
     - **Cualquier agente** (la opción predeterminada) conserva el programa elegido en la página de inicio.
-    - **Claude Code**, **Codex**, **Custom** (“Cualquier modelo”), o cualquier agente que hayas añadido en [Configuración → Agentes → Más agentes](/settings?s=agents).
+    - **Claude Code**, **Codex**, **Custom** (“Cualquier modelo”), o cualquier agente que hayas añadido en [Configuración → Agentes → Más agentes](/settings?s=agents). Un Claude Code o Codex en el que no has iniciado sesión muestra **Sin configurar** y no se puede elegir.
     - Cuando eliges un programa, aparece a su lado un menú de modelos con los de ese programa (para los programas que ofrecen elección); si no lo tocas, se usa el modelo predeterminado del programa. Un nivel de los de arriba elige el modelo en su lugar.
   - **Modo de permisos**: cuándo te pregunta antes.
     - **Según lo elegido** (la opción predeterminada): conserva el modo elegido en la página de inicio.

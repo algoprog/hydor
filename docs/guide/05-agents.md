@@ -194,7 +194,7 @@ On a computer a column at the left lists seven sections, each with what it is se
   - **Thinks with**: **Automatic**, **Quick**, **Standard**, **Best** or **Max**, each with a line on what it is for (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
   - **Runs on**: the program it suggests, picked with it on the start page.
     - **Any agent** (the default) keeps the program picked on the start page.
-    - **Claude Code**, **Codex**, **Custom** ("Any model"), or any agent you added in [Settings → Agents → More agents](/settings?s=agents).
+    - **Claude Code**, **Codex**, **Custom** ("Any model"), or any agent you added in [Settings → Agents → More agents](/settings?s=agents). A Claude Code or Codex you are not signed in to shows **Not set up** and cannot be picked.
     - Once you pick a program, a model menu appears next to it with that program's models (for programs that offer a choice); left alone, it is the program's default model. A tier above picks the model instead.
   - **Permission mode**: when it asks you first.
     - **As picked** (the default): keeps the mode picked on the start page.

@@ -12,6 +12,8 @@ import { MAX_RUNNING_DEFAULT, MAX_RUNNING_LIMIT, SWARM_SIZE_DEFAULT, SWARM_SIZE_
 import { researchOf } from '../../shared/research.ts';
 import { isSubscription, type Agent, type AgentModel, type SessionSummary } from '../../shared/types.ts';
 import { acpAgents, CONSOLE_ID, CUT_BY_RESTART } from '../agents/acp.ts';
+import { defaultProgram, programRefusal, programsNow } from '../agents/programs.ts';
+import { PROGRAM_IDS, PROGRAM_LABEL, programUsable, type Program } from '../../shared/programs.ts';
 import { HttpError } from '../auth.ts';
 import { capReached, childShare, spending } from '../budget/index.ts';
 import { confidentialKey, confidentialRun, privateHelper } from '../confidential/index.ts';
@@ -31,7 +33,7 @@ import { clampTier, isTier, lowerTier, nextTier, tierLabel, tierProgram, tierRan
 import { allAssistants, findAssistant } from '../assistants/store.ts';
 import { modelName, teamOf, tierPick } from '../assistants/tiers.ts';
 import { leadTier, stepUpSelf, teamNote } from './team.ts';
-import { sendToInbox } from '../assistants/inbox.ts';
+import { sendToInbox, standingKey } from '../assistants/inbox.ts';
 
 export { childKeys, parentOf } from './family.ts';
 
@@ -167,6 +169,16 @@ function programOf(ctx: Pick<RunCtx, 'agent' | 'acpAgent'>, agentArg: string, mo
   return { agent: 'acp', acpAgent: want };
 }
 
+/** Why a subagent may not run on `agent`, a Claude Code or Codex not signed in here, or nothing; `named` when it was one of the user's agents. */
+async function refuseSignedOut(agent: Agent, named?: string): Promise<void> {
+  if (agent !== 'claude' && agent !== 'codex') return;
+  if (!(await programRefusal(agent))) return;
+  const custom = customModels().length ? 'agent: "custom" works (name one of its models).' : 'agent: "custom" works once Custom has a model, which the user adds in Settings → Models.';
+  throw new Error(
+    `${named ? `${named} runs on ${PROGRAM_LABEL[agent]}, which` : PROGRAM_LABEL[agent]} is not signed in here, so no Hydor subagent can run on it. ${custom} The user signs in to ${PROGRAM_LABEL[agent]} in Settings → Agents → Accounts.`,
+  );
+}
+
 /** The program one of the user's agents names, as start_child_session's agent argument; empty when it names none. */
 const agentArgOf = (a: Assistant): string => (!a.agent ? '' : a.agent === 'acp' ? (a.acpAgent === CONSOLE_ID ? 'custom' : (a.acpAgent ?? '')) : a.agent);
 
@@ -227,13 +239,19 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
   const models = customModels().filter((m) => !local || m.local);
   const agents = local ? [] : named;
   const offered = TIERS.map((t) => t.id).filter((t) => tierRank(t) <= tierRank(top));
+  // Claude Code and Codex only when they are signed in here (as last read, when the session's tools are made).
+  const signedIn = programsNow();
+  const programs: Program[] = PROGRAM_IDS.filter((p) => programUsable(signedIn, p));
+  const out = PROGRAM_IDS.filter((p) => !programs.includes(p)).map((p) => PROGRAM_LABEL[p]);
+  const forModel = programs.length ? `For ${orList(programs)}, a model name (default: the agent’s own).` : 'For another agent, a model name (default: its own).';
   return {
     name: 'start_child_session',
     description: [
       'Hand a self-contained part of the job to a Hydor subagent: a new session of its own that works on it in parallel.',
       local
         ? 'This session is confidential, so a Hydor subagent runs here too: on custom, with one of the models on this computer, and confidential like this one.'
-        : 'It can run another agent or model of this app: a cheaper or local model for bulk work, Claude Code or Codex for a hard part.',
+        : `It can run another agent or model of this app: a cheaper or local model for bulk work${programs.length ? `, ${orList(programs.map((p) => PROGRAM_LABEL[p]))} for a hard part` : ''}.`,
+      !local && out.length ? `${out.join(' and ')} ${out.length > 1 ? 'are' : 'is'} not signed in here: do not ask for ${out.length > 1 ? 'them' : 'it'}.` : '',
       'It starts at once and returns its key; when its turn ends, its reply comes back to you as a message, and you go on from there.',
       'A Hydor subagent sees nothing of this conversation: put everything it needs in the brief (the goal, the facts and files it needs, what to hand back).',
       `Use it for parts that can be handed over whole, not for single steps you can take yourself. A Hydor subagent cannot start Hydor subagents; at most ${max} of yours run at once.`,
@@ -257,10 +275,10 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
       type: 'object',
       properties: {
         brief: { type: 'string', description: 'Everything the Hydor subagent needs: the goal, context, files, limits, and what its reply should contain.' },
-        agent: { type: 'string', description: 'custom (the app’s own agent: name the model), claude, codex, or another agent’s id. Default: the same agent as yours.' },
+        agent: { type: 'string', description: `custom (the app’s own agent: name the model), ${programs.map((p) => `${p}, `).join('')}or another agent’s id. Default: the same agent as yours.` },
         model: {
           type: 'string',
-          description: models.length ? `For custom, one of: ${models.map((m) => m.id).join(', ')}. For claude or codex, a model name (default: the agent’s own).` : 'For claude or codex, a model name (default: the agent’s own).',
+          description: models.length ? `For custom, one of: ${models.map((m) => m.id).join(', ')}. ${forModel}` : forModel,
         },
         cwd: { type: 'string', description: 'The folder to work in (default: yours).' },
         worktree: { type: 'boolean', description: 'Work on a branch of its own in a new worktree of the folder’s git repository, so its changes do not mix with others’ (a campaign’s members always do).' },
@@ -340,6 +358,9 @@ async function startChild(
   }
   // An agent that keeps a conversation of its own takes the brief in its inbox; its answer comes back as a message.
   if (named?.standing) {
+    // Its own conversation's program, or the one it would start on.
+    const kept = standingKey(d.db, named.id);
+    await refuseSignedOut((kept ? d.sessions.summary(kept)?.agent : undefined) ?? named.agent ?? (await defaultProgram()).agent, named.name);
     const leadName = leadAgent?.name ?? d.sessions.summary(ctx.key)?.title ?? 'another session';
     const item = sendToInbox(d, named, { text: brief, from: { kind: 'agent', key: ctx.key, name: leadName }, replyTo: ctx.key });
     return `Put in ${named.name}'s inbox (message ${item.id.slice(0, 6)}): it keeps one conversation of its own and takes messages in turn. Its answer comes to you as a message; go on with other work, or end your turn to wait for it.`;
@@ -373,6 +394,7 @@ async function startChild(
     if (!pick?.model && !pick?.effort && !o.tierOverride) tier = undefined;
   }
   const target = pickAgent(d, ctx, agentArg || tierProgram, modelArg);
+  await refuseSignedOut(target.agent, named && !String(a.agent ?? '').trim() && named.agent ? named.name : undefined);
   const lead = role?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
   // A campaign's members each change their part on a branch of their own.
   const worktree = !!a.worktree || (role?.role === 'lead' && role.mode === 'campaign');

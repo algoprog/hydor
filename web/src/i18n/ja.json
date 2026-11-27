@@ -28962,5 +28962,12 @@
   "shipping, releasing, running servers": "出荷、リリース、サーバーの運用",
   "test suites, type checks, linting": "テストスイート、型チェック、リント",
   "training, evaluation, sweeps, benchmarks": "学習、評価、スイープ、ベンチマーク",
-  "writing or changing code, docs or translations, reviewing it": "コード・ドキュメント・翻訳の作成や変更、そのレビュー"
+  "writing or changing code, docs or translations, reviewing it": "コード・ドキュメント・翻訳の作成や変更、そのレビュー",
+  "Not set up": "未設定",
+  "Not set up: sign in to it to set its tiers. Those saved stay as they are.": "未設定です。ティアを設定するにはサインインしてください。保存済みのティアはそのまま残ります。",
+  "This session continues once you sign in.": "サインインすると、このセッションは続行されます。",
+  "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "ここでは{0}が設定されていません。「実行環境」で別のエージェントを選ぶか、サインインしてください。",
+  "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "ここでは{0}にサインインしていません。「設定」→「アカウント」でサインインするか、別のエージェントを選んでください。",
+  "· Not set up": "· 未設定",
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "このマシンでは{0}にサインインしていません。「設定」→「エージェント」→「アカウント」でサインインするか、別のエージェントを選んでください。"
 }

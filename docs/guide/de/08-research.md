@@ -69,7 +69,7 @@ Du musst nichts aktivieren. Bitte etwa „Lass drei Subagenten jeweils einen Anb
 
 Für jeden Hydor-Subagenten legt der Agent fest:
 
-- **Agentenprogramm und Modell**: Custom mit einem seiner unter [Einstellungen → Modelle](/settings?s=models) hinzugefügten Modelle, Claude Code, Codex oder ein anderer Agent wie Gemini CLI oder OpenCode. Standard ist dasselbe Programm wie bei der Leitung. Günstige oder lokale Modelle eignen sich für umfangreiche Routinearbeit, Claude Code oder Codex für anspruchsvolle Teile.
+- **Agentenprogramm und Modell**: Custom mit einem seiner unter [Einstellungen → Modelle](/settings?s=models) hinzugefügten Modelle, Claude Code, Codex oder ein anderer Agent wie Gemini CLI oder OpenCode. Standard ist dasselbe Programm wie bei der Leitung. Günstige oder lokale Modelle eignen sich für umfangreiche Routinearbeit, Claude Code oder Codex für anspruchsvolle Teile. Einem Agenten werden nur die Programme angeboten, bei denen du angemeldet bist. Wird er nach einem Claude Code oder Codex gefragt, bei dem du nicht angemeldet bist (mit Namen oder als einer deiner Agenten, der darauf läuft), erfährt er das und dass Custom funktioniert, statt unbemerkt ein anderes Programm zu bekommen.
 - **Modellstufe**: **Schnell** für kleine, sehr klare Aufgaben, **Standard** für klare Aufgaben mittleren Umfangs und als Vorgabe ohne Auswahl, **Am besten** für schwierige eigenständige Teilaufgaben. Das Modell je Programm und Stufe kommt aus [Einstellungen → Modelle → Modellstufen](/settings?s=models&find=Tiers). Subagenten verwenden nie eine höhere Stufe als ihre Leitung. Eigene Agenten können niedrigere Höchststufen vorgeben.
 - **Einen deiner Agenten** per Name statt eines allgemeinen Subagenten. Dieser verwendet eigene Anweisungen, Tools und Modellstufe. Siehe [Agenten mit delegierten Aufgaben](/guide/agents#agents-that-hand-work-to-other-agents). Ein Agent mit fortlaufendem eigener Unterhaltung erhält die Aufgabe stattdessen im Posteingang und antwortet, wenn er sie bearbeitet.
 - **Ordner**: standardmäßig der Arbeitsordner der Leitung, sonst ein ausdrücklich anderer.
@@ -189,6 +189,8 @@ Es kommen nur Modelle anderer Anbieter infrage, damit kein Anbieter seine eigene
 - **Claude Code**-Sitzungen und andere Sitzungen mit Anthropic-Modell können von **Codex** über dessen Programm oder einem nicht von Anthropic stammenden Custom-Modell geprüft werden.
 - **Codex**-Sitzungen und andere Sitzungen mit OpenAI-Modell können von **Claude**, Sonnet über Claude Code, oder einem Custom-Modell außerhalb von OpenAI geprüft werden.
 - Andere Sitzungen mit Custom oder weiteren Agenten und Modellen anderer Anbieter können Claude, Codex oder ein Custom-Modell eines jeweils anderen Anbieters verwenden.
+
+Claude und Codex werden nur angeboten, wenn du bei ihnen angemeldet bist.
 
 Custom bietet deine unter [Einstellungen → Modelle](/settings?s=models) hinzugefügten Modelle an. Die Prüfung liest nur. Claude und Codex dürfen gezielt Dateien im Sitzungsordner öffnen, verändern aber nichts. Zusätzlich zum Durchlauf sehen sie deine erste Sitzungsnachricht und deine Nachricht unmittelbar vor dem Durchlauf. Zu große Änderungen werden nur teilweise übergeben; die Karte weist darauf hin.
 

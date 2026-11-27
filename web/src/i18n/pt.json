@@ -28962,5 +28962,12 @@
   "shipping, releasing, running servers": "entrega, lançamento, execução de servidores",
   "test suites, type checks, linting": "conjuntos de testes, verificação de tipos, linting",
   "training, evaluation, sweeps, benchmarks": "treinamento, avaliação, varreduras de parâmetros, benchmarks",
-  "writing or changing code, docs or translations, reviewing it": "escrever ou alterar código, documentação ou traduções, e revisar tudo isso"
+  "writing or changing code, docs or translations, reviewing it": "escrever ou alterar código, documentação ou traduções, e revisar tudo isso",
+  "Not set up": "Não configurado",
+  "Not set up: sign in to it to set its tiers. Those saved stay as they are.": "Não configurado: entre nele para definir os níveis. Os que já estão salvos continuam como estão.",
+  "This session continues once you sign in.": "Esta sessão continua depois que você entrar.",
+  "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "{0} não está configurado aqui: escolha outro agente em Executa em ou entre nele.",
+  "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "{0} não está conectado aqui: entre nele em Configurações → Contas ou escolha outro agente.",
+  "· Not set up": "· Não configurado",
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Você não entrou em {0} aqui: entre em Configurações → Agentes → Contas ou escolha outro agente."
 }

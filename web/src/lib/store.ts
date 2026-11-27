@@ -21,6 +21,7 @@ import type {
   TimelinePage,
   UpdateState,
 } from '@shared/types';
+import type { ProgramStatus } from '@shared/programs';
 import { api, enc, post } from './api';
 import { stopRegistry, type Stop, type StopScope } from './stopping';
 import { live } from './ws';
@@ -133,6 +134,8 @@ export interface Bootstrap {
   /** Which model each tier means, and how sessions use the tiers (the start page's Automatic); missing on servers before the team. */
   tiers?: TierMap;
   team?: TeamSettings;
+  /** Whether Claude Code and Codex are signed in here; missing when not known yet (and on older servers): both offered. */
+  programs?: ProgramStatus;
 }
 
 export const useApp = create<{
@@ -669,6 +672,11 @@ export function handleEvent(e: ServerEvent) {
     case 'signin':
       useSignIn.getState().set(e.needs);
       break;
+    case 'programs': {
+      const boot = useApp.getState().boot;
+      if (boot) useApp.getState().set({ boot: { ...boot, programs: e.programs } });
+      break;
+    }
     case 'acpAgents': {
       const boot = useApp.getState().boot;
       if (boot) useApp.getState().set({ boot: { ...boot, acpAgents: e.agents } });

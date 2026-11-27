@@ -8,6 +8,7 @@ import { isAppNotice } from '../shared/app-notice.ts';
 import type { AccountAgent, Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
 import { ClaudeLive, CLAUDE_MODES, claudeSpec, mcpRunFiles, precompactCopy, removeMcpRunFiles } from './agents/claude.ts';
 import { acpControl } from './agents/acp-accounts.ts';
+import { startRefusal } from './agents/programs.ts';
 import { antigravityControl } from './agents/antigravity.ts';
 import { RpcError } from './agents/rpc.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
@@ -1763,6 +1764,9 @@ export class SessionManager extends EventEmitter {
     // Automatic: Best's model for its program; its own agent may step up to Max when a problem proves too hard for it.
     const auto = wantAuto && !o.model ? autoPlan(this.db, { agent: o.agent, acpAgent: o.acpAgent }) : null;
     if (auto) o = { ...o, model: auto.model, effort: o.effort ?? auto.effort, extra: { ...o.extra, auto: true } };
+    // A Claude Code or Codex never signed in here is not started (nor Claude Code installed) by a default of the app's.
+    const refused = await startRefusal(o.agent);
+    if (refused) throw new HttpError(409, refused);
     if (o.agent === 'claude') await ensureClaude();
     // A Codex session with no model (the API, a Hydor subagent) would start on Codex's own default, which on an account
     // signed in with ChatGPT can be a model its plan does not have ("The 'gpt-6-astra' model is not supported…"). The start

@@ -69,7 +69,7 @@ Il n’y a rien à activer : demandez simplement avec vos mots (« demande à tr
 
 Pour chaque sous-agent Hydor, l’agent choisit :
 
-- **L’agent et le modèle** : Custom avec n’importe lequel de ses modèles (depuis [Paramètres → Modèles](/settings?s=models)), Claude Code, Codex, ou un autre agent que vous avez ajouté (Gemini CLI, OpenCode…). Par défaut, un sous-agent Hydor exécute le même agent que la session qui l’a démarré. Un modèle moins cher ou local convient au travail en volume ; Claude Code ou Codex convient à une partie difficile.
+- **L’agent et le modèle** : Custom avec n’importe lequel de ses modèles (depuis [Paramètres → Modèles](/settings?s=models)), Claude Code, Codex, ou un autre agent que vous avez ajouté (Gemini CLI, OpenCode…). Par défaut, un sous-agent Hydor exécute le même agent que la session qui l’a démarré. Un modèle moins cher ou local convient au travail en volume ; Claude Code ou Codex convient à une partie difficile. Un agent ne se voit proposer que les programmes auxquels vous êtes connecté. S’il demande un Claude Code ou un Codex auquel vous n’êtes pas connecté (par son nom, ou en tant que l’un de vos agents qui fonctionne avec lui), il en est informé, et apprend que Custom fonctionne, au lieu d’obtenir un autre programme sans en être averti.
 - **Un niveau** pour sa partie : **Rapide** pour un petit travail très clair, **Standard** pour une tâche claire de taille moyenne (ce que reçoit un sous-agent Hydor quand aucun n’est demandé), **Meilleur** pour une partie difficile qui se suffit à elle-même ; le modèle du niveau pour ce programme provient de [Paramètres → Modèles → Niveaux](/settings?s=models&find=Tiers). Un sous-agent Hydor ne réfléchit jamais avec un niveau supérieur à celui de son parent, et l’un de vos agents peut plafonner plus bas le niveau de ses sous-agents.
 - **Un de vos agents**, par son nom, au lieu d’un sous-agent simple : il travaille avec ses propres instructions, ses outils et son niveau (voir [Des agents qui confient du travail à d’autres agents](/guide/agents#agents-that-hand-work-to-other-agents)). Un agent qui garde une conversation à lui reçoit le travail dans sa boîte de réception, et sa réponse revient quand il s’en occupe.
 - **Le dossier** : celui du parent, sauf si un autre est indiqué.
@@ -189,6 +189,8 @@ Uniquement un modèle d’une société différente de celle dont le modèle a f
 - Une session **Claude Code**, ou toute session exécutant un modèle Anthropic, peut être vérifiée par **Codex** (via le programme Codex) ou par l’un des modèles de Custom qui n’est pas d’Anthropic.
 - Une session **Codex**, ou toute session exécutant un modèle OpenAI, peut être vérifiée par **Claude** (Sonnet, via Claude Code) ou par l’un des modèles de Custom qui n’est pas d’OpenAI.
 - Toute autre session (Custom ou un autre agent avec le modèle d’un autre éditeur) peut être vérifiée par Claude, Codex, ou l’un des modèles de Custom d’un éditeur différent de celui du modèle de la session.
+
+Claude et Codex ne sont proposés que lorsque vous y êtes connecté.
 
 Les modèles de Custom sont ceux que vous avez ajoutés dans [Paramètres → Modèles](/settings?s=models). Le relecteur ne fait que lire : Claude et Codex peuvent ouvrir des fichiers du dossier de la session pour vérifier un point précis, mais ils ne modifient rien. Outre le tour lui-même, le relecteur voit votre premier message dans la session et votre message précédant ce tour, pour le contexte. Quand les modifications sont trop volumineuses pour être montrées en entier, une partie est omise, et la carte l’indique.
 

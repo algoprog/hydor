@@ -30798,5 +30798,12 @@
   "shipping, releasing, running servers": "交付、发布、运行服务器",
   "test suites, type checks, linting": "测试套件、类型检查、代码规范检查",
   "training, evaluation, sweeps, benchmarks": "训练、评估、参数扫描、基准测试",
-  "writing or changing code, docs or translations, reviewing it": "编写或修改代码、文档或翻译，并进行审查"
+  "writing or changing code, docs or translations, reviewing it": "编写或修改代码、文档或翻译，并进行审查",
+  "Not set up": "未设置",
+  "Not set up: sign in to it to set its tiers. Those saved stay as they are.": "尚未设置：登录后才能设置它的档位。已保存的档位保持不变。",
+  "This session continues once you sign in.": "登录后，此会话会继续。",
+  "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "这里尚未设置 {0}：请在“运行于”下选择其他智能体，或登录它。",
+  "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "这里尚未登录 {0}：请在“设置 → 账户”中登录，或选择其他智能体。",
+  "· Not set up": "· 未设置",
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "这里尚未登录 {0}：请在“设置 → 智能体 → 账户”中登录，或换一个智能体。"
 }

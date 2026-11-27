@@ -67,7 +67,15 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - Switch models or assistants mid-session; the model menu lists the session's own agent's models (or, when the agent
   did not start as the app asked for them, why, with Try again), and another assistant applies from your next
   message, the conversation carrying on. "Continue in Codex" (or
-  Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.
+  Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent (Claude Code and
+  Codex only when you are signed in to them).
+- Only what is signed in: a Claude Code or Codex you are not signed in to is listed greyed with Not set up and a way
+  to Settings → Accounts on the start page (a place that had picked it keeps the pick, says so and starts nothing),
+  in Settings → Models → Tiers (the saved tiers stay), in an agent's program menu and in Chat apps; second opinion,
+  hand-off and Do on a browser tab leave it out; a Hydor subagent asked for it is refused with the reason and that
+  Custom works. Nothing swaps in another program for you. What nobody picked a program for (the first start page,
+  an agent with none, a chat, a board's refresh, an agent on call) runs on Claude Code if signed in, else Codex, else
+  Custom, and a program never signed in here is not started, or installed, by any of the app's defaults.
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - **Goals** (the session's menu → Set a goal, or Options → Goal on the start page), for every agent: the person and the
@@ -169,7 +177,8 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   or none left, it stops with a banner and a **Sign in** button, and continues by itself once you are signed in
   again); the helper model's background jobs pass it over for 15 minutes, then the next signed-in account, then
   Codex, then one of your Custom models (the one Custom's Quick tier names, else the cheapest you added; not your plans' models, which go through the same two programs) answer; and
-  only when nothing could do the work does a card on every page ask you to sign in again.
+  only when nothing could do the work does a card on every page ask you to sign in again (just "sign in" for a
+  Claude Code or Codex never signed in here).
   With **Use API credit at a limit** (off by default), Claude Code sessions carry on billed to an Anthropic API key saved for an
   account when every account is at its limit, and go back to the plan once it has usage again.
 
@@ -998,7 +1007,8 @@ agents that speak ACP and take MCP servers.
   works or waits for you (and while you have it open), and in the work tray above the prompt bar, it opens to its
   reply, and you can talk to it. In the sessions Hydor runs, every subagent is a Hydor one: the programs' own are
   switched off (Claude Code's Agent tool, its workflows and its cloud agents, Codex's multi-agent tools) and other
-  agents are told to use Hydor's. A Claude Code or Codex subagent that a session in VS Code or a terminal (or an
+  agents are told to use Hydor's. A subagent is never started on a Claude Code or Codex that is not signed in: the
+  agent is offered only those that are, and asked for another it is told so, and that Custom works. A Claude Code or Codex subagent that a session in VS Code or a terminal (or an
   earlier one) started is one the program runs inside the session, and it shows the same way. The subagents one turn started show together as one card under that turn (the Hydor ones in
   one, the program's own in another): its top line says how many and of what kind, with what they share (“6 Claude
   Code subagents · Sonnet 5.5”, “3 Hydor subagents · Claude Code · Sonnet 5.5”, “4 researchers” in a deep research)
@@ -1746,7 +1756,7 @@ agents that speak ACP and take MCP servers.
   side, you keep the best one and the others are archived. Usage → Arena shows which models win on your own
   tasks, as a rating over the matches you decided.
 - **A second opinion, and caps**: one click has another company's model check a turn's work against what you
-  asked; a spending cap stops a session, or a scheduled task's run, at its limit, checked after each model call.
+  asked (Claude and Codex offered only when signed in); a spending cap stops a session, or a scheduled task's run, at its limit, checked after each model call.
 
 ## For researchers
 
@@ -2236,7 +2246,7 @@ programs shows each program's version and what is out, with Check now, Update no
   it on); what files hold and what is forwarded from someone else reach the agent marked as outside data. /as and an
   agent's name starts a session as one of your own agents (Discord completes the name; /hydor as in Slack), /agents
   lists them with buttons, a standing agent takes the chat into its own conversation, and New sessions as makes one of
-  them every new session's agent. In
+  them every new session's agent. New sessions use Claude Code, Codex or Custom (until you pick one, the first signed in). In
   Discord and Slack a channel works too, when the person who linked it mentions the bot. The app connects out (it
   asks Telegram for messages, opens Discord's Gateway and Slack's Socket Mode WebSockets itself), so none needs an
   address on the internet; the tokens are kept in the vault. Connect refuses a token only when the service says no to

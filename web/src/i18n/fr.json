@@ -28961,5 +28961,12 @@
   "shipping, releasing, running servers": "livraison, publication, exploitation de serveurs",
   "test suites, type checks, linting": "suites de tests, vérification des types, linting",
   "training, evaluation, sweeps, benchmarks": "entraînement, évaluation, balayages de paramètres, benchmarks",
-  "writing or changing code, docs or translations, reviewing it": "écriture ou modification de code, de documentation ou de traductions, relecture"
+  "writing or changing code, docs or translations, reviewing it": "écriture ou modification de code, de documentation ou de traductions, relecture",
+  "Not set up": "Non configuré",
+  "Not set up: sign in to it to set its tiers. Those saved stay as they are.": "Non configuré : connectez-vous pour définir ses niveaux. Ceux qui sont enregistrés restent tels quels.",
+  "This session continues once you sign in.": "Cette session reprendra une fois que vous serez connecté.",
+  "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "{0} n’est pas configuré ici : choisissez un autre agent sous « Fonctionne avec », ou connectez-vous-y.",
+  "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "{0} n’est pas connecté ici : connectez-vous dans Paramètres → Comptes, ou choisissez un autre agent.",
+  "· Not set up": "· Non configuré",
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Vous n’êtes pas connecté à {0} ici : connectez-vous dans Paramètres → Agents → Comptes, ou choisissez un autre agent."
 }

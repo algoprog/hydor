@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { agentMode, assistantExtra, type Assistant } from '../../shared/assistants.ts';
+import { defaultProgramNow } from '../agents/programs.ts';
 import type { Agent } from '../../shared/types.ts';
 import { ensureStanding } from '../assistants/inbox.ts';
 import { allAssistants, findAssistant, taskRoot } from '../assistants/store.ts';
@@ -51,11 +52,25 @@ export interface ChatMessage {
 
 const busy = (status?: string) => status === 'working' || status === 'waiting' || status === 'starting';
 
+/** What Settings → Chat apps → New sessions use may be; 'custom' is Hydor's own agent. */
+export type ChatProgram = 'claude' | 'codex' | 'custom';
+export const isChatProgram = (v: unknown): v is ChatProgram => v === 'claude' || v === 'codex' || v === 'custom';
+
+/** The program picked for a chat app (`kept`), else the first signed in of Claude Code and Codex, else Custom. */
+export function chatProgram(kept: string | null | undefined): ChatProgram {
+  if (isChatProgram(kept)) return kept;
+  const { agent } = defaultProgramNow();
+  return agent === 'acp' ? 'custom' : agent;
+}
+
+/** The agent a chat app's program is: Custom is the ACP agent 'console'. */
+export const chatAgent = (p: ChatProgram): Agent => (p === 'custom' ? 'acp' : p);
+
 /** How a new session starts as agent `a` (none: the chat's program alone), as the scheduler and a standing agent's start do. */
 function startOf(a: Assistant | null, program: Agent) {
-  if (!a) return { agent: program };
+  if (!a) return { agent: program, ...(program === 'acp' ? { acpAgent: 'console' } : {}) };
   const agent = a.agent ?? program;
-  const acpAgent = agent === 'acp' ? a.acpAgent : undefined;
+  const acpAgent = agent === 'acp' ? (a.agent ? a.acpAgent : 'console') : undefined;
   return {
     agent,
     ...(acpAgent ? { acpAgent } : {}),

@@ -26,6 +26,7 @@ import { addExampleRun, exampleRun, exampleRuns, latestTries, openExampleRuns, s
 import { monthSpend } from './rules.ts';
 import { findAssistant } from './store.ts';
 import { currentVersion, keepVersion } from './versions.ts';
+import { defaultProgram } from '../agents/programs.ts';
 
 /** What a session that tries an example keeps in its settings (SessionExtra.agentExample). */
 export interface ExampleMark {
@@ -184,8 +185,9 @@ export async function tryExamples(d: Deps, a: Assistant, o: { only?: string[]; u
   if (!list.length) throw new HttpError(400, o.only?.length ? 'It has no such example' : `${a.name} has no examples yet: add one first`);
   const going = new Set(openExampleRuns(d.db).filter((r) => r.agent === a.id).map((r) => r.example));
   const version = versionNow(d.db, a);
-  const agent: Agent = a.agent ?? o.use?.agent ?? 'claude';
-  const acpAgent = agent === 'acp' ? (a.agent ? a.acpAgent : o.use?.acpAgent) || 'console' : undefined;
+  const fallback = a.agent || o.use?.agent ? null : await defaultProgram();
+  const agent: Agent = a.agent ?? o.use?.agent ?? fallback!.agent;
+  const acpAgent = agent === 'acp' ? (a.agent ? a.acpAgent : (o.use?.acpAgent ?? fallback?.acpAgent)) || 'console' : undefined;
   const out: AgentExampleRun[] = [];
   for (const ex of list) {
     if (going.has(ex.id)) continue;

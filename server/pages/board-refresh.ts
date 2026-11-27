@@ -47,6 +47,7 @@ import { parseExtra } from '../sessionExtra.ts';
 import { localNow } from '../userPrefs.ts';
 import { readBoard } from './boards.ts';
 import { addVersion, listPages, onPageChange, pageInfo, pageSource } from './store.ts';
+import { defaultProgramNow } from '../agents/programs.ts';
 
 // ---- which card a task refreshes -----------------------------------------------------------------------------------
 
@@ -83,12 +84,16 @@ export const readsSource = (c: Pick<BoardCard, 'data'>) => isDataRef(c.data);
 
 // ---- where a refresh runs ------------------------------------------------------------------------------------------
 
-/** The agent program a card's refreshes run on, and the folder: those of the conversation it came from, else Claude Code in the home folder. */
+/**
+ * The agent program a card's refreshes run on, and the folder: those of the conversation it came from, else the first
+ * signed in of Claude Code and Codex (else Custom) in the home folder.
+ */
 function placeOf(d: Pick<Deps, 'sessions'>, c: BoardCard): { agent: Agent; acpAgent?: string; cwd: string } {
   const s = c.from?.session ? d.sessions.summary(c.from.session) : null;
   const folder = [c.from?.cwd, s?.cwd].find((p): p is string => !!p && fs.existsSync(p));
-  const agent: Agent = s?.agent === 'codex' || s?.agent === 'acp' ? s.agent : 'claude';
-  return { agent, ...(agent === 'acp' ? { acpAgent: s?.acpAgent || 'console' } : {}), cwd: folder ?? os.homedir() };
+  const fallback = s ? null : defaultProgramNow();
+  const agent: Agent = s?.agent ?? fallback!.agent;
+  return { agent, ...(agent === 'acp' ? { acpAgent: s?.acpAgent || fallback?.acpAgent || 'console' } : {}), cwd: folder ?? os.homedir() };
 }
 
 /** A run nobody watches goes ahead with routine steps (as an app's run does). */

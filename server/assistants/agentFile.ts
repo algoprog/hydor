@@ -30,6 +30,7 @@ import type { DB } from '../db.ts';
 import type { Scheduler } from '../scheduler.ts';
 import { validSchedule } from '../scheduler.ts';
 import { allAssistants, cleanAssistant, saveAssistant, taskRoot } from './store.ts';
+import { defaultProgramNow } from '../agents/programs.ts';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const names = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
@@ -237,8 +238,9 @@ export function installAgent(
   const a = saveAssistant(d.db, body, { by: 'install' });
   let made = 0;
   if (o.schedules && p.schedules.length) {
-    const agent: Agent = a.agent ?? o.use?.agent ?? 'claude';
-    const acpAgent = agent === 'acp' ? (a.agent ? a.acpAgent : o.use?.acpAgent) || 'console' : undefined;
+    const fallback = a.agent || o.use?.agent ? null : defaultProgramNow();
+    const agent: Agent = a.agent ?? o.use?.agent ?? fallback!.agent;
+    const acpAgent = agent === 'acp' ? (a.agent ? a.acpAgent : (o.use?.acpAgent ?? fallback?.acpAgent)) || 'console' : undefined;
     const cwd = taskRoot(d.db);
     fs.mkdirSync(cwd, { recursive: true });
     for (const s of p.schedules) {

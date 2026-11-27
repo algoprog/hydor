@@ -39,6 +39,7 @@ import { remoteMachine, type RemoteRun } from './remote.ts';
 import { fmt, spread, tellEnded } from './notices.ts';
 import { earlyStop, fillCommand, paramsOf, runFile, settingsLine, type Value } from './sweeps.ts';
 import { keyNumbers } from '../../shared/metric-rank.ts';
+import { defaultProgram } from '../agents/programs.ts';
 
 const TICK_MS = 3000;
 /** Clusters are asked about their runs at most this often, other machines too (the tests make them short). */
@@ -987,7 +988,9 @@ async function onCallAgent(d: Deps, r: RunRecord, kind: WatchKind, text: string)
     return null;
   }
   const st = startSettings(d.db);
-  const agentKey = r.onCall?.agent || st.agent || 'claude';
+  const named = r.onCall?.agent || st.agent;
+  const fallback = named ? null : await defaultProgram();
+  const agentKey = named || (fallback!.acpAgent ? `acp:${fallback!.acpAgent}` : fallback!.agent);
   const agent: Agent = agentKey.startsWith('acp') ? 'acp' : agentKey === 'codex' ? 'codex' : 'claude';
   const acpAgent = agent === 'acp' ? agentKey.slice(4) || undefined : undefined;
   const pick = st.runs?.[agentKey] ?? {};

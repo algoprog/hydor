@@ -5,6 +5,7 @@ import type { GoalStatus } from './goals.ts';
 import type { QuickAnswer } from './inbox.ts';
 import type { AppTheme } from './themes.ts';
 import type { SignatureCard } from './signatures.ts';
+import type { ProgramStatus } from './programs.ts';
 import type { WebAppChoose, WebKinds } from './webapps.ts';
 
 /** Claude Code, Codex, or an agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode…). */
@@ -864,6 +865,8 @@ export interface AccountStatus {
   method?: string;
   detail?: string;
   error?: string;
+  /** Codex set to a model provider that asks for no OpenAI sign-in: it works signed out. */
+  noSignInNeeded?: boolean;
 }
 
 /**
@@ -887,6 +890,8 @@ export interface SignInNeed {
   at: number;
   /** Not now: the prompt on every page stays hidden until then (a session it stops shows it again). */
   hiddenUntil?: number;
+  /** Its program was never signed in here: asked to sign in, not to sign in "again". */
+  first?: boolean;
 }
 
 export interface LoginFlow {
@@ -1067,6 +1072,8 @@ export type ServerEvent =
   | { t: 'login'; flow: LoginFlow }
   /** The accounts to sign in to again (server/signin.ts), all of them each time. */
   | { t: 'signin'; needs: SignInNeed[] }
+  /** Whether Claude Code and Codex are signed in here, when that changes (server/agents/programs.ts). */
+  | { t: 'programs'; programs: ProgramStatus }
   | { t: 'index'; done: number; total: number; running: boolean }
   | { t: 'system'; sample: SystemSample }
   | { t: 'toast'; level: 'info' | 'error'; text: string }

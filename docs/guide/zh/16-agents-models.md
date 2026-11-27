@@ -50,7 +50,7 @@ Hydor 可以运行多种 AI 智能体：Claude Code、Codex、Custom（应用自
 
 会话的**思考强度**同样如此。选好之后，正在运行的智能体从下一轮起使用它。如果你切换到的模型不支持你原来的思考强度，选择器会显示该模型的默认值，模型也会按它运行。
 
-模型菜单只列出该会话自己智能体的模型；保密会话则只列出这台电脑或你的私人网络上的模型。要把对话转给另一个智能体，请使用会话的菜单（⋯）→ **转到 Codex**、**转到 Claude Code** 或 **转到 Custom 智能体**（适用于 Claude Code 和 Codex 的会话；Custom 在有了模型之后才会出现）。你的下一条消息会在同一文件夹中启动该智能体的一个新会话，并带上到目前为止的对话。已停止的会话会在它上次使用的模型上继续，除非你在发送前选了另一个。
+模型菜单只列出该会话自己智能体的模型；保密会话则只列出这台电脑或你的私人网络上的模型。要把对话转给另一个智能体，请使用会话的菜单（⋯）→ **转到 Codex**、**转到 Claude Code** 或 **转到 Custom 智能体**（适用于 Claude Code 和 Codex 的会话；这两者中的另一个只有在你已登录它时才会出现，Custom 在有了模型之后才会出现）。你的下一条消息会在同一文件夹中启动该智能体的一个新会话，并带上到目前为止的对话。已停止的会话会在它上次使用的模型上继续，除非你在发送前选了另一个。
 
 ## Grok Build 的思考强度
 
@@ -69,7 +69,7 @@ Grok 的模型支持推理强度，和 Claude Code、Codex 提供的选择一样
 
 在开始页面上，**模型**默认停在**自动**：会话从最佳开始（同样的**自动**也用于启动[定时任务](/guide/tasks#model-effort-permissions-and-other-options)的会话，[应用](/guide/apps)也可以用档位而不是按名称指定的模型来思考）。它的主智能体会把明确的部分交给标准和快速档的子智能体，并且在问题证明比最佳档应付得了的更难时（修复失败了两次、找不到原因、一个证明），可能把自己切换到最大值；对话中会有一行说明这一点及原因。请求不会仅凭措辞就被送到最大值：看上去很难的事情，大多数最佳档就能解决，而且花费更少。改为按名称选择一个模型，会话就用那个模型思考；它的子智能体仍然使用档位。你的某个智能体可以改用某一个档位来思考（参见[智能体用什么来思考：档位](/guide/agents#what-an-agent-thinks-with-tiers)）。
 
-[设置 → 智能体 → 模型 → 档位](/settings?s=models&find=Tiers)说明每个档位对每个程序意味着什么：每个档位一行，分组标题旁有一个开关用来选择程序（**Claude Code**、**Codex** 或 **Custom**），每一行中有一个模型，Claude Code 和 Codex 还有一个思考强度。点击档位的 (i) 可以了解更多。起初，对 Claude Code 来说，快速是 Haiku，标准是 Sonnet，最佳是 Opus，最大值是最新的 Fable；对 Codex 来说，快速是 Luna，标准是 Terra，最佳是 Sol，最大值是 Astra（在缺少其中某个的套餐上，则用它提供的最接近的模型，如果两个档位共用一个模型，较高的档位会用更高的思考强度）；Custom 的档位会自动填写：你不去动的档位，会从 Custom 拥有的模型中取同类型的最新模型。来自你的 Claude 套餐的，快速是 Haiku，标准是 Sonnet，最佳是 Opus，最大值是最新的 Fable；否则来自你的 ChatGPT 套餐，即 Luna、Terra、Sol 和 Astra；再否则来自你添加的、不在这台电脑上（OpenRouter、某个端点）且名称属于这些系列之一的模型。这台电脑上的模型绝不会被自动选中，因为它的名称看不出强弱，小模型（Haiku、Luna）也绝不会成为最佳：如果只有小模型或本地模型，档位会一直为空，直到你来选择，而 Custom 会话则保留它所选的模型。一旦最佳指定了模型，开始页面就会为 Custom 提供**自动**，它的会话会带领子智能体（和所有会话一样，是 Hydor 子智能体）。在 **Custom** 标签页上，你可以为某个档位指定它的任何模型（参见[Custom 的模型从哪里来](#where-customs-models-come-from)）。你不去动的档位，会跟随其程序中同类型的最新模型。标题旁 **⋯** 菜单中的**恢复默认**会把它们恢复，包括 Custom 的选择。
+[设置 → 智能体 → 模型 → 档位](/settings?s=models&find=Tiers)说明每个档位对每个程序意味着什么：每个档位一行，分组标题旁有一个开关用来选择程序（**Claude Code**、**Codex** 或 **Custom**），每一行中有一个模型，Claude Code 和 Codex 还有一个思考强度。点击档位的 (i) 可以了解更多。起初，对 Claude Code 来说，快速是 Haiku，标准是 Sonnet，最佳是 Opus，最大值是最新的 Fable；对 Codex 来说，快速是 Luna，标准是 Terra，最佳是 Sol，最大值是 Astra（在缺少其中某个的套餐上，则用它提供的最接近的模型，如果两个档位共用一个模型，较高的档位会用更高的思考强度）；Custom 的档位会自动填写：你不去动的档位，会从 Custom 拥有的模型中取同类型的最新模型。来自你的 Claude 套餐的，快速是 Haiku，标准是 Sonnet，最佳是 Opus，最大值是最新的 Fable；否则来自你的 ChatGPT 套餐，即 Luna、Terra、Sol 和 Astra；再否则来自你添加的、不在这台电脑上（OpenRouter、某个端点）且名称属于这些系列之一的模型。这台电脑上的模型绝不会被自动选中，因为它的名称看不出强弱，小模型（Haiku、Luna）也绝不会成为最佳：如果只有小模型或本地模型，档位会一直为空，直到你来选择，而 Custom 会话则保留它所选的模型。一旦最佳指定了模型，开始页面就会为 Custom 提供**自动**，它的会话会带领子智能体（和所有会话一样，是 Hydor 子智能体）。在 **Custom** 标签页上，你可以为某个档位指定它的任何模型（参见[Custom 的模型从哪里来](#where-customs-models-come-from)）。你没有登录的 Claude Code 或 Codex 在开关中显示为灰色，并有一行说明它**未设置**，还带有一个**配置**按钮；该部分打开时会停在第一个你能用的程序上。为它保存的档位保持原样，留待你登录后使用。你不去动的档位，会跟随其程序中同类型的最新模型。标题旁 **⋯** 菜单中的**恢复默认**会把它们恢复，包括 Custom 的选择。
 
 档位下方**会话中的档位**分组里有两个开关，说明会话如何使用档位：
 
@@ -194,14 +194,14 @@ Antigravity CLI 是 Google 为你的 Google AI 套餐提供的智能体，添加
 
 ## 账户登出时
 
-Claude Code、Codex 或 Grok Build 的账户可能会被登出：它的登录已结束或被撤销，程序会提示 "Not logged in · Please run /login" 或 "401 Unauthorized"。应用会尽可能自行解决，只有在别无他法时，才会请你重新登录。
+Claude Code、Codex 或 Grok Build 的账户可能会被登出：它的登录已结束或被撤销，程序会提示 "Not logged in · Please run /login" 或 "401 Unauthorized"。应用会尽可能自行解决，只有在别无他法时，才会请你重新登录。（对于你从未在这里登录过的 Claude Code 或 Codex，它会请你登录，而不说“重新”，并且 Hydor 不会启动它的会话或它的 Hydor 子智能体，而是说明原因。）
 
 Antigravity CLI 没有其他账户可以切换。如果你在它登出时新建会话，会话会停止，并提示 "Antigravity CLI is not signed in: sign in with your Google account in Settings → Agents → Accounts, then try again."，同时那里的对应行会显示它已登出。请在那里登录，然后重新发送你的消息。
 
 - **你的会话.** 当某个会话的一轮请求因其账户已登出而被拒绝，并且 [达到限额时切换账户](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) 已开启（默认开启）时，该会话会连同全部历史记录，转移到同一智能体的另一个仍有用量的已登录账户，并继续运行。屏幕底部会出现一条简短的提示："<session>: <account> is signed out, so it continues on <other account>"，同时智能体会收到这样的告知："… is signed out, so this session now runs on …. Continue where you left off."。如果你向一个不久前被发现账户已登出的会话发送消息，会话会先以同样的方式转移，这样你的消息就不会被拒绝。
 - **会话无法转移时。** 如果 **达到限额时切换账户** 已关闭，或者该智能体没有其他账户还有用量，会话就会停止。消息框上方会出现一条横幅，写着 "<account> is signed out" 和 "This session continues once you sign in again."，并带有一个 **登录** 按钮。你重新登录后（无论是在这里还是在终端中），会话会自行继续，智能体会收到这样的告知："Signed in again. Continue where you left off."。
 - **后台工作。** 在 [辅助模型](/settings?s=models&find=Helper%20model) 设为 **自动** 时，它负责的小任务（会话标题、记忆备注、精简[你的个人资料](/guide/memory#your-profile)、应用的快速模型步骤、拉取请求描述等）会跳过已登出的账户 15 分钟，之后再重试，因此你在终端中完成的登录会被察觉。接下来由下一个已登录的账户来回答，再之后是 Codex。当 Claude Code 和 Codex 都无法回答（已登出、已达限额或未安装）时，会由你的某个 **Custom** 模型来完成：即 Custom 的 **快速** 档位在 [设置 → 智能体 → 模型 → 档位](/settings?s=models&find=Tiers) 中指定的那个模型（其次是 **标准**，遇到少见的较大任务则依次是 **最佳**、**最大值**），否则就用你添加的最便宜的模型（本机上的模型视为免费）。最多尝试两个。它的花费和其他 Custom 模型的用量一样计算。
-- **登录提示。** 只有在没有任何方式能完成工作、且有账户已登出时，每个页面的右下角（手机上则在消息框上方）才会显示一张卡片。标题是 "Sign in to Claude Code again"（或 Codex、Grok Build），下面是 "<account> is signed out."，然后说明原因："Background work needs it (shortening your profile), and no other account or Custom model could do it."，如果是它停止的会话，则是 "… continues once you sign in."。**登录** 会打开与 [设置 → 智能体 → 账户](/settings?s=accounts) 相同的登录对话框。**暂不** 会把这张卡片隐藏一小时；如果有会话因此而停止，卡片会再次显示，而该会话中的横幅会一直保留。同时最多显示两张卡片，多出的部分会显示为 "+N more"，点击后会跳转到 设置 → 智能体 → 账户。账户重新登录后，卡片就会消失，无论是通过卡片、设置还是在终端中登录（应用会在下一次成功的调用时察觉）。当后台工作通过其他方式重新得以完成（其他账户或某个 Custom 模型作答）时，卡片也会消失。当 Claude Code 和 Codex 都已登出时，只会询问最先作答的 Claude Code。
+- **登录提示。** 只有在没有任何方式能完成工作、且有账户已登出时，每个页面的右下角（手机上则在消息框上方）才会显示一张卡片。标题是 "Sign in to Claude Code again"（或 Codex、Grok Build；如果你从未在这里登录过它，则是 "Sign in to Claude Code"），下面是 "<account> is signed out."，然后说明原因："Background work needs it (shortening your profile), and no other account or Custom model could do it."，如果是它停止的会话，则是 "… continues once you sign in."。**登录** 会打开与 [设置 → 智能体 → 账户](/settings?s=accounts) 相同的登录对话框。**暂不** 会把这张卡片隐藏一小时；如果有会话因此而停止，卡片会再次显示，而该会话中的横幅会一直保留。同时最多显示两张卡片，多出的部分会显示为 "+N more"，点击后会跳转到 设置 → 智能体 → 账户。账户重新登录后，卡片就会消失，无论是通过卡片、设置还是在终端中登录（应用会在下一次成功的调用时察觉）。当后台工作通过其他方式重新得以完成（其他账户或某个 Custom 模型作答）时，卡片也会消失。当 Claude Code 和 Codex 都已登出时，只会询问最先作答的 Claude Code。
 
 你的个人资料也会显示这一点：如果精简它时因账户已登出而失败，下方的原因会这样说明（"Your Claude Code account “Work” is signed out, and no other account or Custom model could do this: sign in again (Settings → Agents → Accounts)."），并且会出现这张卡片。
 

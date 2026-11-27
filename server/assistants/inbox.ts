@@ -15,6 +15,7 @@ import { sessionExtra } from '../sessionExtra.ts';
 import { spaceById } from '../spaces/index.ts';
 import { monthSpend } from './rules.ts';
 import { findAssistant, taskRoot } from './store.ts';
+import { defaultProgram } from '../agents/programs.ts';
 
 const MAX_TEXT = 40_000;
 
@@ -85,8 +86,8 @@ export async function ensureStanding(d: Deps, a: Assistant): Promise<string> {
   const only = a.projects?.length === 1 ? spaceById(d.db, a.projects[0]) : null;
   const cwd = only?.folder ?? path.join(taskRoot(d.db), 'Agents', slug(a.name));
   fs.mkdirSync(cwd, { recursive: true });
-  const agent = a.agent ?? 'claude';
-  const acpAgent = agent === 'acp' ? a.acpAgent : undefined;
+  // With no program of its own: the first signed in of Claude Code and Codex, else Custom.
+  const { agent, acpAgent } = a.agent ? { agent: a.agent, acpAgent: a.agent === 'acp' ? a.acpAgent : undefined } : await defaultProgram();
   const key = await d.sessions.create({
     agent,
     acpAgent,

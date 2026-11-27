@@ -194,7 +194,7 @@ Sur un ordinateur, une colonne à gauche liste sept sections, chacune avec son r
   - **Réfléchit avec** : **Automatique**, **Rapide**, **Standard**, **Meilleur** ou **Max**, chacun avec une ligne sur son usage (voir [Avec quoi réfléchit un agent : les niveaux](#what-an-agent-thinks-with-tiers)).
   - **Fonctionne avec** : le programme qu’il suggère, choisi avec lui sur la page de démarrage.
     - **N’importe quel agent** (par défaut) conserve le programme choisi sur la page de démarrage.
-    - **Claude Code**, **Codex**, **Custom** (« N’importe quel modèle »), ou tout agent que vous avez ajouté dans [Paramètres → Agents → Plus d’agents](/settings?s=agents).
+    - **Claude Code**, **Codex**, **Custom** (« N’importe quel modèle »), ou tout agent que vous avez ajouté dans [Paramètres → Agents → Plus d’agents](/settings?s=agents). Un Claude Code ou un Codex auquel vous n’êtes pas connecté affiche **Non configuré** et ne peut pas être choisi.
     - Une fois le programme choisi, un menu de modèles apparaît à côté avec ceux de ce programme (pour les programmes qui offrent un choix) ; si vous n’y touchez pas, c’est le modèle par défaut du programme. Un niveau choisi plus haut sélectionne le modèle à la place.
   - **Mode d’autorisation** : quand il vous demande d’abord.
     - **Selon le choix** (par défaut) : conserve le mode choisi sur la page de démarrage.

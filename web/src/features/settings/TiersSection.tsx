@@ -1,15 +1,17 @@
 // Settings → Models → Tiers: the model (and effort) Quick, Standard, Best and Max mean for each program, and how
 // sessions use them. A session on Automatic thinks with Best (its main agent may move itself to Max when a problem
 // proves too hard), and its main agent hands clear parts to subagents on Standard and Quick; an agent of yours thinks
-// with one tier.
+// with one tier. A Claude Code or Codex not signed in here is greyed, with a line on why; its saved tiers stay.
 import { useEffect, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
+import { PROGRAM_LABEL, isProgram, programUsable } from '@shared/programs';
 import { TIER_PROGRAMS, TIERS, type TeamSettings, type Tier, type TierMap, type TierPick, type TierProgram } from '@shared/tiers';
 import type { Agent } from '@shared/types';
 import { api, put } from '../../lib/api';
-import { toastError } from '../../lib/store';
+import { go } from '../../lib/nav';
+import { toastError, useApp } from '../../lib/store';
 import { EffortPicker, ModelPicker } from '../../components/AgentPickers';
-import { MenuItem, Segmented, Switch, Throbber } from '../../components/ui';
+import { Button, MenuItem, Segmented, Switch, Throbber } from '../../components/ui';
 import { Group, MoreMenu, Row } from './kit';
 import { useTiers } from '../assistants/agentsState';
 
@@ -32,7 +34,12 @@ const SHORT: Record<Tier, string> = {
 
 export function TiersSection() {
   const [st, setSt] = useState<State | null>(null);
-  const [program, setProgram] = useState<TierProgram>('claude');
+  const programs = useApp((s) => s.boot?.programs);
+  const usable = (p: TierProgram) => programUsable(programs, p);
+  const out = TIER_PROGRAMS.map((p) => p.id).filter((p) => !usable(p));
+  // Opens on the first program signed in here (Custom always is).
+  const [picked, setProgram] = useState<TierProgram | null>(null);
+  const program = picked && usable(picked) ? picked : TIER_PROGRAMS.find((p) => usable(p.id))!.id;
   useEffect(() => {
     api<State>('/api/models/tiers').then(setSt, toastError);
   }, []);
@@ -51,7 +58,7 @@ export function TiersSection() {
         info="The model each tier means for each program. A session on Automatic thinks with Best, and its main agent may move itself to Max when a problem proves too hard; it hands clear parts to subagents on Standard and Quick. A tier you leave alone follows its program’s newest model."
         actions={
           <>
-            <Segmented size="sm" value={program} onChange={setProgram} options={TIER_PROGRAMS.map((p) => ({ value: p.id, label: p.label }))} />
+            <Segmented size="sm" value={program} onChange={setProgram} options={TIER_PROGRAMS.map((p) => ({ value: p.id, label: p.label, disabled: !usable(p.id), title: usable(p.id) ? undefined : 'Not set up' }))} />
             <MoreMenu width={220}>
               {(close) => (
                 <MenuItem
@@ -69,6 +76,18 @@ export function TiersSection() {
           </>
         }
       >
+        {out.map((p) => (
+          <Row
+            key={p}
+            label={isProgram(p) ? PROGRAM_LABEL[p] : p}
+            hint="Not set up: sign in to it to set its tiers. Those saved stay as they are."
+            control={
+              <Button size="sm" variant="secondary" onClick={() => go('/settings?s=accounts')}>
+                Set up
+              </Button>
+            }
+          />
+        ))}
         {TIERS.map((t) => {
           const pick = st?.tiers[program][t.id];
           return (
