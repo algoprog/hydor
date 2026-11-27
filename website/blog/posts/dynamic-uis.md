@@ -1,7 +1,7 @@
 ---
 title: Dynamic UIs: answers you can use, not just read
 description: Hydor's agents answer with 150 ready-made cards, charts, maps and small tools that draw themselves as the reply arrives. What they are, how an agent picks one, what you can do in them, and what else a session shows you while an agent works.
-date: 2026-11-25
+date: 2026-11-07
 tags: Product, Design
 cover: /img/blog/dynamic-uis/cover.webp
 coverAlt: A stream of glowing turquoise water pours across a dark mirror floor and fills clear glass shapes standing on it: the bars of a chart, a map pin, a ring and a small grid, each holding the water at its own level.

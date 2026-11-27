@@ -1,7 +1,7 @@
 ---
 title: How Hydor remembers: one memory for every agent
 description: Claude Code, Codex and every other agent in Hydor share one memory that you can see and undo. How it is kept, what each agent is given and when, how the right notes are found, and how memory stays true as your work changes.
-date: 2026-11-25
+date: 2026-10-31
 tags: Memory, Under the hood
 cover: /img/blog/how-hydor-remembers/cover.webp
 coverAlt: Small glowing cards float on dark water, each joined by a thread of light to one bright point at the centre, where ripples spread outward.

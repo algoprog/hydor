@@ -1,7 +1,7 @@
 ---
 title: Word suggestions that never leave your computer
 description: How Hydor suggests the rest of the word you are typing, and the next one, in about 200 languages, with a 49-million-parameter model on your own processor that learns how you write without anything you type leaving your computer.
-date: 2026-11-25
+date: 2026-11-23
 tags: Word suggestions, Research
 cover: /img/blog/on-device-word-suggestions/cover.webp
 coverAlt: A glass keyboard key marked Tab, half full of glowing turquoise water, sends ripples across a black surface, with a trail of small lights leading away from it like letters about to be typed.

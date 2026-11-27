@@ -1,7 +1,7 @@
 ---
 title: Goals and swarms: many agents, and checks that decide
 description: On a hard problem, many agents attacking from different angles find more than one does, but only if something outside them decides what counts as done. What this year's reports on swarms show, and how goals and swarms work in Hydor.
-date: 2026-11-25
+date: 2026-11-21
 tags: Goals, Swarms, Research
 cover: /img/blog/goals-and-swarms/cover.webp
 coverAlt: A school of small glowing fish swims in sweeping turquoise and blue streams around a single ring of light in dark water.

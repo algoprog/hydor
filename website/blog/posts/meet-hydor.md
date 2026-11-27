@@ -1,7 +1,7 @@
 ---
 title: Meet Hydor: a home for your AI agents
 description: What Hydor is, what a day with it looks like and how to start: Claude Code, Codex or any model on your own computer, with the plans you already pay for, one memory for all of them and every session on your phone.
-date: 2026-11-25
+date: 2026-10-30
 tags: Product, Introduction
 cover: /img/blog/meet-hydor/cover.webp
 coverAlt: A glowing arch of clear water, shaped like the Ω of Hydor's logo, stands on a dark mirror floor while thin streams of coral, lavender, blue, green and amber light flow into it.
