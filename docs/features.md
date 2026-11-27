@@ -2074,6 +2074,8 @@ programs shows each program's version and what is out, with Check now, Update no
 - Tables, code blocks and Mermaid diagrams open full screen (a small button at a table's corner, beside Copy on code,
   in a diagram's bar), where − 100% +, Ctrl or ⌘ with + − 0, Ctrl and the wheel or a pinch (about the pointer) zoom
   them, a drag moves about once zoomed and scrolling works too.
+- A code block has a **Wrap lines** button beside Full screen and Copy: on, its long lines break at the edge instead of
+  scrolling sideways (per block, off again on reload; the full screen view keeps it).
 - Answer UIs: when part of an answer is something to look at, compare, choose from, follow, try or practise, the agent
   shows it in one of more than 140 ready-made UIs drawn in the app's look as the reply streams, by writing a
   ```` ```ui <name> ```` block of JSON. Agents are told to use one for every such part, which is most of an answer of more
