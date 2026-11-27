@@ -6,7 +6,7 @@ tags: Memory, Under the hood
 cover: /img/blog/how-hydor-remembers/cover.webp
 coverAlt: Small glowing cards float on dark water, each joined by a thread of light to one bright point at the centre, where ripples spread outward.
 og: /img/blog/how-hydor-remembers/og.jpg
-order: 4
+order: 1
 ---
 
 Tell an agent that the staging server is only up on weekdays and it will use that all afternoon. Tomorrow, in a new session, it asks again. Switch to another agent and it asks again too, because each agent keeps what it keeps in its own place, if it keeps anything. You end up being the memory that carries facts from one to the next.
