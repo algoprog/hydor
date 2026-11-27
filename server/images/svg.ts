@@ -1,6 +1,6 @@
 // Drawings (SVG) from words, for the editors (POST /api/images/svg) and agents (make_svg). Quick: written as SVG by the
-// model that writes the app's code (writer.ts: the helper model picked in Settings → Models, else Claude's Sonnet,
-// else Codex), with no picture model to pay; Best: drawn by a Recraft vector model through OpenRouter. Either way the
+// model that writes the app's code (writer.ts: the helper model of Settings → Models; on Automatic Claude's Sonnet,
+// else Codex, else a Custom model), with no picture model to pay; Best: drawn by a Recraft vector model through OpenRouter. Either way the
 // drawing is cleaned (svg-clean.ts) before it is kept or saved, and its size read from it.
 import type { DrawingKind, ImageModel, ImageTier, SvgAsk } from '../../shared/images.ts';
 import { drawingTierFor } from '../../shared/image-tier.ts';

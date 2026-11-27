@@ -28967,5 +28967,19 @@
   "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "{0} n’est pas configuré ici : choisissez un autre agent sous « Fonctionne avec », ou connectez-vous-y.",
   "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "{0} n’est pas connecté ici : connectez-vous dans Paramètres → Comptes, ou choisissez un autre agent.",
   "· Not set up": "· Non configuré",
-  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Vous n’êtes pas connecté à {0} ici : connectez-vous dans Paramètres → Agents → Comptes, ou choisissez un autre agent."
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Vous n’êtes pas connecté à {0} ici : connectez-vous dans Paramètres → Agents → Comptes, ou choisissez un autre agent.",
+  "About {0} min, then the agent starts. The rest builds in the background, with {1}.": "Environ {0} min, puis l’agent démarre. Le reste se construit en arrière-plan, avec {1}.",
+  "Add a model": "Ajouter un modèle",
+  "Claude Haiku through Claude Code": "Claude Haiku via Claude Code",
+  "Could not reach a model.": "Impossible de joindre un modèle.",
+  "Custom has no model yet: add one, or set up Claude Code or Codex.": "Custom n’a pas encore de modèle : ajoutez-en un, ou configurez Claude Code ou Codex.",
+  "Custom: {0}.": "Custom : {0}.",
+  "No model from another company here: add one from another maker in Settings → Models, or set up Claude Code or Codex.": "Aucun modèle d’une autre entreprise ici : ajoutez-en un d’un autre éditeur dans Paramètres → Modèles, ou configurez Claude Code ou Codex.",
+  "No model here sees pictures: add one that does in Settings → Models.": "Aucun modèle ici ne voit les images : ajoutez-en un qui le fait dans Paramètres → Modèles.",
+  "No model to do this with: add one in Settings → Models, or set up Claude Code or Codex in Settings → Agents → Accounts.": "Aucun modèle pour effectuer cette opération : ajoutez-en un dans Paramètres → Modèles, ou configurez Claude Code ou Codex dans Paramètres → Agents → Comptes.",
+  "No model yet: add one here, or set up Claude Code or Codex": "Aucun modèle pour l’instant : ajoutez-en un ici, ou configurez Claude Code ou Codex",
+  "Set up Claude Code or Codex": "Configurer Claude Code ou Codex",
+  "Through Codex": "Via Codex",
+  "{0}, one of Custom’s models": "{0}, l’un des modèles de Custom",
+  "A cheap model through OpenRouter when you have a key, else Claude Haiku, else a model of yours that sees images": "Un modèle économique via OpenRouter si vous avez une clé, sinon Claude Haiku, sinon l’un de vos modèles capables de voir les images"
 }

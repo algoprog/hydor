@@ -89,7 +89,13 @@ export function OpinionDialog({ s }: { s: SessionSummary }) {
               <OptionRow key={r.id} label={r.label} hint={r.detail} selected={r.id === reviewer} onClick={() => setReviewer(r.id)} />
             ))}
           </div>
-          {!opts.reviewers.length && <p className="text-[13px] text-fg-3">No model on this computer from another maker: add one in Settings → Models.</p>}
+          {!opts.reviewers.length && (
+            <p className="text-[13px] text-fg-3">
+              {isConfidential(s.extra)
+                ? 'No model on this computer from another maker: add one in Settings → Models.'
+                : 'No model from another company here: add one from another maker in Settings → Models, or set up Claude Code or Codex.'}
+            </p>
+          )}
           <div className="mt-4 mb-1 text-[12.5px] font-medium text-fg-2">Which turn</div>
           {opts.turns.length ? (
             <div className="max-h-56 space-y-0.5 overflow-y-auto">

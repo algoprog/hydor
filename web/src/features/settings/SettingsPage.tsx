@@ -16,6 +16,7 @@ import { cx, useIsMobile } from '../../components/ui';
 import { ColumnScroll } from '../layout/ColumnScroll';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { SideColumn } from '../layout/SideColumn';
+import { programUsable } from '@shared/programs';
 import { InstructionsSettings, McpSettings } from './AgentSettings';
 import { SkillsSettings } from '../skillpack/SkillsPage';
 import { PluginsSettings } from '../plugins/PluginsSettings';
@@ -242,7 +243,8 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
   const boot = useApp((s) => s.boot);
   const root = useUI((s) => s.explorerRoot);
   const cwd = cwdParam || root || boot?.defaultCwd || boot?.home || '/';
-  const agent = agentParam ?? 'claude';
+  // The instruction files shown first: Claude Code's while it is signed in, else AGENTS.md (Codex's, which Custom reads too).
+  const agent = agentParam ?? (programUsable(boot?.programs, 'claude') ? 'claude' : 'codex');
   // Wide screens always show a section; phones start at the list.
   const current = section ?? (mobile ? null : 'general');
   const def = sections().find((d) => d.id === current);

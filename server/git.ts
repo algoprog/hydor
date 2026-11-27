@@ -29,7 +29,7 @@ import type {
   GitStashDetail,
   GitSyncResult,
 } from '../shared/types.ts';
-import { oneShot } from './oneshot.ts';
+import { helper } from './helper.ts';
 import { HttpError } from './auth.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { agentBaseEnv } from './env.ts';
@@ -890,14 +890,16 @@ export class GitRepos {
       parts.push(d);
     }
     const recent = (await git(repoPath, ['log', '-12', '--format=%s'])).out.trim();
-    const out = await oneShot({
+    const out = await helper(this.db, {
       system: [
         'You write git commit messages. Given a change, write one that says what it does and why it was needed.',
         'A summary line under 72 characters, then (when the change is not obvious from it) a blank line and a short body wrapped at about 72 columns.',
         'Match the style of the repository’s recent messages. Reply with the message only: no quotes, no code fences, no preamble.',
       ].join('\n'),
       prompt: `Recent commit messages in this repository:\n${recent || '(none yet)'}\n\nThe change:\n${parts.join('\n')}`,
+      maxTokens: 2000,
       timeoutMs: 90_000,
+      task: 'writing a commit message',
     });
     return { message: out.trim().replace(/^```\w*\n?|```$/g, '').trim() };
   }

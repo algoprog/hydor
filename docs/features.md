@@ -75,7 +75,12 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   hand-off and Do on a browser tab leave it out; a Hydor subagent asked for it is refused with the reason and that
   Custom works. Nothing swaps in another program for you. What nobody picked a program for (the first start page,
   an agent with none, a chat, a board's refresh, an agent on call) runs on Claude Code if signed in, else Codex, else
-  Custom, and a program never signed in here is not started, or installed, by any of the app's defaults.
+  Custom, and a program never signed in here is not started, or installed, by any of the app's defaults. Background
+  work starts none that is not signed in either: the helper model on Automatic, and what asks a model by itself
+  (commit messages, pull request descriptions and reading guides, terminal commands, drawings and plots, captions,
+  LaTeX from a picture, second opinions), go to Custom's models instead (long questions to one that can read them,
+  pictures to one that sees them), and with none they say to add one or set up Claude Code or Codex. The arena offers
+  only what is signed in, and with Custom picked and no model, the start page says what to set up and sends nothing.
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - **Goals** (the session's menu → Set a goal, or Options → Goal on the start page), for every agent: the person and the
@@ -176,7 +181,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   whose turn it turned away moves to another signed-in account with usage left and carries on (with the setting off,
   or none left, it stops with a banner and a **Sign in** button, and continues by itself once you are signed in
   again); the helper model's background jobs pass it over for 15 minutes, then the next signed-in account, then
-  Codex, then one of your Custom models (the one Custom's Quick tier names, else the cheapest you added; not your plans' models, which go through the same two programs) answer; and
+  Codex, then one of your Custom models (the one Custom's Quick tier names, then Standard, else the cheapest you added; not your plans' models, which go through the same two programs) answer; and
   only when nothing could do the work does a card on every page ask you to sign in again (just "sign in" for a
   Claude Code or Codex never signed in here).
   With **Use API credit at a limit** (off by default), Claude Code sessions carry on billed to an Anthropic API key saved for an
@@ -1755,7 +1760,7 @@ agents that speak ACP and take MCP servers.
   side, you keep the best one and the others are archived. Usage → Arena shows which models win on your own
   tasks, as a rating over the matches you decided.
 - **A second opinion, and caps**: one click has another company's model check a turn's work against what you
-  asked (Claude and Codex offered only when signed in); a spending cap stops a session, or a scheduled task's run, at its limit, checked after each model call.
+  asked (Claude and Codex offered only when signed in, else a Custom model from another maker); a spending cap stops a session, or a scheduled task's run, at its limit, checked after each model call.
 
 ## For researchers
 
@@ -2256,7 +2261,8 @@ programs shows each program's version and what is out, with Check now, Update no
   Shortcuts shortcut can open the start page with shared text (/?prompt=).
 
 ## Shipping the work
-- Open a pull request on GitHub or Gitea from a session's branch, with a description written for you; its
+- Open a pull request on GitHub or Gitea from a session's branch, with a description written for you by the helper
+  model; its
   state and checks show in the sidebar.
 - Review what a branch changes file by file, mark files viewed, and let a guide put them in an order that is
   easy to read, with a note on each.

@@ -11,7 +11,7 @@ import { HttpError } from './auth.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { agentBaseEnv } from './env.ts';
 import { git } from './git.ts';
-import { oneShotJson } from './oneshot.ts';
+import { helperJson } from './helper.ts';
 
 export type Provider = 'github' | 'gitea';
 
@@ -286,8 +286,8 @@ const DESCRIBE = [
   'Add "## Testing" only for tests the commits or diff show were added or run. Claim nothing the material does not show. Plain words, no filler, no emoji.',
 ].join(' ');
 
-/** A title and description written by a model from the branch's commits and diff (and the task the session was given). */
-export async function prDescribe(draft: PrDraft, context: { task?: string }, codexModel?: string): Promise<{ title: string; body: string }> {
+/** A title and description written by the helper model from the branch's commits and diff (and the task the session was given). */
+export async function prDescribe(db: DB, draft: PrDraft, context: { task?: string }, codexModel?: string): Promise<{ title: string; body: string }> {
   const ref = await baseRef(draft.dir, draft.remote, draft.base);
   const [stat, diff] = await Promise.all([git(draft.dir, ['diff', '--stat=120', `${ref}...HEAD`]), git(draft.dir, ['diff', '--no-color', '--no-ext-diff', `${ref}...HEAD`], 30_000)]);
   if (!draft.commits.length) throw new HttpError(400, `There are no commits on ${draft.head} beyond ${draft.base} yet`);
@@ -300,7 +300,7 @@ export async function prDescribe(draft: PrDraft, context: { task?: string }, cod
   ]
     .filter(Boolean)
     .join('\n\n');
-  const r = await oneShotJson<{ title?: string; body?: string }>({ system: DESCRIBE, prompt, model: 'sonnet', codexModel, timeoutMs: 150_000 }, 'a description');
+  const r = await helperJson<{ title?: string; body?: string }>(db, { system: DESCRIBE, prompt, strong: true, codexModel, maxTokens: 4000, timeoutMs: 150_000, task: 'writing a pull request description' }, 'a description');
   return { title: String(r.title ?? '').slice(0, 200), body: String(r.body ?? '') };
 }
 
@@ -484,14 +484,15 @@ const GUIDE = [
   'note: one or two sentences on what changed in that file and what to look at closely (risks, edge cases). Use the exact paths given.',
 ].join(' ');
 
-/** A reading order for the changes with a note per file, written by a model and kept for these exact changes. */
+/** A reading order for the changes with a note per file, written by the helper model and kept for these exact changes. */
 export async function writeGuide(db: DB, review: Review, codexModel?: string): Promise<Guide> {
   if (!review.files.length) throw new HttpError(400, 'There are no changes to guide you through');
   const budget = 50_000;
   const per = Math.max(1500, Math.floor(budget / review.files.length));
   const body = review.files.map((f) => `### ${f.path} (${f.status}, +${f.added} −${f.removed})\n${f.binary ? '(binary)' : f.diff.slice(0, per)}`).join('\n\n');
-  const g = await oneShotJson<{ summary?: string; steps?: { path?: string; note?: string }[] }>(
-    { system: GUIDE, prompt: `Branch ${review.head} against ${review.base}.\n\n${body.slice(0, 80_000)}`, model: 'sonnet', codexModel, timeoutMs: 150_000 },
+  const g = await helperJson<{ summary?: string; steps?: { path?: string; note?: string }[] }>(
+    db,
+    { system: GUIDE, prompt: `Branch ${review.head} against ${review.base}.\n\n${body.slice(0, 80_000)}`, strong: true, codexModel, maxTokens: 8000, timeoutMs: 150_000, task: 'writing a reading guide' },
     'a guide',
   );
   const known = new Set(review.files.map((f) => f.path));

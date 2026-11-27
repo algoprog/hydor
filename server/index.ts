@@ -1516,7 +1516,8 @@ app.post('/api/git/stash/:action', async (req) => {
 
 // ---- agent setup: MCP servers, skills, plugins, instruction files ------------------------
 
-const agentOf = (v: unknown): Agent => (v === 'codex' ? 'codex' : 'claude');
+/** Which program's files a setup page means: as asked, else Claude Code when signed in here, else Codex (its AGENTS.md is what Custom reads too). */
+const agentOf = async (v: unknown): Promise<Agent> => (v === 'claude' || v === 'codex' ? v : (await programStatus()).claude ? 'claude' : 'codex');
 const body = (req: FastifyRequest) => (req.body ?? {}) as Record<string, any>;
 const query = (req: FastifyRequest) => req.query as Record<string, string | undefined>;
 
@@ -1524,27 +1525,27 @@ app.get('/api/setup/mcp', async (req) => ({ servers: await setup.listMcp(query(r
 app.post('/api/setup/mcp', async (req) => ({ results: await setup.addMcp(body(req) as McpSpec) }));
 app.post('/api/setup/mcp/remove', async (req) => {
   const b = body(req);
-  return setup.removeMcp(agentOf(b.agent), String(b.name ?? ''), b.scope, b.cwd);
+  return setup.removeMcp(await agentOf(b.agent), String(b.name ?? ''), b.scope, b.cwd);
 });
-app.post('/api/setup/mcp/status', async (req) => ({ servers: await setup.mcpStatus(agentOf(body(req).agent), codex, body(req).cwd) }));
+app.post('/api/setup/mcp/status', async (req) => ({ servers: await setup.mcpStatus(await agentOf(body(req).agent), codex, body(req).cwd) }));
 app.post('/api/setup/mcp/login', async (req) => {
   const b = body(req);
   const name = String(b.name ?? '');
-  return terms.createTerminal({ cwd: b.cwd || config.home, name: `MCP login · ${name}`, command: setup.loginCommand(agentOf(b.agent), name) });
+  return terms.createTerminal({ cwd: b.cwd || config.home, name: `MCP login · ${name}`, command: setup.loginCommand(await agentOf(b.agent), name) });
 });
 app.get('/api/setup/skills', async (req) => setup.listSkills(codex, query(req).cwd));
 app.post('/api/setup/skills', async (req) => {
   const b = body(req);
-  return { path: setup.createSkill(agentOf(b.agent), String(b.name ?? ''), String(b.description ?? ''), b.scope === 'project' ? 'project' : 'user', b.cwd, typeof b.body === 'string' ? b.body : undefined) };
+  return { path: setup.createSkill(await agentOf(b.agent), String(b.name ?? ''), String(b.description ?? ''), b.scope === 'project' ? 'project' : 'user', b.cwd, typeof b.body === 'string' ? b.body : undefined) };
 });
 app.post('/api/setup/skills/toggle', async (req) => {
   const b = body(req);
-  await setup.setSkillEnabled(codex, agentOf(b.agent), String(b.name ?? ''), String(b.path ?? ''), !!b.enabled);
+  await setup.setSkillEnabled(codex, await agentOf(b.agent), String(b.name ?? ''), String(b.path ?? ''), !!b.enabled);
   return { ok: true };
 });
 app.post('/api/setup/skills/delete', async (req) => {
   const b = body(req);
-  setup.deleteSkill(agentOf(b.agent), String(b.path ?? ''), b.cwd);
+  setup.deleteSkill(await agentOf(b.agent), String(b.path ?? ''), b.cwd);
   return { ok: true };
 });
 app.get('/api/setup/plugins', async (req) => setup.listPlugins(query(req).q ?? '', Number(query(req).limit) || 60));
@@ -1569,10 +1570,10 @@ app.post('/api/setup/codex-marketplaces/:action', async (req) => {
   if (action !== 'add' && action !== 'remove' && action !== 'upgrade') throw new HttpError(404, 'Not found');
   return setup.codexMarketplaceAction(action, String(body(req).target ?? ''));
 });
-app.get('/api/setup/instructions', async (req) => ({ files: setup.instructionFiles(agentOf(query(req).agent), query(req).cwd) }));
+app.get('/api/setup/instructions', async (req) => ({ files: setup.instructionFiles(await agentOf(query(req).agent), query(req).cwd) }));
 app.post('/api/setup/instructions', async (req) => {
   const b = body(req);
-  return { path: setup.createInstructionFile(agentOf(b.agent), String(b.path ?? ''), b.cwd) };
+  return { path: setup.createInstructionFile(await agentOf(b.agent), String(b.path ?? ''), b.cwd) };
 });
 // ---- notifications: Web Push to devices that asked ---------------------------------------------
 
@@ -1684,7 +1685,7 @@ app.get('/api/sessions/:key/pr/draft', async (req) => {
 });
 app.post('/api/sessions/:key/pr/describe', async (req) => {
   const { s, cwd, wt } = sessionDir(K(req));
-  return prDescribe(await prDraft(db, cwd, wt), { task: s.firstPrompt ?? s.title }, sessions.defaults('codex').model);
+  return prDescribe(db, await prDraft(db, cwd, wt), { task: s.firstPrompt ?? s.title }, sessions.defaults('codex').model);
 });
 app.post('/api/sessions/:key/pr', async (req) => {
   const b = (req.body ?? {}) as any;
@@ -1768,7 +1769,7 @@ app.get('/api/terminals/:id/complete', async (req) => {
 });
 app.post('/api/terminals/:id/ask', async (req) => {
   const ctx = await terms.paneContext(TID(req));
-  return { commands: await askCommands(String((req.body as any)?.text ?? ''), { cwd: ctx.cwd, shell: ctx.shell ? ctx.program : 'bash', codexModel: sessions.defaults('codex').model }) };
+  return { commands: await askCommands(db, String((req.body as any)?.text ?? ''), { cwd: ctx.cwd, shell: ctx.shell ? ctx.program : 'bash', codexModel: sessions.defaults('codex').model }) };
 });
 
 // ---- live events ---------------------------------------------------------------------------

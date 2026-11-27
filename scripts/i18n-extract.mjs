@@ -405,6 +405,8 @@ for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) =
   const js = transformSync(fs.readFileSync(path.join(ROOT, f), 'utf8'), { loader: 'ts', legalComments: 'none' }).code;
   for (const s of literals(js)) add(s, f);
 }
+// What background work says when there is no model at all (server/oneshot.ts), a constant the helper passes on.
+for (const m of fs.readFileSync(path.join(ROOT, 'server/oneshot.ts'), 'utf8').matchAll(/^export const NOTHING_SET_UP = ('(?:[^'\\]|\\.)*');$/gm)) for (const s of literals(m[1])) add(s, 'server/oneshot.ts');
 // The goal loop's own sentences that people read on a screen (a goal's reason, a limit, a round's why and the report's
 // summary, the notices, and what a refused action says), from the files of server/goals. Not what goes to the agent (the
 // round messages in brief.ts, the tools' answers and descriptions in tools.ts, the reviewers' instructions in review.ts, what

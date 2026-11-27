@@ -30807,5 +30807,19 @@
   "{0} is not set up here: pick another agent under Runs on, or sign in to it.": "Ο πράκτορας {0} δεν έχει ρυθμιστεί εδώ: επιλέξτε άλλον πράκτορα στο «Τρέχει σε» ή συνδεθείτε σε αυτόν.",
   "{0} is not signed in here: sign in to it in Settings → Accounts, or pick another agent.": "Δεν έχει γίνει σύνδεση στον πράκτορα {0} εδώ: συνδεθείτε από τις Ρυθμίσεις → Λογαριασμοί ή επιλέξτε άλλον πράκτορα.",
   "· Not set up": "· Δεν έχει ρυθμιστεί",
-  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Δεν έχει γίνει σύνδεση στο {0} εδώ: συνδεθείτε από τις Ρυθμίσεις → Πράκτορες → Λογαριασμοί ή επιλέξτε άλλον πράκτορα."
+  "{0} is not signed in here: sign in to it in Settings → Agents → Accounts, or pick another agent.": "Δεν έχει γίνει σύνδεση στο {0} εδώ: συνδεθείτε από τις Ρυθμίσεις → Πράκτορες → Λογαριασμοί ή επιλέξτε άλλον πράκτορα.",
+  "About {0} min, then the agent starts. The rest builds in the background, with {1}.": "Περίπου {0} λεπτά και μετά ξεκινά ο πράκτορας. Τα υπόλοιπα δημιουργούνται στο παρασκήνιο, με {1}.",
+  "Add a model": "Προσθήκη μοντέλου",
+  "Claude Haiku through Claude Code": "Claude Haiku μέσω του Claude Code",
+  "Could not reach a model.": "Δεν ήταν δυνατή η σύνδεση με κάποιο μοντέλο.",
+  "Custom has no model yet: add one, or set up Claude Code or Codex.": "Ο Custom δεν έχει ακόμα μοντέλο: προσθέστε ένα ή ρυθμίστε το Claude Code ή το Codex.",
+  "Custom: {0}.": "Custom: {0}.",
+  "No model from another company here: add one from another maker in Settings → Models, or set up Claude Code or Codex.": "Δεν υπάρχει εδώ μοντέλο από άλλη εταιρεία: προσθέστε ένα από άλλον κατασκευαστή στις Ρυθμίσεις → Μοντέλα ή ρυθμίστε το Claude Code ή το Codex.",
+  "No model here sees pictures: add one that does in Settings → Models.": "Κανένα μοντέλο εδώ δεν βλέπει εικόνες: προσθέστε ένα που βλέπει στις Ρυθμίσεις → Μοντέλα.",
+  "No model to do this with: add one in Settings → Models, or set up Claude Code or Codex in Settings → Agents → Accounts.": "Δεν υπάρχει μοντέλο για αυτή την ενέργεια: προσθέστε ένα στις Ρυθμίσεις → Μοντέλα ή ρυθμίστε το Claude Code ή το Codex στις Ρυθμίσεις → Πράκτορες → Λογαριασμοί.",
+  "No model yet: add one here, or set up Claude Code or Codex": "Δεν υπάρχει ακόμα μοντέλο: προσθέστε ένα εδώ ή ρυθμίστε το Claude Code ή το Codex",
+  "Set up Claude Code or Codex": "Ρύθμιση Claude Code ή Codex",
+  "Through Codex": "Μέσω του Codex",
+  "{0}, one of Custom’s models": "{0}, ένα από τα μοντέλα του Custom",
+  "A cheap model through OpenRouter when you have a key, else Claude Haiku, else a model of yours that sees images": "Ένα φθηνό μοντέλο μέσω του OpenRouter όταν έχετε κλειδί, αλλιώς το Claude Haiku, αλλιώς ένα δικό σας μοντέλο που βλέπει εικόνες"
 }

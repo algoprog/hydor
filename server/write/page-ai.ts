@@ -14,7 +14,7 @@ import { cleanLang } from '../../shared/write.ts';
 import { HttpError } from '../auth.ts';
 import { confidentialKey } from '../confidential/index.ts';
 import type { DB } from '../db.ts';
-import { helper, helperModelId, helperOptions, localHelper } from '../helper.ts';
+import { helper, helperModelId, helperOptions, localHelper, helperName } from '../helper.ts';
 import { pageInfo } from '../pages/store.ts';
 
 // ---- a stand-in, for the tests -------------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ const line = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/
 
 /** The helper model's name, as the answer says it. */
 function modelName(db: DB, id: string): string {
-  return id === 'auto' ? 'Claude' : (helperOptions(db).options.find((x) => x.value === id)?.label ?? id);
+  return id === 'auto' ? helperName(db) : (helperOptions(db).options.find((x) => x.value === id)?.label ?? id);
 }
 
 /** Which model writes for a page: the helper; for a confidential session's page, the helper on this computer, or none. */

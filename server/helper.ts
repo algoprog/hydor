@@ -1,18 +1,21 @@
 // The helper model: small jobs the app does with a model outside any session, such as writing memory
-// notes after a turn, checking a step in Auto mode, a second opinion, or reading a web page for one
-// question. Settings → Models picks it: one of Custom's models, or "auto", which asks Claude's Haiku
-// through its CLI (else Codex), like the app's other one-off questions (server/oneshot.ts).
+// notes after a turn, checking a step in Auto mode, a commit message, a terminal command, or reading a web
+// page for one question. Settings → Models picks it: one of Custom's models, or "auto", which asks Claude's
+// Haiku through its CLI (else Codex), as far as they are signed in here (server/oneshot.ts), and else one of
+// Custom's models.
 import fs from 'node:fs';
 import { isSubscription, modelSource, type AgentModel } from '../shared/types.ts';
+import { programRefusal, programsNow, signedInBefore } from './agents/programs.ts';
 import { chat, ToolsUnsupported, type ChatMessage, type Part, type Reply, type ToolSchema } from './agent/llm.ts';
 import { HttpError } from './auth.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { AGENT_FILE } from './models/config.ts';
 import type { ModelManager } from './models/manager.ts';
-import { oneShot, signedOutOf } from './oneshot.ts';
+import { NOTHING_SET_UP, oneShot, signedInPrograms, signedOutOf } from './oneshot.ts';
 import { costOf } from './prices.ts';
 import { accountLabel, backgroundDone, needSignIn } from './signin.ts';
 import { ACCOUNT_AGENT_NAMES } from '../shared/account-agents.ts';
+import { PROGRAM_IDS, programUsable, type Program } from '../shared/programs.ts';
 import { tiersOf } from './assistants/tiers.ts';
 
 export interface HelperAsk {
@@ -27,6 +30,8 @@ export interface HelperAsk {
    * Claude Sonnet instead of Haiku. A helper model the user picked is used as it is.
    */
   strong?: boolean;
+  /** On Automatic, the Codex model when Codex answers (else Codex's own default). */
+  codexModel?: string;
   maxTokens?: number;
   timeoutMs?: number;
   /** What the call is for, in a few words ("shortening your profile"): the prompt to sign in again says it when no account could do it. */
@@ -55,6 +60,44 @@ export function setHelperModel(db: DB, id: string) {
   kvSet(db, KEY, id);
 }
 
+/** Whether Claude Code or Codex may be asked on Automatic, from the last answer (none yet: they may). */
+const programNow = (): Program | undefined => {
+  const status = programsNow();
+  return PROGRAM_IDS.find((p) => programUsable(status, p));
+};
+
+/**
+ * What answers on Automatic, from what is known now without asking anything: the first signed in of Claude Code and
+ * Codex, else the Custom model it turns to; null when there is neither.
+ */
+export function automaticNow(db: DB, q: Pick<HelperAsk, 'strong' | 'images'> = {}): { program: Program } | { model: AgentModel } | null {
+  const program = programNow();
+  if (program) return { program };
+  const model = fallbackModels(db, { system: '', prompt: '', ...q })[0];
+  return model ? { model } : null;
+}
+
+/** Who the helper is, as the editors and price lines name it: the picked model, else who answers on Automatic now. */
+export function helperName(db: DB): string {
+  const id = helperModelId(db);
+  if (id !== 'auto') return customModels().find((m) => m.id === id)?.label ?? id;
+  const a = automaticNow(db);
+  if (!a) return 'Automatic';
+  return 'model' in a ? a.model.label : a.program === 'claude' ? 'Claude' : 'Codex';
+}
+
+/** What "Automatic" comes to here, in a line. */
+function automaticDetail(db: DB): string {
+  const status = programsNow();
+  const claude = programUsable(status, 'claude');
+  const codex = programUsable(status, 'codex');
+  if (claude && codex) return 'Claude Haiku through Claude Code, else Codex';
+  if (claude) return 'Claude Haiku through Claude Code';
+  if (codex) return 'Through Codex';
+  const m = fallbackModels(db, { system: '', prompt: '' })[0];
+  return m ? `${m.label}, one of Custom’s models` : 'No model yet: add one here, or set up Claude Code or Codex';
+}
+
 /**
  * What the helper can be: "auto" first, then Custom's models, each with how it is paid for and where it runs (source:
  * your plan through Claude Code or Codex, this computer, or the cloud) and what it comes through, as the pickers say.
@@ -64,7 +107,7 @@ export function helperOptions(db: DB) {
   return {
     model: helperModelId(db),
     options: [
-      { value: 'auto', label: 'Automatic', detail: 'Claude Haiku through Claude Code, else Codex' },
+      { value: 'auto', label: 'Automatic', detail: automaticDetail(db) },
       ...customModels().map((m) => {
         const o = said.get(m.id);
         return { value: m.id, label: m.label, detail: o?.description?.split(' · ')[0] ?? m.provider, vision: !!m.vision, source: o?.source ?? modelSource(m), via: o?.via ?? m.provider };
@@ -83,15 +126,22 @@ export function localHelper(db: DB): string | null {
   return id !== 'auto' && customModels().find((m) => m.id === id)?.local ? id : null;
 }
 
+/** The Custom model the helper comes to: the one picked, or on Automatic the one it turns to with no program signed in. */
+function helperChoice(db: DB): { id: string; model?: AgentModel } {
+  const id = helperModelId(db);
+  if (id !== 'auto') return { id, model: customModels().find((m) => m.id === id) };
+  const a = automaticNow(db);
+  return a && 'model' in a ? { id: a.model.id, model: a.model } : { id };
+}
+
 /**
  * What a number of helper tokens would cost, for an estimate shown before a long job (a wiki's rebuild): the helper's
- * name, and its price from the app's model prices when it has one ($0 on this computer). Automatic has none: it uses
- * the Claude account's usage.
+ * name, and its price from the app's model prices when it has one ($0 on this computer). Automatic through Claude Code
+ * or Codex has none: it uses the account's usage.
  */
 export function helperCost(db: DB, t: { tokensIn: number; tokensOut: number }): { model: string; label: string; priced: boolean; usd?: number } {
-  const id = helperModelId(db);
+  const { id, model: m } = helperChoice(db);
   if (id === 'auto') return { model: 'auto', label: 'Automatic', priced: false };
-  const m = customModels().find((x) => x.id === id);
   if (!m) return { model: id, label: id, priced: false };
   if (m.provider === 'ollama' || m.provider === 'vllm') return { model: id, label: m.label, priced: true, usd: 0 };
   // A model of your plan uses the plan's usage, as Automatic does: no price to show.
@@ -106,9 +156,8 @@ export function helperCost(db: DB, t: { tokensIn: number; tokensOut: number }): 
  * Claude Code or Codex program), 4 for a model over an API, 1 for a model on this computer or the local network.
  */
 export function helperParallel(db: DB): number {
-  const id = helperModelId(db);
+  const { id, model: m } = helperChoice(db);
   if (id === 'auto') return 3;
-  const m = customModels().find((x) => x.id === id);
   if (!m || m.local || m.provider === 'ollama' || m.provider === 'vllm') return 1;
   // Each call to a model of your Claude plan is a Claude Code program, as on Automatic.
   if (m.provider === 'claude') return 3;
@@ -118,7 +167,9 @@ export function helperParallel(db: DB): number {
 /** Whether the helper (or the given model) can look at images. */
 export function helperSees(db: DB, model?: string): boolean {
   const id = model ?? helperModelId(db);
-  return id !== 'auto' && !!customModels().find((m) => m.id === id)?.vision;
+  if (id !== 'auto') return !!customModels().find((m) => m.id === id)?.vision;
+  // Automatic takes pictures only where it turns to a Custom model: with no program signed in.
+  return !programNow() && !!seeingModel(db);
 }
 
 let manager: ModelManager | null = null;
@@ -136,7 +187,8 @@ function guessCost(db: DB, m: AgentModel): number {
 /**
  * Custom's models to try when neither Claude Code nor Codex could answer, at most two: first the models Custom's tiers
  * name for a call of this size (Quick then Standard; Best, Max then Standard for a strong one), then the others,
- * cheapest first. A call with pictures needs a model that sees them.
+ * cheapest first; one whose context is known to be too small for the question goes after those it fits. A call with
+ * pictures needs a model that sees them.
  */
 function fallbackModels(db: DB, q: HelperAsk): AgentModel[] {
   // Your plans' models go through the same Claude Code and Codex that could not answer: they are no way round them.
@@ -152,7 +204,10 @@ function fallbackModels(db: DB, q: HelperAsk): AgentModel[] {
     .map((m) => ({ m, cost: guessCost(db, m) }))
     .sort((a, b) => (a.cost === b.cost ? 0 : a.cost < b.cost ? -1 : 1))
     .map((x) => x.m);
-  return [...named, ...rest].slice(0, 2);
+  // About 4 characters a token, and room for the answer.
+  const need = Math.ceil((q.system.length + q.prompt.length) / 4) + (q.maxTokens ?? 1000);
+  const fits = (m: AgentModel) => !m.contextLength || m.contextLength >= need;
+  return [...named, ...rest].sort((a, b) => Number(!fits(a)) - Number(!fits(b))).slice(0, 2);
 }
 
 /** What a reply cost, in US dollars: 0 on a model of this computer or a plan, else what the server said or the model's price; undefined when no price is known. */
@@ -165,6 +220,11 @@ function replyCost(db: DB, m: AgentModel, usage: NonNullable<Reply['usage']>): n
 
 /** One of Custom's models answers: its text, and what it cost told to `onCost`. */
 async function askModel(db: DB, q: HelperAsk, model: AgentModel, timeout: number): Promise<string> {
+  // A model of your plan answers through its program: one not signed in here is not started.
+  if (isSubscription(model.provider)) {
+    const why = await programRefusal(model.provider);
+    if (why) throw new HttpError(502, `${model.label}: ${why}`);
+  }
   let m = model;
   if (m.start && manager) m = await manager.ensure(m.id);
   const content: string | Part[] = q.images?.length && m.vision ? [{ type: 'text', text: q.prompt }, ...q.images.map((i): Part => ({ type: 'image_url', image_url: { url: `data:${i.mimeType};base64,${i.data}` } }))] : q.prompt;
@@ -180,6 +240,9 @@ async function askModel(db: DB, q: HelperAsk, model: AgentModel, timeout: number
   }
   return r.text;
 }
+
+/** Custom's model for a question with pictures where the helper cannot take them (as Automatic picks); null: none sees. */
+export const seeingModel = (db: DB): AgentModel | null => fallbackModels(db, { system: '', prompt: '', images: [{ data: '', mimeType: '' }] })[0] ?? null;
 
 /** A model of Custom's by its id, or null (no such model). */
 export const customModel = (id: string): AgentModel | null => customModels().find((m) => m.id === id) ?? null;
@@ -255,40 +318,53 @@ function signedOutSentence(accounts: { agent: 'claude' | 'codex'; account?: stri
 export async function helper(db: DB, q: HelperAsk): Promise<string> {
   const id = q.model ?? helperModelId(db);
   const timeout = q.timeoutMs ?? 90_000;
-  if (id === 'auto') {
-    if (q.images?.length) throw new HttpError(400, 'The helper model cannot see images: pick one that does in Settings → Models');
-    try {
-      return await oneShot({ system: q.system, prompt: q.prompt, timeoutMs: timeout, signal: q.signal, ...(q.strong ? { model: 'sonnet' as const } : {}) });
-    } catch (e) {
-      // Neither CLI answered: one of Custom's models needs neither.
-      if (!(e instanceof HttpError && e.status === 502) || q.signal?.aborted) throw e;
-      const said: string[] = [];
-      for (const m of fallbackModels(db, q)) {
-        try {
-          const text = await askModel(db, q, m, timeout);
-          backgroundDone();
-          return text;
-        } catch (err) {
-          if (q.signal?.aborted) throw err;
-          said.push(`${m.label}: ${((err as Error).message || 'no answer').replace(/\s+/g, ' ').replace(/\.$/, '').slice(0, 120)}`);
-        }
-      }
-      // Signed out is why, and nothing else could do the work: the user is asked to sign in again, to the first program
-      // that would have answered (Claude Code before Codex), as one sign-in is enough, and a Codex never signed in to is
-      // not asked about while Claude Code is.
-      const all = signedOutOf(e).filter((a, i, list) => list.findIndex((b) => b.agent === a.agent && b.account === a.account) === i);
-      const out = all.some((a) => a.agent === 'claude') ? all.filter((a) => a.agent === 'claude') : all;
-      if (out.length) {
-        for (const a of out) needSignIn({ agent: a.agent, account: a.account, task: q.task });
-        throw new HttpError(502, signedOutSentence(out));
-      }
-      const why = said.length ? `${e.message} Custom: ${said.join('; ')}.` : e.message;
-      throw new HttpError(502, `${why} Settings → Models → Helper model can use another model.`);
-    }
-  }
+  if (id === 'auto') return automatic(db, q, timeout);
   const m = customModels().find((x) => x.id === id);
   if (!m) throw new HttpError(400, 'The helper model is gone: pick another in Settings → Models');
   return askModel(db, q, m, timeout);
+}
+
+/**
+ * Automatic: Claude Code, else Codex, as far as they are signed in here, else one of Custom's models. Pictures go only
+ * to a Custom model, and only where no program is signed in (the programs take none this way).
+ */
+async function automatic(db: DB, q: HelperAsk, timeout: number): Promise<string> {
+  const pictures = !!q.images?.length;
+  if (pictures && Object.values(await signedInPrograms()).some(Boolean)) throw new HttpError(400, 'The helper model cannot see images: pick one that does in Settings → Models');
+  let programs: HttpError | null = null;
+  if (!pictures) {
+    try {
+      return await oneShot({ system: q.system, prompt: q.prompt, timeoutMs: timeout, signal: q.signal, ...(q.strong ? { model: 'sonnet' as const } : {}), ...(q.codexModel ? { codexModel: q.codexModel } : {}) });
+    } catch (e) {
+      // Neither CLI answered: one of Custom's models needs neither.
+      if (!(e instanceof HttpError && e.status === 502) || q.signal?.aborted) throw e;
+      programs = e;
+    }
+  }
+  const said: string[] = [];
+  for (const m of fallbackModels(db, q)) {
+    try {
+      const text = await askModel(db, q, m, timeout);
+      backgroundDone();
+      return text;
+    } catch (err) {
+      if (q.signal?.aborted) throw err;
+      said.push(`${m.label}: ${((err as Error).message || 'no answer').replace(/\s+/g, ' ').replace(/\.$/, '').slice(0, 120)}`);
+    }
+  }
+  // Signed out is why, and nothing else could do the work: the user is asked to sign in again, to the first program
+  // that would have answered (Claude Code before Codex), as one sign-in is enough, and a Codex never signed in to is
+  // not asked about while Claude Code is. A program never signed in to here is not asked about at all.
+  const all = (programs ? signedOutOf(programs) : []).filter((a, i, list) => signedInBefore(a.agent) && list.findIndex((b) => b.agent === a.agent && b.account === a.account) === i);
+  const out = all.some((a) => a.agent === 'claude') ? all.filter((a) => a.agent === 'claude') : all;
+  if (out.length) {
+    for (const a of out) needSignIn({ agent: a.agent, account: a.account, task: q.task });
+    throw new HttpError(502, signedOutSentence(out));
+  }
+  const nothing = !programs || programs.message === NOTHING_SET_UP;
+  if (nothing && !said.length) throw new HttpError(502, pictures ? 'No model here sees pictures: add one that does in Settings → Models.' : NOTHING_SET_UP);
+  const why = [nothing ? 'Could not reach a model.' : programs!.message, said.length ? `Custom: ${said.join('; ')}.` : ''].filter(Boolean).join(' ');
+  throw new HttpError(502, `${why} Settings → Models → Helper model can use another model.`);
 }
 
 /** The helper's answer as JSON (the first object in it); `what` names it in the error. */
