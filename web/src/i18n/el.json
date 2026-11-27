@@ -30790,5 +30790,16 @@
   "1 run has none of these metrics: {0} reports {1} instead.": "1 εκτέλεση δεν έχει καμία από αυτές τις μετρικές: {0} αναφέρει {1} αντ’ αυτού.",
   "{0} runs have none of these metrics: {1} report no metrics.": "{0} εκτελέσεις δεν έχουν καμία από αυτές τις μετρικές: {1} δεν αναφέρουν μετρικές.",
   "{0} runs have none of these metrics: {1} report no number for {2}.": "{0} εκτελέσεις δεν έχουν καμία από αυτές τις μετρικές: {1} δεν αναφέρουν αριθμό για {2}.",
-  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} εκτελέσεις δεν έχουν καμία από αυτές τις μετρικές: {1} αναφέρουν {2} αντ’ αυτού."
+  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} εκτελέσεις δεν έχουν καμία από αυτές τις μετρικές: {1} αναφέρουν {2} αντ’ αυτού.",
+  "The app did not take the address it was given.": "Η εφαρμογή δεν δέχτηκε τη διεύθυνση που της δόθηκε.",
+  "Wrap lines": "Αναδίπλωση γραμμών",
+  "backups, clean-up, updates": "αντίγραφα ασφαλείας, εκκαθάριση, ενημερώσεις",
+  "building, compiling, packaging": "δόμηση, μεταγλώττιση, δημιουργία πακέτων",
+  "cleaning, converting, indexing, embedding data": "καθαρισμός, μετατροπή, ευρετηρίαση, ενσωμάτωση δεδομένων",
+  "crawling, scraping, downloading, querying services, labelling or generating data": "ανίχνευση ιστού, εξαγωγή δεδομένων, λήψη, ερωτήματα σε υπηρεσίες, επισήμανση ή παραγωγή δεδομένων",
+  "research, reports, plots, statistics": "έρευνα, αναφορές, γραφήματα, στατιστικά",
+  "shipping, releasing, running servers": "αποστολή, κυκλοφορία, εκτέλεση διακομιστών",
+  "test suites, type checks, linting": "σουίτες δοκιμών, έλεγχοι τύπων, linting",
+  "training, evaluation, sweeps, benchmarks": "εκπαίδευση, αξιολόγηση, σαρώσεις παραμέτρων, δοκιμές επιδόσεων",
+  "writing or changing code, docs or translations, reviewing it": "συγγραφή ή τροποποίηση κώδικα, τεκμηρίωσης ή μεταφράσεων, έλεγχός τους"
 }

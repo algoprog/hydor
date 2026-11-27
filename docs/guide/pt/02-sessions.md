@@ -197,7 +197,7 @@ Os turnos do Claude Code informam o tempo do próprio modelo e a primeira respos
 
 Os agentes escrevem as respostas para este app, não para um terminal, então uma resposta pode ter mais do que texto. Todo agente sabe fazer isso e usa estes recursos por conta própria quando deixam a resposta mais clara:
 
-- **Formatação**: títulos, listas, tabelas, negrito e código, organizados para facilitar a leitura.
+- **Formatação**: títulos, listas, tabelas, negrito e código, organizados para facilitar a leitura. Um bloco de código tem **Quebrar linhas** na barra dele (ao lado de **Tela cheia** e **Copiar**): quando ativado, as linhas longas quebram na borda em vez de continuar para o lado; vale para cada bloco e volta ao normal quando você recarrega a página.
 - **Matemática**: equações desenhadas como em um livro didático, dentro de uma frase ou isoladas em uma linha própria, e equações químicas (2H₂ + O₂ → 2H₂O). Números entre pares de cifrões (`$1$`, `$0$`) também são matemática; preços comuns, como $4,70, continuam sendo dinheiro.
 - **Diagramas**: fluxogramas, diagramas de sequência e de estado, linhas do tempo, mapas mentais, gráficos de Gantt e de pizza, desenhados nas cores do app, claro ou escuro. A barra acima de um diagrama tem **Mostrar o código** (o que o agente escreveu; o mesmo botão mostra o diagrama de novo), **Salvar como imagem (SVG)**, **Tela cheia** e um botão que copia o código. Um diagrama que não pode ser desenhado mostra o código, com o motivo.
 - **Figuras e pequenas ferramentas**: um gráfico, uma figura anotada, uma calculadora, uma simulação com controles deslizantes ou um quiz curto roda dentro da resposta, isolado do app e dos seus arquivos, como as páginas que os agentes mostram. Ele adota a aparência do app e cresce para caber (**Ver tudo** abre uma figura alta); sua barra tem **Mostrar o código** (**Mostrar** volta), **Salvar como arquivo** e **Tela cheia**. As escolhas que você clica nele vão para a sua caixa de mensagem. Enquanto a resposta ainda está sendo escrita, ele vai se montando no lugar (“Writing…” até ter algo para mostrar) e ganha vida quando está completo.
@@ -241,7 +241,7 @@ O que você estava lendo no topo da tela continua lá quando o nível muda. Um t
 
 O zoom não é a mesma coisa que [Configurações → App → Geral → Aparência → Tamanho do texto](/settings?s=general&find=Text%20size). **Tamanho do texto** aumenta o texto de leitura em todo o app (mensagens, as páginas de Ajuda e a caixa em que você digita) e deixa cartões e imagens como estão; o zoom amplia toda a conversa de uma sessão, e nada fora dela.
 
-**Tabelas, código e diagramas em tela cheia**: uma tabela tem um pequeno botão no canto superior direito, um bloco de código tem um ao lado de **Copiar**, e um diagrama tem **Tela cheia** na barra dele. Cada um abre sobre a página, onde:
+**Tabelas, código e diagramas em tela cheia**: uma tabela tem um pequeno botão no canto superior direito, um bloco de código tem um ao lado de **Copiar** (com **Quebrar linhas** ao lado, para quebrar as linhas longas em vez de rolar para os lados; a visualização em tela cheia mantém essa configuração), e um diagrama tem **Tela cheia** na barra dele. Cada um abre sobre a página, onde:
 
 - **− 100% +** no topo aplica zoom ao que é mostrado, e clicar na porcentagem volta para 100%;
 - **Ctrl** ou **⌘** com **+**, **−** e **0** fazem o mesmo, e **Ctrl** com rolagem, ou o gesto de pinça, aplicam zoom em torno do ponteiro;

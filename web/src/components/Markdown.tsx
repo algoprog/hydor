@@ -6,7 +6,7 @@ import remarkMath from 'remark-math';
 import { normalizeMath } from './markdown-math';
 import { streamBlocks } from './stream-blocks';
 import { groupPictures, replyPictureRefs } from './markdown-pictures';
-import { FileText, Maximize2 } from 'lucide-react';
+import { FileText, Maximize2, WrapText } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
 import { appPageLink, isAppPage } from '@shared/app-pages';
 import type { CardSource } from '@shared/boards';
@@ -67,15 +67,19 @@ export function CopyButton({ text, className, label = 'Copy' }: { text: string |
   );
 }
 
-/** A small button in the bar over a block (code, a diagram, a live block), beside its copy button. */
-export function BarButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+/** A small button in the bar over a block (code, a diagram, a live block), beside its copy button; `pressed`: a switch that is on. */
+export function BarButton({ label, onClick, pressed, children }: { label: string; onClick: () => void; pressed?: boolean; children: ReactNode }) {
   return (
     <button
       type="button"
       title={label}
       aria-label={label}
+      aria-pressed={pressed}
       onClick={onClick}
-      className="inline-flex h-6 w-6 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg"
+      className={cx(
+        'inline-flex h-6 w-6 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg',
+        pressed && 'bg-bg-3 text-fg',
+      )}
     >
       {children}
     </button>
@@ -114,6 +118,8 @@ export const CodeBlock = memo(function CodeBlock({
   const html = arriving ? null : (highlighted.get(key) ?? (shown?.key === key ? shown.html : null));
   const [expanded, setExpanded] = useState(false);
   const [full, setFull] = useState(false);
+  /** Lines wrap instead of scrolling sideways: per block, off until its button is pressed (not remembered). */
+  const [wrap, setWrap] = useState(false);
   useEffect(() => {
     if (arriving || highlighted.has(key)) return;
     let alive = true;
@@ -133,12 +139,15 @@ export const CodeBlock = memo(function CodeBlock({
   const tall = !whole && lines > 28;
   const name = resolveLang(lang) ?? lang ?? 'text';
   return (
-    <div className={cx(bare ? 'code-body group relative' : 'code-block group relative my-2', className)}>
+    <div className={cx(bare ? 'code-body group relative' : 'code-block group relative my-2', wrap && 'code-wrap', className)}>
       {!bare && (
         <div className="flex h-7 items-center gap-2 border-b border-line px-3 text-[11px] text-fg-3">
           <span className="font-mono">{name}</span>
           <span className="flex-1" />
           {/* Through tr: inside a reply (.md) the page's own translation of text passes it by. */}
+          <BarButton label={tr('Wrap lines')} pressed={wrap} onClick={() => setWrap((w) => !w)}>
+            <WrapText size={12} />
+          </BarButton>
           <BarButton label={tr('Full screen')} onClick={() => setFull(true)}>
             <Maximize2 size={12} />
           </BarButton>
@@ -160,7 +169,7 @@ export const CodeBlock = memo(function CodeBlock({
       {full && (
         <ZoomOverlay title={<span translate="no" className="font-mono text-[13px]">{name}</span>} onClose={() => setFull(false)} actions={<CopyButton text={text} />}>
           <div className="md zoom-code">
-            <CodeBlock code={text} lang={lang} arriving={arriving} bare whole className="code-block" />
+            <CodeBlock code={text} lang={lang} arriving={arriving} bare whole className={cx('code-block', wrap && 'code-wrap')} />
           </div>
         </ZoomOverlay>
       )}

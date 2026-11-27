@@ -197,7 +197,7 @@ Claude Code's turns give the model's own time and the first reply; for other age
 
 Agents write their replies for this app, not for a terminal, so a reply can hold more than text. Every agent knows how, and uses these by itself where they make an answer clearer:
 
-- **Formatting**: headings, lists, tables, bold and code, laid out to read.
+- **Formatting**: headings, lists, tables, bold and code, laid out to read. A block of code has **Wrap lines** in its bar (beside **Full screen** and **Copy**): on, its long lines break at the edge instead of running off to the side; it is per block and goes back when you reload.
 - **Maths**: equations drawn as in a textbook, inside a sentence or set apart on a line of their own, and chemical equations (2H₂ + O₂ → 2H₂O). Numbers between paired dollar signs (`$1$`, `$0$`) are maths too; ordinary prices such as $4.70 stay money.
 - **Diagrams**: flowcharts, sequence and state diagrams, timelines, mind maps, Gantt and pie charts, drawn in the app's colours, light or dark. The bar above one has **Show the code** (what the agent wrote; the same button shows the diagram again), **Save as a picture (SVG)**, **Full screen** and a button that copies its code. A diagram that can't be drawn shows its code, with the reason.
 - **Figures and small tools**: a chart, an annotated figure, a calculator, a simulation with sliders or a short quiz runs inside the reply, sealed off from the app and your files like the pages agents show. It takes the app's look and grows to fit (**See all of it** opens a tall one); its bar has **Show the code** (**Show it** goes back), **Save as a file** and **Full screen**. Choices you click on it go to your message box. While the reply is still being written, it builds up in place ("Writing…" until it has something to show), and it comes alive once it is complete.
@@ -241,7 +241,7 @@ What you were reading at the top of the screen stays there as the level changes.
 
 Zoom is not the same as [Settings → App → General → Appearance → Text size](/settings?s=general&find=Text%20size). **Text size** makes the reading text bigger throughout the app (messages, the Help pages and the box you type in) and leaves cards and pictures as they are; zoom enlarges the whole of a session's conversation, and nothing outside it.
 
-**Tables, code and diagrams full screen**: a table has a small button at its top right corner, a block of code has one beside **Copy**, and a diagram has **Full screen** in its bar. Each opens over the page, where:
+**Tables, code and diagrams full screen**: a table has a small button at its top right corner, a block of code has one beside **Copy** (with **Wrap lines** beside it, to break its long lines instead of scrolling sideways; the full screen view keeps that setting), and a diagram has **Full screen** in its bar. Each opens over the page, where:
 
 - **− 100% +** at the top zooms what it shows, and clicking the percentage goes back to 100%;
 - **Ctrl** or **⌘** with **+**, **−** and **0** do the same, and **Ctrl** and scroll, or a pinch, zoom around the pointer;

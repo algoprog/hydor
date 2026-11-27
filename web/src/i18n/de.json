@@ -29584,5 +29584,16 @@
   "1 run has none of these metrics: {0} reports {1} instead.": "1 Lauf hat keine dieser Metriken: {0} meldet stattdessen {1}.",
   "{0} runs have none of these metrics: {1} report no metrics.": "{0} Läufe haben keine dieser Metriken: {1} melden keine Metriken.",
   "{0} runs have none of these metrics: {1} report no number for {2}.": "{0} Läufe haben keine dieser Metriken: {1} melden keine Zahl für {2}.",
-  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} Läufe haben keine dieser Metriken: {1} melden stattdessen {2}."
+  "{0} runs have none of these metrics: {1} report {2} instead.": "{0} Läufe haben keine dieser Metriken: {1} melden stattdessen {2}.",
+  "The app did not take the address it was given.": "Die App hat die Adresse, die sie erhalten hat, nicht angenommen.",
+  "Wrap lines": "Zeilen umbrechen",
+  "backups, clean-up, updates": "Sicherungen, Aufräumen, Updates",
+  "building, compiling, packaging": "Bauen, Kompilieren, Paketieren",
+  "cleaning, converting, indexing, embedding data": "Daten bereinigen, umwandeln, indexieren, einbetten",
+  "crawling, scraping, downloading, querying services, labelling or generating data": "Crawlen, Scraping, Herunterladen, Dienste abfragen, Daten labeln oder erzeugen",
+  "research, reports, plots, statistics": "Recherche, Berichte, Diagramme, Statistiken",
+  "shipping, releasing, running servers": "Ausliefern, Veröffentlichen, Server betreiben",
+  "test suites, type checks, linting": "Testsuiten, Typprüfungen, Linting",
+  "training, evaluation, sweeps, benchmarks": "Training, Auswertung, Sweeps, Benchmarks",
+  "writing or changing code, docs or translations, reviewing it": "Code, Doku oder Übersetzungen schreiben, ändern oder prüfen"
 }

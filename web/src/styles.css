@@ -2366,6 +2366,14 @@ html:not([data-motion='off']) .zoom-news {
 .code-block pre code {
   font-family: inherit;
 }
+/* Wrap lines (the bar's button): long lines break at the box's edge, with no sideways scroll; the highlighted code's own pre too. */
+.code-block.code-wrap pre,
+.md .code-block.code-wrap pre,
+.md .aui .code-block.code-wrap pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: hidden;
+}
 /* A reply's code blocks follow Text size; an answer card's, and the tool steps' beside the reply, keep theirs. */
 .md .code-block pre {
   font-size: calc(12.5px * var(--n-text-scale, 1));

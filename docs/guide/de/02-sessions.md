@@ -197,7 +197,7 @@ Die Runden von Claude Code liefern die eigene Zeit des Modells und die erste Ant
 
 Agenten schreiben ihre Antworten für diese App, nicht für ein Terminal, deshalb kann eine Antwort mehr als Text enthalten. Jeder Agent kennt diese Möglichkeiten und nutzt sie selbstständig, wo sie eine Antwort klarer machen:
 
-- **Formatierung**: Überschriften, Listen, Tabellen, Fettdruck und Code, übersichtlich angeordnet.
+- **Formatierung**: Überschriften, Listen, Tabellen, Fettdruck und Code, gut lesbar gesetzt. Ein Codeblock hat in seiner Leiste **Zeilen umbrechen** (neben **Vollbild** und **Kopieren**): Ist es eingeschaltet, brechen lange Zeilen am Rand um, statt seitlich hinauszulaufen; das gilt pro Block und wird beim Neuladen zurückgesetzt.
 - **Mathematik**: Gleichungen wie in einem Lehrbuch dargestellt, innerhalb eines Satzes oder abgesetzt in einer eigenen Zeile, sowie chemische Gleichungen (2H₂ + O₂ → 2H₂O). Zahlen zwischen paarigen Dollarzeichen (`$1$`, `$0$`) sind ebenfalls Mathematik; gewöhnliche Preise wie $4.70 bleiben Geld.
 - **Diagramme**: Flussdiagramme, Sequenz- und Zustandsdiagramme, Zeitleisten, Mindmaps, Gantt- und Kreisdiagramme, in den Farben der App gezeichnet, hell oder dunkel. Die Leiste über einem Diagramm hat **Code anzeigen** (was der Agent geschrieben hat; dieselbe Schaltfläche zeigt wieder das Diagramm), **Als Bild speichern (SVG)**, **Vollbild** und eine Schaltfläche, die seinen Code kopiert. Ein Diagramm, das sich nicht zeichnen lässt, zeigt seinen Code mit dem Grund.
 - **Grafiken und kleine Tools**: Ein Diagramm, eine kommentierte Abbildung, ein Rechner, eine Simulation mit Schiebereglern oder ein kurzes Quiz läuft innerhalb der Antwort, abgeschottet von der App und deinen Dateien, wie die Seiten, die Agenten zeigen. Es übernimmt das Aussehen der App und wächst passend mit (**Alles anzeigen** öffnet ein hohes); seine Leiste hat **Code anzeigen** (**Anzeigen** führt zurück), **Als Datei speichern** und **Vollbild**. Auswahlen, die du darin anklickst, landen in deinem Nachrichtenfeld. Solange die Antwort noch geschrieben wird, baut es sich an Ort und Stelle auf („Wird geschrieben …“, bis es etwas zu zeigen hat), und es wird lebendig, sobald es vollständig ist.
@@ -241,7 +241,7 @@ Was du oben auf dem Bildschirm gelesen hast, bleibt dort, wenn sich die Stufe ä
 
 Zoom ist nicht dasselbe wie [Einstellungen → App → Allgemein → Darstellung → Textgröße](/settings?s=general&find=Text%20size). **Textgröße** macht den Lesetext in der ganzen App größer (Nachrichten, die Hilfeseiten und das Feld, in das du tippst) und lässt Karten und Bilder, wie sie sind; Zoom vergrößert die gesamte Unterhaltung einer Sitzung und nichts außerhalb davon.
 
-**Tabellen, Code und Diagramme im Vollbild**: Eine Tabelle hat oben rechts einen kleinen Button, ein Codeblock hat einen neben **Kopieren**, und ein Diagramm hat **Vollbild** in seiner Leiste. Jedes öffnet sich über der Seite, wo:
+**Tabellen, Code und Diagramme im Vollbild**: Eine Tabelle hat oben rechts einen kleinen Button, ein Codeblock hat einen neben **Kopieren** (daneben **Zeilen umbrechen**, um lange Zeilen umzubrechen, statt seitwärts zu scrollen; die Vollbildansicht behält diese Einstellung), und ein Diagramm hat **Vollbild** in seiner Leiste. Jedes öffnet sich über der Seite, wo:
 
 - **− 100% +** oben das Angezeigte zoomt und ein Klick auf die Prozentzahl zu 100 % zurückführt;
 - **Strg** oder **⌘** mit **+**, **−** und **0** dasselbe bewirken und **Strg** mit Scrollen oder die Zweifingergeste um den Mauszeiger herum zoomt;
