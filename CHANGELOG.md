@@ -3,6 +3,40 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.119.0 · 27 November 2026
+
+Custom stands on its own: with only your own models, Hydor never offers, starts or asks you to sign in to a Claude
+Code or Codex you have not set up. Plus the fixes and ideas from five GitHub issues.
+
+- **Only what is set up is offered**: a Claude Code or Codex you are not signed in to shows as **Not set up**, with
+  **Set up**, on the start page (an amber dot on **Runs on** when a place had it picked), in **Settings → Models →
+  Tiers** (which opens on a program you can use and keeps your saved tiers) and for Hydor subagents, which say so
+  instead of starting it. A first start picks the first program you can use, and nothing installs Claude Code on its
+  own any more.
+- **Background work follows the helper model**: on Automatic it uses only a program you are signed in to, else your
+  Custom models (the Quick tier, then Standard). Commit messages, pull request descriptions and review guides, terminal
+  suggestions, drawings, captions, LaTeX from pictures and second opinions all follow that choice, and when nothing
+  can do the work it says what to add.
+- **Ready-made apps run with**: a new setting in **Settings → Capabilities → Apps** (Automatic, Claude Code, Codex or
+  Custom), with the model taken from each app's tier. On an app's page, **Keep for this app** saves another choice for
+  that app on every device, or use it **For this run only**. A program that can't run it is named before the run,
+  never swapped silently.
+- **MCP servers for Custom**: **Settings → MCP servers → Add server** offers Custom, kept by Hydor itself, so you need
+  neither program to add one. Servers that sign in through the browser (OAuth) get **Sign in**, and their tokens are
+  renewed by themselves.
+- **Effort levels**: each of your endpoints' models that reasons has its own levels, ticked or typed (so xhigh works
+  where the endpoint takes it). OpenRouter's models offer the efforts OpenRouter lists for each and send the one you
+  pick (they always ran at medium before), and your Claude and ChatGPT plans' models in Custom take the effort picked
+  too.
+- **Skills you switch off stay off**: Custom no longer gets a Claude Code or Codex skill that is switched off, in its
+  skills, its skill tool or the skills suggested for a first message; nor do the suggestions for Codex and other
+  agents.
+- **Wrap lines**: a code block has a button beside **Full screen** and **Copy** that breaks its long lines at the edge
+  instead of scrolling sideways. Copy still copies the text as it was.
+- **Apps that need a plugin**: an app can say it needs a plugin (its page then offers to add or turn it on), call that
+  plugin's tools in a step, and ask for a **Project** to work in, whose files and knowledge its steps then use. Runs by
+  an app's key or a public page keep to the project the app was given.
+
 ## 0.118.1 · 27 November 2026
 
 What a real agent tripped on when it used 0.118.0's experiment tools, put right.
