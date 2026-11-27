@@ -1,5 +1,6 @@
 // The reasoning effort in the real Custom agent over ACP: each model's own levels are offered and accepted, and the one
-// set goes with the request to a local mock model (an endpoint's as reasoning_effort, OpenRouter's as reasoning.effort).
+// set goes with the request to a local mock model (an endpoint's as reasoning_effort, OpenRouter's as reasoning.effort,
+// a plan's model's to the app, which asks its program).
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/agent/effort-test.ts && DATA_DIR=/tmp/hydor-test-effort node dist/dev/effort-test.js
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -23,7 +24,12 @@ let asked: any;
 const server = http.createServer(async (req, res) => {
   let body = '';
   for await (const chunk of req) body += chunk;
-  if (req.url === '/chat/completions') {
+  if (req.url === '/model') {
+    // The app, asked for a model of your plan.
+    asked = JSON.parse(body);
+    res.writeHead(200, { 'content-type': 'application/x-ndjson' });
+    res.end(JSON.stringify({ t: 'reply', reply: { text: 'Done.', reasoning: '', calls: [], finish: 'stop' } }) + '\n');
+  } else if (req.url === '/chat/completions') {
     asked = JSON.parse(body);
     res.writeHead(200, { 'content-type': 'text/event-stream' });
     res.end(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Done.' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`);
@@ -44,6 +50,7 @@ fs.writeFileSync(
       model('levels', { reasoning: true, efforts: ['low', 'high', 'xhigh'] }),
       model('router', { provider: 'openrouter', reasoning: true, efforts: ['none', 'low', 'medium', 'high', 'max'] }),
       model('plain', {}),
+      model('claude/sonnet', { provider: 'claude', baseUrl: '', local: false, tools: 'text', reasoning: true, efforts: ['low', 'medium', 'high', 'xhigh'] }),
     ],
   }),
 );
@@ -85,6 +92,7 @@ try {
       ['levels', ['low', 'high', 'xhigh']],
       ['router', ['none', 'low', 'medium', 'high', 'max']],
       ['plain', ['low', 'medium', 'high']],
+      ['claude/sonnet', ['low', 'medium', 'high', 'xhigh']],
     ],
   );
   assert.deepEqual(values(opened), ['default', 'low', 'medium', 'high']);
@@ -119,6 +127,14 @@ try {
   // Kept from the model before, which this one does not offer: its default.
   await use('levels');
   assert.equal('reasoning_effort' in (await send()), false);
+
+  await use('claude/sonnet');
+  assert.ok((await set('max')).error, 'max is not one of its efforts');
+  assert.ok(!(await set('xhigh')).error);
+  const plan = await send();
+  assert.deepEqual([plan.id, plan.effort], ['claude/sonnet', 'xhigh']);
+  await set('default');
+  assert.equal('effort' in (await send()), false);
   console.log('custom effort: ok');
 } finally {
   child.kill();

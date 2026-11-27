@@ -325,7 +325,7 @@ irm https://antigravity.google/cli/install.ps1 | iex
 
 Custom 可以运行你的 Claude 和 ChatGPT 套餐中的模型、这台电脑上的模型以及云端的模型，使用的工具、技能和 MCP 服务器与其他智能体相同。在开始页面选择 Custom，然后选择模型。它们来自三个地方：
 
-- **你的订阅**：你的 Claude 和 ChatGPT 套餐中的模型，通过这台电脑上 Claude Code 和 Codex 的登录获得。无需任何设置：当 Claude Code 已登录时，Custom 的 **模型** 菜单会提供 Claude Opus、Fable、Sonnet 和 Haiku（始终是各自最新的版本）；当 Codex 以 ChatGPT 登录时，它会提供你的 ChatGPT 套餐列出的模型（例如 GPT-6 Luna）。如果发现某个程序已退出登录，它的模型会从菜单中消失，直到你重新登录；而以 API 密钥而不是 ChatGPT 登录的 Codex 不会提供任何模型。它们使用的是你套餐的用量，而不是 API 密钥，也不按词元计费，所以 Custom 会话在这些步骤上显示 $0。程序的每个账户会依次尝试，与其他一次性工作相同：某个账户达到用量上限或已退出登录时，会把这一步交给你的下一个账户（需开启 **达到限额时切换账户**）。[保密会话](/guide/sessions#keep-a-session-confidential) 永远不会使用它们，因为它们运行在 Anthropic 或 OpenAI 的服务器上。关于它们如何回答，参见 [Custom](/guide/custom#what-custom-is-and-when-to-use-it)。
+- **你的订阅**：你的 Claude 和 ChatGPT 方案中的模型，借助这台电脑上 Claude Code 和 Codex 的登录状态使用。无需任何设置：Claude Code 登录后，Custom 的**模型**菜单会提供 Claude Opus、Fable、Sonnet 和 Haiku（始终是各自的最新版本）；Codex 用 ChatGPT 登录后，菜单会提供你的 ChatGPT 方案列出的模型（例如 GPT-6 Luna）。如果发现某个程序已退出登录，它的模型会从菜单中消失，直到你重新登录；用 API 密钥而不是 ChatGPT 登录的 Codex 不提供任何模型。这些模型消耗的是你的方案用量，不使用 API 密钥，也不按 token 收费，因此 Custom 会话中使用它们的步骤显示为 $0。**思考强度**菜单为每个模型提供其程序列出的级别；选择**默认**时，使用程序自身的默认值。和其他一次性工作一样，程序的各个账户会依次尝试：如果某个账户达到用量限额或已退出登录，这一步会交给你的下一个账户（需开启**达到限额时切换账户**）。[保密会话](/guide/sessions#keep-a-session-confidential)从不使用这些模型，因为它们运行在 Anthropic 或 OpenAI 的服务器上。它们的回答方式见 [Custom](/guide/custom#what-custom-is-and-when-to-use-it)。
 - **在这台电脑上**：安装在这里的模型（Ollama、vLLM），以及你网络中的端点。
 - **在云端**：OpenRouter、其他地方的端点，以及 Ollama 的云端模型。
 

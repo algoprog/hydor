@@ -23,11 +23,14 @@ export function orderEfforts(list: string[]): string[] {
   return [...KNOWN_EFFORTS.filter((v) => all.includes(v)), ...all.filter((v) => !KNOWN_EFFORTS.includes(v))];
 }
 
-/** The efforts a model of Custom's offers (OpenRouter's and your endpoints' that reason); none for the others. */
+/**
+ * The efforts a model of Custom's offers, when it reasons: your plans' as their programs list them, OpenRouter's as its
+ * catalog does, your endpoints' as set; none for the others.
+ */
 export function effortsOf(m: Pick<AgentModel, 'provider' | 'reasoning' | 'efforts'>): string[] {
   if (!m.reasoning) return [];
-  if (m.provider === 'openrouter') return m.efforts ?? [];
   if (m.provider === 'endpoint') return m.efforts ?? ENDPOINT_EFFORTS;
+  if (m.provider === 'openrouter' || m.provider === 'claude' || m.provider === 'codex') return m.efforts ?? [];
   return [];
 }
 

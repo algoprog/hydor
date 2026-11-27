@@ -655,6 +655,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
         onReasoning: (t) => say(s.id, 'agent_thought_chunk', t),
         maxTokens: budget ?? room,
         extra: requestOptions(m, fam, s.effort),
+        effort: s.effort,
         cacheKey: s.id,
       });
       filter.end();

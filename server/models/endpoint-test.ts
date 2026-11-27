@@ -238,6 +238,17 @@ test('an endpoint model’s own levels: offered, kept with the endpoint, and low
   await mgr.configure({ endpointModel: { endpoint: 'gw', model: 'think', vision: null } });
 });
 
+test('the pickers offer a plan model the efforts its program lists, and none without them', async () => {
+  const plan = (id: string, efforts: string[]): AgentModel => ({ id, label: id, provider: id.startsWith('claude/') ? 'claude' : 'codex', baseUrl: '', model: id.split('/')[1], tools: 'native', reasoning: true, efforts });
+  mgr.setPlans(async () => ({ models: [plan('claude/sonnet', ['low', 'medium', 'high', 'max']), plan('claude/haiku', []), plan('codex/gpt', ['minimal', 'low', 'xhigh'])], state: [] }));
+  await mgr.refresh();
+  const opt = (id: string) => mgr.options().find((o) => o.value === id)!;
+  assert.deepEqual(opt('claude/sonnet').efforts, ['low', 'medium', 'high', 'max']);
+  assert.deepEqual(opt('codex/gpt').efforts, ['minimal', 'low', 'xhigh']);
+  assert.deepEqual(opt('claude/haiku').efforts, []);
+  assert.equal(opt('claude/sonnet').defaultEffort, undefined, 'Default is the program’s own');
+});
+
 test('OpenRouter: the efforts its catalog lists, of those it documents; none for a model that offers no choice', () => {
   assert.deepEqual(effortsFrom({ supported_efforts: ['high', 'medium', 'low', 'none', 'turbo'], default_effort: 'high', mandatory: false }), { efforts: ['none', 'low', 'medium', 'high'], defaultEffort: 'high' });
   assert.deepEqual(effortsFrom({ supported_efforts: ['high', 'low', 'none'], mandatory: true }), { efforts: ['low', 'high'] }, 'mandatory reasoning takes no none');

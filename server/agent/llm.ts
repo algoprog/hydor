@@ -81,6 +81,11 @@ export interface ChatOptions {
   maxTokens?: number;
   /** Sampling and reasoning options, dropped if the server refuses them. */
   extra?: Record<string, unknown>;
+  /**
+   * The effort picked for the session, for a model of your plan (its program takes it only if the model lists it); the
+   * other models get theirs in `extra`.
+   */
+  effort?: string;
   /** The same for every step of a conversation (its session's id): a provider that caches by it reads the last step's back. */
   cacheKey?: string;
 }
