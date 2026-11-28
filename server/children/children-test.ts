@@ -34,6 +34,7 @@ import { mergeTables } from '../features/registry.ts';
 import type { SpawnAdditions } from '../features/types.ts';
 import { ancestorsOf, betweenAgents, childKeys, FROM_LEAD, parentOf, queueGoesOn, runningBelow, runningChildren, stillRunning, workStatus } from './family.ts';
 import { childMode } from './modes.ts';
+import { namedIn, noteAsked } from './asked.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '') {
   console.error('Run with DATA_DIR=/tmp/… and PRICES_URL= (empty) so nothing touches real data or the network.');
@@ -195,6 +196,7 @@ const end = (status = 'completed'): TimelineItem => ({ kind: 'turn', id: `e${++s
 // ---- starting a child -----------------------------------------------------------------------------
 
 sessions.add('claude:p', { agent: 'claude', live: 'working', mode: 'acceptEdits', title: 'Parent', items: [user('Build the report'), step('ls')] });
+noteAsked(db, 'claude:p', 'Use Custom with Qwen3 Coder or llama3 for the bulk work, and Codex or Claude where it helps.');
 
 test('a model of Custom’s is found by its id or a name only it has', () => {
   assert.equal(findModel(MODELS, 'openrouter/qwen/qwen3-coder')?.label, 'Qwen3 Coder');
@@ -303,6 +305,7 @@ test('at most N working at once (busy children and ones still starting count)', 
 
 test('a child gets a share of the parent’s cap; none when the cap is spent', async () => {
   sessions.add('codex:q', { agent: 'codex', live: 'working', mode: 'full', items: [user('Plan the trip')] });
+  noteAsked(db, 'codex:q', 'Use llama3 from Custom for the bulk searches.');
   setSessionExtra(db, 'codex:q', { capUsd: 5 });
   db.prepare("insert into sessions (key, agent, id, path, model, tokens_in, tokens_out) values ('codex:q', 'codex', 'q', '/tmp/q', 'test-model', 100000, 0)").run();
   await call('codex:q', 'start_child_session', { brief: 'Find trains.', agent: 'custom', model: 'llama3' });
@@ -312,6 +315,92 @@ test('a child gets a share of the parent’s cap; none when the cap is spent', a
   assert.equal(o.mode, 'full');
   db.prepare("update sessions set tokens_in = 600000 where key = 'codex:q'").run();
   await assert.rejects(call('codex:q', 'start_child_session', { brief: 'more', agent: 'custom', model: 'llama3' }), /spending cap is reached \(\$6\.00 of \$5\.00\)/);
+});
+
+// ---- another program than the session's own: only when the person asks for it by name ------------------
+
+sessions.add('claude:same', { agent: 'claude', live: 'working', mode: 'acceptEdits', title: 'Same', items: [user('Write the docs')] });
+sessions.add('codex:same', { agent: 'codex', live: 'working', mode: 'full', title: 'Same Codex', items: [user('Plan the tests')] });
+
+test('a Hydor subagent on another program than the session’s own is refused unless the person asked for it: nothing is started', async () => {
+  const before = sessions.created.length;
+  await assert.rejects(
+    call('claude:same', 'start_child_session', { brief: 'Write the tests.', agent: 'codex' }),
+    /runs on Claude Code, the program the user picked for it[\s\S]*Codex works only when the user asks for it by name/,
+  );
+  assert.equal(sessions.created.length, before, 'nothing created');
+});
+
+test('a Claude Code session’s subagent with a tier and no program runs on Claude Code', async () => {
+  await call('claude:same', 'start_child_session', { brief: 'Write the unit tests.', tier: 'standard' });
+  const o = sessions.created.at(-1)!;
+  assert.equal(o.agent, 'claude');
+  assert.equal(o.model, 'sonnet');
+});
+
+test('once the person names Codex in the session, a Claude Code session’s subagent may run on Codex', async () => {
+  noteAsked(db, 'claude:same', 'let Codex write the tests');
+  await call('claude:same', 'start_child_session', { brief: 'Write the tests for the parser.', agent: 'codex' });
+  assert.equal(sessions.created.at(-1)!.agent, 'codex');
+});
+
+test('a Codex session’s subagent asked for one of Custom’s models is refused until the person names it, then runs on Custom', async () => {
+  const before = sessions.created.length;
+  await assert.rejects(
+    call('codex:same', 'start_child_session', { brief: 'Count the tests.', model: 'qwen3-coder' }),
+    /runs on Codex, the program the user picked for it/,
+  );
+  assert.equal(sessions.created.length, before, 'nothing created');
+  noteAsked(db, 'codex:same', 'try qwen for this');
+  await call('codex:same', 'start_child_session', { brief: 'Count the tests.', model: 'qwen3-coder' });
+  const o = sessions.created.at(-1)!;
+  assert.equal(o.agent, 'acp');
+  assert.equal(o.acpAgent, 'console');
+  assert.equal(o.model, 'openrouter/qwen/qwen3-coder');
+});
+
+test('what a message names: a program, one of Custom’s models or an agent, as a word of its own; a path, a picture model or a common word names none', () => {
+  const yes: [string, string][] = [
+    ['let Codex write the tests', 'codex'],
+    ['Codexでテストを書いて', 'codex'],
+    ['compare with gpt-5', 'codex'],
+    ['ask Claude to review', 'claude'],
+    ['use a Custom model', 'custom'],
+    ['qwen3', 'custom:openrouter/qwen/qwen3-coder'],
+    ['use llama', 'custom:ollama/llama3'],
+  ];
+  const no: [string, string][] = [
+    ['make it with GPT Image 2', 'codex'],
+    ['update CLAUDE.md', 'claude'],
+    ['see ~/.codex/config.toml', 'codex'],
+    ['write a custom parser', 'custom'],
+    ['a helper', 'custom:endpoint/lab/helper'],
+  ];
+  for (const [text, id] of yes) assert.ok(namedIn(db, text).includes(id), `“${text}” names ${id}`);
+  for (const [text, id] of no) assert.ok(!namedIn(db, text).includes(id), `“${text}” does not name ${id}`);
+  assert.deepEqual(namedIn(db, 'Continue where you left off.'), []);
+});
+
+test('the start_child_session tool says that a Claude Code session’s subagents run on Claude Code, another program only when asked for by name', () => {
+  const t = tool('claude:same', 'start_child_session');
+  assert.match(t.description, /It runs on Claude Code, the program the user picked for this session/);
+  assert.match(t.description, /only when the user asks for it by name in this conversation/);
+});
+
+test('a step up keeps the program its first try ran on, without asking again', async () => {
+  const k = 'claude:stepup';
+  sessions.add(k, { agent: 'claude', live: 'working', mode: 'acceptEdits', title: 'Step up', items: [user('Ship the release')] });
+  noteAsked(db, k, 'let Codex write the tests');
+  await call(k, 'start_child_session', { brief: 'Write the release notes.', agent: 'codex', tier: 'quick' });
+  const a = newest();
+  assert.equal(sessions.created.at(-1)!.agent, 'codex');
+  // The person's ask is gone: the step up is not a new ask.
+  db.prepare('delete from kv where k = ?').run('asked:claude:stepup');
+  finish(a, 'Notes: things changed.');
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  const out = await call(k, 'step_up_child', { key: a, why: 'too thin: name each change' });
+  assert.match(out, /It runs again on Standard/);
+  assert.equal(sessions.created.at(-1)!.agent, 'codex');
 });
 
 // ---- replies flow back --------------------------------------------------------------------------------
@@ -455,6 +544,7 @@ const leadKey = (n: string) => {
 
 test('a tier picks the child’s model for its program: Claude Code’s own names by default, Custom’s as set', async () => {
   const k = leadKey('t1');
+  noteAsked(db, k, 'Sort these with the Custom model llama3.');
   const out = await call(k, 'start_child_session', { brief: 'List the commits since the last release.', tier: 'quick' });
   let o = sessions.created.at(-1)!;
   assert.equal(o.agent, 'claude');
@@ -817,6 +907,7 @@ async function withPlanModel(fn: () => Promise<void>) {
 test('a Claude Code parent’s Standard helper stays Claude Code on Sonnet, though Custom has a plan model of that name; its exact id, or a Custom parent, still gives Custom', async () => {
   await withPlanModel(async () => {
     const k = leadKey('plan1');
+    noteAsked(db, k, 'Send the Custom model Sonnet through Custom for this part.');
     // The tier's model is Claude Code's own name, sonnet: the same program as its parent, with its own tools.
     await call(k, 'start_child_session', { brief: 'Add the --json flag to the export command as specified.', tier: 'standard' });
     let o = sessions.created.at(-1)!;
@@ -1306,10 +1397,20 @@ test('a Hydor subagent is never started on a Claude Code or Codex not signed in:
     await programStatus();
     const k = 'acp:programs-lead';
     sessions.add(k, { agent: 'acp', acpAgent: 'console', model: 'ollama/llama3', live: 'working', mode: 'edits', title: 'Custom lead', items: [user('Fix it')] });
+    noteAsked(db, k, 'Use Claude Code or Codex for the hard part, and Custom for the rest.');
     const t = tool(k, 'start_child_session');
-    assert.match(t.description, /, Codex for a hard part\./);
+    assert.match(t.description, /Another program \(Codex or another agent of this app\) only when the user asks for it by name in this conversation/);
     assert.match(t.description, /Claude Code is not signed in here: do not ask for it\./);
     assert.match((t.inputSchema as any).properties.agent.description, /custom \(the app’s own agent: name the model\), codex, or/);
+    // Codex signed out too: it is left out of the other programs offered, and the description says so.
+    signedIn = [];
+    await programStatus({ fresh: true });
+    const bothOut = tool(k, 'start_child_session').description;
+    assert.match(bothOut, /Another program \(another agent of this app\) only when the user asks for it by name in this conversation/);
+    assert.doesNotMatch(bothOut, /Another program \([^)]*Codex/);
+    assert.match(bothOut, /Claude Code and Codex are not signed in here: do not ask for them\./);
+    signedIn = ['codex'];
+    await programStatus({ fresh: true });
     assert.doesNotMatch((t.inputSchema as any).properties.model.description, /Claude Code|claude or codex/);
     const before = sessions.created.length;
     await assert.rejects(call(k, 'start_child_session', { brief: 'Do the hard part.', agent: 'claude' }), /^Error: Claude Code is not signed in here, so no Hydor subagent can run on it\. agent: "custom" works \(name one of its models\)\./);

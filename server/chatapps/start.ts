@@ -17,6 +17,7 @@ import type { Deps } from '../features/types.ts';
 import { spaceById } from '../spaces/index.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { compose, filesOf, folderWords, forSend, gather, type ChatFile, type Gathered } from './files.ts';
+import { noteAsked } from '../children/asked.ts';
 
 /** One chat, as the platform holding it lets this module see and answer it. */
 export interface ChatSide {
@@ -159,6 +160,8 @@ export async function deliver(d: Deps, c: ChatSide, m: ChatMessage): Promise<voi
       await c.say(`Could not start a session: ${(e as Error).message}`);
       return;
     }
+    // What the person wrote may ask for subagents on another program by name (server/children/asked.ts).
+    noteAsked(d.db, made, words);
     c.tookAs();
     c.setCurrent(made);
     c.own(made);
@@ -178,6 +181,7 @@ export async function deliver(d: Deps, c: ChatSide, m: ChatMessage): Promise<voi
   }
   const out = forSend(compose(words, g, { app: c.app, forwarded: m.forwarded }), filesOf(g));
   if (!out.text.trim()) return;
+  noteAsked(d.db, k, words);
   c.own(k);
   if (busy(s.live?.status)) {
     d.sessions.enqueue(k, out.text, out.images);

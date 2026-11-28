@@ -72,8 +72,8 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - Only what is signed in: a Claude Code or Codex you are not signed in to is listed greyed with Not set up and a way
   to Settings → Accounts on the start page (a place that had picked it keeps the pick, says so and starts nothing),
   in Settings → Models → Tiers (the saved tiers stay), in an agent's program menu and in Chat apps; second opinion,
-  hand-off and Do on a browser tab leave it out; a Hydor subagent asked for it is refused with the reason and that
-  Custom works. Nothing swaps in another program for you. What nobody picked a program for (the first start page,
+  hand-off and Do on a browser tab leave it out; a Hydor subagent asked for it is refused with the reason. Nothing
+  swaps in another program for you. What nobody picked a program for (the first start page,
   an agent with none, a chat, a board's refresh, an agent on call) runs on Claude Code if signed in, else Codex, else
   Custom, and a program never signed in here is not started, or installed, by any of the app's defaults. Background
   work starts none that is not signed in either: the helper model on Automatic, and what asks a model by itself
@@ -1025,12 +1025,15 @@ agents that speak ACP and take MCP servers.
   to Ask first in one click. A scheduled task can start for each new item in an account (a deal, a file, a ticket,
   a payment) or before each event in a connected calendar (see Scheduled tasks).
 - **Subagents**: an agent hands parts of a job to subagents and gets their results back. A Hydor subagent is a
-  session of its own that Hydor starts, with any agent and model; it shows under its parent in the sidebar while it
+  session of its own that Hydor starts, on the program of the session that started it (another, such as Codex in a
+  Claude Code session or one of Custom's models, only when the person names it in that conversation: what they typed,
+  never the app's notes or an agent's words, and never because a usage limit stopped the session's own program, whose
+  subagents wait for the limit to lift); it shows under its parent in the sidebar while it
   works or waits for you (and while you have it open), and in the work tray above the prompt bar, it opens to its
   reply, and you can talk to it. In the sessions Hydor runs, every subagent is a Hydor one: the programs' own are
   switched off (Claude Code's Agent tool, its workflows and its cloud agents, Codex's multi-agent tools) and other
   agents are told to use Hydor's. A subagent is never started on a Claude Code or Codex that is not signed in: the
-  agent is offered only those that are, and asked for another it is told so, and that Custom works. A Claude Code or Codex subagent that a session in VS Code or a terminal (or an
+  agent is offered only those that are, and asked for another it is told so. A Claude Code or Codex subagent that a session in VS Code or a terminal (or an
   earlier one) started is one the program runs inside the session, and it shows the same way. The subagents one turn started show together as one card under that turn (the Hydor ones in
   one, the program's own in another): its top line says how many and of what kind, with what they share (“6 Claude
   Code subagents · Sonnet 5.5”, “3 Hydor subagents · Claude Code · Sonnet 5.5”, “4 researchers” in a deep research)

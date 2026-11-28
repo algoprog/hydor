@@ -34,6 +34,7 @@ import { allAssistants, findAssistant } from '../assistants/store.ts';
 import { modelName, teamOf, tierPick } from '../assistants/tiers.ts';
 import { leadTier, stepUpSelf, teamNote } from './team.ts';
 import { sendToInbox, standingKey } from '../assistants/inbox.ts';
+import { mayRunOn, otherProgramRefusal, programName, sameProgram, type RunsOn } from './asked.ts';
 
 export { childKeys, parentOf } from './family.ts';
 
@@ -169,13 +170,20 @@ function programOf(ctx: Pick<RunCtx, 'agent' | 'acpAgent'>, agentArg: string, mo
   return { agent: 'acp', acpAgent: want };
 }
 
-/** Why a subagent may not run on `agent`, a Claude Code or Codex not signed in here, or nothing; `named` when it was one of the user's agents. */
-async function refuseSignedOut(agent: Agent, named?: string): Promise<void> {
+/**
+ * Why a subagent may not run on `agent`, a Claude Code or Codex not signed in here, or nothing; `named` when it was one of
+ * the user's agents. `custom`: Custom is offered instead (the session runs on it, or the user asked for it).
+ */
+async function refuseSignedOut(agent: Agent, named?: string, custom = false): Promise<void> {
   if (agent !== 'claude' && agent !== 'codex') return;
   if (!(await programRefusal(agent))) return;
-  const custom = customModels().length ? 'agent: "custom" works (name one of its models).' : 'agent: "custom" works once Custom has a model, which the user adds in Settings → Models.';
+  const instead = !custom
+    ? ''
+    : customModels().length
+      ? ' agent: "custom" works (name one of its models).'
+      : ' agent: "custom" works once Custom has a model, which the user adds in Settings → Models.';
   throw new Error(
-    `${named ? `${named} runs on ${PROGRAM_LABEL[agent]}, which` : PROGRAM_LABEL[agent]} is not signed in here, so no Hydor subagent can run on it. ${custom} The user signs in to ${PROGRAM_LABEL[agent]} in Settings → Agents → Accounts.`,
+    `${named ? `${named} runs on ${PROGRAM_LABEL[agent]}, which` : PROGRAM_LABEL[agent]} is not signed in here, so no Hydor subagent can run on it.${instead} The user signs in to ${PROGRAM_LABEL[agent]} in Settings → Agents → Accounts.`,
   );
 }
 
@@ -233,9 +241,10 @@ const TIER_FOR: Record<Tier, string> = {
  * `local`: the parent is confidential, so its children run on Custom with a model on this computer (server/confidential).
  * `named`: the user's agents it may hand work to (by name, with their own instructions, tools and tier); `top`: the
  * highest tier its subagents may have (its own, or lower when the agent it works as says so); `team`: a child asked for
- * with no tier gets Standard.
+ * with no tier gets Standard. `lead`: the program the session runs on, which its subagents run on unless the user asks
+ * for another by name (asked.ts).
  */
-function startTool(d: Deps, max: number, local = false, named: Assistant[] = [], top: Tier = 'best', team = false): RunTool {
+function startTool(d: Deps, max: number, local = false, named: Assistant[] = [], top: Tier = 'best', team = false, lead: RunsOn = { agent: 'claude' }): RunTool {
   const models = customModels().filter((m) => !local || m.local);
   const agents = local ? [] : named;
   const offered = TIERS.map((t) => t.id).filter((t) => tierRank(t) <= tierRank(top));
@@ -244,13 +253,19 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
   const programs: Program[] = PROGRAM_IDS.filter((p) => programUsable(signedIn, p));
   const out = PROGRAM_IDS.filter((p) => !programs.includes(p)).map((p) => PROGRAM_LABEL[p]);
   const forModel = programs.length ? `For ${orList(programs)}, a model name (default: the agent’s own).` : 'For another agent, a model name (default: its own).';
+  const own = programName(d.db, lead);
+  const others = [
+    ...programs.filter((p) => !sameProgram(lead, { agent: p })).map((p) => PROGRAM_LABEL[p]),
+    ...(sameProgram(lead, { agent: 'acp', acpAgent: CONSOLE_ID }) ? [] : ['one of Custom’s models']),
+    'another agent of this app',
+  ];
   return {
     name: 'start_child_session',
     description: [
       'Hand a self-contained part of the job to a Hydor subagent: a new session of its own that works on it in parallel.',
       local
         ? 'This session is confidential, so a Hydor subagent runs here too: on custom, with one of the models on this computer, and confidential like this one.'
-        : `It can run another agent or model of this app: a cheaper or local model for bulk work${programs.length ? `, ${orList(programs.map((p) => PROGRAM_LABEL[p]))} for a hard part` : ''}.`,
+        : `It runs on ${own}, the program the user picked for this session, with its tier’s model. Another program (${orList(others)}) only when the user asks for it by name in this conversation ("let Codex write the tests"): never by your own choice, and never because a usage limit stops ${own} (wait for it to lift: a Hydor subagent the limit stopped carries on then).`,
       !local && out.length ? `${out.join(' and ')} ${out.length > 1 ? 'are' : 'is'} not signed in here: do not ask for ${out.length > 1 ? 'them' : 'it'}.` : '',
       'It starts at once and returns its key; when its turn ends, its reply comes back to you as a message, and you go on from there.',
       'A Hydor subagent sees nothing of this conversation: put everything it needs in the brief (the goal, the facts and files it needs, what to hand back).',
@@ -262,7 +277,7 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
         ? ''
         : 'A Hydor subagent on a tier whose reply to its brief does not pass a quick check runs again one tier up by itself (never above the highest allowed); its later replies, to your messages, are not checked. step_up_child does that when you judge a result not good enough.',
       agents.length
-        ? `You can also hand a part to one of the user's agents, by its name in as; it works with its own instructions, tools and tier: ${agents
+        ? `You can also hand a part to one of the user's agents, by its name in as; it works with its own instructions, tools and tier (one that runs on another program than ${own} only when the user asks for it, or its program, by name): ${agents
             .slice(0, 40)
             .map((a) => `${a.name} (${a.description || 'no description'}${a.tier ? `; ${tierLabel(a.tier)}` : ''})`)
             .join('; ')}${agents.length > 40 ? `; and ${agents.length - 40} more` : ''}.`
@@ -275,7 +290,10 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
       type: 'object',
       properties: {
         brief: { type: 'string', description: 'Everything the Hydor subagent needs: the goal, context, files, limits, and what its reply should contain.' },
-        agent: { type: 'string', description: `custom (the app’s own agent: name the model), ${programs.map((p) => `${p}, `).join('')}or another agent’s id. Default: the same agent as yours.` },
+        agent: {
+          type: 'string',
+          description: `Leave it out: a Hydor subagent runs on your program (${own}). Another only when the user asked for it by name in this conversation: custom (the app’s own agent: name the model), ${programs.map((p) => `${p}, `).join('')}or another agent’s id.`,
+        },
         model: {
           type: 'string',
           description: models.length ? `For custom, one of: ${models.map((m) => m.id).join(', ')}. ${forModel}` : forModel,
@@ -358,9 +376,12 @@ async function startChild(
   }
   // An agent that keeps a conversation of its own takes the brief in its inbox; its answer comes back as a message.
   if (named?.standing) {
-    // Its own conversation's program, or the one it would start on.
+    // Its own conversation's program, or the one it would start on: another than this session's only when the user asked.
     const kept = standingKey(d.db, named.id);
-    await refuseSignedOut((kept ? d.sessions.summary(kept)?.agent : undefined) ?? named.agent ?? (await defaultProgram()).agent, named.name);
+    const keptOn = kept ? d.sessions.summary(kept) : null;
+    const on: RunsOn = keptOn ? { agent: keptOn.agent, acpAgent: keptOn.acpAgent } : named.agent ? { agent: named.agent, acpAgent: named.acpAgent } : await defaultProgram();
+    if (!mayRunOn(d.db, ctx.key, ctx, on, named)) throw new Error(otherProgramRefusal(d.db, ctx, programName(d.db, on), named));
+    await refuseSignedOut(on.agent, named.name, mayRunOn(d.db, ctx.key, ctx, { agent: 'acp', acpAgent: CONSOLE_ID }));
     const leadName = leadAgent?.name ?? d.sessions.summary(ctx.key)?.title ?? 'another session';
     const item = sendToInbox(d, named, { text: brief, from: { kind: 'agent', key: ctx.key, name: leadName }, replyTo: ctx.key });
     return `Put in ${named.name}'s inbox (message ${item.id.slice(0, 6)}): it keeps one conversation of its own and takes messages in turn. Its answer comes to you as a message; go on with other work, or end your turn to wait for it.`;
@@ -394,7 +415,10 @@ async function startChild(
     if (!pick?.model && !pick?.effort && !o.tierOverride) tier = undefined;
   }
   const target = pickAgent(d, ctx, agentArg || tierProgram, modelArg);
-  await refuseSignedOut(target.agent, named && !String(a.agent ?? '').trim() && named.agent ? named.name : undefined);
+  // The session's own program; another only when the user asked for it by name (a step up stays where its first try ran).
+  if (!local && !o.stepFrom && !mayRunOn(d.db, ctx.key, ctx, target, named))
+    throw new Error(otherProgramRefusal(d.db, ctx, target.label, named && !String(a.agent ?? '').trim() && named.agent ? named : null));
+  await refuseSignedOut(target.agent, named && !String(a.agent ?? '').trim() && named.agent ? named.name : undefined, mayRunOn(d.db, ctx.key, ctx, { agent: 'acp', acpAgent: CONSOLE_ID }));
   const lead = role?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
   // A campaign's members each change their part on a branch of their own.
   const worktree = !!a.worktree || (role?.role === 'lead' && role.mode === 'campaign');
@@ -927,7 +951,7 @@ export const children: Feature = {
     const local = confidentialRun(ctx);
     // A swarm's lead picked its model for a hard problem already, and its members think with it.
     const swarm = roleOf(d.db, ctx)?.role === 'lead';
-    const start = startTool(d, maxFor(d.db, ctx), local, namedFor(d, ctx.key), ceilingOf(d, ctx, lead), teamOf(d.db).on && !swarm);
+    const start = startTool(d, maxFor(d.db, ctx), local, namedFor(d, ctx.key), ceilingOf(d, ctx, lead), teamOf(d.db).on && !swarm, { agent: ctx.agent, acpAgent: ctx.acpAgent });
     // Its own step up to Max: for a session on Automatic, where Max is another model than Best and its agent names no tier of its own.
     const self = !local && !swarm && tierProgram(ctx.agent, ctx.acpAgent) && !('no' in stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: x.assistant, auto: x.auto }));
     return [start, LIST, MESSAGE, STEP_UP, ...(self ? [STEP_UP_SELF] : [])];

@@ -19,6 +19,7 @@ import { spaceById } from '../spaces/index.ts';
 import { startSettings } from '../startSettings.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { defaultProgram } from '../agents/programs.ts';
+import { noteAsked } from '../children/asked.ts';
 
 export interface VoiceReply {
   /** What to say back. */
@@ -152,10 +153,13 @@ export async function handsFree(d: Pick<Deps, 'db' | 'sessions'>, text: string, 
         // Started by the person's own voice.
         person: true,
       });
+      // What they said may ask for subagents on another program by name (server/children/asked.ts).
+      noteAsked(d.db, k, text);
       return { say: plan.say || 'Started. I will tell you when it is done.', focus: k, did: 'started' };
     }
     case 'send': {
       if (!key) return { say: plan.say || 'Which session should I tell?', did: 'answer' };
+      noteAsked(d.db, key, text);
       await d.sessions.deliverOrQueue(key, (plan.text || text).trim(), { person: true });
       return { say: plan.say || `Sent to ${named(key)}.`, focus: key, did: 'sent' };
     }

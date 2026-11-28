@@ -117,6 +117,7 @@ import { loadGoal } from './goals/store.ts';
 import { goalOver } from '../shared/goals.ts';
 import { cleanReport, type DeviceReport } from '../shared/device.ts';
 import { sessionExtraRoutes } from './sessions-extra.ts';
+import { copyAsked, noteAsked } from './children/asked.ts';
 import { useMachines } from './experiments/remote.ts';
 import { BROWSING_KEY } from '../shared/browser.ts';
 
@@ -463,6 +464,8 @@ app.post('/api/sessions', async (req) => {
   const startId = typeof b.startId === 'string' && START_ID.test(b.startId) ? b.startId : undefined;
   const key = await sessions.startOnce(startId, async () => {
     const key = await sessions.create(opts);
+    // What a person typed names the programs its Hydor subagents may run on besides its own (server/children/asked.ts).
+    if (opts.person) noteAsked(db, key, prompt);
     if (others) await startMatch({ db, sessions, broadcast }, { key, agent: b.agent, ...(opts.acpAgent ? { acpAgent: opts.acpAgent } : {}), ...(opts.model ? { model: opts.model } : {}) }, opts, others);
     return key;
   });
@@ -503,6 +506,9 @@ app.post('/api/sessions/:key/fork', async (req) => {
     files: Array.isArray(b.files) ? b.files : [],
     at: typeof b.at === 'string' && b.at ? b.at : undefined,
   });
+  // The fork goes on with the conversation: what the person asked its subagents to run on holds there, with what they typed now.
+  copyAsked(db, K(req), key);
+  if (!isInternal(req)) noteAsked(db, key, b.text);
   return { key };
 });
 app.post('/api/sessions/:key/compact', async (req) => {
@@ -705,6 +711,8 @@ const sendIdOf = (b: { sendId?: unknown }) => (typeof b.sendId === 'string' && S
 app.post('/api/sessions/:key/message', async (req) => {
   const b = (req.body ?? {}) as any;
   noteUserMessage();
+  // A person's message, not an agent's (its app_api): it may ask for subagents on another program by name.
+  if (!isInternal(req)) noteAsked(db, K(req), b.text);
   const r = await sessions.sendOnce(sendIdOf(b), () => sessions.send(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []));
   // Put in the queue instead (the agent takes one message at a time): the page shows it there.
   return { ok: true, ...(r === 'queued' ? { queued: true } : {}) };
@@ -765,6 +773,7 @@ app.post('/api/uploads', async (req) => {
 app.post('/api/sessions/:key/queue', async (req) => {
   const b = (req.body ?? {}) as any;
   noteUserMessage();
+  if (!isInternal(req)) noteAsked(db, K(req), b.text);
   await sessions.sendOnce(sendIdOf(b), () => sessions.enqueue(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []));
   return { ok: true };
 });
@@ -778,6 +787,7 @@ app.post('/api/sessions/:key/queue/:id/send', async (req) => {
 });
 app.post('/api/sessions/:key/queue/:id/edit', async (req) => {
   const b = (req.body ?? {}) as any;
+  if (!isInternal(req)) noteAsked(db, K(req), b.text);
   sessions.editQueued(K(req), (req.params as { id: string }).id, {
     text: String(b.text ?? ''),
     keep: Array.isArray(b.keep) ? b.keep.map(String) : undefined,
