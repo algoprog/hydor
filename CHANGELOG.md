@@ -3,6 +3,19 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.120.2 · 28 November 2026
+
+Subagents stay on the program you picked: a Claude Code session's subagents think with Claude's models, a Codex
+session's with OpenAI's, a Custom session's with Custom's own, unless you ask for another by name.
+
+- An agent can no longer move part of its work to another program by itself, for example to Codex when every Claude
+  account is at its usage limit. It waits for the limit to lift, does that part itself, or asks you.
+- To use another program for a part of the job, name it in your message, such as "let Codex write the tests". Only
+  what you type counts (on the start page, in the message box, in a chat app or by voice), never the app's notes or
+  an agent's own words, and only a name used as one: "update CLAUDE.md" or "GPT Image" asks for nothing.
+- The same holds for one of your agents that runs on another program: it takes the work only when you name it or its
+  program in the conversation.
+
 ## 0.120.1 · 28 November 2026
 
 Sessions waiting out a usage limit now agree with the Usage page: when one of your accounts has usage left, they go
