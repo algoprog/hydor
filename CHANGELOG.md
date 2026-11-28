@@ -3,6 +3,22 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.122.0 · 28 November 2026
+
+A project can now go from a server's own pages to a machine that uses it, such as your laptop, while Hydor runs there.
+
+- **Send to another machine…** on a machine's own pages (a server you open in a browser, say) now also lists the
+  machines that use this one while they are connected, by the name of the access token each uses here ("My laptop").
+  Before, it listed only the machines in this one's Settings → Machines, so a server you reach from your laptop could
+  not send a project back to it.
+- This machine can't reach such a machine, so the one you pick does the sending itself: it reads the project from here
+  and writes it there, as if you had sent it from Hydor on that machine. The dialog here shows what goes, where it
+  lands there and the free space, the bar, **Cancel sending** and how it ended, and says where to find the project:
+  "Open it in Hydor on My laptop: it is in its Projects".
+- A project sent this way goes into a folder in that machine's home folder. Kept in sync, that machine keeps the link,
+  so the rounds run while Hydor runs on it.
+- Both machines need this version. A machine with an older Hydor is greyed out, with "Update Hydor there first".
+
 ## 0.121.0 · 28 November 2026
 
 When an account has usage again while many sessions wait, they move there one at a time and leave room for each other,
