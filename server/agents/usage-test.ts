@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { keychainService, resetReads } from './claudeResets.ts';
-import { ClaudeControl, claudeFamily, claudeUsage, CodexControl, limitHolds } from './control.ts';
+import type { AgentUsage } from '../../shared/types.ts';
+import { ClaudeControl, claudeFamily, claudeUsage, CodexControl, limitHolds, newerUsage, pastItsReset } from './control.ts';
 
 const raw = { subscription_type: 'max', rate_limits: { five_hour: { utilization: 21 } } };
 const init = { account: { email: 'work@example.com', subscriptionType: 'Claude Ultra' } };
@@ -379,4 +380,43 @@ try {
   assert.equal(k.refuses('fable'), true, 'with no usage read, the refusal stands');
   for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
   console.log('Models the plan does not include passed');
+}
+
+// pastItsReset: a reading that said a limit holds until a time that has come since it was taken is read again.
+{
+  const T = Date.now();
+  const at = (ago: number) => T - ago;
+  const reading = (fetchedAgo: number, limited: AgentUsage['limited'], windows: AgentUsage['windows'] = []): AgentUsage => ({
+    agent: 'claude',
+    ok: true,
+    fetchedAt: at(fetchedAgo),
+    windows,
+    limited,
+  });
+  const full = (resetsAgo: number | null, usedPercent = 100) => ({ id: 'w', label: 'Weekly', usedPercent, resetsAt: resetsAgo === null ? null : at(resetsAgo) });
+  assert.equal(pastItsReset(reading(30_000, { label: 'x', resetsAt: at(10_000) }), T), true, 'a limit reset 10 s ago, read 30 s ago');
+  assert.equal(pastItsReset(reading(30_000, { label: 'x', resetsAt: T + 10 * 60_000 }), T), false, 'a limit that resets in 10 min');
+  assert.equal(pastItsReset(reading(10_000, { label: 'x', resetsAt: at(60_000) }), T), false, 'read after its reset time: it already knows');
+  assert.equal(pastItsReset(reading(30_000, null, [full(10_000)]), T), true, 'a window at 100% reset 10 s ago');
+  assert.equal(pastItsReset(reading(30_000, null, [full(10_000, 80)]), T), false, 'a window at 80% is not a limit');
+  assert.equal(pastItsReset(reading(30_000, null), T), false, 'no limit and no windows');
+  console.log('Usage readings past their reset are read again passed');
+}
+
+// newerUsage: of two readings of one account, the one taken later.
+{
+  const mk = (fetchedAt: number): AgentUsage => ({ agent: 'codex', ok: true, fetchedAt, windows: [], limited: null });
+  const older = mk(1_000);
+  const newer = mk(2_000);
+  assert.equal(newerUsage(older, newer), newer);
+  assert.equal(newerUsage(newer, older), newer, 'the newer one whichever comes first');
+  const same = mk(1_500);
+  const twin = mk(1_500);
+  assert.equal(newerUsage(same, twin), same, 'equal times give the first');
+  assert.equal(newerUsage(null, newer), newer, 'a missing one gives the other');
+  assert.equal(newerUsage(undefined, older), older);
+  assert.equal(newerUsage(older, null), older);
+  assert.equal(newerUsage(null, undefined), null, 'both missing gives null');
+  assert.equal(newerUsage(undefined, null), null);
+  console.log('Newer usage reading passed');
 }

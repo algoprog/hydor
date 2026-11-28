@@ -464,7 +464,7 @@ Une fois liée, son état et ses vérifications s’affichent sous forme de badg
 
 ## Quand une limite d’utilisation arrête une session
 
-Quand un forfait Claude Code ou Codex arrive au bout de son utilisation, une bannière au-dessus de la zone de message indique de qui la limite a été atteinte, laquelle, et quand elle sera réinitialisée : « You've hit the Claude Code usage limit » avec un seul compte de cet agent, « All your Claude Code accounts have hit their usage limit » quand vous en avez plusieurs et qu’aucun n’a plus d’utilisation disponible, ou le compte par son nom (« Work has hit its usage limit ») quand un autre en a encore.
+Quand un forfait Claude Code ou Codex arrive au bout de son utilisation, une bannière au-dessus de la zone de message indique de qui la limite a été atteinte, laquelle, et quand elle sera réinitialisée : « You've hit the Claude Code usage limit » avec un seul compte de cet agent, « All your Claude Code accounts have hit their usage limit » quand vous en avez plusieurs et qu’aucun n’a plus d’utilisation disponible, ou le compte par son nom (« Work has hit its usage limit ») quand un autre en a encore. Quand aucun n’a plus d’utilisation et que **Changer de compte à une limite** est activé, la bannière nomme le compte qui se réinitialise en premier, où la session reprend alors (« Work se réinitialise en premier, dans 3 h 36 min »).
 
 Quand un autre compte de cet agent a encore de l’utilisation disponible, vous ne voyez aucune bannière tant que **Changer de compte à une limite** est activé : la session passe à ce compte et continue (les nouvelles sessions démarrent avec lui). Quand l’option est désactivée, la bannière nomme ce compte et propose **Activer**.
 

@@ -14,7 +14,7 @@ La [page Utilisation](/usage) comporte trois onglets :
 - **Activité** (`/stats`) : lignes modifiées, jetons et sessions au fil du temps.
 - **Arène** (`/arena`) : quels modèles l’emportent sur vos propres tâches.
 
-L’app lit votre utilisation à l’ouverture de la page, puis toutes les cinq minutes tant que l’app est ouverte ; dans l’onglet Limites, **Actualiser** la relit tout de suite. L’utilisation de Grok Build est lue auprès de son agent à quelques minutes d’intervalle, et **Actualiser** la lit aussi immédiatement.
+L’app lit votre utilisation à l’ouverture de la page, puis toutes les cinq minutes tant que l’app est ouverte ; dans l’onglet Limites, **Actualiser** la relit tout de suite. Entre-temps, chaque carte montre aussi ce que les sessions de ce compte ont reçu en dernier du fournisseur, si bien qu’une limite qu’une session vient d’atteindre apparaît tout de suite sur sa carte. L’utilisation de Grok Build est lue auprès de son agent à quelques minutes d’intervalle, et **Actualiser** la lit aussi immédiatement.
 
 ## Lire les limites d’un forfait
 
@@ -70,7 +70,7 @@ Pour que chaque session qui atteint une limite reprenne toute seule, ouvrez [Par
 Comment fonctionne le calendrier, avec le réglage ou avec **Reprendre à la réinitialisation** :
 
 - La session est due une minute après la réinitialisation de la limite, telle que le fournisseur l’a signalée en dernier. L’app lit l’utilisation de temps en temps pendant qu’une session attend, plus souvent à mesure que la réinitialisation approche, et décale l’heure si le fournisseur décale la réinitialisation.
-- Si la limite est levée plus tôt (vous avez utilisé une réinitialisation, ou vous vous êtes connecté avec un autre compte), la session reprend aussitôt. Si elle avait repris plus tôt dans les 15 dernières minutes et a de nouveau atteint la limite, elle attend la réinitialisation.
+- Si la limite est levée plus tôt (vous avez utilisé une réinitialisation, ou vous vous êtes connecté avec un autre compte), la session reprend aussitôt. Si elle avait repris de cette façon dans les 15 dernières minutes et a de nouveau atteint la limite, elle réessaie une fois ces 15 minutes écoulées (ou à la réinitialisation, si elle arrive plus tôt), et l’avis indique quand. Utiliser une réinitialisation de la limite la fait reprendre aussitôt.
 - Seul un tour réellement arrêté par la limite est repris, pas un tour qui s’est terminé juste au moment où l’utilisation du forfait atteignait 100 %. Une reprise prévue est abandonnée quand la session continue sans elle : vous envoyez un message ou vous appuyez sur **Arrêter**, ou un tour passe normalement. Un tour que l’agent lance de lui-même pendant l’attente (quand une tâche d’arrière-plan ou un sous-agent à lui s’arrête à la même limite) ne l’abandonne pas. Une session que vous avez arrêtée avec **Arrêter** n’est jamais reprise toute seule, même si l’erreur de la limite est arrivée en premier, tant que vous ne lui avez pas envoyé de message.
 - **Annuler** sur l’avis arrête une reprise prévue.
 

@@ -464,7 +464,7 @@ Claude Code 的各轮会给出模型自身的耗时和首次回复；对其他�
 
 ## 用量限额让会话停下时
 
-当 Claude Code 或 Codex 的套餐用量用完时，消息框上方的横幅会说明是谁的限额、哪一种限额以及何时重置：当该智能体只有一个账户时显示“You've hit the Claude Code usage limit”；当你有多个账户而且都没有剩余用量时显示“All your Claude Code accounts have hit their usage limit”；当另一个账户仍有用量时，则显示该账户的名称（“Work has hit its usage limit”）。
+当 Claude Code 或 Codex 的套餐用量用完时，消息框上方的横幅会说明是谁的限额、哪一种限额以及何时重置：当该智能体只有一个账户时显示“You've hit the Claude Code usage limit”；当你有多个账户而且都没有剩余用量时显示“All your Claude Code accounts have hit their usage limit”；当另一个账户仍有用量时，则显示该账户的名称（“Work has hit its usage limit”）。当所有账户都没有剩余用量，且 **达到限额时切换账户** 已开启时，横幅会注明最先重置的账户，会话届时将在该账户上继续（“Work 最先重置，in 3 h 36 min”）。
 
 当该智能体的另一个账户仍有剩余用量时，只要 **达到限额时切换账户** 处于开启状态，你就不会看到横幅：会话会转到那个账户并继续（新会话也从那里开始）。关闭时，横幅会指出那个账户，并提供 **开启**。
 

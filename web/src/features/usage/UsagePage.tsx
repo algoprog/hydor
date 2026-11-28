@@ -71,7 +71,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: AccountAgent
         </div>
       ) : (
         <>
-          <LimitBanner agent={agent} account={account?.id} className="mb-2" />
+          <LimitBanner agent={agent} account={account?.id} className="mb-2" alone />
           <div className="divide-y divide-line">
             {u.windows.map((w) => (
               <WindowRow key={w.id} w={w} />

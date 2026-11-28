@@ -57,6 +57,24 @@ function usedUp(windows: UsageWindow[]): AgentUsage['limited'] {
 }
 
 /**
+ * Whether a reading said a limit holds until a time that has come since the reading was taken: it no longer tells how the
+ * account stands, so it is read again before anything is decided on it (a session moving to the account, or not).
+ */
+export function pastItsReset(u: AgentUsage, now = Date.now()): boolean {
+  const times = [u.limited?.resetsAt, ...u.windows.filter((w) => (w.usedPercent ?? 0) >= 100).map((w) => w.resetsAt)];
+  return times.some((t) => typeof t === 'number' && t > u.fetchedAt && t <= now);
+}
+
+/**
+ * Of two readings of one account, the newer: what its sessions heard from the provider since the last full reading (a
+ * limit a session just hit), or a full reading (or why it failed) since then.
+ */
+export function newerUsage(a: AgentUsage | null | undefined, b: AgentUsage | null | undefined): AgentUsage | null {
+  if (!a || !b) return a ?? b ?? null;
+  return b.fetchedAt > a.fetchedAt ? b : a;
+}
+
+/**
  * The family of a Claude model, as a limit of one model alone names it: "fable" for claude-fable-5-2, fable, fable[1m]
  * or Fable 5.2. Null when it is not known which model runs: the default one (whichever the plan gives), or opusplan
  * (Opus to plan, Sonnet otherwise).

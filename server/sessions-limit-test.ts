@@ -1405,6 +1405,70 @@ test('subagentsLine for none, one and several names', () => {
   assert.ok(three.startsWith(' Your subagents '), three);
 });
 
+// ---- usageOf and backFirst ----------------------------------------------------------------
+
+test('usageOf answers from the cached reading while it is young and its limit has not reset, and reads again otherwise', async () => {
+  const now = Date.now();
+  const cached = (ago: number, limited: { label: string; resetsAt: number } | null = null) => ({ agent: 'codex', ok: true, fetchedAt: now - ago, windows: [], limited });
+  /** A codex account whose cached reading is `last`: how many reads happened, and what usageOf returned. */
+  const run = async (last: unknown, fresh?: number) => {
+    const reading = { agent: 'codex', ok: true, fetchedAt: Date.now(), windows: [], limited: null };
+    const m: any = { db, usageReads: new Map(), lastUsageOf: () => last, emit: () => {}, liveClaudeUsage: () => undefined, reads: 0 };
+    m.controlFor = () => ({ usage: async () => (m.reads++, reading) });
+    const u = await (fresh === undefined ? proto.usageOf.call(m, 'codex', undefined) : proto.usageOf.call(m, 'codex', undefined, fresh));
+    return { u, reads: m.reads, reading };
+  };
+  const young = cached(30_000);
+  let r = await run(young);
+  assert.equal(r.u, young, 'cached 30 s old, no limit: the cached reading');
+  assert.equal(r.reads, 0, 'and no read');
+  r = await run(cached(30_000, { label: 'x', resetsAt: now - 10_000 }));
+  assert.equal(r.reads, 1, 'cached 30 s old with its limit reset 10 s ago: read again');
+  assert.equal(r.u, r.reading, 'and the fresh reading is the answer');
+  r = await run(cached(30_000, { label: 'x', resetsAt: now + 10 * 60_000 }));
+  assert.equal(r.reads, 0, 'cached 30 s old with the limit resetting in 10 min: still the cached one');
+  r = await run(cached(10_000, { label: 'x', resetsAt: now - 60_000 }));
+  assert.equal(r.reads, 0, 'taken after its reset time: it already knows the account has room');
+  r = await run(cached(180_000));
+  assert.equal(r.reads, 1, 'cached 3 min old, no limit: older than the default 2 min, so read again');
+  assert.equal(r.u, r.reading);
+  r = await run(cached(180_000), 300_000);
+  assert.equal(r.reads, 0, 'a longer fresh window keeps a 3 min old reading');
+});
+
+signedOutTest('backFirst names the account whose limit lifts first, passing over one signed out or turning the model away', async () => {
+  const a = addAccount(db, 'claude', 'Work');
+  const b = addAccount(db, 'claude', 'Personal');
+  try {
+    const now = Date.now();
+    const readings = new Map<string | undefined, unknown>();
+    const limitedUntil = (resetsAt: number | null) => ({ agent: 'claude', ok: true, fetchedAt: now, windows: [], limited: { label: 'x', resetsAt } });
+    readings.set(undefined, limitedUntil(now + 5 * 24 * HOUR));
+    readings.set(a.id, limitedUntil(now + 3 * HOUR));
+    readings.set(b.id, limitedUntil(now + 2 * 24 * HOUR));
+    let refuses = (_id: string | undefined, _family: string) => false;
+    const m: any = {
+      db,
+      lastUsageOf: (_agent: string, id: string | undefined) => readings.get(id),
+      refusesModel: (_agent: string, id: string | undefined, family: string) => refuses(id, family),
+    };
+    const backFirst = (family: string | null) => proto.backFirst.call(m, 'claude', family);
+    assert.deepEqual(backFirst(null), { id: a.id }, 'the added Work account lifts in 3 h, first of the three');
+    markSignedOut('claude', a.id);
+    assert.deepEqual(backFirst(null), { id: b.id }, 'Work signed out: Personal (2 days) lifts first of the rest');
+    markSignedIn('claude', a.id);
+    refuses = (id, family) => family === 'fable' && id === a.id;
+    assert.deepEqual(backFirst('fable'), { id: b.id }, 'Work turns Fable away: Personal for a Fable session');
+    assert.deepEqual(backFirst(null), { id: a.id }, 'and with no model known, Work still counts');
+    refuses = () => false;
+    for (const id of [undefined, a.id, b.id]) readings.set(id, limitedUntil(null));
+    assert.equal(backFirst(null), null, 'no account says when its limit lifts: null');
+    assert.equal(backFirst('fable'), null);
+  } finally {
+    for (const x of [a, b]) removeAccount(db, x.id, true);
+  }
+});
+
 for (const [name, fn] of tests) {
   try {
     await fn();

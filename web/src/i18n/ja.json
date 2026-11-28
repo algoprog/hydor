@@ -29179,5 +29179,6 @@
   "Where on that machine? Give the whole path of a new or empty folder": "そのマシンのどこですか？ 新しいフォルダか空のフォルダのパス全体を指定してください",
   "Which folder? Give its whole path": "どのフォルダですか？ パス全体を指定してください",
   "Which project?": "どのプロジェクトですか？",
-  "You can close this: it carries on, and a notice tells you when it is done.": "閉じても処理は続き、完了すると通知でお知らせします。"
+  "You can close this: it carries on, and a notice tells you when it is done.": "閉じても処理は続き、完了すると通知でお知らせします。",
+  "· {0} resets first, {1}": "・{0}が先にリセットされます（{1}）"
 }

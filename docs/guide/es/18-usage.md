@@ -14,7 +14,7 @@ La [página Uso](/usage) tiene tres pestañas:
 - **Actividad** (`/stats`): líneas modificadas, tokens y sesiones a lo largo del tiempo.
 - **Arena** (`/arena`): qué modelos ganan en tus propias tareas.
 
-La app lee tu uso cuando abres la página, y cada cinco minutos mientras la app está abierta; en la pestaña **Límites**, **Actualizar** lo vuelve a leer ahora mismo. El uso de Grok Build se lee de su agente con unos minutos de diferencia, y **Actualizar** también lo lee al instante.
+La app lee tu uso cuando abres la página, y cada cinco minutos mientras la app está abierta; en la pestaña **Límites**, **Actualizar** lo vuelve a leer ahora mismo. Mientras tanto, cada tarjeta muestra también lo último que las sesiones de esa cuenta recibieron del proveedor, así que un límite que una sesión acaba de alcanzar aparece en su tarjeta de inmediato. El uso de Grok Build se lee de su agente con unos minutos de diferencia, y **Actualizar** también lo lee al instante.
 
 ## Leer los límites de un plan
 
@@ -70,7 +70,7 @@ Para que cada sesión que alcance un límite continúe sola, abre [Configuració
 Cómo funciona el tiempo, con el interruptor o con **Reanudar al restablecer**:
 
 - La sesión debe continuar un minuto después de que se restablezca el límite, según lo último que informó el proveedor. La app lee el uso de vez en cuando mientras una sesión espera, con más frecuencia a medida que se acerca el restablecimiento, y cambia la hora si el proveedor mueve el restablecimiento.
-- Si el límite se levanta antes (usaste un restablecimiento o iniciaste sesión con otra cuenta), la sesión continúa de inmediato. Si se continuó antes de tiempo en los últimos 15 minutos y volvió a alcanzar el límite, espera al restablecimiento.
+- Si el límite se levanta antes (usaste un restablecimiento o iniciaste sesión con otra cuenta), la sesión continúa de inmediato. Si se continuó de esa forma en los últimos 15 minutos y volvió a alcanzar el límite, lo intenta de nuevo cuando pasen esos 15 minutos (o en el restablecimiento, si llega antes), y el aviso indica cuándo. Usar un restablecimiento del límite la continúa de inmediato.
 - Solo se continúa un turno que el límite realmente detuvo, no uno que terminó justo cuando el uso del plan llegó al 100 %. Una continuación planificada se descarta cuando la sesión sigue sin ella: envías un mensaje o pulsas **Detener**, o un turno se completa con normalidad. Un turno que el agente inicia por sí mismo mientras espera (cuando una tarea en segundo plano o un subagente propio se detiene en el mismo límite) no la descarta. Una sesión que detuviste con **Detener** nunca continúa sola, incluso si el error del límite llegó primero, hasta que le envíes un mensaje.
 - **Cancelar** en el aviso detiene una continuación planificada.
 

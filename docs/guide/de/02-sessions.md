@@ -464,7 +464,7 @@ Nach der Verknüpfung erscheinen sein Status und seine Prüfungen als Badge in d
 
 ## Wenn ein Nutzungslimit eine Sitzung stoppt
 
-Wenn bei einem Claude-Code- oder Codex-Tarif die Nutzung aufgebraucht ist, sagt ein Banner über dem Nachrichtenfeld, wessen Limit erreicht wurde, welches Limit und wann es zurückgesetzt wird: „Du hast das Nutzungslimit von Claude Code erreicht“ bei einem Konto dieses Agents, „Alle deine Claude-Code-Konten haben ihr Nutzungslimit erreicht“, wenn du mehrere hast und keines mehr Nutzung übrig hat, oder das Konto mit seinem Namen („Work hat sein Nutzungslimit erreicht“), wenn ein anderes noch welche hat.
+Wenn bei einem Claude-Code- oder Codex-Tarif die Nutzung aufgebraucht ist, sagt ein Banner über dem Nachrichtenfeld, wessen Limit erreicht wurde, welches Limit und wann es zurückgesetzt wird: „Du hast das Nutzungslimit von Claude Code erreicht“ bei einem Konto dieses Agents, „Alle deine Claude-Code-Konten haben ihr Nutzungslimit erreicht“, wenn du mehrere hast und keines mehr Nutzung übrig hat, oder das Konto mit seinem Namen („Work hat sein Nutzungslimit erreicht“), wenn ein anderes noch welche hat. Hat keines mehr Nutzung übrig und ist **Bei erreichtem Limit das Konto wechseln** eingeschaltet, nennt das Banner das Konto, das zuerst zurückgesetzt wird, und dort macht die Sitzung dann weiter („Work wird zuerst zurückgesetzt, in 3 Std. 36 Min“).
 
 Wenn eines der anderen Konten dieses Agents noch Nutzung übrig hat, siehst du kein Banner, solange **Bei erreichtem Limit das Konto wechseln** aktiviert ist: Die Sitzung wechselt zu diesem Konto und macht weiter (neue Sitzungen starten dort). Ist die Option deaktiviert, nennt das Banner dieses Konto und bietet **Aktivieren** an.
 

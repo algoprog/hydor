@@ -7,6 +7,7 @@ import { pct, untilText } from '../../lib/format';
 import { toast, toastError, useApp, useAppSettings, usedUp, useUsage } from '../../lib/store';
 import { Button, cx, useConfirm } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
+import { firstBack } from './limits';
 
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
@@ -67,6 +68,18 @@ function useSpareAccount(agent: AccountAgent, account: string | undefined): { id
 }
 
 /**
+ * With Switch accounts at a limit on and every account of the agent at its limit: the one whose limit resets first, and
+ * when, since sessions carry on there then (null with one account, with the switch off, or while one has usage left).
+ */
+function useFirstBack(agent: AccountAgent, spare: unknown, autoSwitch: boolean | null): { name: string; at: number } | null {
+  const added = useApp((s) => s.boot?.accounts);
+  const usage = useUsage();
+  const others = (added ?? []).filter((a) => a.agent === agent);
+  if (spare || !autoSwitch || !others.length) return null;
+  return firstBack([{ name: usage[agent]?.account?.email ?? `your main ${ACCOUNT_AGENT_NAMES[agent]} account`, u: usage[agent] }, ...others.map((a) => ({ name: a.name, u: usage.accounts[a.id] }))]);
+}
+
+/**
  * Whose usage limit it is, in words: the agent's when you have one account of it; when you have several, all of
  * them, or the one at its limit by name while another still has usage left (`spare`).
  */
@@ -96,13 +109,27 @@ function useTicking(on: boolean, ms = 30_000) {
  * that on the limit's reset time as it moves), or offers to. One banner: the text has the width, and its
  * buttons go under it when there is no room beside it.
  */
-export function LimitBanner({ agent, account, className, session }: { agent: AccountAgent; account?: string; className?: string; session?: { key: string; resumeAt?: number; busy?: boolean } }) {
+export function LimitBanner({
+  agent,
+  account,
+  className,
+  session,
+  alone,
+}: {
+  agent: AccountAgent;
+  account?: string;
+  className?: string;
+  session?: { key: string; resumeAt?: number; busy?: boolean };
+  /** About this account alone, as a Usage page card is: its own reset, never another account's that comes first. */
+  alone?: boolean;
+}) {
   const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : s[agent]));
   const reset = useLimitReset(agent, account);
   const spare = useSpareAccount(agent, account);
   const title = useLimitTitle(agent, account, spare);
   const autoSwitch = useAppSettings((s) => s.autoSwitch);
   const autoResume = useAppSettings((s) => s.autoResume);
+  const first = useFirstBack(agent, spare || alone, autoSwitch);
   // Antigravity CLI's sessions never continue by themselves (Google's terms for its plans allow only turns you start).
   const byHand = agent === 'antigravity';
   useEffect(() => void useAppSettings.getState().load(), []);
@@ -171,8 +198,11 @@ export function LimitBanner({ agent, account, className, session }: { agent: Acc
       </div>
     );
   const left = u?.resetCredits?.available ?? 0;
+  // Every account is at its limit and the switch is on: what counts is the first of them to reset, where the session (or a
+  // new one) carries on, not this account's own reset when that comes later.
+  const resetsAt = first && (!lim.resetsAt || first.at < lim.resetsAt) ? first.at : lim.resetsAt;
   // The server continues a minute after the reset; told apart only when the two disagree.
-  const withReset = !!resumeAt && !!lim.resetsAt && Math.abs(resumeAt - lim.resetsAt - 60_000) < 3 * 60_000;
+  const withReset = !!resumeAt && !!resetsAt && Math.abs(resumeAt - resetsAt - 60_000) < 3 * 60_000;
   return (
     <div data-tip={session ? 'limit' : undefined} className={cx('anim-expand flex gap-3 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[13.5px]', className)} role="status">
       <AlertTriangle size={15} className="mt-[3px] shrink-0 text-warn" />
@@ -182,17 +212,17 @@ export function LimitBanner({ agent, account, className, session }: { agent: Acc
             <div className="font-medium">{title}</div>
             <div className="text-[12.5px] text-fg-2">
               {lim.label}
-              {lim.resetsAt ? ` · resets ${untilText(lim.resetsAt)}` : ''}
+              {first && resetsAt === first.at ? ` · ${first.name} resets first, ${untilText(first.at)}` : resetsAt ? ` · resets ${untilText(resetsAt)}` : ''}
             </div>
           </div>
-          {((session && !byHand && !resumeAt && lim.resetsAt) || usable.length > 0) && (
+          {((session && !byHand && !resumeAt && resetsAt) || usable.length > 0) && (
             <div className="flex flex-wrap items-center gap-2">
-              {session && !byHand && !resumeAt && lim.resetsAt && (
+              {session && !byHand && !resumeAt && resetsAt && (
                 <Button
                   size="sm"
                   variant={usable.length ? 'secondary' : 'primary'}
                   icon={<Clock3 size={14} />}
-                  onClick={() => post(`/api/sessions/${enc(session.key)}/resume-at`, { at: lim.resetsAt! + 60_000 }).catch(toastError)}
+                  onClick={() => post(`/api/sessions/${enc(session.key)}/resume-at`, { at: resetsAt + 60_000 }).catch(toastError)}
                   title="Sends “Continue where you left off.” a minute after the limit resets"
                 >
                   Resume at reset

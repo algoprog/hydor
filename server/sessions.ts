@@ -12,7 +12,7 @@ import { startRefusal } from './agents/programs.ts';
 import { antigravityControl } from './agents/antigravity.ts';
 import { RpcError } from './agents/rpc.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
-import { ClaudeControl, claudeFamily, claudeUsage, CodexControl, limitHolds, mergeCodexSnapshot } from './agents/control.ts';
+import { ClaudeControl, claudeFamily, claudeUsage, CodexControl, limitHolds, mergeCodexSnapshot, pastItsReset } from './agents/control.ts';
 import type { ApprovalAnswer, ImageInput, LiveAdapter, LiveConfig, ModelCall } from './agents/live.ts';
 import { HttpError } from './auth.ts';
 import { config, paths } from './config.ts';
@@ -1825,8 +1825,10 @@ export class SessionManager extends EventEmitter {
       const family = acctAgent === 'claude' ? claudeFamily(o.model) : null;
       const lim = this.lastUsageOf(acctAgent, account)?.limited;
       if ((lim?.resetsAt && lim.resetsAt > Date.now() && limitHolds(lim.model, family)) || this.refusesModel(acctAgent, account, family)) {
-        const free = await this.freeAccount(acctAgent, account, family);
-        if (free) account = free.id;
+        // None has usage left: the one whose limit lifts first, so the session waits there, its notice saying when it
+        // continues (not the farther reset of the account picked).
+        const to = (await this.freeAccount(acctAgent, account, family)) ?? this.backFirst(acctAgent, family);
+        if (to) account = to.id;
       }
     }
     const l = await this.spawn(o.agent, cwd, { model: o.model || undefined, effort: o.effort || undefined, mode, account, acpAgent: o.acpAgent, extra: o.extra, prompt: (splitHandoff(o.prompt ?? '')?.request ?? o.prompt)?.slice(0, 2000) });
@@ -2137,7 +2139,9 @@ export class SessionManager extends EventEmitter {
   /** An account's usage as it last said, read again when that is older than `fresh` ms. */
   private async usageOf(agent: AccountAgent, account: string | undefined, fresh = 120_000): Promise<AgentUsage | undefined> {
     const last = this.lastUsageOf(agent, account);
-    if (last && Date.now() - last.fetchedAt <= fresh) return last;
+    // One that said a limit holds until a time that has come since is read again: just after a reset the account has room,
+    // and sessions waiting for it should move there, not be sent on to the account they are at the limit of.
+    if (last && Date.now() - last.fetchedAt <= fresh && !pastItsReset(last)) return last;
     // One read at a time per account.
     const id = `${agent}:${account ?? ''}`;
     let read = this.usageReads.get(id);
@@ -2215,6 +2219,20 @@ export class SessionManager extends EventEmitter {
       if (!best || used < best.used) best = { id, used };
     }
     return best;
+  }
+
+  /**
+   * Of the agent's signed-in accounts that take a session on that model family, the one whose limit lifts first, by its
+   * usage as last read; null when none says when (or one has room now: freeAccount picks that).
+   */
+  private backFirst(agent: AccountAgent, family: string | null): { id: string | undefined } | null {
+    let best: { id: string | undefined; at: number } | null = null;
+    for (const id of accountPool(this.db, agent)) {
+      if (isSignedOut(agent, id) || (family && this.refusesModel(agent, id, family))) continue;
+      const at = SessionManager.liftsAt(this.lastUsageOf(agent, id), family);
+      if (typeof at === 'number' && (!best || at < best.at)) best = { id, at };
+    }
+    return best && { id: best.id };
   }
 
   /** An account as people know it: an added one's name, the CLI's own by its email. */

@@ -214,6 +214,7 @@
 "· {0} pages":"server/apps/views.ts",
 "· {0} post{1}":"web/src/features/swarm/feature.tsx",
 "· {0} read":"server/apps/views.ts",
+"· {0} resets first, {1}":"web/src/features/usage/LimitReset.tsx",
 "· {0} saves":"web/src/features/pages/PagesPage.tsx",
 "· {0} stories":"server/apps/views.ts",
 "· {0} tabs":"web/src/features/browser/Dock.tsx",

@@ -140,6 +140,8 @@ export type HookResult = { status: 'started' | 'duplicate'; runId?: string; key?
 /** Failures in a row before a task pauses itself, unless it says otherwise. */
 export const DEFAULT_FAIL_LIMIT = 3;
 const NOTEPAD_MAX = 8000;
+/** How long a session continued as soon as usage was back, and stopped at the limit again, waits before it tries again. */
+const EARLY_HOLD_MS = 15 * 60_000;
 /** Added to the summary of a run that ended its own schedule. */
 const SCHEDULE_ENDED = 'Its job is done, so its schedule was deleted.';
 /** A run's one-line summary with SCHEDULE_ENDED after it, as a sentence of its own. */
@@ -669,7 +671,10 @@ export class Scheduler extends EventEmitter {
     return r?.t ?? undefined;
   }
 
-  /** Sessions continued early because their limit lifted, and when: one that hits it again waits for the reset. */
+  /**
+   * Sessions continued while their accounts' usage said they had room again, and when: one that hits the limit again does
+   * not trust that for EARLY_HOLD_MS, and tries again after it (or at the reset, if that comes first).
+   */
   private earlyResumes = new Map<string, number>();
 
   /**
@@ -677,8 +682,10 @@ export class Scheduler extends EventEmitter {
    * account's usage last said. That time moves: the provider reports another, a reset clears the limit,
    * the account signs in as another one. Usage back already continues the session now.
    */
-  syncResumes() {
+  syncResumes(o: { usageBack?: boolean } = {}) {
     const now = Date.now();
+    // A limit reset was used: usage is back for certain, so none waits out a hold.
+    if (o.usageBack) this.earlyResumes.clear();
     for (const r of this.db.prepare('select * from tasks where resume = 1').all() as Row[]) {
       const key = r.target!;
       const live = this.sessions.lives?.get(key)?.adapter;
@@ -693,11 +700,19 @@ export class Scheduler extends EventEmitter {
       if (lifts === undefined) continue;
       let at: number;
       if (lifts === null) {
-        // Not at a limit (anymore): now, unless it was continued early lately and stopped at the limit again.
-        if ((this.earlyResumes.get(key) ?? 0) > now - 15 * 60_000) continue;
-        at = now + 5_000;
-        if ((r.next_at ?? 0) <= at) continue;
-        this.earlyResumes.set(key, now);
+        const early = this.earlyResumes.get(key) ?? 0;
+        if (early > now - EARLY_HOLD_MS) {
+          // Continued so lately and stopped at the limit again: it tries again once that hold is over, and its notice says
+          // so, rather than the later reset it would otherwise show while an account has usage left.
+          at = early + EARLY_HOLD_MS;
+          if ((r.next_at ?? 0) <= at + 30_000) continue;
+        } else {
+          // Not at a limit (anymore): now. One already due goes now too, and counts as continued early: if the limit stops
+          // it again, it is held as well.
+          at = now + 5_000;
+          this.earlyResumes.set(key, now);
+          if ((r.next_at ?? 0) <= at) continue;
+        }
       } else {
         at = Math.max(lifts + 60_000, now + 5_000);
         if (Math.abs(at - (r.next_at ?? 0)) < 30_000) continue;
@@ -705,7 +720,7 @@ export class Scheduler extends EventEmitter {
       this.db.prepare('update tasks set schedule = ?, next_at = ? where id = ?').run(JSON.stringify({ kind: 'once', at }), at, r.id);
       this.sessions.queueSummary(key);
     }
-    for (const [k, t] of this.earlyResumes) if (t < now - 15 * 60_000) this.earlyResumes.delete(k);
+    for (const [k, t] of this.earlyResumes) if (t < now - EARLY_HOLD_MS) this.earlyResumes.delete(k);
   }
 
   // ---- webhooks ----------------------------------------------------------------------------

@@ -464,7 +464,7 @@ Depois de vinculado, o estado e as verificações dele aparecem como um selo na 
 
 ## Quando um limite de uso interrompe uma sessão
 
-Quando um plano do Claude Code ou do Codex fica sem uso, um banner acima da caixa de mensagem diz de quem foi o limite atingido, qual limite e quando ele é renovado: “Você atingiu o limite de uso do Claude Code” com uma conta desse agente, “Todas as suas contas do Claude Code atingiram o limite de uso” quando você tem várias e nenhuma tem mais uso disponível, ou a conta pelo nome (“Trabalho atingiu o limite de uso”) quando outra ainda tem algum.
+Quando um plano do Claude Code ou do Codex fica sem uso, um banner acima da caixa de mensagem diz de quem foi o limite atingido, qual limite e quando ele é renovado: “Você atingiu o limite de uso do Claude Code” com uma conta desse agente, “Todas as suas contas do Claude Code atingiram o limite de uso” quando você tem várias e nenhuma tem mais uso disponível, ou a conta pelo nome (“Trabalho atingiu o limite de uso”) quando outra ainda tem algum. Quando nenhuma tem mais uso e **Trocar de conta no limite** está ativado, o banner diz qual conta é redefinida primeiro, onde a sessão continua então (“Work é redefinido primeiro, em 3 h 36 min”).
 
 Quando outra conta desse agente ainda tem uso disponível, você não vê banner enquanto **Trocar de conta no limite** estiver ativado: a sessão passa para essa conta e continua (as novas sessões começam por lá). Com a opção desativada, o banner cita essa conta e oferece **Ativar**.
 

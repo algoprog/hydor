@@ -14,7 +14,7 @@ A [página Uso](/usage) tem três abas:
 - **Atividade** (`/stats`): linhas alteradas, tokens e sessões ao longo do tempo.
 - **Arena** (`/arena`): quais modelos se saem melhor nas suas próprias tarefas.
 
-O app lê o seu uso quando você abre a página e a cada cinco minutos enquanto o app está aberto; na aba Limites, **Atualizar** lê de novo agora. O uso do Grok Build é lido do agente dele com alguns minutos de intervalo, e **Atualizar** também o lê na hora.
+O app lê o seu uso quando você abre a página e a cada cinco minutos enquanto o app está aberto; na aba Limites, **Atualizar** lê de novo agora. Enquanto isso, cada cartão também mostra o que as sessões dessa conta receberam por último do provedor, então um limite que uma sessão acabou de atingir aparece no cartão na hora. O uso do Grok Build é lido do agente dele com alguns minutos de intervalo, e **Atualizar** também o lê na hora.
 
 ## Ler os limites de um plano
 
@@ -70,7 +70,7 @@ Para que toda sessão que atinge um limite continue sozinha, abra [Configuraçõ
 Como funciona o tempo, com a opção ativada ou com **Retomar na renovação**:
 
 - A sessão está prevista para um minuto depois da renovação do limite, conforme o último informe do provedor. O app lê o uso de tempos em tempos enquanto uma sessão espera, com mais frequência perto da renovação, e muda o horário se o provedor mudar a renovação.
-- Se o limite for liberado antes (você usou uma renovação ou entrou com outra conta), a sessão continua na hora. Se ela foi continuada antes do tempo nos últimos 15 minutos e atingiu o limite de novo, espera pela renovação.
+- Se o limite for liberado antes (você usou uma renovação ou entrou com outra conta), a sessão continua na hora. Se ela foi continuada dessa forma nos últimos 15 minutos e atingiu o limite de novo, tenta de novo quando esses 15 minutos passarem (ou na renovação, se ela vier antes), e o aviso diz quando. Usar uma renovação do limite a continua na hora.
 - Só é continuada uma vez que o limite realmente interrompeu, não uma que terminou justo quando o uso do plano chegou a 100%. Uma continuação planejada é descartada quando a sessão segue sem ela: você envia uma mensagem ou clica em **Parar**, ou uma vez passa normalmente. Uma vez que o agente inicia sozinho enquanto espera (quando uma tarefa em segundo plano ou um subagente dele para no mesmo limite) não a descarta. Uma sessão que você parou com **Parar** nunca é continuada sozinha, mesmo que o erro do limite tenha vindo primeiro, até você enviar uma mensagem a ela.
 - **Cancelar** no aviso interrompe uma continuação planejada.
 

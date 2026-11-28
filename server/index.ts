@@ -17,7 +17,7 @@ import { isInternal } from './internal.ts';
 import { config, ensureDirs, paths } from './config.ts';
 import { kvGet, kvSet, openDb } from './db.ts';
 import { agentBaseEnv } from './env.ts';
-import { ClaudeControl, CodexControl, ensureProbeDir, publicFlow } from './agents/control.ts';
+import { ClaudeControl, CodexControl, ensureProbeDir, newerUsage, publicFlow } from './agents/control.ts';
 import * as files from './files.ts';
 import { viewRoutes } from './view.ts';
 import { fileThumbRoutes } from './file-thumbs.ts';
@@ -1134,6 +1134,21 @@ async function addedUsage(force = false): Promise<Record<string, AgentUsage>> {
   return { ...extraUsage };
 }
 
+/**
+ * Each added account's usage as it stands: its own control's reading, which what its sessions hear from the provider keeps
+ * current (a limit one just hit), or the last full reading when that is newer (one that failed says why). The copy kept
+ * from the last full reading alone would show an account with usage left that its sessions were just turned away from.
+ */
+function addedNow(): Record<string, AgentUsage> {
+  const out: Record<string, AgentUsage> = {};
+  for (const a of addedAccounts(db)) {
+    const live = isAcpAccountAgent(a.agent) ? acpControl(db, a.agent, a.id).lastUsage : sessions.controlFor(a.agent, a.id).lastUsage;
+    const u = newerUsage(live, extraUsage[a.id]);
+    if (u) out[a.id] = u;
+  }
+  return out;
+}
+
 /** Reads every account's usage now, tells the open pages, and keeps sessions waiting out a limit on its reset. */
 async function readUsage(force = false) {
   usageAt = Date.now();
@@ -1148,7 +1163,7 @@ app.get('/api/usage', async (req) => {
   const stale = Date.now() - usageAt > 120_000;
   const acp = acpAccountAgents().map((a) => [a, acpControl(db, a).lastUsage] as const);
   if (refresh || stale || !claude.lastUsage || !codex.lastUsage || acp.some(([, u]) => !u)) return readUsage(refresh);
-  return { claude: claude.lastUsage, codex: codex.lastUsage, ...Object.fromEntries(acp), accounts: { ...extraUsage } };
+  return { claude: claude.lastUsage, codex: codex.lastUsage, ...Object.fromEntries(acp), accounts: addedNow() };
 });
 
 // While a session waits to continue after a usage limit, usage is read now and then, more often as the
@@ -1179,8 +1194,8 @@ app.post('/api/usage/:agent/reset', async (req) => {
   const usage = agent === 'claude' ? await sessions.controlFor('claude', account).usage(sessions.liveClaudeUsage(account)) : await sessions.controlFor('codex', account).usage();
   if (account) extraUsage[account] = usage;
   broadcast(account ? { t: 'usage', accounts: { [account]: usage } } : { t: 'usage', [agent]: usage });
-  // Usage back: a session waiting for the reset continues now.
-  scheduler.syncResumes();
+  // Usage back: a session waiting for the reset continues now, also one that tried lately and was turned away.
+  scheduler.syncResumes({ usageBack: r.outcome === 'reset' });
   return { ok: r.outcome === 'reset', ...r, usage } satisfies LimitResetResult;
 });
 

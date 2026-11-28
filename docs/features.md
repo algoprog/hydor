@@ -175,7 +175,10 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   session's subagents that the limit stopped go on there too, and a Hydor subagent's lead hears that it carries on
   rather than an error). Usage counts for the model the session runs: a limit of one model alone (a weekly Fable
   limit) holds back only sessions on that model, and an account whose plan doesn't include the model ("requires usage
-  credits", as Fable on a Pro plan) is passed over for it. The app's own quick
+  credits", as Fable on a Pro plan) is passed over for it. When every account is at its limit, a new session starts on
+  the one that resets first and the limit notice names it; just after a reset the account's usage is read again
+  before sessions are sent anywhere, and the Usage page shows what each account's sessions last heard from the
+  provider, so it never shows usage left on an account they were just turned away from. The app's own quick
   questions (the helper model, apps' model steps) go to the next signed-in account too.
   An account that has been signed out (its sign-in ended or was revoked) is worked around the same way: a session
   whose turn it turned away moves to another signed-in account with usage left and carries on (with the setting off,
@@ -2398,7 +2401,8 @@ programs shows each program's version and what is out, with Check now, Update no
   the last result, the next run, a pause switch, a delete button (not for a board card's refresh, which is stopped on its board) and a link to where each is changed; a right-click on a calendar entry or a list row opens a menu to edit, pause or turn it on, or delete it, and a tapped entry's card has the same buttons; on a phone, a day at a time. An agent's page, built-in agents' too, lists its schedules with a pause switch and a delete button each, and a saved task's form has Delete.
   Sessions stopped by a usage limit can continue by themselves when it resets (quietly, with a line saying
   whose limit it hit, all your accounts of that agent or one by name, which one and when, while Resume after
-  usage limits is on); one you stopped yourself never does.
+  usage limits is on); one you stopped yourself never does. One continued as soon as usage was back that stops at
+  the limit again tries again 15 minutes later, and says so.
 - Usage: how much of each plan's limits (Claude Code, Codex and Grok Build, each account; Antigravity CLI's card points to its own /usage) you have used and when they reset, what the same work would cost
   through the API, and activity over time, for every agent or one (Custom and the ACP agents by name) and every
   model or one: today, this week, this month or this year so far, against the period before up to the same point,

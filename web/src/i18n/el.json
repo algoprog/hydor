@@ -31018,5 +31018,6 @@
   "Where on that machine? Give the whole path of a new or empty folder": "Πού σε εκείνο το μηχάνημα; Δώστε ολόκληρη τη διαδρομή ενός νέου ή κενού φακέλου",
   "Which folder? Give its whole path": "Ποιος φάκελος; Δώστε ολόκληρη τη διαδρομή του",
   "Which project?": "Ποιο έργο;",
-  "You can close this: it carries on, and a notice tells you when it is done.": "Μπορείτε να το κλείσετε: συνεχίζεται και θα ειδοποιηθείτε όταν ολοκληρωθεί."
+  "You can close this: it carries on, and a notice tells you when it is done.": "Μπορείτε να το κλείσετε: συνεχίζεται και θα ειδοποιηθείτε όταν ολοκληρωθεί.",
+  "· {0} resets first, {1}": "· Ο λογαριασμός {0} επαναφέρεται πρώτος, {1}"
 }

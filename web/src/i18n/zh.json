@@ -31015,5 +31015,6 @@
   "Where on that machine? Give the whole path of a new or empty folder": "在那台机器的什么位置？请给出一个新的或空文件夹的完整路径",
   "Which folder? Give its whole path": "哪个文件夹？请给出完整路径",
   "Which project?": "哪个项目？",
-  "You can close this: it carries on, and a notice tells you when it is done.": "你可以关闭此窗口：它会继续进行，完成时会通知你。"
+  "You can close this: it carries on, and a notice tells you when it is done.": "你可以关闭此窗口：它会继续进行，完成时会通知你。",
+  "· {0} resets first, {1}": "· {0} 最先重置，{1}"
 }

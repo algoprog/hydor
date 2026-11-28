@@ -14,7 +14,7 @@ The [Usage page](/usage) has three tabs:
 - **Activity** (`/stats`): lines changed, tokens and sessions over time.
 - **Arena** (`/arena`): which models win on your own tasks.
 
-The app reads your usage when you open the page, and every five minutes while the app is open; on the Limits tab, **Refresh** reads it again now. Grok Build's usage is read from its agent a few minutes apart, and **Refresh** reads it at once too.
+The app reads your usage when you open the page, and every five minutes while the app is open; on the Limits tab, **Refresh** reads it again now. In between, each card also shows what that account's sessions last heard from the provider, so a limit a session has just hit shows on its card at once. Grok Build's usage is read from its agent a few minutes apart, and **Refresh** reads it at once too.
 
 ## Read a plan's limits
 
@@ -70,7 +70,7 @@ To have every session that hits a limit continue by itself, open [Settings → A
 How the timing works, with the switch or with **Resume at reset**:
 
 - The session is due a minute after the limit resets, as the provider last reported it. The app reads the usage now and then while a session waits, more often as the reset nears, and moves the time if the provider moves the reset.
-- If the limit lifts early (you used a reset, or signed in with another account), the session continues right away. If it was continued early in the last 15 minutes and hit the limit again, it waits for the reset instead.
+- If the limit lifts early (you used a reset, or signed in with another account), the session continues right away. If it was continued that way in the last 15 minutes and hit the limit again, it tries again once those 15 minutes are up (or at the reset, if that comes first), and the notice says when. Using a limit reset continues it at once.
 - Only a turn the limit really stopped is continued, not one that finished just as the plan's usage reached 100%. A planned continue is dropped when the session goes on without it: you send a message or press **Stop**, or a turn gets through normally. A turn the agent starts by itself while it waits (when a background task or subagent of its own stops at the same limit) does not drop it. A session you stopped with **Stop** is never continued by itself, even when the limit's error came first, until you send it a message.
 - **Cancel** on the notice stops a planned continue.
 

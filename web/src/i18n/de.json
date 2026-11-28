@@ -29812,5 +29812,6 @@
   "Where on that machine? Give the whole path of a new or empty folder": "Wo auf diesem Computer? Gib den vollständigen Pfad eines neuen oder leeren Ordners an",
   "Which folder? Give its whole path": "Welcher Ordner? Gib den vollständigen Pfad an",
   "Which project?": "Welches Projekt?",
-  "You can close this: it carries on, and a notice tells you when it is done.": "Du kannst das schließen: Es läuft weiter, und eine Benachrichtigung sagt dir, wenn es fertig ist."
+  "You can close this: it carries on, and a notice tells you when it is done.": "Du kannst das schließen: Es läuft weiter, und eine Benachrichtigung sagt dir, wenn es fertig ist.",
+  "· {0} resets first, {1}": "· {0} wird zuerst zurückgesetzt, {1}"
 }

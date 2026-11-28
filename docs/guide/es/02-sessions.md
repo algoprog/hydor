@@ -464,7 +464,7 @@ Una vez vinculado, su estado y sus comprobaciones se muestran como una insignia 
 
 ## Cuando un límite de uso detiene una sesión
 
-Cuando un plan de Claude Code o Codex se queda sin uso, un banner sobre el cuadro de mensaje indica de quién es el límite alcanzado, qué límite y cuándo se restablece: “You've hit the Claude Code usage limit” con una cuenta de ese agente, “All your Claude Code accounts have hit their usage limit” cuando tienes varias y ninguna tiene uso disponible, o la cuenta por su nombre (“Work has hit its usage limit”) cuando otra aún tiene algo.
+Cuando un plan de Claude Code o Codex se queda sin uso, un banner sobre el cuadro de mensaje indica de quién es el límite alcanzado, qué límite y cuándo se restablece: “You've hit the Claude Code usage limit” con una cuenta de ese agente, “All your Claude Code accounts have hit their usage limit” cuando tienes varias y ninguna tiene uso disponible, o la cuenta por su nombre (“Work has hit its usage limit”) cuando otra aún tiene algo. Cuando ninguna tiene uso y **Cambiar de cuenta en un límite** está activado, el banner nombra la cuenta que se restablece primero, donde la sesión sigue entonces (“Work se restablece primero, en 3 h 36 min”).
 
 Cuando otra cuenta de ese agente aún tiene uso disponible, no ves ningún banner mientras **Cambiar de cuenta en un límite** está activado: la sesión pasa a esa cuenta y sigue (las sesiones nuevas empiezan allí). Con la opción desactivada, el banner nombra esa cuenta y ofrece **Activar**.
 

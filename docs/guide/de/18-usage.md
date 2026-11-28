@@ -14,7 +14,7 @@ Die [Seite „Nutzung“](/usage) hat drei Tabs:
 - **Aktivität** (`/stats`): geänderte Zeilen, Token und Sitzungen im Lauf der Zeit.
 - **Arena** (`/arena`): welche Modelle bei deinen eigenen Aufgaben gewinnen.
 
-Die App liest deine Nutzung, wenn du die Seite öffnest, und alle fünf Minuten, solange die App geöffnet ist; im Tab **Grenzen** liest **Aktualisieren** sie sofort erneut. Die Nutzung von Grok Build wird in Abständen von einigen Minuten von seinem Agenten gelesen, und **Aktualisieren** liest sie ebenfalls sofort.
+Die App liest deine Nutzung, wenn du die Seite öffnest, und alle fünf Minuten, solange die App geöffnet ist; im Tab **Grenzen** liest **Aktualisieren** sie sofort erneut. Dazwischen zeigt jede Karte außerdem, was die Sitzungen dieses Kontos zuletzt vom Anbieter erfahren haben, sodass ein Limit, das eine Sitzung gerade erreicht hat, sofort auf ihrer Karte erscheint. Die Nutzung von Grok Build wird in Abständen von einigen Minuten von seinem Agenten gelesen, und **Aktualisieren** liest sie ebenfalls sofort.
 
 ## Die Limits eines Tarifs lesen
 
@@ -70,7 +70,7 @@ Damit jede Sitzung, die ein Limit erreicht, von selbst weiterläuft, öffne [Ein
 So funktioniert das Timing, mit dem Schalter oder mit **Beim Zurücksetzen fortsetzen**:
 
 - Die Sitzung ist eine Minute nach dem Zurücksetzen des Limits fällig, so wie der Anbieter es zuletzt gemeldet hat. Die App liest die Nutzung hin und wieder, während eine Sitzung wartet, öfter, je näher das Zurücksetzen rückt, und verschiebt die Zeit, wenn der Anbieter das Zurücksetzen verschiebt.
-- Wird das Limit früher aufgehoben (du hast einen Reset verwendet oder dich mit einem anderen Konto angemeldet), läuft die Sitzung sofort weiter. Wurde sie in den letzten 15 Minuten früher fortgesetzt und hat das Limit erneut erreicht, wartet sie stattdessen auf das Zurücksetzen.
+- Wird das Limit früher aufgehoben (du hast einen Reset verwendet oder dich mit einem anderen Konto angemeldet), läuft die Sitzung sofort weiter. Wurde sie auf diese Weise in den letzten 15 Minuten fortgesetzt und hat das Limit erneut erreicht, versucht sie es noch einmal, sobald diese 15 Minuten vorbei sind (oder beim Zurücksetzen, falls das früher kommt), und der Hinweis sagt, wann das ist. Ein Limit-Reset zu verwenden, setzt sie sofort fort.
 - Nur ein Zug, den das Limit wirklich gestoppt hat, wird fortgesetzt, nicht einer, der gerade fertig wurde, als die Nutzung des Tarifs 100 % erreichte. Ein geplantes Fortsetzen entfällt, wenn die Sitzung ohne es weitergeht: Du sendest eine Nachricht oder drückst **Stoppen**, oder ein Zug läuft normal durch. Ein Zug, den der Agent während des Wartens von selbst startet (wenn eine Hintergrundaufgabe oder ein eigener Subagent am selben Limit stoppt), lässt es nicht entfallen. Eine Sitzung, die du mit **Stoppen** angehalten hast, wird nie von selbst fortgesetzt, auch wenn der Fehler des Limits zuerst kam, bis du ihr eine Nachricht sendest.
 - **Abbrechen** im Hinweis stoppt ein geplantes Fortsetzen.
 
