@@ -17,16 +17,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { NotifyEvent } from '../../../shared/types.ts';
 import type { ArrivalPlace, CarryPlan, MachineRef, ProjectSyncMark, SendHow, SyncArea, SyncLink, SyncState, Transfer } from '../../../shared/transfer.ts';
+import { isClientRef } from '../../../shared/transfer.ts';
 import { HttpError } from '../../auth.ts';
+import { config } from '../../config.ts';
 import type { DB } from '../../db.ts';
 import type { Deps, Feature } from '../../features/types.ts';
 import { machineId } from '../../machines.ts';
 import { spaceById } from '../index.ts';
-import { endpointOf, isGone, RemoteError, selfName, Unreachable, useTransferLocal, wordsOf, type Endpoint } from './endpoints.ts';
+import { arrivalPlace } from './arrive.ts';
+import { endpointOf, isGone, LONG, RemoteError, SHORT, selfName, transferClients, transferMachines, Unreachable, useTransferLocal, wordsOf, type Endpoint } from './endpoints.ts';
 import { keyOf, mergeDetails, mergeFiles, mergeNotes, settle, type Base, type BaseEntry, type FilePlan, type Outcome } from './merge.ts';
 import { setSyncMark, syncRoutes, type ApplyBody, type ApplyResult } from './sync-endpoint.ts';
 import { sizeWords } from './safe.ts';
-import { tapBundle } from './stream.ts';
+import { BundleError, tapBundle } from './stream.ts';
 
 const enc = encodeURIComponent;
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -120,12 +123,38 @@ interface Running {
   t: Transfer;
   ac: AbortController;
   cancelled: boolean;
+  /** Handed over by a machine of Settings → Machines that this one runs the sending for: its id there, and the id of the mirror it keeps. */
+  handedFrom?: { machine: string; id: string };
+  /**
+   * The mirror of a sending that a machine that uses this one runs (it cannot be reached from here): that machine's ref, the
+   * transfer's id there, and the timer that ends it when the machine stays away.
+   */
+  handedTo?: { ref: string; remote?: string; lost?: NodeJS.Timeout };
 }
 const transfers = new Map<string, Running>();
 const tell = throttled(250);
+const tellBack = throttled(250);
 
 function emitTransfer(r: Running, force = false) {
   tell(`t:${r.t.id}`, () => dep().broadcast({ t: 'feature', id: 'transfers', data: { transfer: structuredClone(r.t) } }), force);
+  relay(r, force);
+}
+
+/** A handed-over sending tells the machine that handed it over how it goes (it keeps the mirror there). */
+function relay(r: Running, force = false) {
+  const h = r.handedFrom;
+  if (!h) return;
+  tellBack(
+    `h:${r.t.id}`,
+    () => {
+      try {
+        transferMachines()?.get(h.machine).tell({ t: 'transfer', handoff: h.id, transfer: structuredClone(r.t) });
+      } catch {
+        // The machine was taken out of the list, or its socket is down: it is told again when the socket is back.
+      }
+    },
+    force,
+  );
 }
 
 /** The running transfers and the last 20 that ended, newest first. */
@@ -148,7 +177,13 @@ interface SendBody {
 
 const isAbs = (p: string) => /^([\\/]|[A-Za-z]:[\\/])/.test(p);
 
-async function send(b: SendBody): Promise<Transfer> {
+/** Fails when this project is being sent from there already. */
+function notBusy(project: string, from: MachineRef) {
+  const busy = [...transfers.values()].find((r) => !r.t.endedAt && r.t.project.id === project && r.t.from.machine === from);
+  if (busy) throw new HttpError(409, `“${busy.t.project.name}” is being sent already`);
+}
+
+async function send(b: SendBody, o: { handedFrom?: { machine: string; id: string } } = {}): Promise<Transfer> {
   const from = typeof b.from === 'string' ? b.from : '';
   const to = typeof b.to === 'string' ? b.to : '';
   const project = typeof b.project === 'string' ? b.project : '';
@@ -156,8 +191,8 @@ async function send(b: SendBody): Promise<Transfer> {
   if (!project) throw new HttpError(400, 'Which project?');
   if (!['copy', 'sync', 'move'].includes(how)) throw new HttpError(400, 'how: copy, sync or move');
   if (how === 'sync' && from !== '' && to !== '') throw new HttpError(400, 'One of the two must be this machine to keep them in sync');
-  const busy = [...transfers.values()].find((r) => !r.t.endedAt && r.t.project.id === project && r.t.from.machine === from);
-  if (busy) throw new HttpError(409, `“${busy.t.project.name}” is being sent already`);
+  if (isClientRef(to)) return handOff(b, { from, to, project, how });
+  notBusy(project, from);
   const leaveOut = b.leaveOut !== false;
   const also = b.also === true;
   let planned: Planned;
@@ -175,6 +210,7 @@ async function send(b: SendBody): Promise<Transfer> {
   const r: Running = {
     ac: new AbortController(),
     cancelled: false,
+    ...(o.handedFrom ? { handedFrom: o.handedFrom } : {}),
     t: {
       id: newId(),
       how,
@@ -253,14 +289,228 @@ async function runTransfer(r: Running, p: Planned, o: { folder: string; leaveOut
   }
 }
 
-function cancelTransfer(id: string): Transfer {
+async function cancelTransfer(id: string): Promise<Transfer> {
   const r = transfers.get(id);
   if (!r) throw new HttpError(404, 'No such transfer');
   if (r.t.endedAt) return structuredClone(r.t);
   if (r.t.state !== 'sending') throw new HttpError(409, 'It is almost done: it cannot be stopped now');
+  if (r.handedTo) {
+    // It runs on the other machine: that one is asked to stop; it tells how it ended.
+    const { ref, remote } = r.handedTo;
+    if (!remote) throw new HttpError(409, 'It is only starting: try again in a moment');
+    try {
+      mergeHanded(r, (await transferClients()!.call(ref, 'cancel', { transfer: remote }, SHORT)) as Transfer);
+    } catch (e) {
+      throw http(e);
+    }
+    return structuredClone(r.t);
+  }
   r.cancelled = true;
   r.ac.abort();
   return structuredClone(r.t);
+}
+
+// ---- handed over: a machine that uses this one runs the sending -----------------------------------------------
+
+/** How long a machine may stay away before a sending it runs for this one counts as lost. */
+const LOST_AFTER = 3 * 60_000;
+const STATES_ENDED = ['done', 'failed', 'cancelled'];
+
+/** Sending to a machine that uses this one: it is handed the job, and this keeps a mirror of its transfer for the page. */
+async function handOff(b: SendBody, o: { from: MachineRef; to: MachineRef; project: string; how: SendHow }): Promise<Transfer> {
+  const clients = transferClients();
+  if (!clients) throw new HttpError(503, 'The app is still starting');
+  if (o.from !== '') throw new HttpError(400, 'A machine that uses this one takes projects only from this machine’s own pages');
+  const c = clients.get(o.to);
+  if (!c) throw new HttpError(404, 'That machine is not connected now: open Hydor there');
+  if (!c.takes) throw new HttpError(409, `${c.name} runs an older Hydor: update it there to send projects to it`);
+  const space = spaceById(dep().db, o.project);
+  if (!space) throw new HttpError(404, 'No such project');
+  notBusy(o.project, o.from);
+  const r: Running = {
+    ac: new AbortController(),
+    cancelled: false,
+    handedTo: { ref: o.to },
+    t: {
+      id: newId(),
+      how: o.how,
+      from: { machine: '', name: selfName() },
+      to: { machine: o.to, name: c.name },
+      project: { id: o.project, name: space.name },
+      state: 'sending',
+      done: { files: 0, bytes: 0 },
+      total: { files: 0, bytes: 0 },
+      startedAt: Date.now(),
+    },
+  };
+  transfers.set(r.t.id, r);
+  const leaveOut = b.leaveOut !== false;
+  const also = b.also === true;
+  try {
+    // No folder given (an agent's call, say): the place the plan gives there, as for any other machine.
+    let folder = typeof b.folder === 'string' ? b.folder.trim() : '';
+    if (!folder) folder = (await planFor({ from: '', project: o.project, to: o.to, leaveOut, also })).place.folder;
+    // That machine plans first, which may walk a big folder through this one's carry route.
+    const started = (await clients.call(o.to, 'send', { project: o.project, how: o.how, folder, leaveOut, also, handoff: r.t.id }, LONG + 30_000)) as Transfer | null;
+    if (!started || typeof started.id !== 'string') throw new Unreachable(`${c.name} did not answer as Hydor does`);
+    r.handedTo!.remote = started.id;
+    mergeHanded(r, started);
+  } catch (e) {
+    transfers.delete(r.t.id);
+    throw http(e);
+  }
+  return structuredClone(r.t);
+}
+
+/** What the machine that runs a handed-over sending says about it now. */
+function mergeHanded(r: Running, v: Transfer) {
+  const t = r.t;
+  if (t.endedAt || !v || !['sending', 'finishing', ...STATES_ENDED].includes(v.state)) return;
+  // Its first news can come before the answer to the call that started it: the id there is known from either.
+  if (r.handedTo && !r.handedTo.remote && typeof v.id === 'string') r.handedTo.remote = v.id;
+  const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : 0);
+  t.state = v.state;
+  t.done = { files: n(v.done?.files), bytes: n(v.done?.bytes) };
+  t.total = { files: n(v.total?.files), bytes: n(v.total?.bytes) };
+  if (typeof v.error === 'string') t.error = v.error;
+  else delete t.error;
+  if (v.result && typeof v.result === 'object') t.result = structuredClone(v.result);
+  if (STATES_ENDED.includes(v.state)) {
+    t.endedAt = typeof v.endedAt === 'number' ? v.endedAt : Date.now();
+    endMirror(r);
+  } else emitTransfer(r);
+}
+
+/** A mirror has ended (done, failed or cancelled): the notice, the page, and the list of the last 20. */
+function endMirror(r: Running) {
+  const t = r.t;
+  if (r.handedTo) {
+    clearTimeout(r.handedTo.lost);
+    r.handedTo.lost = undefined;
+  }
+  if (t.state === 'done') {
+    const left = t.result?.leftOut ?? [];
+    notice({
+      kind: 'done',
+      title: `“${t.project.name}” is on ${t.to.name} now`,
+      body: left.length ? `${plural(left.length, 'thing')} could not be placed there` : (t.result?.kept ?? ''),
+      // A moved project is not here any more.
+      ...(t.how === 'move' ? {} : { url: projectUrl('', t.project.id) }),
+    });
+  } else if (t.state === 'failed') {
+    notice({ kind: 'failed', title: `Could not send “${t.project.name}” to ${t.to.name}`, body: t.error ?? '', url: projectUrl('', t.project.id) });
+  }
+  emitTransfer(r, true);
+  trimTransfers();
+}
+
+/** The mirrors of a machine's sendings that have not ended. */
+const mirrorsOf = (ref: string) => [...transfers.values()].filter((r) => r.handedTo?.ref === ref && !r.t.endedAt);
+
+/** Listens to the machines that use this one: what they tell of the sendings they run, and when they go and come back. */
+function watchClients(): () => void {
+  const c = transferClients();
+  if (!c) return () => {};
+  const onTransfer = (ref: string, handoff: string, t: Transfer) => {
+    const r = transfers.get(handoff);
+    if (r?.handedTo?.ref === ref) mergeHanded(r, t);
+  };
+  const onGone = (ref: string) => {
+    for (const r of mirrorsOf(ref)) {
+      const h = r.handedTo!;
+      if (h.lost) continue;
+      h.lost = setTimeout(() => {
+        h.lost = undefined;
+        if (transfers.get(r.t.id) !== r || r.t.endedAt) return;
+        r.t.state = 'failed';
+        r.t.endedAt = Date.now();
+        r.t.error = `Lost touch with ${r.t.to.name}: open Hydor there to see whether it arrived`;
+        endMirror(r);
+      }, LOST_AFTER);
+      h.lost.unref();
+    }
+  };
+  // It is back: it tells again how its sendings stand.
+  const onBack = (ref: string) => {
+    for (const r of mirrorsOf(ref)) {
+      clearTimeout(r.handedTo!.lost);
+      r.handedTo!.lost = undefined;
+    }
+  };
+  c.on('transfer', onTransfer);
+  c.on('gone', onGone);
+  c.on('back', onBack);
+  return () => {
+    c.off('transfer', onTransfer);
+    c.off('gone', onGone);
+    c.off('back', onBack);
+    for (const r of transfers.values()) if (r.handedTo) clearTimeout(r.handedTo.lost);
+  };
+}
+
+/** Whether a folder is a place a machine that hands over a project may put it: in the home folder here, not in a hidden one. */
+function underHome(folder: string): boolean {
+  if (!path.isAbsolute(folder) || folder.split(/[\\/]/).includes('..')) return false;
+  // The nearest folder that exists, as it really is (a link in the way cannot lead out of the home folder).
+  const real = (p: string): string => {
+    const rest: string[] = [];
+    for (let q = path.resolve(p); ; q = path.dirname(q)) {
+      try {
+        return path.join(fs.realpathSync(q), ...rest.reverse());
+      } catch {
+        if (path.dirname(q) === q) return path.resolve(p);
+        rest.push(path.basename(q));
+      }
+    }
+  };
+  const rel = path.relative(real(config.home), real(folder));
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return false;
+  const parts = rel.split(path.sep);
+  if (parts.some((x) => x.startsWith('.'))) return false;
+  return !(process.platform === 'darwin' && parts[0].toLowerCase() === 'library');
+}
+
+const HANDOFF_ID = /^[a-f0-9]{6,20}$/;
+const MAX_HANDED = 2;
+
+/** What a machine of Settings → Machines asks of this one over its socket: to plan, to run a sending for it, to stop it. */
+async function answerCall(machine: { id: string; name: string }, op: string, args: unknown): Promise<unknown> {
+  const a = (args && typeof args === 'object' && !Array.isArray(args) ? args : {}) as Record<string, unknown>;
+  if (op === 'info') return endpointOf('').info();
+  if (op === 'place') {
+    if (a.name !== undefined && (typeof a.name !== 'string' || a.name.length > 200)) throw new HttpError(400, 'name: up to 200 characters');
+    if (a.rel !== undefined && (typeof a.rel !== 'string' || a.rel.length > 2000)) throw new HttpError(400, 'rel: a path');
+    if (a.also !== undefined && (!Array.isArray(a.also) || a.also.length > 50 || !a.also.every((x) => typeof x === 'string' && x.length <= 2000))) throw new HttpError(400, 'also: a list of up to 50 folders');
+    try {
+      return arrivalPlace(dep().db, { name: a.name as string | undefined, rel: a.rel as string | undefined, also: a.also as string[] | undefined }, config.version);
+    } catch (e) {
+      if (e instanceof BundleError) throw new HttpError(400, `rel: ${e.message}`);
+      throw e;
+    }
+  }
+  if (op === 'send') {
+    const how = a.how as SendHow;
+    if (typeof a.project !== 'string' || !a.project) throw new HttpError(400, 'Which project?');
+    if (!['copy', 'sync', 'move'].includes(how)) throw new HttpError(400, 'how: copy, sync or move');
+    if (typeof a.handoff !== 'string' || !HANDOFF_ID.test(a.handoff)) throw new HttpError(400, 'handoff: an id');
+    if (typeof a.folder !== 'string' || !a.folder.trim()) throw new HttpError(400, 'Where on that machine? Give the whole path of a new or empty folder');
+    for (const k of ['leaveOut', 'also']) if (a[k] !== undefined && typeof a[k] !== 'boolean') throw new HttpError(400, `${k}: true or false`);
+    const folder = a.folder.trim();
+    if (!underHome(folder)) throw new HttpError(400, "From here, a project can go only to a folder in that machine's home folder: to put it elsewhere, send it from Hydor on that machine");
+    if ([...transfers.values()].filter((r) => !r.t.endedAt && r.handedFrom?.machine === machine.id).length >= MAX_HANDED) throw new HttpError(429, 'That machine is taking two projects from here already: wait for one of them to end');
+    return send({ from: machine.id, to: '', project: a.project, how, folder, leaveOut: a.leaveOut as boolean | undefined, also: a.also as boolean | undefined }, { handedFrom: { machine: machine.id, id: a.handoff } });
+  }
+  if (op === 'cancel') {
+    const r = typeof a.transfer === 'string' ? transfers.get(a.transfer) : undefined;
+    if (!r || r.handedFrom?.machine !== machine.id) throw new HttpError(404, 'No such transfer');
+    return cancelTransfer(r.t.id);
+  }
+  throw new HttpError(400, 'Unknown call');
+}
+
+/** A machine's socket is open again: it is told once more how each sending it handed over stands. */
+function handedBack(machine: { id: string; name: string }) {
+  for (const r of transfers.values()) if (r.handedFrom?.machine === machine.id) relay(r, true);
 }
 
 // ---- links: what is kept --------------------------------------------------------------------------------------
@@ -922,7 +1172,7 @@ function hubRoutes(d: Deps) {
   });
   d.app.post('/api/machines/projects/send', async (req) => ({ transfer: await send((req.body ?? {}) as SendBody) }));
   d.app.get('/api/machines/projects/transfers', async () => ({ transfers: listTransfers() }));
-  d.app.delete('/api/machines/projects/transfers/:id', async (req) => ({ transfer: cancelTransfer(id(req)) }));
+  d.app.delete('/api/machines/projects/transfers/:id', async (req) => ({ transfer: await cancelTransfer(id(req)) }));
   d.app.get('/api/machines/projects/links', async () => ({ links: [...lives.values()].map((l) => linkOf(l.row, l)) }));
   d.app.post('/api/machines/projects/links/:id/sync', async (req) => {
     const live = lives.get(id(req));
@@ -936,6 +1186,8 @@ function hubRoutes(d: Deps) {
   });
 }
 
+let stopClients: (() => void) | null = null;
+
 export const projectHub: Feature = {
   id: 'project-hub',
   routes(d) {
@@ -946,6 +1198,8 @@ export const projectHub: Feature = {
   },
   start(d) {
     deps = d;
+    stopClients = watchClients();
+    transferMachines()?.setCallHandler({ call: answerCall, back: handedBack });
     tables(d.db);
     d.db.prepare("update project_links set state = 'ok' where state = 'syncing'").run();
     const rows = (d.db.prepare('select * from project_links order by created_at').all() as Row[]).map(rowOf);
@@ -957,6 +1211,9 @@ export const projectHub: Feature = {
     });
   },
   stop() {
+    stopClients?.();
+    stopClients = null;
+    transferMachines()?.setCallHandler(null);
     for (const live of lives.values()) {
       live.dead = true;
       live.ac?.abort();

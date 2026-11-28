@@ -133,7 +133,7 @@ Wenn der Ordner des Projekts ein Git-Repository ist, bietet das Ende des Menüs 
 - **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**: In der Desktop-App zeigt es den Ordner des Projekts ausgewählt im Dateimanager des Systems (siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)).
 - **Nur Projektsitzungen in der Seitenleiste**: Die Sitzungsliste zeigt nur die Sitzungen im Projekt, so wie es der Filter der Seitenleiste selbst tut (siehe [Die Sitzungen eines Projekts in der Seitenleiste zeigen](#show-one-projects-sessions-in-the-sidebar)). Wähle es noch einmal aus, um wieder alle Sitzungen zu sehen.
 - **Mit anderen teilen**: Lade jemanden (eine Betreuerin, einen Studenten) ein, das Projekt zu sehen und seine Dokumente über einen eigenen Link zu kommentieren (siehe [Ein Projekt mit anderen teilen](#share-a-project-with-people)).
-- **An anderen Computer senden …**: Kopiere das Projekt auf einen anderen Computer, auf dem Hydor läuft, verschiebe es dorthin oder halte es mit einer Kopie dort synchron (siehe [Ein Projekt an einen anderen Computer senden](#send-a-project-to-another-machine)). Der Eintrag erscheint, sobald du in [Einstellungen → Computer](/settings?s=machines) einen weiteren Computer hast, und nicht bei einer Gruppe.
+- **An anderen Computer senden …**: Kopiere das Projekt auf einen anderen Computer, auf dem Hydor läuft, verschiebe es dorthin oder halte es mit einer Kopie dort synchron (siehe [Ein Projekt an einen anderen Computer senden](#send-a-project-to-another-machine)). Der Eintrag erscheint, sobald du in [Einstellungen → Computer](/settings?s=machines) einen weiteren Computer hast, oder, auf den eigenen Seiten dieses Computers, solange ein Computer verbunden ist, der diesen nutzt (siehe [An einen Computer senden, der diesen nutzt](#send-to-a-machine-that-uses-this-one)), und nicht bei einer Gruppe.
 - **Jetzt synchronisieren** und **Synchronisierung beenden**: nur für ein Projekt, das mit einer Kopie synchron gehalten wird. **Jetzt synchronisieren** erscheint auf dem Computer, der die Verbindung hält (stattdessen **Trotzdem synchronisieren**, wenn eine Runde zurückgehalten wird), und **Synchronisierung beenden** auf beiden (siehe [Zwei Kopien synchron halten](#keep-two-copies-in-sync)).
 - **Projekt löschen**; siehe [Ein Projekt löschen](#delete-a-project).
 
@@ -412,7 +412,7 @@ Auf jedem Computer muss Hydor 0.120.0 oder neuer laufen. Ein Computer mit einer 
 ### Den Dialog öffnen und die Art wählen
 
 1. Öffne die Details des Projekts und klicke oben auf **Mehr** (⋯), oder nutze das ⋯ auf der Karte des Projekts auf der Seite „Projekte“. Wähle **An anderen Computer senden …**. Der Eintrag erscheint, sobald es einen anderen Computer als Ziel gibt.
-2. Wähle unter **An** den Computer. Jeder zeigt seinen Zustand; einer, der nicht antwortet, ist ausgegraut, mit dem Grund („Nicht erreichbar“, „Startet neu“). Auch der Computer, auf dem du die App geöffnet hast, zählt, wenn das Projekt auf den Seiten eines anderen Computers liegt: Der Dialog sendet von dem Computer, auf dessen Seiten du dich befindest.
+2. Wähle unter **An** den Computer. Jeder zeigt seinen Zustand; einer, der nicht antwortet, ist ausgegraut, mit dem Grund („Nicht erreichbar“, „Startet neu“). Auch der Computer, auf dem du die App geöffnet hast, zählt, wenn das Projekt auf den Seiten eines anderen Computers liegt: Der Dialog sendet von dem Computer, auf dessen Seiten du dich befindest. Auf den eigenen Seiten dieses Computers stehen auch die Computer, die diesen nutzen, solange sie verbunden sind (siehe [An einen Computer senden, der diesen nutzt](#send-to-a-machine-that-uses-this-one)).
 3. Wähle unter **Wie** eine Möglichkeit:
    - **Kopieren**: Eine Kopie geht dorthin, und dieses Projekt bleibt, wie es ist.
    - **Synchron halten**: Eine Kopie geht dorthin, und eine Änderung an einem der beiden Projekte erreicht das andere, solange beide Computer eingeschaltet sind (siehe [Zwei Kopien synchron halten](#keep-two-copies-in-sync)). Die Option ist ausgegraut („Einer der beiden muss dieser Computer sein“), wenn das Projekt auf einem deiner anderen Computer liegt und der Zielcomputer ebenfalls ein anderer ist: Der Computer, auf dem du die App geöffnet hast, muss einer der beiden sein, denn er hält die Verbindung.
@@ -459,6 +459,18 @@ Ist es fertig, sagt der Dialog „„Thesis“ ist jetzt auf GPU-Box“, was aus
 
 Eine Datei, die sich ändert, während sie gelesen wird, wird von diesem Senden ausgelassen, statt halb verändert kopiert zu werden; sende erneut oder halte die beiden synchron, um sie herüberzubringen.
 
+### An einen Computer senden, der diesen nutzt
+
+Manche Computer erreichen diesen, aber dieser erreicht sie nicht: Dein Laptop hat diesen Server in seinen [Einstellungen → Computer](/settings?s=machines), doch ein Server kann keine Verbindung zu einem Laptop hinter deinem Router aufbauen. Auf den eigenen Seiten dieses Computers (etwa ein Server, den du im Browser unter seiner Adresse geöffnet hast) stehen deshalb auch die Computer, die diesen nutzen, unter **An**, **solange sie verbunden sind**, also solange Hydor auf ihnen läuft. Jeder heißt so wie das Zugriffstoken, das er hier benutzt (das du unter **Einstellungen → Computer → Zugriff von anderen Computern** erstellt hast, siehe [Anderen Computern Zugriff auf diesen geben](/guide/devices#let-other-machines-use-this-one)), zum Beispiel „My laptop“.
+
+Da dieser Computer ihn nicht erreicht, **sendet der Computer, den du wählst, selbst**: Er liest das Projekt von hier und schreibt es bei sich, genau als hättest du es in Hydor auf diesem Computer gesendet. Der Dialog funktioniert wie sonst: **Was mitgeht**, **Wo auf My laptop** (von diesem Computer erfragt), **Kopieren**, **Synchron halten** oder **Verschieben**, der Balken („Senden · 45 % · …“), **Senden abbrechen** und der Hinweis am Ende. **Dort öffnen** gibt es nicht, denn dieser Computer kann dessen Seiten nicht öffnen: Der Dialog sagt „Öffne es in Hydor auf My laptop: Du findest es dort unter Projekte“, mit **Schließen**.
+
+- **Beide Computer brauchen Hydor 0.122.0 oder neuer.** Einer mit älterem Hydor ist ausgegraut („Aktualisiere zuerst Hydor dort“).
+- **Der Ordner dort muss im Home-Ordner des anderen Computers liegen.** Sonst sagt der Dialog „Von hier aus kann ein Projekt nur in einen Ordner im Home-Ordner des anderen Computers gesendet werden: Um es woanders abzulegen, sende es aus Hydor auf dem anderen Computer“.
+- **Synchron halten**: Der andere Computer hält die Verbindung (siehe [Zwei Kopien synchron halten](#keep-two-copies-in-sync)), die Runden laufen also, solange Hydor auf ihm läuft. Bei der Kopie auf diesem Computer fehlt **Jetzt synchronisieren**; der Zustand wird wie sonst angezeigt, und **Synchronisierung beenden** funktioniert auch hier.
+- **Ist er nicht verbunden**, wenn du sendest, sagt der Dialog „Dieser Computer ist gerade nicht verbunden: Öffne dort Hydor“. Verschwindet er mittendrin (seine App wird beendet oder er geht in den Ruhezustand) und kommt nicht innerhalb von 3 Minuten zurück, endet das Senden hier mit „Lost touch with My laptop: open Hydor there to see whether it arrived“. Es kann trotzdem dort angekommen sein: Sieh in seinen Projekten nach.
+- **Nur von den eigenen Seiten dieses Computers.** Ein Projekt auf den Seiten eines anderen Computers kann nicht an einen Computer gesendet werden, der diesen nutzt.
+
 ### Zwei Kopien synchron halten
 
 **Synchron halten** erstellt die Kopie wie oben und hält danach die beiden Projekte gleich: Eine Änderung, die du an einem von beiden machst, erreicht das andere. Es funktioniert, solange beide Computer eingeschaltet sind; dazwischen muss nichts laufen.
@@ -483,7 +495,7 @@ Etwas, das das Projekt behalten hat (eine Seite, ein Dokument, ein Bild …), is
 
 Ist der andere Computer aus oder nicht erreichbar, sagt das Projekt „Warten auf GPU-Box“, und nichts geht verloren: Es wird wieder synchronisiert, sobald der Computer zurück ist.
 
-**Welcher Computer die Verbindung hält.** Ein Computer übernimmt das Synchronisieren: der, auf dem du die App geöffnet hattest, als du das Projekt gesendet hast (deshalb muss für „Synchron halten“ einer der beiden dieser Computer sein). **Jetzt synchronisieren** gibt es nur dort. Beide Projekte zeigen den Zustand, und **Synchronisierung beenden** funktioniert bei beiden.
+**Welcher Computer die Verbindung hält.** Ein Computer übernimmt das Synchronisieren: der, auf dem du die App geöffnet hattest, als du das Projekt gesendet hast (deshalb muss für „Synchron halten“ einer der beiden dieser Computer sein); bei einem Projekt, das an einen Computer gesendet wurde, der diesen nutzt (siehe [An einen Computer senden, der diesen nutzt](#send-to-a-machine-that-uses-this-one)), hält dieser die Verbindung. **Jetzt synchronisieren** gibt es nur dort. Beide Projekte zeigen den Zustand, und **Synchronisierung beenden** funktioniert bei beiden.
 
 ### Wenn beide Kopien dieselbe Datei ändern
 
@@ -664,6 +676,7 @@ Wissenstools liefern nie unzugängliche Projektdokumente, auch nicht bei direkte
 - „Kopiere mein Projekt Thesis auf meine GPU-Box, ohne node_modules, und sag mir Bescheid, wenn es dort ist.“
 - „Halte dieses Projekt mit dem Laptop synchron.“
 - „Verschiebe mein Projekt Steuern 2026 auf den Desktop zu Hause.“
+- „Sende das Projekt Thesis an meinen Laptop.“
 - „Welche meiner Projekte werden mit einem anderen Computer synchron gehalten, und welche warten oder sind zurückgehalten?“
 - „Synchronisiere mein Projekt Thesis jetzt mit dem Laptop und sag mir, ob eine Datei auf beiden geändert wurde.“
 - „Beende die Synchronisierung meines Projekts Thesis mit der GPU-Box.“

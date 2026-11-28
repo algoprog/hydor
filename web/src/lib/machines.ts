@@ -1,7 +1,7 @@
 // The machines this server uses (Settings → Machines), for the switcher and notices. Always asked of
 // this server itself, whichever machine the page shows.
 import { create } from 'zustand';
-import type { MachineNews, MachineStatus, MachineView } from '@shared/types';
+import type { ClientView, MachineNews, MachineStatus, MachineView } from '@shared/types';
 import { api } from './api';
 import { machineId } from './machine';
 
@@ -17,6 +17,8 @@ interface Self {
 interface MachinesState {
   self: Self | null;
   list: MachineView[];
+  /** The machines that use this server and are connected now (missing from an older server). */
+  clients: ClientView[];
   loaded: boolean;
   load: () => Promise<void>;
 }
@@ -24,10 +26,11 @@ interface MachinesState {
 export const useMachines = create<MachinesState>((set) => ({
   self: null,
   list: [],
+  clients: [],
   loaded: false,
   load: async () => {
-    const r = await api<{ self: Self; machines: MachineView[] }>('/api/machines');
-    set({ self: r.self, list: r.machines, loaded: true });
+    const r = await api<{ self: Self; machines: MachineView[]; clients?: ClientView[] }>('/api/machines');
+    set({ self: r.self, list: r.machines, clients: r.clients ?? [], loaded: true });
   },
 }));
 

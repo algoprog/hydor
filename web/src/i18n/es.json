@@ -29181,5 +29181,19 @@
   "You can close this: it carries on, and a notice tells you when it is done.": "Puedes cerrar esto: sigue en marcha y un aviso te dirá cuando termine.",
   "· {0} resets first, {1}": "· {0} se restablece primero, {1}",
   "{0} still has usage left, kept for the session that moved there.": "A {0} todavía le queda uso, reservado para la sesión que se movió allí.",
-  "{0} still has usage left, kept for the {1} sessions that moved there.": "A {0} todavía le queda uso, reservado para las {1} sesiones que se movieron allí."
+  "{0} still has usage left, kept for the {1} sessions that moved there.": "A {0} todavía le queda uso, reservado para las {1} sesiones que se movieron allí.",
+  "Open it in Hydor on {0}: it is in its Projects": "Ábrelo en Hydor en {0}: está en sus Proyectos",
+  "Update Hydor there first": "Primero actualiza Hydor allí",
+  "A machine that uses this one takes projects only from this machine’s own pages": "Una máquina que usa esta toma proyectos solo de las páginas propias de esta máquina",
+  "From here, a project can go only to a folder in that machine's home folder: to put it elsewhere, send it from Hydor on that machine": "Desde aquí, un proyecto solo puede ir a una carpeta dentro de la carpeta de inicio de esa máquina: para ponerlo en otro lugar, envíalo desde Hydor en esa máquina",
+  "It is only starting: try again in a moment": "Todavía se está iniciando: inténtalo de nuevo en un momento",
+  "That machine is not connected now: open Hydor there": "Esa máquina no está conectada ahora: abre Hydor allí",
+  "That machine is taking two projects from here already: wait for one of them to end": "Esa máquina ya está recibiendo dos proyectos desde aquí: espera a que termine uno de ellos",
+  "Unknown call": "Llamada desconocida",
+  "also: a list of up to 50 folders": "also: una lista de hasta 50 carpetas",
+  "handoff: an id": "handoff: un id",
+  "name: up to 200 characters": "name: hasta 200 caracteres",
+  "rel: a path": "rel: una ruta",
+  "{0} runs an older Hydor: update it there to send projects to it": "{0} usa una versión anterior de Hydor: actualízala allí para poder enviarle proyectos",
+  "{0}: true or false": "{0}: verdadero o falso"
 }

@@ -7,8 +7,14 @@
 // always asks of this server, whichever machine its page shows): it reads from one machine and writes to the other, its
 // own or another of Settings → Machines, and keeps the copies in sync while both are reachable.
 
-/** A machine: '' for this server's own, else the id of a machine in Settings → Machines. */
+/**
+ * A machine: '' for this server's own, else the id of a machine in Settings → Machines, or a machine that uses this one
+ * and is connected now ('c:…', ClientView.ref in shared/types.ts), which runs a sending to it itself.
+ */
 export type MachineRef = string;
+
+/** A machine that uses this one, connected now: this server cannot reach it, so a project sent to it goes by its own hub. */
+export const isClientRef = (ref: MachineRef) => ref.startsWith('c:');
 
 /** How a project goes: a copy there (this one stays), a copy kept in sync with this one, or moved (it leaves here). */
 export type SendHow = 'copy' | 'sync' | 'move';

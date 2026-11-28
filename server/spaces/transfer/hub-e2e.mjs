@@ -1,6 +1,8 @@
 // End to end: two real Hydor servers (ports 18811 and 18812, each with its own HOME, data folder and sign-in) linked as machines,
 // and a project sent from one to the other through the first one's hub routes: plan, copy, copy back, move, keep in sync (changes,
 // additions, deletions and a conflict on both sides, details and notes, the marks, stop syncing) and cancelling a big copy midway.
+// Then the other way round: b is used by a, so b lists a as a machine that uses it, and a project sent to it from b's own pages is
+// handed to a, which runs the sending (copy, sync, move, refused folders, cancel) while b keeps a mirror of it.
 // Builds the server from this checkout, starts and stops both servers itself and removes its scratch folder.
 //   node server/spaces/transfer/hub-e2e.mjs            (from the checkout's root; node_modules must be there)
 import { execFileSync, spawn } from 'node:child_process';
@@ -457,6 +459,99 @@ async function main() {
   })();
   check('cancel: nor staging in its data folder', stagingData === '', stagingData);
   check('cancel: the original is untouched', fs.readdirSync(folderBig).length === 13 && !!(await projectNamed('a', 'Big')));
+
+  // ---- handed over: b is used by a (a has b in its list), so b lists a as a machine that uses it and hands the sending to it ----
+  // Everything here is driven through b's own API, as a browser on b's pages would, to a machine b cannot reach by itself.
+  const ref = `c:${self.id}`;
+  const clientOf = async () => ((await api('b', 'GET', '/api/machines')).clients ?? []).find((c) => c.ref === ref);
+  // a had to connect to b again when b came back: it may take a minute.
+  const client = await until('a is listed on b as a client', clientOf, 120_000, 500);
+  check('handoff: b lists a as a client that takes projects, with its name and host', client.takes === true && client.name === 'hub' && client.version === (await api('a', 'GET', '/api/machine')).version && !!client.host, JSON.stringify(client));
+  const sendB = async (body) => (await api('b', 'POST', '/api/machines/projects/send', body)).transfer;
+  const transfersB = async () => (await api('b', 'GET', '/api/machines/projects/transfers')).transfers;
+  const waitB = (id, ms = 90_000) => until(`b transfer ${id}`, async () => (await transfersB()).find((x) => x.id === id && ['done', 'failed', 'cancelled'].includes(x.state)), ms, 200);
+  const transfersA = async () => (await api('a', 'GET', '/api/machines/projects/transfers')).transfers;
+  const makeOnB = async (name, files) => {
+    const dir = `${D.b.home}/work/${name.toLowerCase()}`;
+    for (const [rel, text] of Object.entries(files)) put(dir, rel, text, T0);
+    const sp = await api('b', 'POST', '/api/projects', { name, folder: dir, wikiMemory: false });
+    return { id: sp.id, dir };
+  };
+
+  const hc = await makeOnB('Handoff', { 'one.txt': 'one\n', 'deep/two.txt': 'two\n'.repeat(100), 'bin/run.sh': '#!/bin/sh\n' });
+  const hplan = await api('b', 'GET', `/api/machines/projects/plan?from=&project=${hc.id}&to=${encodeURIComponent(ref)}&leaveOut=1&also=0`);
+  check('handoff: the plan is made here and the place comes from a', hplan.plan.files.count >= 3 && hplan.place.folder === `${D.a.home}/work/handoff` && hplan.place.home === D.a.home, JSON.stringify(hplan.place));
+
+  // copy
+  let ht = await sendB({ from: '', project: hc.id, to: ref, how: 'copy', folder: hplan.place.folder });
+  check('handoff copy: starts as a mirror that is sending, from here to a', ht.state === 'sending' && ht.from.machine === '' && ht.to.machine === ref && ht.to.name === 'hub' && ht.project.id === hc.id, JSON.stringify(ht));
+  ht = await waitB(ht.id);
+  check('handoff copy: the mirror ends done, with the project on a and bytes counted', ht.state === 'done' && !!ht.result?.project && ht.done.files >= 3 && ht.done.bytes > 0 && ht.endedAt, JSON.stringify(ht));
+  const hOnA = (await projects('a')).find((x) => x.id === ht.result?.project);
+  check('handoff copy: it is in a\'s projects, as a copy that came from b, with the same files', !!hOnA && hOnA.name === 'Handoff' && hOnA.came?.how === 'copy' && hOnA.folder === `${D.a.home}/work/handoff` && same(tree(hc.dir), tree(hOnA.folder)), hOnA && diff(tree(hc.dir), tree(hOnA.folder)));
+  check('handoff copy: the original stays on b', !!(await projectNamed('b', 'Handoff')) && fs.existsSync(`${hc.dir}/one.txt`));
+  check('handoff copy: a ran it as its own sending (from b, to itself)', (await transfersA()).some((x) => x.project.id === hc.id && x.from.machine === gpu && x.to.machine === '' && x.state === 'done'));
+
+  // no folder given (an agent's call): it goes to the place the plan gives there
+  const hn = await makeOnB('HandoffNoFolder', { 'n.txt': 'n\n' });
+  const htn = await waitB((await sendB({ from: '', project: hn.id, to: ref, how: 'copy' })).id);
+  check('handoff copy: with no folder given, it goes to the place the plan gives there', htn.state === 'done' && htn.result?.folder === `${D.a.home}/work/handoffnofolder`, JSON.stringify(htn));
+
+  // a folder that is not empty: a's own words reach b\'s mirror
+  const dupeH = await waitB((await sendB({ from: '', project: hc.id, to: ref, how: 'copy', folder: hplan.place.folder })).id);
+  check('handoff copy: a folder with files in it is refused by a, and its words are in the mirror', dupeH.state === 'failed' && /files at/.test(dupeH.error ?? ''), JSON.stringify(dupeH));
+
+  // refused folders: outside a\'s home, hidden, with .. in it
+  for (const [what, folder] of [['outside its home folder', `/tmp/hydor-hub-e2e-outside/handoff`], ['in a hidden folder', `${D.a.home}/.hidden/handoff`], ['with ..', `${D.a.home}/work/../../outside`]]) {
+    const r = await raw('b', 'POST', '/api/machines/projects/send', { from: '', project: hc.id, to: ref, how: 'copy', folder });
+    check(`handoff: a folder ${what} is refused in words`, r.status === 400 && /^From here, a project can go only to a folder in that machine's home folder: to put it elsewhere, send it from Hydor on that machine$/.test(r.json?.error ?? ''), r.text);
+  }
+  check('handoff: a refused sending leaves nothing behind (no mirror, nothing on a)', !(await transfersB()).some((x) => x.state === 'sending') && !fs.existsSync('/tmp/hydor-hub-e2e-outside') && !fs.existsSync(`${D.a.home}/.hidden`));
+  const notThere = await raw('b', 'POST', '/api/machines/projects/send', { from: '', project: hc.id, to: 'c:00000000', how: 'copy', folder: hplan.place.folder });
+  check('handoff: a machine that is not connected is a 404 in words', notThere.status === 404 && /not connected now/.test(notThere.json?.error ?? ''), notThere.text);
+  const fromOther = await raw('b', 'POST', '/api/machines/projects/send', { from: 'somewhere', project: hc.id, to: ref, how: 'copy', folder: hplan.place.folder });
+  check('handoff: a sending from another machine is refused', fromOther.status === 400 && /own pages/.test(fromOther.json?.error ?? ''), fromOther.text);
+
+  // sync: a keeps the link, b\'s copy is marked as the other side of it
+  const hs = await makeOnB('HandoffSync', { 'a.txt': 'a\n', 'sub/b.txt': 'b\n' });
+  const syncFolder = `${D.a.home}/work/handoff-sync`;
+  ht = await waitB((await sendB({ from: '', project: hs.id, to: ref, how: 'sync', folder: syncFolder })).id);
+  check('handoff sync: the mirror ends done with the link', ht.state === 'done' && !!ht.result?.link && !!ht.result?.project, JSON.stringify(ht));
+  const aLink = await until('the link on a', async () => (await api('a', 'GET', '/api/machines/projects/links')).links.find((x) => x.id === ht.result.link && x.state === 'ok' && x.at), 40_000, 300);
+  check('handoff sync: a keeps the link, between its new project and b\'s', aLink.here.project === ht.result.project && aLink.there.project === hs.id && aLink.there.machine === gpu, JSON.stringify(aLink));
+  const markB = await until('the mark on b', async () => (await api('b', 'GET', `/api/projects/${hs.id}`)).space.sync, 30_000, 300);
+  check('handoff sync: b\'s project is marked, by a (its id), with the same link', markB.by.id === self.id && markB.link === ht.result.link, JSON.stringify(markB));
+  check('handoff sync: b is not the keeper: it has no link of its own', (await api('b', 'GET', '/api/machines/projects/links')).links.length === 0);
+  put(syncFolder, 'later.txt', 'written on a\n', Date.now());
+  check('handoff sync: a change on a reaches b', await until('later.txt on b', async () => fs.existsSync(`${hs.dir}/later.txt`), 40_000, 300).then(() => true, () => false));
+  await api('a', 'DELETE', `/api/machines/projects/links/${aLink.id}`);
+  check('handoff sync: a stops syncing: the marks go from both', await until('marks gone', async () => !(await api('b', 'GET', `/api/projects/${hs.id}`)).space.sync && !(await api('a', 'GET', `/api/projects/${ht.result.project}`)).space.sync, 30_000, 300).then(() => true, () => false));
+
+  // move: it leaves b (its folder to b\'s Trash), a has it
+  const hm = await makeOnB('HandoffMove', { 'm.txt': 'moved\n', 'x/y.txt': 'y\n' });
+  ht = await waitB((await sendB({ from: '', project: hm.id, to: ref, how: 'move', folder: `${D.a.home}/work/handoffmove` })).id);
+  check('handoff move: the mirror ends done, with b\'s Trash path', ht.state === 'done' && typeof ht.result?.trashed === 'string' && fs.existsSync(ht.result.trashed), JSON.stringify(ht.result));
+  check('handoff move: it left b (project and folder) and is on a with its files', !(await projectNamed('b', 'HandoffMove')) && !fs.existsSync(hm.dir) && (await projectNamed('a', 'HandoffMove'))?.came?.how === 'move' && fs.existsSync(`${D.a.home}/work/handoffmove/x/y.txt`));
+
+  // cancel a big one midway: both sides say cancelled
+  const hb = await makeOnB('HandoffBig', { 'small.txt': 'x' });
+  for (let i = 0; i < 12; i++) fs.writeFileSync(`${hb.dir}/blob${i}.bin`, crypto.randomBytes(40_000_000));
+  const bigT = await sendB({ from: '', project: hb.id, to: ref, how: 'copy', folder: `${D.a.home}/work/handoffbig` });
+  const midH = await until('some bytes sent by a', async () => {
+    const x = (await transfersB()).find((y) => y.id === bigT.id);
+    if (x.state !== 'sending') throw new Error(`it ended before it could be cancelled: ${x.state} ${x.error ?? ''}`);
+    return x.done.bytes > 30_000_000 ? x : null;
+  }, 90_000, 100);
+  check('handoff cancel: the mirror shows the progress and the plan\'s total', midH.done.bytes > 30_000_000 && midH.total.bytes > 480_000_000, JSON.stringify([midH.done, midH.total]));
+  await api('b', 'DELETE', `/api/machines/projects/transfers/${bigT.id}`);
+  const endedH = await waitB(bigT.id, 40_000);
+  check('handoff cancel: the mirror ends as cancelled', endedH.state === 'cancelled', `${endedH.state} ${endedH.error ?? ''}`);
+  const onA = await until('a ended it too', async () => (await transfersA()).find((x) => x.project.id === hb.id && ['done', 'failed', 'cancelled'].includes(x.state)), 30_000, 200);
+  check('handoff cancel: a\'s own transfer ended as cancelled', onA.state === 'cancelled', `${onA.state} ${onA.error ?? ''}`);
+  await sleep(2000);
+  const leftA = fs.readdirSync(`${D.a.home}/work`).filter((n) => n === 'handoffbig' || n.startsWith('.hydor-'));
+  check('handoff cancel: nothing is left on a (no project, no folder, no staging)', !(await projectNamed('a', 'HandoffBig')) && leftA.length === 0, `${leftA}`);
+  check('handoff cancel: the original is untouched on b', !!(await projectNamed('b', 'HandoffBig')) && fs.readdirSync(hb.dir).length === 13);
 }
 
 let code = 0;

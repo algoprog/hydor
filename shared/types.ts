@@ -634,6 +634,25 @@ export interface MachineView {
   status: MachineStatus;
 }
 
+/**
+ * A machine that uses this one (this server is in its Settings → Machines, with an access token made here) and is
+ * connected now. This server cannot reach it, but it listens on the socket it keeps open here, so a project can be sent
+ * to it from this server's own pages: it runs the sending itself (shared/transfer.ts, isClientRef).
+ */
+export interface ClientView {
+  /** How the hub names it: 'c:' and its own id (GET /api/machine there), or 'c:token-' and the token's id for an older Hydor that does not say. */
+  ref: string;
+  /** Its access token's name here (Settings → Machines → Access from other machines). */
+  name: string;
+  /** Its host name and Hydor version, as it says (missing from an older Hydor). */
+  host?: string;
+  version?: string;
+  /** It takes projects sent from here (a Hydor that says so when it connects). */
+  takes: boolean;
+  /** When it connected. */
+  since: number;
+}
+
 export interface MachineStatus {
   state: 'connecting' | 'online' | 'offline';
   /** Its hostname and Hydor version, once reached. */

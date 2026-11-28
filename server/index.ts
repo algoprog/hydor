@@ -40,8 +40,9 @@ import { DEFAULT_TASK_ROOT, taskRoot } from './assistants/store.ts';
 import { teamOf, tiersOf } from './assistants/tiers.ts';
 import { WORK_DIR as APPS_WORK_DIR } from './apps/runs.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
-import { accessOk, accessTokens, bearerOf, createAccessToken, machineId, machineInfo, Machines, revokeAccessToken } from './machines.ts';
-import { useTransferMachines } from './spaces/transfer/endpoints.ts';
+import { accessOk, accessTokenOf, accessTokens, bearerOf, createAccessToken, machineId, machineInfo, Machines, revokeAccessToken } from './machines.ts';
+import { MachineClients } from './machine-clients.ts';
+import { useTransferClients, useTransferMachines } from './spaces/transfer/endpoints.ts';
 import { briefOf, newsOf } from './machine-news.ts';
 import { createMcpToken, mcpRoutes, mcpTokens, OFFLINE_PAGE_CSP, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
 import { ModelManager } from './models/manager.ts';
@@ -142,6 +143,9 @@ const machines = new Machines(db);
 useMachines(machines);
 // Projects are sent to and kept in step with other machines' (spaces/transfer).
 useTransferMachines(machines);
+// The machines that use this one and are connected to it now: projects can be sent to them from its own pages.
+const machineClients = new MachineClients();
+useTransferClients(machineClients);
 const SYSTEM_CHANNEL = '@system';
 
 agentBaseEnv(); // capture the login environment once, up front
@@ -1908,6 +1912,7 @@ machines.on('notify', (n: NotifyEvent) => {
   tellDesktop({ type: 'notice', n, title: p.t.title, body, path: `/m/${n.machine!.id}${n.url ?? `/s/${encodeURIComponent(n.key)}`}` });
 });
 machines.on('changed', () => broadcast({ t: 'machines' }));
+machineClients.on('changed', () => broadcast({ t: 'machines' }));
 
 /**
  * This server's own sessions as the machine switcher shows them on a page of another machine: what needs you, what works
@@ -2025,6 +2030,11 @@ app.register(async (scope) => {
     // notices (?away=1), and so does another machine following this one (machines.ts).
     const stopLooking = (req.query as Record<string, string> | undefined)?.away ? null : machines.looked.enter('');
     ws.on('close', () => stopLooking?.());
+    // Another Hydor that uses this one keeps this socket open (with its access token): this server can ask it to do things.
+    const q = (req.query ?? {}) as Record<string, string>;
+    const bearer = q.away ? bearerOf(req.headers.authorization) : null;
+    const used = bearer ? accessTokenOf(db, bearer) : null;
+    if (used) machineClients.add(ws, { tokenId: used.id, tokenName: used.name, id: q.from, host: q.host, version: q.v, can: String(q.can ?? '').split(',').filter(Boolean) });
     send(c, { t: 'hello', version: config.version, build: currentBuild() });
     ws.on('message', async (raw) => {
       let m: ClientEvent;
@@ -2289,7 +2299,7 @@ mcpRoutes(app, db, sessions, (key) => `${publicBase()}/s/${encodeURIComponent(ke
 app.get('/api/machine', async () => ({ ...machineInfo(), id: machineId(db) }));
 
 /** The other machines this one uses (Settings → Machines); their pages are /m/<id>/… */
-app.get('/api/machines', async () => ({ self: { ...machineInfo(), id: machineId(db), status: selfStatus() }, machines: machines.list() }));
+app.get('/api/machines', async () => ({ self: { ...machineInfo(), id: machineId(db), status: selfStatus() }, machines: machines.list(), clients: machineClients.list() }));
 app.post('/api/machines', async (req) => ({ machine: await machines.add(req.body) }));
 app.patch('/api/machines/:id', async (req) => ({ machine: await machines.update((req.params as { id: string }).id, req.body) }));
 app.delete('/api/machines/:id', async (req) => {

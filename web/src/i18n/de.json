@@ -29815,5 +29815,19 @@
   "You can close this: it carries on, and a notice tells you when it is done.": "Du kannst das schließen: Es läuft weiter, und eine Benachrichtigung sagt dir, wenn es fertig ist.",
   "· {0} resets first, {1}": "· {0} wird zuerst zurückgesetzt, {1}",
   "{0} still has usage left, kept for the session that moved there.": "{0} hat noch Nutzung übrig, reserviert für die Sitzung, die dorthin gewechselt ist.",
-  "{0} still has usage left, kept for the {1} sessions that moved there.": "{0} hat noch Nutzung übrig, reserviert für die {1} Sitzungen, die dorthin gewechselt sind."
+  "{0} still has usage left, kept for the {1} sessions that moved there.": "{0} hat noch Nutzung übrig, reserviert für die {1} Sitzungen, die dorthin gewechselt sind.",
+  "Open it in Hydor on {0}: it is in its Projects": "Öffne es in Hydor auf {0}: Du findest es dort unter Projekte",
+  "Update Hydor there first": "Aktualisiere zuerst Hydor dort",
+  "A machine that uses this one takes projects only from this machine’s own pages": "Ein Computer, der diesen hier verwendet, übernimmt Projekte nur aus den eigenen Seiten dieses Computers",
+  "From here, a project can go only to a folder in that machine's home folder: to put it elsewhere, send it from Hydor on that machine": "Von hier aus kann ein Projekt nur in einen Ordner im Home-Ordner des anderen Computers gesendet werden: Um es woanders abzulegen, sende es aus Hydor auf dem anderen Computer",
+  "It is only starting: try again in a moment": "Der Vorgang startet gerade erst: Versuche es gleich noch einmal",
+  "That machine is not connected now: open Hydor there": "Dieser Computer ist gerade nicht verbunden: Öffne dort Hydor",
+  "That machine is taking two projects from here already: wait for one of them to end": "Dieser Computer übernimmt von hier bereits zwei Projekte: Warte, bis eines davon abgeschlossen ist",
+  "Unknown call": "Unbekannter Aufruf",
+  "also: a list of up to 50 folders": "also: eine Liste mit bis zu 50 Ordnern",
+  "handoff: an id": "handoff: eine ID",
+  "name: up to 200 characters": "name: bis zu 200 Zeichen",
+  "rel: a path": "rel: ein Pfad",
+  "{0} runs an older Hydor: update it there to send projects to it": "Auf {0} läuft eine ältere Version von Hydor: Aktualisiere Hydor dort, um Projekte dorthin zu senden",
+  "{0}: true or false": "{0}: true oder false"
 }

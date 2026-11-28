@@ -133,7 +133,7 @@ Cuando la carpeta del proyecto es un repositorio de Git, el final del menú ofre
 - **Mostrar en Finder**, **Mostrar en el Explorador de archivos** o **Mostrar en la carpeta**: en la app de escritorio, la carpeta del proyecto seleccionada en el administrador de archivos del sistema (consulta [Trabajar con archivos y carpetas](/guide/files-git#work-with-files-and-folders)).
 - **Solo sus sesiones en la barra lateral**: la lista de sesiones muestra solo las sesiones del proyecto, igual que el filtro de la propia barra lateral (consulta [Mostrar en la barra lateral las sesiones de un solo proyecto](#show-one-projects-sessions-in-the-sidebar)). Vuelve a elegirla para ver todas las sesiones.
 - **Compartir con otras personas**: invita a alguien (un asesor, un estudiante) a ver el proyecto y comentar sus documentos en un enlace propio (consulta [Compartir un proyecto con otras personas](#share-a-project-with-people)).
-- **Enviar a otra máquina…**: copia el proyecto a otra máquina que ejecute Hydor, múdalo allí o mantenlo sincronizado con una copia de allí (consulta [Enviar un proyecto a otra máquina](#send-a-project-to-another-machine)). Aparece cuando tienes otra máquina en [Configuración → Máquinas](/settings?s=machines), y no para un grupo.
+- **Enviar a otra máquina…**: copia el proyecto a otra máquina que ejecute Hydor, múdalo allí o mantenlo sincronizado con una copia de allí (consulta [Enviar un proyecto a otra máquina](#send-a-project-to-another-machine)). Aparece cuando tienes otra máquina en [Configuración → Máquinas](/settings?s=machines) o, en las páginas propias de esta máquina, mientras haya conectada una máquina que usa esta (consulta [Enviar a una máquina que usa esta](#send-to-a-machine-that-uses-this-one)), y no para un grupo.
 - **Sincronizar ahora** y **Dejar de sincronizar**: solo para un proyecto que se mantiene sincronizado con una copia. **Sincronizar ahora** aparece en la máquina que mantiene el vínculo (**Sincronizar de todos modos** cuando se retiene una ronda), y **Dejar de sincronizar** en ambas (consulta [Mantener dos copias sincronizadas](#keep-two-copies-in-sync)).
 - **Eliminar el proyecto** (consulta [Eliminar un proyecto](#delete-a-project)).
 
@@ -412,7 +412,7 @@ Cada máquina debe ejecutar Hydor 0.120.0 o una versión más reciente. Una máq
 ### Abrir el diálogo y elegir cómo
 
 1. Abre los detalles del proyecto y haz clic en **Más** (⋯) en la parte superior, o usa el ⋯ de su tarjeta en la página Proyectos. Elige **Enviar a otra máquina…**. La opción aparece cuando hay otra máquina a la que enviar.
-2. En **Para**, elige la máquina. Cada una muestra su estado; la que no responde aparece en gris, con el motivo (“Not reachable”, “Restarting”). La máquina en la que abriste la app también cuenta cuando el proyecto está en las páginas de otra máquina: el diálogo envía desde la máquina en cuyas páginas estás.
+2. En **Para**, elige la máquina. Cada una muestra su estado; la que no responde aparece en gris, con el motivo (“Not reachable”, “Restarting”). La máquina en la que abriste la app también cuenta cuando el proyecto está en las páginas de otra máquina: el diálogo envía desde la máquina en cuyas páginas estás. En las páginas propias de esta máquina aparecen también las máquinas que usan esta mientras estén conectadas (consulta [Enviar a una máquina que usa esta](#send-to-a-machine-that-uses-this-one)).
 3. En **Cómo**, elige una opción:
    - **Copiar**: se envía una copia allí y esta se queda como está.
    - **Mantener sincronizado**: se envía una copia allí, y un cambio en cualquiera de las dos llega a la otra mientras ambas máquinas estén encendidas (consulta [Mantener dos copias sincronizadas](#keep-two-copies-in-sync)). Aparece en gris (“One of the two must be this machine”) cuando el proyecto está en una de tus otras máquinas y también lo está aquella a la que lo envías: la máquina en la que abriste la app debe ser una de las dos, porque es la que mantiene el vínculo.
@@ -459,6 +459,18 @@ Cuando termina, el diálogo dice ““Thesis” is on GPU box now”, qué pas�
 
 Un archivo que cambia mientras se lee se omite de ese envío en lugar de copiarse a medio cambiar; vuelve a enviar, o mantén las dos copias sincronizadas, para traerlo.
 
+### Enviar a una máquina que usa esta
+
+Algunas máquinas llegan a esta, pero esta no llega a ellas: tu laptop tiene este servidor en su [Configuración → Máquinas](/settings?s=machines), pero un servidor no puede abrir una conexión hacia una laptop detrás de tu router. En las páginas propias de esta máquina (un servidor abierto en un navegador, en su dirección, por ejemplo), las máquinas que usan esta aparecen por eso también en **Para**, **mientras estén conectadas**, es decir, mientras Hydor se ejecuta en ellas. Cada una se llama como el token de acceso que usa aquí (el que creaste en **Configuración → Máquinas → Acceso desde otras máquinas**, consulta [Dejar que otras máquinas usen esta](/guide/devices#let-other-machines-use-this-one)): “My laptop”, por ejemplo.
+
+Como esta máquina no llega a ella, **la máquina que eliges hace el envío por sí misma**: lee el proyecto desde aquí y lo escribe allí, exactamente como si lo hubieras enviado desde Hydor en esa máquina. El diálogo funciona como siempre: **Qué se envía**, **Dónde en My laptop** (se le pregunta a esa máquina), **Copiar**, **Mantener sincronizado** o **Mover**, la barra (“Sending · 45% · …”), **Cancelar envío** y el aviso del final. No hay **Abrir allí**, porque esta máquina no puede abrir las páginas de la otra: el diálogo dice “Ábrelo en Hydor en My laptop: está en sus Proyectos”, con **Cerrar**.
+
+- **Las dos máquinas necesitan Hydor 0.122.0 o más reciente.** Una con un Hydor más antiguo aparece en gris (“Primero actualiza Hydor allí”).
+- **La carpeta allí debe estar en la carpeta personal de esa máquina.** Si no, el diálogo dice “Desde aquí, un proyecto solo puede ir a una carpeta dentro de la carpeta de inicio de esa máquina: para ponerlo en otro lugar, envíalo desde Hydor en esa máquina”.
+- **Mantener sincronizado**: la otra máquina mantiene el vínculo (consulta [Mantener dos copias sincronizadas](#keep-two-copies-in-sync)), así que las rondas se ejecutan mientras Hydor está en marcha en ella. En la copia de esta máquina no aparece **Sincronizar ahora**; el estado se muestra como siempre y **Dejar de sincronizar** también funciona aquí.
+- **Si no está conectada** cuando envías, el diálogo dice “Esa máquina no está conectada ahora: abre Hydor allí”. Si se va a mitad del envío (su app se cierra o se suspende) y no vuelve en 3 minutos, el envío aquí termina con “Lost touch with My laptop: open Hydor there to see whether it arrived”. Aun así, puede haber llegado: mira en sus Proyectos.
+- **Solo desde las páginas propias de esta máquina.** Un proyecto que está en las páginas de otra máquina no se puede enviar a una máquina que usa esta.
+
 ### Mantener dos copias sincronizadas
 
 **Mantener sincronizado** hace la copia como se explicó y después mantiene los dos proyectos iguales: un cambio que hagas en cualquiera de los dos llega al otro. Funciona mientras ambas máquinas estén encendidas; no hace falta que nada se esté ejecutando entre ellas.
@@ -483,7 +495,7 @@ Algo que el proyecto conservó (una página, un documento, una imagen…) es un 
 
 Si la otra máquina está apagada o no se puede alcanzar, el proyecto dice “Waiting for GPU box” y no se pierde nada: se sincroniza de nuevo cuando la máquina vuelve.
 
-**Qué máquina mantiene el vínculo.** Una máquina hace la sincronización: aquella en la que abriste la app cuando enviaste el proyecto (por eso mantener sincronizado exige que una de las dos sea esa máquina). **Sincronizar ahora** está solo allí. Ambos proyectos muestran el estado, y **Dejar de sincronizar** funciona en cualquiera de los dos.
+**Qué máquina mantiene el vínculo.** Una máquina hace la sincronización: aquella en la que abriste la app cuando enviaste el proyecto (por eso mantener sincronizado exige que una de las dos sea esa máquina); en un proyecto enviado a una máquina que usa esta (consulta [Enviar a una máquina que usa esta](#send-to-a-machine-that-uses-this-one)), esa máquina mantiene el vínculo. **Sincronizar ahora** está solo allí. Ambos proyectos muestran el estado, y **Dejar de sincronizar** funciona en cualquiera de los dos.
 
 ### Cuando ambas copias cambian el mismo archivo
 
@@ -664,6 +676,7 @@ Las herramientas de conocimiento nunca muestran los documentos de otro proyecto,
 - “Copia mi proyecto Tesis a mi GPU box, sin node_modules, y avísame cuando esté allí.”
 - “Mantén este proyecto sincronizado con la laptop.”
 - “Mueve mi proyecto Impuestos 2026 a la computadora de escritorio de casa.”
+- “Envía el proyecto Tesis a mi laptop.”
 - “¿Cuáles de mis proyectos se mantienen sincronizados con otra máquina y cuáles están en espera o retenidos?”
 - “Sincroniza ahora mi proyecto Tesis con la laptop y dime si algún archivo cambió en ambas.”
 - “Deja de sincronizar mi proyecto Tesis con la GPU box.”

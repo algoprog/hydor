@@ -81,17 +81,22 @@ export function bearerOf(header: unknown): string | null {
   return m ? m[1] : null;
 }
 
-export function accessOk(db: DB, token: string): boolean {
+/** The access token a header's value is, with its id and name (null: not one of ours); counts as a use of it. */
+export function accessTokenOf(db: DB, token: string): { id: string; name: string } | null {
   const h = Buffer.from(hashOf(token));
   const list = accessTokens(db);
   const t = list.find((x) => crypto.timingSafeEqual(Buffer.from(x.hash), h));
-  if (!t) return false;
+  if (!t) return null;
   // At most one write a minute for "last used".
   if (!t.lastUsed || Date.now() - t.lastUsed > 60_000) {
     t.lastUsed = Date.now();
     kvSet(db, 'machine_tokens', JSON.stringify(list));
   }
-  return true;
+  return { id: t.id, name: t.name };
+}
+
+export function accessOk(db: DB, token: string): boolean {
+  return accessTokenOf(db, token) !== null;
 }
 
 // ---- the machines this one uses -------------------------------------------------------------------
@@ -204,6 +209,19 @@ function killStaleTunnels() {
 /** How long a machine that went away while restarting into an update is expected back. */
 const RESTART_WAIT = 2 * 60_000;
 
+/** What a machine of this list asks of this server over its socket (a project handed to it to send: spaces/transfer/hub.ts). */
+export interface CallHandler {
+  call(machine: { id: string; name: string }, op: string, args: unknown): Promise<unknown>;
+  /** Its socket is open again: what it was told before may need telling once more. */
+  back(machine: { id: string; name: string }): void;
+}
+
+/** What each Machine gets of the Machines that keep it: what its socket says about this server, and who answers its calls. */
+interface Link {
+  announce(): string;
+  handler(): CallHandler | null;
+}
+
 /** One machine: how to reach it, and its events while connected. */
 class Machine extends EventEmitter {
   status: MachineStatus = { state: 'connecting', waiting: 0, working: 0 };
@@ -219,7 +237,10 @@ class Machine extends EventEmitter {
   private timer: NodeJS.Timeout | null = null;
   private closed = false;
 
-  constructor(public def: MachineDef) {
+  constructor(
+    public def: MachineDef,
+    private link: Link,
+  ) {
     super();
     if (def.via === 'ssh') {
       // One socket per tunnel, so an old ssh going away never takes a new one's socket with it. Socket
@@ -333,7 +354,8 @@ class Machine extends EventEmitter {
     }
     if (this.closed) return;
     // away: this server only listens to its news, so that is not looking at it.
-    const ws = new WebSocket(socketUrl(ep, '/ws?away=1'), { headers: { authorization: `Bearer ${this.def.token}` }, perMessageDeflate: false, handshakeTimeout: 15_000 });
+    // It says who it is and that it takes projects handed to it, so that machine can offer to send them here.
+    const ws = new WebSocket(socketUrl(ep, `/ws?away=1${this.link.announce()}`), { headers: { authorization: `Bearer ${this.def.token}` }, perMessageDeflate: false, handshakeTimeout: 15_000 });
     this.ws = ws;
     let error = '';
     ws.on('open', async () => {
@@ -344,6 +366,9 @@ class Machine extends EventEmitter {
         this.retry = 0;
         this.clearRestart();
         this.setStatus({ state: 'online', error: undefined, restarting: undefined, host: info.host, version: info.version, since: Date.now(), ...this.counts() });
+        try {
+          this.link.handler()?.back({ id: this.def.id, name: this.def.name });
+        } catch {}
       } catch (e) {
         error = (e as Error).message;
         ws.close();
@@ -366,6 +391,8 @@ class Machine extends EventEmitter {
         let share = typeof run?.share === 'number' ? run.share : run?.total ? (run.done ?? 0) / run.total : undefined;
         if (share !== undefined) share = Math.round(Math.max(0, Math.min(1, share)) * 100) / 100;
         this.setStatus({ update: run ? { phase: String(run.phase), ...(share !== undefined ? { share } : {}) } : undefined });
+      } else if (e.t === 'call' && typeof e.id === 'number' && typeof e.op === 'string') {
+        void this.answer(ws, e.id, e.op, e.args);
       } else if (e.t === 'notify' && e.n && !e.n.machine) {
         // Its own sessions' notices (ones it passes on from its machines would point at the wrong one).
         this.emit('notify', { ...(e.n as NotifyEvent), machine: { id: this.def.id, name: this.def.name } });
@@ -388,6 +415,33 @@ class Machine extends EventEmitter {
       this.setStatus({ state: 'offline', error: error || 'The connection closed', waiting: 0, working: 0, finished: undefined, news: undefined, update: undefined });
       this.later();
     });
+  }
+
+  /** Answers a call of that machine (sent up its socket) with a reply frame. */
+  private async answer(ws: WebSocket, id: number, op: string, args: unknown) {
+    const h = this.link.handler();
+    let frame: Record<string, unknown>;
+    if (!h) frame = { t: 'reply', id, ok: false, status: 501, error: 'This machine cannot do that' };
+    else {
+      try {
+        frame = { t: 'reply', id, ok: true, value: await h.call({ id: this.def.id, name: this.def.name }, op, args) };
+      } catch (e) {
+        frame = { t: 'reply', id, ok: false, status: e instanceof HttpError ? e.status : 500, error: (e as Error)?.message ?? String(e) };
+      }
+    }
+    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(frame));
+  }
+
+  /** Sends a frame up the open socket; false when there is none (it is told again once the socket is back). */
+  tell(frame: unknown): boolean {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(JSON.stringify(frame));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private counts() {
@@ -451,6 +505,12 @@ const DROP_RESPONSE = new Set(['connection', 'keep-alive', 'transfer-encoding', 
 
 export class Machines extends EventEmitter {
   private live = new Map<string, Machine>();
+  private handler: CallHandler | null = null;
+  /** What each machine's socket tells it about this server, and who answers what it asks. */
+  private link: Link = {
+    announce: () => `&from=${machineId(this.db)}&host=${encodeURIComponent(os.hostname())}&v=${encodeURIComponent(config.version)}&can=send`,
+    handler: () => this.handler,
+  };
   /** When you last looked at each machine, and this server ('' ): what finished since is news. */
   readonly looked: Looked;
 
@@ -485,7 +545,7 @@ export class Machines extends EventEmitter {
     try {
       killStaleTunnels();
     } catch {}
-    for (const d of this.defs()) this.track(new Machine(d));
+    for (const d of this.defs()) this.track(new Machine(d, this.link));
   }
 
   private track(m: Machine) {
@@ -499,6 +559,11 @@ export class Machines extends EventEmitter {
 
   list(): MachineView[] {
     return [...this.live.values()].map((m) => m.view());
+  }
+
+  /** Who answers the calls a machine of this list makes over its socket (the hub's, to send a project to this machine). */
+  setCallHandler(h: CallHandler | null) {
+    this.handler = h;
   }
 
   get(id: string): Machine {
@@ -554,7 +619,7 @@ export class Machines extends EventEmitter {
 
   /** Checks a machine answers before it is kept; a failed SSH tunnel is closed again. */
   private async tryOut(def: MachineDef): Promise<Machine> {
-    const m = new Machine(def);
+    const m = new Machine(def, this.link);
     try {
       await m.check();
       return m;

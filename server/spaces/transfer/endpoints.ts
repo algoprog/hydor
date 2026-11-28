@@ -8,10 +8,10 @@
 import type http from 'node:http';
 import os from 'node:os';
 import { Readable } from 'node:stream';
-import type { MachineView } from '../../../shared/types.ts';
+import type { ClientView, MachineView } from '../../../shared/types.ts';
 import { compareVersions } from '../../../shared/releases.ts';
 import type { ArrivalPlace, Arrived, CarryPlan, MachineRef, ProjectSyncMark, SendHow, SyncState } from '../../../shared/transfer.ts';
-import { TRANSFER_SINCE } from '../../../shared/transfer.ts';
+import { isClientRef, TRANSFER_SINCE } from '../../../shared/transfer.ts';
 import { HttpError } from '../../auth.ts';
 import { config } from '../../config.ts';
 import type { Deps } from '../../features/types.ts';
@@ -85,15 +85,36 @@ export interface MachinesFor {
     status: { state: string; error?: string };
     request(method: string, p: string, headers?: http.OutgoingHttpHeaders, timeoutMs?: number): Promise<http.ClientRequest>;
     reason(e: unknown): string;
+    /** Sends a frame up the machine's open socket (false: there is none). */
+    tell(frame: unknown): boolean;
   };
+  /** Who answers what a machine of the list asks of this server over its socket. */
+  setCallHandler(h: { call(machine: { id: string; name: string }, op: string, args: unknown): Promise<unknown>; back(machine: { id: string; name: string }): void } | null): void;
+}
+
+/** What this module needs of server/machine-clients.ts: the machines that use this one and are connected now. */
+export interface ClientsFor {
+  list(): ClientView[];
+  get(ref: string): ClientView | undefined;
+  call(ref: string, op: string, args: unknown, timeoutMs: number): Promise<unknown>;
+  /** 'transfer' (ref, handoff, Transfer), 'gone' (ref) and 'back' (ref). */
+  on(event: string, fn: (...a: any[]) => void): unknown;
+  off(event: string, fn: (...a: any[]) => void): unknown;
 }
 
 let machines: MachinesFor | null = null;
+let clients: ClientsFor | null = null;
 let local: Pick<Deps, 'db' | 'broadcast' | 'sessions'> | null = null;
 
 export function useTransferMachines(m: MachinesFor) {
   machines = m;
 }
+export function useTransferClients(c: ClientsFor) {
+  clients = c;
+}
+/** The machines of Settings → Machines, and those that use this one (null before the server has made them). */
+export const transferMachines = () => machines;
+export const transferClients = () => clients;
 /** This server's own projects (set by the hub's routes, which get the app's deps). */
 export function useTransferLocal(d: Pick<Deps, 'db' | 'broadcast' | 'sessions'>) {
   local = d;
@@ -102,8 +123,8 @@ export function useTransferLocal(d: Pick<Deps, 'db' | 'broadcast' | 'sessions'>)
 /** This server's name in words: its host name. */
 export const selfName = () => os.hostname();
 
-const SHORT = 30_000;
-const LONG = 120_000;
+export const SHORT = 30_000;
+export const LONG = 120_000;
 const enc = encodeURIComponent;
 
 const FACTS_FOR = 60_000;
@@ -273,9 +294,44 @@ function remoteEndpoint(ref: string): Endpoint {
   };
 }
 
-/** The endpoint of a machine: '' for this server, else the id of one in Settings → Machines. */
+// ---- a machine that uses this one ----------------------------------------------------------------------------
+
+/** It cannot be reached from here: it is asked what is needed to plan, and sends the project itself (hub.ts). */
+function clientEndpoint(ref: string): Endpoint {
+  if (!clients) throw new HttpError(503, 'The app is still starting');
+  const c = clients.get(ref);
+  if (!c) throw new HttpError(404, 'That machine is not connected now: open Hydor there');
+  // An older Hydor would not answer the calls below at all: said at once, not after a wait.
+  if (!c.takes) throw new HttpError(409, `${c.name} runs an older Hydor: update it there to send projects to it`);
+  const name = c.name;
+  const never = async (): Promise<never> => {
+    throw new Unreachable(`${name} takes projects from here only by sending them itself`);
+  };
+  return {
+    ref,
+    name,
+    async info() {
+      const j = ((await clients!.call(ref, 'info', {}, SHORT)) ?? {}) as Partial<MachineFacts>;
+      return { host: String(j.host ?? name), version: String(j.version ?? ''), home: String(j.home ?? ''), platform: String(j.platform ?? ''), id: String(j.id ?? '') };
+    },
+    place: async (q) => (await clients!.call(ref, 'place', q, LONG)) as ArrivalPlace,
+    plan: never,
+    bundle: never,
+    arrive: never,
+    leave: never,
+    state: never,
+    hashes: never,
+    stats: never,
+    pull: never,
+    push: never,
+    apply: never,
+    mark: never,
+  };
+}
+
+/** The endpoint of a machine: '' for this server, a machine that uses this one ('c:…'), else the id of one in Settings → Machines. */
 export function endpointOf(ref: MachineRef): Endpoint {
-  return ref === '' ? localEndpoint() : remoteEndpoint(ref);
+  return ref === '' ? localEndpoint() : isClientRef(ref) ? clientEndpoint(ref) : remoteEndpoint(ref);
 }
 
 /** Whether an error says the project there is gone. */

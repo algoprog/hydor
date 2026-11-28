@@ -133,7 +133,7 @@ Ouvrez-les comme décrit dans [Ouvrir les détails d’un projet](#open-a-projec
 - **Afficher dans le Finder**, **Afficher dans l’Explorateur de fichiers** ou **Afficher dans le dossier** : dans l’app de bureau, le dossier du projet sélectionné dans le gestionnaire de fichiers du système (voir [Travailler avec des fichiers et des dossiers](/guide/files-git#work-with-files-and-folders)).
 - **Seulement ses sessions dans la barre latérale** : la liste des sessions n’affiche que les sessions du projet, comme le filtre propre à la barre latérale (voir [Afficher les sessions d’un seul projet dans la barre latérale](#show-one-projects-sessions-in-the-sidebar)). Choisissez-le de nouveau pour voir toutes les sessions.
 - **Partager avec des personnes** : invitez quelqu’un (un directeur de recherche, un étudiant) à voir le projet et à commenter ses documents via un lien qui lui est propre (voir [Partager un projet avec des personnes](#share-a-project-with-people)).
-- **Envoyer vers une autre machine…** : copiez le projet vers une autre machine exécutant Hydor, déplacez-le là-bas, ou gardez-le synchronisé avec une copie qui s’y trouve (voir [Envoyer un projet vers une autre machine](#send-a-project-to-another-machine)). Cette option apparaît dès que vous avez une autre machine dans [Paramètres → Machines](/settings?s=machines), et pas pour un groupe.
+- **Envoyer vers une autre machine…** : copiez le projet vers une autre machine exécutant Hydor, déplacez-le là-bas, ou gardez-le synchronisé avec une copie qui s’y trouve (voir [Envoyer un projet vers une autre machine](#send-a-project-to-another-machine)). Cette option apparaît dès que vous avez une autre machine dans [Paramètres → Machines](/settings?s=machines) ou, sur les pages propres à cette machine, tant qu’une machine qui utilise celle-ci y est connectée (voir [Envoyer vers une machine qui utilise celle-ci](#send-to-a-machine-that-uses-this-one)), et pas pour un groupe.
 - **Synchroniser maintenant** et **Arrêter la synchronisation** : uniquement pour un projet gardé synchronisé avec une copie. **Synchroniser maintenant** apparaît sur la machine qui garde le lien (**Synchroniser quand même** à la place lorsqu’un tour est retenu), et **Arrêter la synchronisation** sur les deux (voir [Garder deux copies synchronisées](#keep-two-copies-in-sync)).
 - **Supprimer le projet** (voir [Supprimer un projet](#delete-a-project)).
 
@@ -412,7 +412,7 @@ Chaque machine doit exécuter Hydor 0.120.0 ou une version plus récente. Une ma
 ### Ouvrir la boîte de dialogue et choisir comment
 
 1. Ouvrez les détails du projet et cliquez sur **Plus** (⋯) en haut, ou utilisez le ⋯ de sa carte sur la page Projets. Choisissez **Envoyer vers une autre machine…**. Cet élément apparaît dès qu’il existe une autre machine vers laquelle envoyer.
-2. Sous **À**, choisissez la machine. Chacune indique son état ; une machine qui ne répond pas est grisée, avec la raison (« Not reachable », « Restarting »). La machine sur laquelle vous avez ouvert l’app compte aussi lorsque le projet se trouve sur les pages d’une autre machine : la boîte de dialogue envoie depuis la machine dont vous consultez les pages.
+2. Sous **À**, choisissez la machine. Chacune indique son état ; une machine qui ne répond pas est grisée, avec la raison (« Not reachable », « Restarting »). La machine sur laquelle vous avez ouvert l’app compte aussi lorsque le projet se trouve sur les pages d’une autre machine : la boîte de dialogue envoie depuis la machine dont vous consultez les pages. Sur les pages propres à cette machine, les machines qui utilisent celle-ci sont listées aussi tant qu’elles sont connectées (voir [Envoyer vers une machine qui utilise celle-ci](#send-to-a-machine-that-uses-this-one)).
 3. Sous **Comment**, choisissez une option :
    - **Copier** : une copie part là-bas, et celui-ci reste tel quel.
    - **Garder synchronisé** : une copie part là-bas, et une modification faite sur l’un des deux parvient à l’autre tant que les deux machines sont allumées (voir [Garder deux copies synchronisées](#keep-two-copies-in-sync)). L’option est grisée (« One of the two must be this machine ») lorsque le projet se trouve sur l’une de vos autres machines et que c’est aussi le cas de la destination : la machine sur laquelle vous avez ouvert l’app doit être l’une des deux, car c’est elle qui garde le lien.
@@ -459,6 +459,18 @@ Une fois terminé, la boîte de dialogue indique « “Thesis” is on GPU box n
 
 Un fichier qui change pendant sa lecture est laissé de côté pour cet envoi plutôt que copié à moitié modifié ; envoyez de nouveau, ou gardez les deux copies synchronisées, pour le transférer.
 
+### Envoyer vers une machine qui utilise celle-ci
+
+Certaines machines atteignent celle-ci, mais celle-ci ne les atteint pas : votre portable a ce serveur dans ses [Paramètres → Machines](/settings?s=machines), mais un serveur ne peut pas ouvrir de connexion vers un portable derrière votre box. Sur les pages propres à cette machine (un serveur ouvert dans un navigateur à son adresse, par exemple), les machines qui utilisent celle-ci sont donc listées aussi sous **À**, **tant qu’elles sont connectées**, c’est-à-dire tant que Hydor tourne dessus. Chacune porte le nom du jeton d’accès qu’elle utilise ici (celui que vous avez créé dans **Paramètres → Machines → Accès depuis d’autres machines**, voir [Laisser d’autres machines utiliser celle-ci](/guide/devices#let-other-machines-use-this-one)) : « My laptop », par exemple.
+
+Comme cette machine ne l’atteint pas, **la machine que vous choisissez fait l’envoi elle-même** : elle lit le projet depuis ici et l’écrit chez elle, exactement comme si vous l’aviez envoyé depuis Hydor sur cette machine. La boîte de dialogue fonctionne comme d’habitude : **Ce qui part**, **Où sur My laptop** (demandé à cette machine), **Copier**, **Garder synchronisé** ou **Déplacer**, la barre (« Sending · 45% · … »), **Annuler l’envoi** et la notification à la fin. Il n’y a pas de **L’ouvrir là-bas**, car cette machine ne peut pas ouvrir les pages de l’autre : la boîte de dialogue indique « Ouvrez-le dans Hydor sur My laptop : il se trouve dans ses Projets », avec **Fermer**.
+
+- **Les deux machines doivent avoir Hydor 0.122.0 ou plus récent.** Une machine avec un Hydor plus ancien est grisée (« Commencez par y mettre Hydor à jour »).
+- **Le dossier là-bas doit se trouver dans le dossier personnel de cette machine.** Sinon, la boîte de dialogue indique « Depuis ici, un projet ne peut être envoyé que dans un dossier du dossier personnel de cette machine : pour le placer ailleurs, envoyez-le depuis Hydor sur cette machine ».
+- **Garder synchronisé** : l’autre machine garde le lien (voir [Garder deux copies synchronisées](#keep-two-copies-in-sync)), donc les tours s’exécutent tant que Hydor tourne dessus. Sur la copie de cette machine, **Synchroniser maintenant** n’apparaît pas ; l’état s’affiche comme d’habitude, et **Arrêter la synchronisation** fonctionne aussi ici.
+- **Si elle n’est pas connectée** quand vous envoyez, la boîte de dialogue indique « Cette machine n’est pas connectée pour le moment : ouvrez Hydor sur cette machine ». Si elle disparaît en cours d’envoi (son app se ferme ou elle se met en veille) et ne revient pas en 3 minutes, l’envoi se termine ici par « Lost touch with My laptop: open Hydor there to see whether it arrived ». Il peut malgré tout être arrivé : regardez dans ses Projets.
+- **Seulement depuis les pages propres à cette machine.** Un projet qui se trouve sur les pages d’une autre machine ne peut pas être envoyé vers une machine qui utilise celle-ci.
+
 ### Garder deux copies synchronisées
 
 **Garder synchronisé** fait la copie comme ci-dessus, puis maintient les deux projets identiques : une modification faite sur l’un parvient à l’autre. Cela fonctionne tant que les deux machines sont allumées ; rien n’a besoin de tourner entre les deux.
@@ -483,7 +495,7 @@ Ce que le projet a gardé (une page, un document, une image…) est un fichier d
 
 Si l’autre machine est éteinte ou injoignable, le projet indique « Waiting for GPU box » et rien n’est perdu : la synchronisation reprend au retour de la machine.
 
-**Quelle machine garde le lien.** Une seule machine fait la synchronisation : celle sur laquelle vous aviez ouvert l’app en envoyant le projet (c’est pourquoi garder synchronisé exige que l’une des deux soit cette machine). **Synchroniser maintenant** n’existe que là. Les deux projets affichent l’état, et **Arrêter la synchronisation** fonctionne sur l’un comme sur l’autre.
+**Quelle machine garde le lien.** Une seule machine fait la synchronisation : celle sur laquelle vous aviez ouvert l’app en envoyant le projet (c’est pourquoi garder synchronisé exige que l’une des deux soit cette machine) ; pour un projet envoyé vers une machine qui utilise celle-ci (voir [Envoyer vers une machine qui utilise celle-ci](#send-to-a-machine-that-uses-this-one)), c’est cette machine qui garde le lien. **Synchroniser maintenant** n’existe que là. Les deux projets affichent l’état, et **Arrêter la synchronisation** fonctionne sur l’un comme sur l’autre.
 
 ### Quand les deux copies modifient le même fichier
 
@@ -664,6 +676,7 @@ Les outils de connaissances ne font jamais apparaître les documents d’un autr
 - « Copie mon projet Thèse sur ma machine GPU, sans node_modules, et dis-moi quand il y est. »
 - « Garde ce projet synchronisé avec le portable. »
 - « Déplace mon projet Impôts 2026 vers l’ordinateur de bureau à la maison. »
+- « Envoie le projet Thèse vers mon portable. »
 - « Lesquels de mes projets sont gardés synchronisés avec une autre machine, et lesquels sont en attente ou retenus ? »
 - « Synchronise maintenant mon projet Thèse avec le portable, et dis-moi si un fichier a été modifié des deux côtés. »
 - « Arrête la synchronisation de mon projet Thèse avec la machine GPU. »

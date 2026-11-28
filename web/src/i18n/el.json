@@ -31021,5 +31021,19 @@
   "You can close this: it carries on, and a notice tells you when it is done.": "Μπορείτε να το κλείσετε: συνεχίζεται και θα ειδοποιηθείτε όταν ολοκληρωθεί.",
   "· {0} resets first, {1}": "· Ο λογαριασμός {0} επαναφέρεται πρώτος, {1}",
   "{0} still has usage left, kept for the session that moved there.": "Ο λογαριασμός {0} έχει ακόμη διαθέσιμη χρήση, κρατημένη για τη συνεδρία που μεταφέρθηκε εκεί.",
-  "{0} still has usage left, kept for the {1} sessions that moved there.": "Ο λογαριασμός {0} έχει ακόμη διαθέσιμη χρήση, κρατημένη για τις {1} συνεδρίες που μεταφέρθηκαν εκεί."
+  "{0} still has usage left, kept for the {1} sessions that moved there.": "Ο λογαριασμός {0} έχει ακόμη διαθέσιμη χρήση, κρατημένη για τις {1} συνεδρίες που μεταφέρθηκαν εκεί.",
+  "Open it in Hydor on {0}: it is in its Projects": "Ανοίξτε το στο Hydor στο {0}: βρίσκεται στα Έργα του",
+  "Update Hydor there first": "Ενημερώστε πρώτα εκεί το Hydor",
+  "A machine that uses this one takes projects only from this machine’s own pages": "Ένα μηχάνημα που χρησιμοποιεί αυτό το μηχάνημα δέχεται έργα μόνο από τις δικές του σελίδες",
+  "From here, a project can go only to a folder in that machine's home folder: to put it elsewhere, send it from Hydor on that machine": "Από εδώ, ένα έργο μπορεί να σταλεί μόνο σε φάκελο μέσα στον αρχικό φάκελο (home) εκείνου του μηχανήματος: για να το τοποθετήσετε αλλού, στείλτε το από το Hydor σε εκείνο το μηχάνημα",
+  "It is only starting: try again in a moment": "Μόλις ξεκινά: δοκιμάστε ξανά σε λίγο",
+  "That machine is not connected now: open Hydor there": "Αυτό το μηχάνημα δεν είναι συνδεδεμένο αυτή τη στιγμή: ανοίξτε το Hydor εκεί",
+  "That machine is taking two projects from here already: wait for one of them to end": "Αυτό το μηχάνημα δέχεται ήδη δύο έργα από εδώ: περιμένετε να ολοκληρωθεί το ένα από αυτά",
+  "Unknown call": "Άγνωστη κλήση",
+  "also: a list of up to 50 folders": "also: μια λίστα με έως και 50 φακέλους",
+  "handoff: an id": "handoff: ένα αναγνωριστικό",
+  "name: up to 200 characters": "name: έως 200 χαρακτήρες",
+  "rel: a path": "rel: μια διαδρομή",
+  "{0} runs an older Hydor: update it there to send projects to it": "Το {0} εκτελεί παλαιότερη έκδοση του Hydor: ενημερώστε την εκεί για να στείλετε έργα σε αυτό",
+  "{0}: true or false": "{0}: true ή false"
 }

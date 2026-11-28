@@ -3,10 +3,12 @@
 // history, what is left out because a command makes it again, its notes, skills, documents, wiki and kept things) and
 // where it would land there (an editable folder, the free space). Then it runs in the background: a bar, Cancel, and at
 // the end Open it there. Closing the dialog while it runs leaves it running. SendHost.tsx opens it from anywhere.
+// On this server's own pages the machines that use it and are connected now are listed too: one of them runs the sending
+// itself (this server cannot reach it), the bar follows what it says, and at the end it says where to open it instead.
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowUpRight, Check, Copy, MoveRight, RefreshCw } from 'lucide-react';
 import type { Space } from '@shared/spaces';
-import type { ArrivalPlace, CarryPlan, SendHow, Transfer } from '@shared/transfer';
+import { isClientRef, type ArrivalPlace, type CarryPlan, type SendHow, type Transfer } from '@shared/transfer';
 import { Button, cx, Dialog, inputCls, Throbber } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { LOCALE } from '../../i18n/locale';
@@ -95,6 +97,7 @@ const Label = ({ children }: { children: React.ReactNode }) => <div className="m
 export function SendDialog({ space, onClose }: { space: Pick<Space, 'id' | 'name'>; onClose: () => void }) {
   const self = useMachines((s) => s.self);
   const list = useMachines((s) => s.list);
+  const clients = useMachines((s) => s.clients);
   const loaded = useMachines((s) => s.loaded);
   useEffect(() => {
     if (!loaded) useMachines.getState().load().catch(() => {});
@@ -110,8 +113,9 @@ export function SendDialog({ space, onClose }: { space: Pick<Space, 'id' | 'name
       const off = m.status.state === 'offline' ? (m.status.restarting ? tr('Restarting') : tr('Not reachable')) : undefined;
       out.push({ ref: m.id, name: m.name, dot: machineDot(m.status), off });
     }
+    if (!machineId) for (const c of clients) out.push({ ref: c.ref, name: c.name, dot: 'bg-ok', off: c.takes ? undefined : tr('Update Hydor there first') });
     return out;
-  }, [self, list]);
+  }, [self, list, clients]);
 
   const [to, setTo] = useState<string | null>(null);
   const [how, setHow] = useState<SendHow>('copy');
@@ -223,6 +227,10 @@ export function SendDialog({ space, onClose }: { space: Pick<Space, 'id' | 'name
         Close
       </Button>
     </>
+  ) : ended && transfer.state === 'done' && isClientRef(transfer.to.machine) ? (
+    <Button variant="ghost" onClick={close}>
+      Close
+    </Button>
   ) : ended && transfer.state === 'done' ? (
     <>
       <Button variant="ghost" onClick={close}>
@@ -410,6 +418,11 @@ function Progress({ t }: { t: Transfer }) {
             <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">
               {t.how === 'sync' ? tr('The two are kept in sync while both machines are on.') : t.how === 'move' ? (r?.trashed ? tr(`Its folder here is in the Trash: ${r.trashed}`) : r?.kept ? tr(`Its folder here stayed where it was: ${r.kept}`) : tr('It has left this machine.')) : tr('This one stays as it is.')}
             </div>
+            {isClientRef(t.to.machine) && (
+              <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3" translate="no">
+                {tr(`Open it in Hydor on ${t.to.name}: it is in its Projects`)}
+              </div>
+            )}
           </div>
         </div>
         {!!r?.leftOut.length && (

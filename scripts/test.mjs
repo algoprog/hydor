@@ -91,7 +91,7 @@ const worker = async () => {
     const data = path.join(scratch, id);
     fs.mkdirSync(data, { recursive: true });
     // A test that asks for a home folder of its own (those of web apps, which start programs that write there) gets one beside its scratch folder.
-    const home = /Run with HOME/.test(fs.readFileSync(path.join(root, file), 'utf8')) ? path.join(scratch, `${id}-home`) : null;
+    const home = /Run with (DATA_DIR=\S+ and )?HOME/.test(fs.readFileSync(path.join(root, file), 'utf8')) ? path.join(scratch, `${id}-home`) : null;
     if (home) fs.mkdirSync(home, { recursive: true });
     const t0 = Date.now();
     const built = await run(process.execPath, ['scripts/build-server.mjs', file], { OUTDIR: out }, 5 * 60_000);

@@ -29182,5 +29182,19 @@
   "You can close this: it carries on, and a notice tells you when it is done.": "閉じても処理は続き、完了すると通知でお知らせします。",
   "· {0} resets first, {1}": "・{0}が先にリセットされます（{1}）",
   "{0} still has usage left, kept for the session that moved there.": "{0}にはまだ使用量が残っています。移動したセッション用に確保されています。",
-  "{0} still has usage left, kept for the {1} sessions that moved there.": "{0}にはまだ使用量が残っています。移動した{1}件のセッション用に確保されています。"
+  "{0} still has usage left, kept for the {1} sessions that moved there.": "{0}にはまだ使用量が残っています。移動した{1}件のセッション用に確保されています。",
+  "Open it in Hydor on {0}: it is in its Projects": "{0}のHydorで開いてください。プロジェクトの中にあります",
+  "Update Hydor there first": "先にそちらのHydorを更新してください",
+  "A machine that uses this one takes projects only from this machine’s own pages": "このマシンを利用しているマシンは、このマシン自身のページからのみプロジェクトを受け取れます",
+  "From here, a project can go only to a folder in that machine's home folder: to put it elsewhere, send it from Hydor on that machine": "ここからは、プロジェクトをそのマシンのホームフォルダ内のフォルダにのみ送れます。別の場所に置くには、そのマシンのHydorから送信してください",
+  "It is only starting: try again in a moment": "まだ起動中です。しばらくしてからもう一度お試しください",
+  "That machine is not connected now: open Hydor there": "そのマシンは現在接続されていません。そのマシンでHydorを開いてください",
+  "That machine is taking two projects from here already: wait for one of them to end": "そのマシンはすでにここから2つのプロジェクトを受け取っています。どちらかが終わるまでお待ちください",
+  "Unknown call": "不明な呼び出しです",
+  "also: a list of up to 50 folders": "also：最大50件のフォルダのリスト",
+  "handoff: an id": "handoff：ID",
+  "name: up to 200 characters": "name：200文字まで",
+  "rel: a path": "rel：パス",
+  "{0} runs an older Hydor: update it there to send projects to it": "{0}は古いバージョンのHydorを使っています。プロジェクトを送るには、そのマシンでHydorを更新してください",
+  "{0}: true or false": "{0}：true または false"
 }

@@ -56,8 +56,9 @@ export function SpaceMenu({ s, onOpen }: { s: Space; onOpen?: (open: boolean) =>
   useEffect(() => onOpen?.(open), [open]);
   const filter = useUI((x) => x.spaceFilter);
   const [confirm, confirmNode] = useConfirm();
-  // Another machine to send it to: this server's own counts when the page shows another machine.
-  const others = useMachines((x) => x.list.filter((m) => m.id !== machineId).length + (machineId && x.self ? 1 : 0));
+  // Another machine to send it to: this server's own counts when the page shows another machine, and on this server's own
+  // pages so do the machines that use it and are connected now (they run the sending themselves).
+  const others = useMachines((x) => x.list.filter((m) => m.id !== machineId).length + (machineId && x.self ? 1 : 0) + (machineId ? 0 : x.clients.length));
   const keeper = useKeepsLink(s.sync);
   const pick = (f: () => void) => () => {
     setOpen(false);

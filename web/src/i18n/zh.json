@@ -31018,5 +31018,19 @@
   "You can close this: it carries on, and a notice tells you when it is done.": "你可以关闭此窗口：它会继续进行，完成时会通知你。",
   "· {0} resets first, {1}": "· {0} 最先重置，{1}",
   "{0} still has usage left, kept for the session that moved there.": "{0} 仍有剩余用量，已留给迁移到那里的会话。",
-  "{0} still has usage left, kept for the {1} sessions that moved there.": "{0} 仍有剩余用量，已留给迁移到那里的 {1} 个会话。"
+  "{0} still has usage left, kept for the {1} sessions that moved there.": "{0} 仍有剩余用量，已留给迁移到那里的 {1} 个会话。",
+  "Open it in Hydor on {0}: it is in its Projects": "在 {0} 上的 Hydor 中打开它：它位于“项目”里",
+  "Update Hydor there first": "请先在那台设备上更新 Hydor",
+  "A machine that uses this one takes projects only from this machine’s own pages": "使用本机的机器只能从本机自己的页面获取项目",
+  "From here, a project can go only to a folder in that machine's home folder: to put it elsewhere, send it from Hydor on that machine": "从这里发送的项目只能放到那台机器主文件夹中的某个文件夹里：若要放到其他位置，请在那台机器上的 Hydor 中发送",
+  "It is only starting: try again in a moment": "它才刚开始启动：请稍后再试",
+  "That machine is not connected now: open Hydor there": "那台机器当前未连接：请在那台机器上打开 Hydor",
+  "That machine is taking two projects from here already: wait for one of them to end": "那台机器已经在接收来自这里的两个项目：请等其中一个完成",
+  "Unknown call": "未知调用",
+  "also: a list of up to 50 folders": "also：最多 50 个文件夹的列表",
+  "handoff: an id": "handoff：一个 id",
+  "name: up to 200 characters": "name：最多 200 个字符",
+  "rel: a path": "rel：一个路径",
+  "{0} runs an older Hydor: update it there to send projects to it": "{0} 运行的是旧版 Hydor：请先在那台机器上更新，才能向它发送项目",
+  "{0}: true or false": "{0}：true 或 false"
 }

@@ -133,7 +133,7 @@ Open them as described in [Open a project's details](#open-a-projects-details). 
 - **Show in Finder**, **Show in File Explorer** or **Show in folder**: in the desktop app, the project's folder selected in the system's file manager (see [Work with files and folders](/guide/files-git#work-with-files-and-folders)).
 - **Only its sessions in the sidebar**: the session list shows only the sessions in the project, as the sidebar's own filter does (see [Show one project's sessions in the sidebar](#show-one-projects-sessions-in-the-sidebar)). Pick it again to see every session.
 - **Share with people**: invite someone (an advisor, a student) to see the project and comment on its documents at a link of their own (see [Share a project with people](#share-a-project-with-people)).
-- **Send to another machine…**: copy the project to another machine running Hydor, move it there, or keep it in sync with a copy there (see [Send a project to another machine](#send-a-project-to-another-machine)). It shows once you have another machine in [Settings → Machines](/settings?s=machines), and not for a group.
+- **Send to another machine…**: copy the project to another machine running Hydor, move it there, or keep it in sync with a copy there (see [Send a project to another machine](#send-a-project-to-another-machine)). It shows once you have another machine in [Settings → Machines](/settings?s=machines), or, on this machine's own pages, while a machine that uses this one is connected (see [Send to a machine that uses this one](#send-to-a-machine-that-uses-this-one)), and not for a group.
 - **Sync now** and **Stop syncing**: only for a project kept in sync with a copy. **Sync now** shows on the machine that keeps the link (**Sync anyway** instead when a round is held back), and **Stop syncing** on both (see [Keep two copies in sync](#keep-two-copies-in-sync)).
 - **Delete the project** (see [Delete a project](#delete-a-project)).
 
@@ -412,7 +412,7 @@ Each machine has to run Hydor 0.120.0 or newer. A machine with an older one says
 ### Open the dialog and choose how
 
 1. Open the project's details and click **More** (⋯) at its top, or use the ⋯ on its card on the Projects page. Pick **Send to another machine…**. The item shows once there is another machine to send to.
-2. Under **To**, pick the machine. Each shows its state; one that doesn't answer is greyed out, with why ("Not reachable", "Restarting"). The machine you opened the app on counts too when the project is on another machine's pages: the dialog sends from the machine whose pages you are on.
+2. Under **To**, pick the machine. Each shows its state; one that doesn't answer is greyed out, with why ("Not reachable", "Restarting"). The machine you opened the app on counts too when the project is on another machine's pages: the dialog sends from the machine whose pages you are on. On this machine's own pages, the machines that use this one are listed too while they are connected (see [Send to a machine that uses this one](#send-to-a-machine-that-uses-this-one)).
 3. Under **How**, pick one:
    - **Copy**: a copy goes there, and this one stays as it is.
    - **Keep in sync**: a copy goes there, and a change on either one reaches the other while both machines are on (see [Keep two copies in sync](#keep-two-copies-in-sync)). It is greyed out ("One of the two must be this machine") when the project is on one of your other machines and so is the one you send it to: the machine you opened the app on has to be one of the two, since it keeps the link.
@@ -459,6 +459,18 @@ When it is done the dialog says "“Thesis” is on GPU box now", what became of
 
 A file that changes while it is being read is left out of that sending rather than copied half changed; send again, or keep the two in sync, to bring it over.
 
+### Send to a machine that uses this one
+
+Some machines reach this one, but this one can't reach them: your laptop has this server in its [Settings → Machines](/settings?s=machines), but a server can't open a connection back to a laptop behind your router. On this machine's own pages (a server opened in a browser at its address, say), the machines that use this one are therefore listed under **To** too, **while they are connected**, that is, while Hydor runs on them. Each is named by the access token it uses here (the one made in **Settings → Machines → Access from other machines**, see [Let other machines use this one](/guide/devices#let-other-machines-use-this-one)): "My laptop", say.
+
+Since this machine can't reach it, the machine you pick **does the sending itself**: it reads the project from here and writes it there, exactly as if you had sent it from Hydor on that machine. The dialog works as usual: **What goes**, **Where on My laptop** (asked of that machine), **Copy**, **Keep in sync** or **Move**, the bar ("Sending · 45% · …"), **Cancel sending** and the notice at the end. There is no **Open it there**, because this machine can't open that one's pages: the dialog says "Open it in Hydor on My laptop: it is in its Projects", with **Close**.
+
+- **Both machines need Hydor 0.122.0 or newer.** One with an older Hydor is greyed out ("Update Hydor there first").
+- **The folder there must be in that machine's home folder.** Otherwise the dialog says "From here, a project can go only to a folder in that machine's home folder: to put it elsewhere, send it from Hydor on that machine".
+- **Keep in sync**: that machine keeps the link (see [Keep two copies in sync](#keep-two-copies-in-sync)), so the rounds run while Hydor runs on it. On this machine's copy **Sync now** doesn't show; the state shows as usual, and **Stop syncing** works here too.
+- **If it isn't connected** when you send, the dialog says "That machine is not connected now: open Hydor there". If it goes away midway (its app quits, or it sleeps) and doesn't come back within 3 minutes, the sending here ends with "Lost touch with My laptop: open Hydor there to see whether it arrived". It may still have arrived there: look in its Projects.
+- **Only from this machine's own pages.** A project on another machine's pages can't be sent to a machine that uses this one.
+
 ### Keep two copies in sync
 
 **Keep in sync** makes the copy as above and then keeps the two projects equal: a change you make on either one reaches the other. It works while both machines are on; nothing needs to be running in between.
@@ -483,7 +495,7 @@ A thing the project kept (a page, a document, a picture…) is a file in its fol
 
 If the other machine is off or can't be reached, the project says "Waiting for GPU box" and nothing is lost: it syncs again when the machine is back.
 
-**Which machine keeps the link.** One machine does the syncing: the one you opened the app on when you sent the project (which is why keeping in sync needs one of the two to be that machine). **Sync now** is there only. Both projects show the state, and **Stop syncing** works on either one.
+**Which machine keeps the link.** One machine does the syncing: the one you opened the app on when you sent the project (which is why keeping in sync needs one of the two to be that machine); for a project sent to a machine that uses this one (see [Send to a machine that uses this one](#send-to-a-machine-that-uses-this-one)), that machine keeps the link. **Sync now** is there only. Both projects show the state, and **Stop syncing** works on either one.
 
 ### When both copies change the same file
 
@@ -664,6 +676,7 @@ The knowledge tools never bring up another project's documents, not even when an
 - "Copy my Thesis project to my GPU box, without node_modules, and tell me when it is there."
 - "Keep this project in sync with the laptop."
 - "Move my Taxes 2026 project to the desktop at home."
+- "Send the Thesis project to my laptop."
 - "Which of my projects are kept in sync with another machine, and which are waiting or held back?"
 - "Sync my Thesis project with the laptop now, and tell me if any file was changed on both."
 - "Stop syncing my Thesis project with the GPU box."
