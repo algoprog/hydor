@@ -314,6 +314,15 @@ const familyName = (family: string) => family.charAt(0).toUpperCase() + family.s
  */
 export type LimitAfter = { goes: 'account'; to: string; signedOut?: boolean } | { goes: 'credit' } | { goes: 'resume'; at: number } | { goes: 'on' };
 
+/** How long a session moving by itself onto another account waits at most for the one before it to show its cost there. */
+const ARRIVAL_MS = 90_000;
+/** Of the room an account had when sessions began moving onto it by themselves, the share they may use before it takes no more. */
+const LANDING_ROOM = 0.5;
+/** How long sessions moved onto an account by themselves keep it for themselves after the last came, once none of them works. */
+const LANDING_MS = 3 * 60_000;
+/** What a session that waits out a usage limit is told by its notice: an account with room it does not move to, kept for the sessions moved there lately. */
+export type LimitKept = { name: string; sessions: number };
+
 /** The notes a started agent has for its first message, given once: a command, or a notice the app sends, leaves them for the next. */
 function takeFirst(l: Live, text: string): string {
   if (!l.firstNotes || text.trimStart().startsWith('/') || isAppNotice(text)) return '';
@@ -589,6 +598,7 @@ export class SessionManager extends EventEmitter {
     const sub = lead ? subagentMeta(r.key, r.path) : null;
     const prefs: SessionPrefs | undefined =
       r.pref_model || r.pref_effort || r.pref_mode ? { model: r.pref_model ?? undefined, effort: r.pref_effort ?? undefined, mode: r.pref_mode ?? undefined } : undefined;
+    const resumeAt = this.resumeLookup?.(r.key);
     return {
       key: r.key,
       agent,
@@ -651,7 +661,9 @@ export class SessionManager extends EventEmitter {
       // Codex thread's goal), which a live Codex session knows first-hand and a transcript tells otherwise. Custom's old
       // goal lines are not one any more: the loop that kept them is gone.
       goal: goalInfo(this.db, r.key) ?? (live && r.key.startsWith('codex:') ? live.adapter.state.goal : r.key.startsWith('acp:') ? undefined : this.timelines.get(r.key)?.goal()) ?? undefined,
-      resumeAt: this.resumeLookup?.(r.key),
+      resumeAt,
+      // Waiting out a limit although an account has room: that account is kept for the sessions moved there lately.
+      limitKept: resumeAt !== undefined ? this.limitKept(r.key) : undefined,
       ...this.queueOf(r.key),
       createdByApp: !!r.created_by_app,
       prefs,
@@ -1022,14 +1034,20 @@ export class SessionManager extends EventEmitter {
       if (autoSwitchOn(this.db) && !s.external) {
         this.switching.add(s.key);
         try {
-          const to = await this.freeAccount(agent, from, this.familyOf(s.key));
-          if (to) {
+          // In turn with the other sessions moving by themselves (a sign-out stops all of an account's sessions at once).
+          const out = await this.inTurn(agent, async (): Promise<{ value: LimitAfter | 'gone' | null; arrived?: Promise<void> }> => {
+            const to = await this.freeAccount(agent, from, this.familyOf(s.key), false, true);
+            if (!to) return { value: null };
             // Meanwhile you stopped it, or it moved already.
-            if (this.userStopped.has(s.key) || this.accountOf(s.key) !== from) return null;
-            if (!(await this.carryOver(s.key, from, to.id, 'signedout'))) await this.deliverOrQueue(s.key, `${this.accountName(agent, from)} is signed out, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.`);
+            if (this.userStopped.has(s.key) || this.accountOf(s.key) !== from) return { value: 'gone' };
+            const goes = await this.carryOver(s.key, from, to.id, 'signedout');
+            const arrived = this.landed(agent, to, s.key);
+            if (!goes) await this.deliverOrQueue(s.key, `${this.accountName(agent, from)} is signed out, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.`);
             dropSignInSession(s.key);
-            return { goes: 'account', to: this.accountName(agent, to.id), signedOut: true };
-          }
+            return { value: { goes: 'account', to: this.accountName(agent, to.id), signedOut: true }, arrived };
+          });
+          if (out === 'gone') return null;
+          if (out) return out;
         } catch (e) {
           // It could not move: the user is asked as when no other account could take it.
           this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${(e as Error).message}` });
@@ -1482,8 +1500,13 @@ export class SessionManager extends EventEmitter {
           tell(u);
         } else this.usageOf('codex', account).catch(() => {});
       }
+      // A session just moved: its second report says what its first request cost its new account (see landed).
+      const a = this.arriving.get(key);
+      if (a && ++a.reports >= 2) a.done();
     });
     adapter.on('result', async (_result: unknown, replay?: boolean) => {
+      // Its turn is over: what it cost is in its account's usage (one moved by itself is no longer waited for).
+      if (!replay) this.arriving.get(key)?.done();
       if (!replay && this.userStopped.has(key)) adapter.limitStopped = false;
       if (!adapter.limitStopped) {
         this.limitHits.delete(key);
@@ -1506,6 +1529,7 @@ export class SessionManager extends EventEmitter {
     });
     adapter.on('title', () => this.indexer.poke([adapter.transcriptPath]));
     adapter.on('exit', () => {
+      this.arriving.get(key)?.done();
       this.indexer.poke([adapter.transcriptPath ?? this.transcriptFor(key)]);
       setTimeout(() => {
         if (this.lives.get(key)?.adapter === adapter) this.lives.delete(key);
@@ -2126,8 +2150,16 @@ export class SessionManager extends EventEmitter {
     // For the session's model: a limit of another model alone does not hold it back, and an account whose plan turned
     // that model away has no reset to wait for.
     const family = this.familyOf(key);
-    const lifts = (account?: string) => (this.refusesModel(agent, account, family) ? undefined : SessionManager.liftsAt(this.lastUsageOf(agent, account), family));
-    const own = lifts(this.accountOf(key));
+    const mine = this.accountOf(key);
+    const lifts = (account?: string) => {
+      if (this.refusesModel(agent, account, family)) return undefined;
+      const u = this.lastUsageOf(agent, account);
+      // Another account counts only as one the session could move to by itself: signed in, and not kept for the sessions
+      // moved there lately (the session waits for the next account back meanwhile).
+      if (account !== mine && (isSignedOut(agent, account) || this.keptFor(agent, account, u, family) !== null)) return undefined;
+      return SessionManager.liftsAt(u, family);
+    };
+    const own = lifts(mine);
     if (!autoSwitchOn(this.db)) return own;
     // Switching accounts at a limit: the first of them to have usage again.
     const all = accountPool(this.db, agent).map(lifts);
@@ -2208,17 +2240,131 @@ export class SessionManager extends EventEmitter {
    * when there is none. One found signed out lately is passed over, and one whose plan turned that model away. A limit of
    * another model alone does not count, unless `anyLimit` (for subagents whose model is not known).
    */
-  private async freeAccount(agent: AccountAgent, except: string | undefined, family: string | null = null, anyLimit = false): Promise<{ id: string | undefined } | null> {
+  private async freeAccount(agent: AccountAgent, except: string | undefined, family: string | null = null, anyLimit = false, byItself = false): Promise<{ id: string | undefined; used: number } | null> {
     let best: { id: string | undefined; used: number } | null = null;
     const counts = anyLimit ? null : family;
     for (const id of accountPool(this.db, agent)) {
       if (id === except || isSignedOut(agent, id) || (family && this.refusesModel(agent, id, family))) continue;
       const u = await this.usageOf(agent, id);
       if (SessionManager.usedUp(u, counts)) continue;
-      const used = Math.max(0, ...u!.windows.filter((w) => limitHolds(w.model, counts)).map((w) => w.usedPercent ?? 0));
+      // A session moving by itself passes over an account kept for the sessions moved there lately (keptFor).
+      if (byItself && this.keptFor(agent, id, u, counts) !== null) continue;
+      const used = SessionManager.usedFor(u, counts);
       if (!best || used < best.used) best = { id, used };
     }
     return best;
+  }
+
+  /** How used an account is for a session on that model family: its fullest window that holds the family back. */
+  private static usedFor(u: AgentUsage | null | undefined, family: string | null): number {
+    return Math.max(0, ...(u?.windows ?? []).filter((w) => limitHolds(w.model, family)).map((w) => w.usedPercent ?? 0));
+  }
+
+  /** Per agent: the last automatic move onto another account, until what it cost shows there (inTurn). */
+  private moveTurns = new Map<AccountAgent, Promise<void>>();
+  /** Sessions just moved onto an account by themselves, with the rate-limit reports seen since (arrival). */
+  private arriving = new Map<string, { reports: number; done: () => void }>();
+  /**
+   * Per account (agent:id): the sessions moved onto it by themselves lately, how used it was when the first of them came
+   * (`from`), and when the last did (keptFor).
+   */
+  private landings = new Map<string, { from: number; keys: Set<string>; last: number }>();
+
+  /**
+   * Runs a move a session makes by itself onto another account (at a limit, continuing after one, for its subagents, at a
+   * sign-out) after every earlier one of the agent's sessions, and once what the last of them cost shows in its new
+   * account's usage: sessions released together would otherwise all re-read their whole history on one account in the
+   * same moment and use up its plan before its usage could say so (12 sessions used 146% of a Pro plan's 5 hours in 11
+   * seconds). `move` picks the account with that known; what it returns as `arrived` the next move waits for.
+   */
+  private async inTurn<T>(agent: AccountAgent, move: () => Promise<{ value: T; arrived?: Promise<void> }>): Promise<T> {
+    const before = this.moveTurns.get(agent) ?? Promise.resolve();
+    let release!: (after: Promise<void>) => void;
+    const mine = new Promise<void>((resolve) => (release = (after) => void after.then(resolve, resolve)));
+    this.moveTurns.set(agent, mine);
+    await before;
+    let arrived: Promise<void> = Promise.resolve();
+    try {
+      const out = await move();
+      if (out.arrived) arrived = out.arrived;
+      return out.value;
+    } finally {
+      release(arrived);
+      void mine.then(() => {
+        if (this.moveTurns.get(agent) === mine) this.moveTurns.delete(agent);
+      });
+    }
+  }
+
+  /**
+   * A session moved onto an account by itself: it counts there (keptFor), and the next move waits until what its first
+   * request cost shows in that account's usage: its second rate-limit report (the first comes before the request is
+   * charged), the end of its turn or of its process, or ARRIVAL_MS at most.
+   */
+  private landed(agent: AccountAgent, to: { id: string | undefined; used: number }, key: string): Promise<void> {
+    const k = `${agent}:${to.id ?? ''}`;
+    const l = this.landingOn(agent, to.id) && this.landings.get(k);
+    if (l) {
+      l.keys.add(key);
+      l.last = Date.now();
+    } else this.landings.set(k, { from: to.used, keys: new Set([key]), last: Date.now() });
+    this.arriving.get(key)?.done();
+    return new Promise<void>((resolve) => {
+      const me = { reports: 0, done: () => {} };
+      const timer = setTimeout(() => me.done(), ARRIVAL_MS);
+      timer.unref?.();
+      me.done = () => {
+        clearTimeout(timer);
+        if (this.arriving.get(key) === me) this.arriving.delete(key);
+        resolve();
+      };
+      this.arriving.set(key, me);
+    });
+  }
+
+  /**
+   * The sessions moved onto an account by themselves lately, while some of them still work there or the last came within
+   * LANDING_MS, with how many are still on it; undefined (and forgotten) once that is over.
+   */
+  private landingOn(agent: AccountAgent, id: string | undefined): { from: number; there: number } | undefined {
+    const k = `${agent}:${id ?? ''}`;
+    const l = this.landings.get(k);
+    if (!l) return undefined;
+    const there = [...l.keys].filter((s) => this.accountOf(s) === id);
+    const atWork = there.some((s) => ['working', 'starting', 'waiting'].includes(this.lives.get(s)?.adapter.state.status ?? ''));
+    if (there.length && (atWork || Date.now() - l.last < LANDING_MS)) return { from: l.from, there: there.length };
+    this.landings.delete(k);
+    return undefined;
+  }
+
+  /**
+   * Whether an account takes no more sessions moving there by themselves, and for how many it is kept: the ones moved there
+   * lately have used LANDING_ROOM of the room it had when the first of them came, and they still work there, so they keep
+   * the rest to work in. Null when it takes more. A message you send, or a session you start, is never held back by it.
+   */
+  private keptFor(agent: AccountAgent, id: string | undefined, u: AgentUsage | null | undefined, family: string | null): number | null {
+    const l = this.landingOn(agent, id);
+    if (!l || !u?.ok) return null;
+    return SessionManager.usedFor(u, family) >= l.from + (100 - l.from) * LANDING_ROOM ? l.there : null;
+  }
+
+  /**
+   * For a session waiting out a usage limit: another account with room that it does not move to by itself, because it is
+   * kept for the sessions moved there lately (by name, and how many); undefined when there is none.
+   */
+  limitKept(key: string): LimitKept | undefined {
+    const agent = this.accountAgentOf(key);
+    if (!agent || !autoSwitchOn(this.db)) return undefined;
+    const mine = this.accountOf(key);
+    const family = this.familyOf(key);
+    for (const id of accountPool(this.db, agent)) {
+      if (id === mine || isSignedOut(agent, id) || (family && this.refusesModel(agent, id, family))) continue;
+      const u = this.lastUsageOf(agent, id);
+      if (SessionManager.usedUp(u, family)) continue;
+      const n = this.keptFor(agent, id, u, family);
+      if (n !== null) return { name: this.accountName(agent, id), sessions: n };
+    }
+    return undefined;
   }
 
   /**
@@ -2266,25 +2412,30 @@ export class SessionManager extends EventEmitter {
       }
       const stopped = this.subagentsToContinue(key);
       const family = this.familyOf(key);
-      const to = await this.freeAccount(agent, from, family);
-      if (!to) {
-        if (agent === 'claude' && (await this.toCredit(key))) {
-          await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit and no other account has usage left, so this session now runs on API credit. Continue where you left off.${subagentsLine(stopped)}`);
-          return { goes: 'credit' };
-        }
-        if (kvGet(this.db, 'auto_resume') === '1') return await this.resumeAfterLimit(key, resetsAt);
-        return null;
+      // In turn with the other sessions moving by themselves, and never onto an account kept for those moved there lately.
+      const moved = await this.inTurn(agent, async (): Promise<{ value: LimitAfter | null; arrived?: Promise<void> }> => {
+        const to = await this.freeAccount(agent, from, family, false, true);
+        if (!to) return { value: null };
+        // Its plan does not include the session's model, rather than a limit.
+        const refused = this.refusesModel(agent, from, family) ? family : null;
+        const goes = await this.carryOver(key, from, to.id, refused ? 'model' : 'limit');
+        const arrived = this.landed(agent, to, key);
+        if (!goes)
+          await this.deliverOrQueue(
+            key,
+            refused
+              ? `${this.accountName(agent, from)}'s plan does not include ${familyName(refused)}, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.${subagentsLine(stopped)}`
+              : `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.${subagentsLine(stopped)}`,
+          );
+        return { value: { goes: 'account', to: this.accountName(agent, to.id) }, arrived };
+      });
+      if (moved) return moved;
+      if (agent === 'claude' && (await this.toCredit(key))) {
+        await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit and no other account has usage left, so this session now runs on API credit. Continue where you left off.${subagentsLine(stopped)}`);
+        return { goes: 'credit' };
       }
-      // Its plan does not include the session's model, rather than a limit.
-      const refused = this.refusesModel(agent, from, family) ? family : null;
-      if (!(await this.carryOver(key, from, to.id, refused ? 'model' : 'limit')))
-        await this.deliverOrQueue(
-          key,
-          refused
-            ? `${this.accountName(agent, from)}'s plan does not include ${familyName(refused)}, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.${subagentsLine(stopped)}`
-            : `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.${subagentsLine(stopped)}`,
-        );
-      return { goes: 'account', to: this.accountName(agent, to.id) };
+      if (kvGet(this.db, 'auto_resume') === '1') return await this.resumeAfterLimit(key, resetsAt);
+      return null;
     } finally {
       this.switching.delete(key);
     }
@@ -2305,12 +2456,16 @@ export class SessionManager extends EventEmitter {
       // A usage that could not be read never moves a session that is getting on with its work.
       const own = await this.usageOf(agent, from, 60_000);
       if (!own?.ok || !SessionManager.usedUp(own)) return;
-      // Which model the subagents run is not known, so every limit counts; the session's own model must run there too.
-      const to = await this.freeAccount(agent, from, this.familyOf(key), true);
-      const stopped = this.subagentsToContinue(key);
-      if (!to || !stopped.length || this.lives.get(key)?.adapter.state.status !== 'idle') return;
-      if (await this.carryOver(key, from, to.id)) return;
-      await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached a usage limit, so this session now runs on ${this.accountName(agent, to.id)}, which has usage left.${subagentsLine(stopped)}`);
+      await this.inTurn(agent, async (): Promise<{ value: void; arrived?: Promise<void> }> => {
+        // Which model the subagents run is not known, so every limit counts; the session's own model must run there too.
+        const to = await this.freeAccount(agent, from, this.familyOf(key), true, true);
+        const stopped = this.subagentsToContinue(key);
+        if (!to || !stopped.length || this.lives.get(key)?.adapter.state.status !== 'idle') return { value: undefined };
+        const goes = await this.carryOver(key, from, to.id);
+        const arrived = this.landed(agent, to, key);
+        if (!goes) await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached a usage limit, so this session now runs on ${this.accountName(agent, to.id)}, which has usage left.${subagentsLine(stopped)}`);
+        return { value: undefined, arrived };
+      });
     } finally {
       this.switching.delete(key);
     }
@@ -2433,15 +2588,31 @@ export class SessionManager extends EventEmitter {
    * the limit and another is not, it moves there. True when a goal it carried over already continues it.
    */
   async beforeResume(key: string): Promise<boolean> {
+    return (await this.leaveLimit(key, false)) === 'goal';
+  }
+
+  /**
+   * For a session the app continues by itself after a usage limit (its resume is due): it moves first as beforeResume does,
+   * but in turn with the other sessions moving by themselves (inTurn), and never onto an account kept for those moved there
+   * lately (keptFor). 'goal' when a goal it carried over continues it; 'send' when its message should go; 'wait' when its own
+   * account is still at the limit and no account can take it, so the message would only be turned away.
+   */
+  continueAfterLimit(key: string): Promise<'goal' | 'send' | 'wait'> {
+    return this.leaveLimit(key, true);
+  }
+
+  private async leaveLimit(key: string, byItself: boolean): Promise<'goal' | 'send' | 'wait'> {
     const agent = this.accountAgentOf(key);
-    if (!agent || !autoSwitchOn(this.db)) return false;
+    if (!agent || !autoSwitchOn(this.db)) return 'send';
     const from = this.accountOf(key);
     // Its own account goes on unless it is at a limit that holds back the session's model, or its plan turned that model away.
     const family = this.familyOf(key);
     const refused = this.refusesModel(agent, from, family) ? family : null;
-    if (!refused && !SessionManager.usedUp(await this.usageOf(agent, from, 60_000), family)) return false;
-    const to = await this.freeAccount(agent, from, family);
-    if (to) {
+    const own = await this.usageOf(agent, from, 60_000);
+    if (!refused && !SessionManager.usedUp(own, family)) return 'send';
+    const move = async (): Promise<{ value: 'goal' | 'send' | null; arrived?: Promise<void> }> => {
+      const to = await this.freeAccount(agent, from, family, false, byItself);
+      if (!to) return { value: null };
       const stopped = this.subagentsToContinue(key);
       const goes = await this.carryOver(key, from, to.id, refused ? 'model' : 'limit');
       // Its next message says so: the agent may be waiting for the old account's reset, for itself or its subagents.
@@ -2451,10 +2622,14 @@ export class SessionManager extends EventEmitter {
           ? `${this.accountName(agent, from)}'s plan does not include ${familyName(refused)}, so this session now runs on ${this.accountName(agent, to.id)}, which has usage left.${subagentsLine(stopped)}`
           : `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}, which has usage left.${subagentsLine(stopped)}`,
       );
-      return goes;
-    }
-    if (agent === 'claude') await this.toCredit(key);
-    return false;
+      return { value: goes ? 'goal' : 'send', arrived: byItself ? this.landed(agent, to, key) : undefined };
+    };
+    const moved = byItself ? await this.inTurn(agent, move) : (await move()).value;
+    if (moved) return moved;
+    if (agent === 'claude' && (await this.toCredit(key))) return 'send';
+    // Nowhere to go while a reading that worked says its own account is still at the limit (or its plan turned the model
+    // away): continued by itself, its message would only be turned away, so it waits for the next account back. Yours goes.
+    return byItself && (refused || own?.ok) ? 'wait' : 'send';
   }
 
   /** What a session that moved to another account before a message is told with that message. */

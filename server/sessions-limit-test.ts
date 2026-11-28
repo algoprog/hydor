@@ -71,6 +71,9 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     moveNotes: new Map<string, string>(),
     limitAfter: new Map(),
     limitReads: new Map(),
+    moveTurns: new Map(),
+    arriving: new Map(),
+    landings: new Map(),
     onLimited: () => {},
     resumeLookup: undefined as undefined | ((k: string) => number | undefined),
     external: { get: () => null },
@@ -95,7 +98,7 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
       calls.usageOf.push(a);
       return opts.usage;
     },
-    freeAccount: async () => (opts.free === undefined ? { id: 'b' } : opts.free),
+    freeAccount: async () => (opts.free === undefined ? { id: 'b', used: 0 } : opts.free),
     carryOver: async (...a: unknown[]) => {
       calls.carryOver.push(a);
       return false;
@@ -124,6 +127,14 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
   // The real waiting, with short timings.
   m.subagentsStop = (key: string) => proto.subagentsStop.call(m, key, 300, 20);
   m.takeMoveNote = proto.takeMoveNote.bind(m);
+  // Moves by themselves: in turn (inTurn), what they landed as (landed, landingOn, keptFor), and the limit's time.
+  m.inTurn = proto.inTurn.bind(m);
+  m.landed = proto.landed.bind(m);
+  m.landingOn = proto.landingOn.bind(m);
+  m.keptFor = proto.keptFor.bind(m);
+  m.limitKept = proto.limitKept.bind(m);
+  m.leaveLimit = proto.leaveLimit.bind(m);
+  m.limitLiftsAt = proto.limitLiftsAt.bind(m);
   return {
     m,
     adapter,
@@ -133,6 +144,7 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     switchAtLimit: proto.switchAtLimit.bind(m) as (key: string, resetsAt: number | undefined) => Promise<unknown>,
     switchForSubagents: proto.switchForSubagents.bind(m) as (key: string) => Promise<unknown>,
     beforeResume: proto.beforeResume.bind(m) as (key: string) => Promise<boolean>,
+    continueAfterLimit: proto.continueAfterLimit.bind(m) as (key: string) => Promise<'goal' | 'send' | 'wait'>,
     resumeAfterLimit: proto.resumeAfterLimit.bind(m) as (key: string, resetsAt: number | undefined) => Promise<unknown>,
     takeMoveNote: m.takeMoveNote as (key: string, text: string) => string,
   };
@@ -1363,10 +1375,14 @@ signedOutTest('limitLiftsAt leaves out an account that turned the model away, an
       accountAgentOf: () => 'claude',
       familyOf: () => family,
       accountOf: () => undefined,
+      lives: new Map(),
+      landings: new Map(),
       lastUsageOf: (_agent: string, id: string | undefined) => reads.get(id),
       controlFor: (_agent: string, id: string | undefined) => refusing((f) => refused && f === 'fable' && id === a.id),
     };
     m.refusesModel = proto.refusesModel.bind(m);
+    m.landingOn = proto.landingOn.bind(m);
+    m.keptFor = proto.keptFor.bind(m);
     const lifts = () => proto.limitLiftsAt.call(m, KEY) as number | null | undefined;
     // The session's own account (the main one) and Personal are at the Fable-only limit; Work has usage but turns Fable away.
     const fableLimitUntil = (resetsAt: number) => {
@@ -1464,6 +1480,243 @@ signedOutTest('backFirst names the account whose limit lifts first, passing over
     for (const id of [undefined, a.id, b.id]) readings.set(id, limitedUntil(null));
     assert.equal(backFirst(null), null, 'no account says when its limit lifts: null');
     assert.equal(backFirst('fable'), null);
+  } finally {
+    for (const x of [a, b]) removeAccount(db, x.id, true);
+  }
+});
+
+// ---- moves by themselves: one at a time, where they landed, and the account kept for them ----------
+
+const OTHER = 'claude:00000000-0000-0000-0000-000000000003';
+/** An account's usage with one window at `used` percent, resetting at `resetsAt` (what keptFor and liftsAt read). */
+const usageAt = (used: number, resetsAt = Date.now() + HOUR) => ({ agent: 'claude', ok: true, fetchedAt: Date.now(), windows: [{ id: 'session', label: 's', usedPercent: used, resetsAt }], limited: null });
+/** A usage reading of an account at its limit (100 %) until `resetsAt`. */
+const atLimit = (resetsAt: number) => ({ agent: 'claude', ok: true, fetchedAt: Date.now(), windows: [{ id: 'weekly_all', label: 'Weekly', usedPercent: 100, resetsAt }], limited: null });
+
+test('inTurn: two moves of the same agent started together run one after the other, the second once the first has arrived', async () => {
+  const t = manager();
+  const order: string[] = [];
+  let arrive!: () => void;
+  const arrived = new Promise<void>((resolve) => (arrive = resolve));
+  const first = t.m.inTurn('claude', async () => (order.push('first'), { value: 1, arrived }));
+  const second = t.m.inTurn('claude', async () => (order.push('second'), { value: 2 }));
+  await sleep(20);
+  assert.deepEqual(order, ['first'], 'the second does not start while the first has not arrived');
+  arrive();
+  assert.deepEqual(await Promise.all([first, second]), [1, 2]);
+  assert.deepEqual(order, ['first', 'second']);
+});
+
+test('inTurn: a move that gives no arrival lets the next start at once', async () => {
+  const t = manager();
+  const order: string[] = [];
+  const first = t.m.inTurn('claude', async () => (order.push('first'), { value: 1 }));
+  const second = t.m.inTurn('claude', async () => (order.push('second'), { value: 2 }));
+  assert.deepEqual(await Promise.all([first, second]), [1, 2]);
+  assert.deepEqual(order, ['first', 'second']);
+});
+
+test('inTurn: a move that throws lets the next start too', async () => {
+  const t = manager();
+  const order: string[] = [];
+  const first = t.m.inTurn('claude', async () => (order.push('first'), Promise.reject(new Error('no account'))));
+  const second = t.m.inTurn('claude', async () => (order.push('second'), { value: 2 }));
+  await assert.rejects(first, /no account/);
+  assert.equal(await second, 2);
+  assert.deepEqual(order, ['first', 'second']);
+});
+
+test('inTurn: the moves of two agents do not wait for each other', async () => {
+  const t = manager();
+  const order: string[] = [];
+  // Claude's first move never arrives, so only its own turn would hold the next Claude move.
+  const held = t.m.inTurn('claude', async () => ({ value: 1, arrived: new Promise<void>(() => {}) }));
+  const other = t.m.inTurn('codex', async () => (order.push('codex'), { value: 2 }));
+  assert.equal(await other, 2);
+  assert.equal(await held, 1);
+  assert.deepEqual(order, ['codex']);
+});
+
+test('landed records the landing on the account, and its arrival ends when its done() is called', async () => {
+  const t = manager();
+  const arrival = t.m.landed('claude', { id: 'b', used: 20 }, KEY);
+  const landing = t.m.landings.get('claude:b');
+  assert.equal(landing.from, 20, 'how used Personal was when the first session came');
+  assert.ok(landing.keys.has(KEY));
+  const me = t.m.arriving.get(KEY);
+  assert.ok(me, 'the arrival is waited for');
+  let arrived = false;
+  void arrival.then(() => (arrived = true));
+  await sleep(5);
+  assert.equal(arrived, false, 'not before its done()');
+  me.done();
+  await arrival;
+  assert.equal(t.m.arriving.has(KEY), false);
+});
+
+test('keptFor keeps an account for the sessions moved onto it lately, while they work there, from half the room it had', () => {
+  const t = manager();
+  t.setFrom('b');
+  t.adapter.state.status = 'working';
+  void t.m.landed('claude', { id: 'b', used: 0 }, KEY);
+  const kept = (used: number) => t.m.keptFor('claude', 'b', usageAt(used), null);
+  assert.equal(kept(40), null, 'the line is half the room it had: under it, the account takes more');
+  assert.equal(kept(50), 1, 'at the line, the one session there keeps it');
+  assert.equal(t.m.keptFor('claude', 'b', undefined, null), null, 'a usage not read keeps nothing');
+  t.m.arriving.get(KEY)?.done();
+});
+
+test('keptFor measures the line from the room the first session found: from 20 used, the account is kept from 60', () => {
+  const t = manager();
+  t.setFrom('c');
+  t.adapter.state.status = 'working';
+  void t.m.landed('claude', { id: 'c', used: 20 }, KEY);
+  const kept = (used: number) => t.m.keptFor('claude', 'c', usageAt(used), null);
+  assert.equal(kept(55), null);
+  assert.equal(kept(60), 1);
+  t.m.arriving.get(KEY)?.done();
+});
+
+test('keptFor lets an account go once no session moved there works there and its last landing is over 3 minutes old', () => {
+  const t = manager();
+  t.setFrom('b');
+  t.adapter.state.status = 'working';
+  void t.m.landed('claude', { id: 'b', used: 0 }, KEY);
+  const kept = () => t.m.keptFor('claude', 'b', usageAt(50), null);
+  assert.equal(kept(), 1);
+  t.adapter.state.status = 'idle';
+  t.m.landings.get('claude:b').last = Date.now() - 2 * 60_000;
+  assert.equal(kept(), 1, 'idle, but the last landing came 2 minutes ago');
+  t.m.landings.get('claude:b').last = Date.now() - 4 * 60_000;
+  assert.equal(kept(), null, 'over 3 minutes: forgotten');
+  assert.equal(t.m.landings.has('claude:b'), false);
+  t.m.arriving.get(KEY)?.done();
+});
+
+signedOutTest('freeAccount moving by itself passes over an account kept for the sessions moved there lately; a message does not', async () => {
+  const a = addAccount(db, 'claude', 'Work');
+  const b = addAccount(db, 'claude', 'Personal');
+  try {
+    const t = manager();
+    t.setFrom(a.id);
+    t.adapter.state.status = 'working';
+    void t.m.landed('claude', { id: a.id, used: 0 }, KEY);
+    const reads = new Map<string | undefined, unknown>([
+      [undefined, usageAt(100)],
+      [a.id, usageAt(50)],
+      [b.id, usageAt(70)],
+    ]);
+    t.m.usageOf = async (_agent: string, id: string | undefined) => reads.get(id);
+    t.m.freeAccount = proto.freeAccount.bind(t.m);
+    const free = (byItself: boolean) => t.m.freeAccount('claude', undefined, null, false, byItself) as Promise<{ id: string | undefined } | null>;
+    assert.equal((await free(false))?.id, a.id, 'a message takes the least used, Work at 50 %');
+    assert.equal((await free(true))?.id, b.id, 'a session moving by itself passes over Work, kept for the sessions moved there');
+    t.m.arriving.get(KEY)?.done();
+  } finally {
+    for (const x of [a, b]) removeAccount(db, x.id, true);
+  }
+});
+
+signedOutTest('limitLiftsAt leaves out another account kept for the sessions moved there lately, and counts the session\'s own account even when kept', async () => {
+  const a = addAccount(db, 'claude', 'Work');
+  const b = addAccount(db, 'claude', 'Personal');
+  try {
+    const now = Date.now();
+    const later = now + 9 * HOUR;
+    const sooner = now + 3 * HOUR;
+    const t = manager();
+    const reads = new Map<string | undefined, unknown>();
+    t.m.lastUsageOf = (_agent: string, id: string | undefined) => reads.get(id);
+    t.m.familyOf = () => null;
+    const lifts = () => t.m.limitLiftsAt(KEY) as number | null | undefined;
+    // The session is on the main account, at its limit until later. Work has room, but is kept for a session moved there
+    // lately (OTHER); Personal is at its limit until sooner.
+    t.m.accountOf = (key: string) => (key === KEY ? undefined : a.id);
+    reads.set(undefined, atLimit(later));
+    reads.set(a.id, usageAt(50));
+    reads.set(b.id, atLimit(sooner));
+    t.m.landings.set(`claude:${a.id}`, { from: 0, keys: new Set([OTHER]), last: Date.now() });
+    assert.equal(lifts(), sooner, 'Work is kept: left out, so the earliest reset of the others is waited for');
+    t.m.landings.delete(`claude:${a.id}`);
+    assert.equal(lifts(), null, 'not kept, Work has room now: null');
+    // The session is on Work, and Work is kept for it (it works there, moved there lately): Work\'s own reset still counts,
+    // and Personal, signed out, does not.
+    t.m.accountOf = () => a.id;
+    t.adapter.state.status = 'working';
+    reads.set(undefined, undefined);
+    reads.set(a.id, atLimit(later));
+    markSignedOut('claude', b.id);
+    t.m.landings.set(`claude:${a.id}`, { from: 0, keys: new Set([KEY]), last: Date.now() });
+    assert.equal(lifts(), later, 'its own account counts even when kept');
+  } finally {
+    for (const x of [a, b]) removeAccount(db, x.id, true);
+  }
+});
+
+// ---- continueAfterLimit: what a session the app continues by itself does ------------------------
+
+test('continueAfterLimit sends the message when the session\'s own account has room, and moves nothing', async () => {
+  const t = manager({ usage: { ok: true, limited: null, windows: [] } });
+  assert.equal(await t.continueAfterLimit(KEY), 'send');
+  assert.equal(t.calls.carryOver.length, 0);
+});
+
+test('continueAfterLimit waits when its own account is used up and no account can take it', async () => {
+  const t = manager({ usage: okLimited, free: null });
+  assert.equal(await t.continueAfterLimit(KEY), 'wait');
+  assert.equal(t.calls.carryOver.length, 0, 'nothing moves');
+});
+
+test('continueAfterLimit sends the message when its own reading is not known, even with no account to take it', async () => {
+  const t = manager({ usage: { ok: false, limited: null, windows: [] }, free: null });
+  assert.equal(await t.continueAfterLimit(KEY), 'send');
+  assert.equal(t.calls.carryOver.length, 0);
+});
+
+test('continueAfterLimit moves the session by itself, answers send, and lands it on the account it moved to', async () => {
+  const t = manager({ usage: okLimited });
+  assert.equal(await t.continueAfterLimit(KEY), 'send');
+  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b', 'limit']]);
+  const landing = t.m.landings.get('claude:b');
+  assert.ok(landing?.keys.has(KEY), 'Account b takes it as a landing');
+  t.m.arriving.get(KEY)?.done();
+});
+
+test('continueAfterLimit answers goal when a goal it carried over continues the session', async () => {
+  const t = manager({ usage: okLimited });
+  t.m.carryOver = async () => true;
+  assert.equal(await t.continueAfterLimit(KEY), 'goal');
+  t.m.arriving.get(KEY)?.done();
+});
+
+// ---- limitKept: the account a waiting session does not move to, kept for the sessions moved there -
+
+signedOutTest('limitKept names another account with room that is kept for the sessions moved there lately', async () => {
+  const a = addAccount(db, 'claude', 'Work');
+  const b = addAccount(db, 'claude', 'Personal');
+  try {
+    const t = manager();
+    t.m.accountName = proto.accountName.bind(t.m);
+    t.m.familyOf = () => null;
+    t.m.accountOf = (key: string) => (key === KEY ? a.id : b.id);
+    t.adapter.state.status = 'working';
+    const reads = new Map<string | undefined, unknown>([
+      [undefined, usageAt(100)],
+      [a.id, usageAt(60)],
+      [b.id, usageAt(50)],
+    ]);
+    t.m.lastUsageOf = (_agent: string, id: string | undefined) => reads.get(id);
+    t.m.landings.set(`claude:${b.id}`, { from: 0, keys: new Set([OTHER]), last: Date.now() });
+    assert.deepEqual(t.m.limitKept(KEY), { name: 'Personal', sessions: 1 });
+
+    reads.set(b.id, usageAt(100));
+    assert.equal(t.m.limitKept(KEY), undefined, 'Personal used up: nothing to name');
+
+    reads.set(b.id, usageAt(50));
+    t.m.landings.clear();
+    t.m.landings.set(`claude:${a.id}`, { from: 0, keys: new Set([KEY]), last: Date.now() });
+    assert.equal(t.m.limitKept(KEY), undefined, 'the only kept account is the session\'s own');
+    t.m.arriving.get(KEY)?.done();
   } finally {
     for (const x of [a, b]) removeAccount(db, x.id, true);
   }

@@ -31019,5 +31019,7 @@
   "Which folder? Give its whole path": "Ποιος φάκελος; Δώστε ολόκληρη τη διαδρομή του",
   "Which project?": "Ποιο έργο;",
   "You can close this: it carries on, and a notice tells you when it is done.": "Μπορείτε να το κλείσετε: συνεχίζεται και θα ειδοποιηθείτε όταν ολοκληρωθεί.",
-  "· {0} resets first, {1}": "· Ο λογαριασμός {0} επαναφέρεται πρώτος, {1}"
+  "· {0} resets first, {1}": "· Ο λογαριασμός {0} επαναφέρεται πρώτος, {1}",
+  "{0} still has usage left, kept for the session that moved there.": "Ο λογαριασμός {0} έχει ακόμη διαθέσιμη χρήση, κρατημένη για τη συνεδρία που μεταφέρθηκε εκεί.",
+  "{0} still has usage left, kept for the {1} sessions that moved there.": "Ο λογαριασμός {0} έχει ακόμη διαθέσιμη χρήση, κρατημένη για τις {1} συνεδρίες που μεταφέρθηκαν εκεί."
 }

@@ -660,6 +660,20 @@ export class Scheduler extends EventEmitter {
     this.sessions.queueSummary(key);
   }
 
+  /**
+   * A session due to continue that no account can take yet (its own still at the limit, the others too or kept for the
+   * sessions moved there lately): it continues when the next of them has room, a minute after, or once EARLY_HOLD_MS is up
+   * while one shows room it may not use yet. Not knowing when, its message goes as it would have.
+   */
+  private waitOn(key: string, text: string) {
+    const lifts = this.sessions.limitLiftsAt(key);
+    if (lifts === undefined) return void this.sessions.deliverOrQueue(key, text).catch(() => {});
+    const now = Date.now();
+    // Room it may not use yet: held like an early continue the limit turned away, so syncResumes does not send it straight back.
+    if (lifts === null) this.earlyResumes.set(key, now);
+    this.resumeAt(key, lifts === null ? now + EARLY_HOLD_MS : Math.max(lifts + 60_000, now + 60_000), text);
+  }
+
   cancelResume(key: string) {
     this.db.prepare('delete from tasks where resume = 1 and target = ?').run(key);
     this.sessions.queueSummary(key);
@@ -686,8 +700,13 @@ export class Scheduler extends EventEmitter {
     const now = Date.now();
     // A limit reset was used: usage is back for certain, so none waits out a hold.
     if (o.usageBack) this.earlyResumes.clear();
+    const kept = new Map<string, string>();
     for (const r of this.db.prepare('select * from tasks where resume = 1').all() as Row[]) {
       const key = r.target!;
+      // Its notice says which account with room it does not move to, kept for the sessions moved there lately: kept up to date.
+      const k = JSON.stringify(this.sessions.limitKept(key) ?? null);
+      kept.set(key, k);
+      if ((this.keptSaid.get(key) ?? 'null') !== k) this.sessions.queueSummary(key);
       const live = this.sessions.lives?.get(key)?.adapter;
       // A newer turn that got through, or your own message or stop, supersedes an older limit interruption
       // (the adapter reconstructs the last outcome when its runner is replayed after a server restart). A turn
@@ -721,7 +740,11 @@ export class Scheduler extends EventEmitter {
       this.sessions.queueSummary(key);
     }
     for (const [k, t] of this.earlyResumes) if (t < now - EARLY_HOLD_MS) this.earlyResumes.delete(k);
+    this.keptSaid = kept;
   }
+
+  /** What each waiting session's notice last said of an account kept for the sessions moved there (syncResumes). */
+  private keptSaid = new Map<string, string>();
 
   // ---- webhooks ----------------------------------------------------------------------------
 
@@ -942,9 +965,12 @@ export class Scheduler extends EventEmitter {
     if (r.resume) {
       // Continuing a session after its usage limit: once, then the task goes.
       try {
-        // Its own account still at the limit: another with usage left takes it (Switch accounts at a limit).
-        const goalGoesOn = await this.sessions.beforeResume(r.target!).catch(() => false);
-        if (!goalGoesOn) await this.sessions.deliverOrQueue(r.target!, r.prompt);
+        // Its own account still at the limit: another with usage left takes it (Switch accounts at a limit), in turn with the
+        // other sessions moving by themselves. With none to take it, it waits on for the next account back rather than
+        // send a message its account would only turn away.
+        const next = await this.sessions.continueAfterLimit(r.target!).catch(() => 'send' as const);
+        if (next === 'wait') this.waitOn(r.target!, r.prompt);
+        else if (next === 'send') await this.sessions.deliverOrQueue(r.target!, r.prompt);
       } finally {
         this.starting.delete(r.id);
         this.db.prepare('delete from tasks where id = ?').run(r.id);

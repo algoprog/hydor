@@ -29180,5 +29180,7 @@
   "Which folder? Give its whole path": "どのフォルダですか？ パス全体を指定してください",
   "Which project?": "どのプロジェクトですか？",
   "You can close this: it carries on, and a notice tells you when it is done.": "閉じても処理は続き、完了すると通知でお知らせします。",
-  "· {0} resets first, {1}": "・{0}が先にリセットされます（{1}）"
+  "· {0} resets first, {1}": "・{0}が先にリセットされます（{1}）",
+  "{0} still has usage left, kept for the session that moved there.": "{0}にはまだ使用量が残っています。移動したセッション用に確保されています。",
+  "{0} still has usage left, kept for the {1} sessions that moved there.": "{0}にはまだ使用量が残っています。移動した{1}件のセッション用に確保されています。"
 }

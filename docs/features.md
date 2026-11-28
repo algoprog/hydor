@@ -175,7 +175,10 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   session's subagents that the limit stopped go on there too, and a Hydor subagent's lead hears that it carries on
   rather than an error). Usage counts for the model the session runs: a limit of one model alone (a weekly Fable
   limit) holds back only sessions on that model, and an account whose plan doesn't include the model ("requires usage
-  credits", as Fable on a Pro plan) is passed over for it. When every account is at its limit, a new session starts on
+  credits", as Fable on a Pro plan) is passed over for it. Sessions moving by themselves go one at a time, each once the
+  one before shows its cost in the new account's usage, and an account takes no more of them once those moved there
+  have used half the room it had (the others wait for the next account back, their notice saying why; your own
+  messages and new sessions are never held back). When every account is at its limit, a new session starts on
   the one that resets first and the limit notice names it; just after a reset the account's usage is read again
   before sessions are sent anywhere, and the Usage page shows what each account's sessions last heard from the
   provider, so it never shows usage left on an account they were just turned away from. The app's own quick

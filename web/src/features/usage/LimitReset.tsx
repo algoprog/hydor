@@ -119,7 +119,8 @@ export function LimitBanner({
   agent: AccountAgent;
   account?: string;
   className?: string;
-  session?: { key: string; resumeAt?: number; busy?: boolean };
+  /** `kept`: an account with usage left it waits rather than move to, kept for the sessions that moved there just before. */
+  session?: { key: string; resumeAt?: number; busy?: boolean; kept?: { name: string; sessions: number } };
   /** About this account alone, as a Usage page card is: its own reset, never another account's that comes first. */
   alone?: boolean;
 }) {
@@ -133,9 +134,16 @@ export function LimitBanner({
   // Antigravity CLI's sessions never continue by themselves (Google's terms for its plans allow only turns you start).
   const byHand = agent === 'antigravity';
   useEffect(() => void useAppSettings.getState().load(), []);
-  // Another account has usage left and Switch accounts at a limit is on: the session (or a new one) just moves there.
-  const lim = session?.busy || (spare && autoSwitch) ? null : u?.limited;
+  // Another account has usage left and Switch accounts at a limit is on: the session (or a new one) just moves there, unless
+  // that account is kept for the sessions that moved there just before: then this one waits, and says why.
+  const kept = session?.kept;
+  const lim = session?.busy || (spare && autoSwitch && !kept) ? null : u?.limited;
   const resumeAt = session?.resumeAt;
+  const keptLine = kept
+    ? kept.sessions === 1
+      ? `${kept.name} still has usage left, kept for the session that moved there.`
+      : `${kept.name} still has usage left, kept for the ${kept.sessions} sessions that moved there.`
+    : null;
   useTicking(!!lim || !!resumeAt);
   if (!lim && !resumeAt) return null;
   const cancel = () => del(`/api/sessions/${enc(session!.key)}/resume-at`).catch(toastError);
@@ -159,6 +167,7 @@ export function LimitBanner({
             )}
             Continues by itself <span className="font-medium text-fg">{untilText(resumeAt)}</span>.
           </span>
+          {keptLine && <span className="mt-0.5 block text-[12.5px] text-fg-2">{keptLine}</span>}
         </span>
         <span className="flex items-center gap-1">
           {lim && usable.length > 0 && (
@@ -254,6 +263,12 @@ export function LimitBanner({
             <Button size="sm" variant="secondary" onClick={() => turnOnSwitch()}>
               Turn on
             </Button>
+          </div>
+        )}
+        {keptLine && (
+          <div className="mt-2 flex items-center gap-1.5 border-t border-warn/20 pt-2 text-[12.5px] text-fg-2">
+            <ArrowRightLeft size={13} className="shrink-0 text-fg-3" />
+            <span className="min-w-0 flex-1">{keptLine}</span>
           </div>
         )}
         {resumeAt && (

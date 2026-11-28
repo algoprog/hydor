@@ -192,6 +192,12 @@ class Sessions extends EventEmitter {
   limitLiftsAt() {
     return undefined;
   }
+  limitKept() {
+    return undefined;
+  }
+  async continueAfterLimit() {
+    return 'send' as const;
+  }
   lives() {
     return true;
   }

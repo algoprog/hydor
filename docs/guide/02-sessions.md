@@ -466,7 +466,7 @@ Once linked, its state and checks show as a badge in the sidebar and the header,
 
 When a Claude Code or Codex plan runs out of usage, a banner above the message box says whose limit it hit, which limit, and when it resets: "You've hit the Claude Code usage limit" with one account of that agent, "All your Claude Code accounts have hit their usage limit" when you have several and none has usage left, or the account by its name ("Work has hit its usage limit") when another still has some. When none has usage left and **Switch accounts at a limit** is on, it names the account that resets first, where the session carries on then ("Work resets first, in 3 h 36 min").
 
-When another of that agent's accounts still has usage left, you see no banner while **Switch accounts at a limit** is on: the session moves to that account and carries on (new sessions start there). With it off, the banner names that account and offers **Turn on**.
+When another of that agent's accounts still has usage left, you see no banner while **Switch accounts at a limit** is on: the session moves to that account and carries on (new sessions start there). If that account is kept for the sessions that moved there just before, the session waits instead, and its notice says so ("Work 3 still has usage left, kept for the 4 sessions that moved there."). With it off, the banner names that account and offers **Turn on**.
 
 - **Resume at reset** continues the session by itself a minute after the limit resets, with the message "Continue where you left off." The banner then says when, with **Cancel**.
 - **Use a reset**: when your account holds limit resets, the banner says how many, and this uses one now.

@@ -36,15 +36,23 @@ const near = (a: number | undefined, b: number, what: string) => {
 
 // What the scheduler reads of the sessions manager: one session, whose account's limit lifts when `lifts` says.
 let lifts: number | null | undefined = null;
+// The account kept for the sessions moved there lately, as the notice names it (undefined: none), and what a due
+// continue answers (continueAfterLimit: 'goal', 'send' or 'wait').
+let kept: { name: string; sessions: number } | undefined;
+let next: 'goal' | 'send' | 'wait' = 'send';
+const delivered: string[] = [];
+const queued: string[] = [];
 const adapter = { limitStopped: true };
 const sessions = {
   lives: new Map([[KEY, { adapter }]]),
   on() {},
   summary: (key: string) => ({ key, agent: 'claude', title: 'A session', cwd: '/tmp' }),
-  queueSummary() {},
+  queueSummary: (key: string) => void queued.push(key),
   limitLiftsAt: () => lifts,
+  limitKept: () => kept,
+  continueAfterLimit: async () => next,
   beforeResume: async () => false,
-  deliverOrQueue: async () => {},
+  deliverOrQueue: async (_key: string, text: string) => void delivered.push(text),
 };
 
 // One scheduler for the whole run: each step below leaves the state the next one starts from.
@@ -116,6 +124,70 @@ test('a turn that got through since the limit cancels the resume', () => {
   } finally {
     adapter.limitStopped = true;
   }
+});
+
+// ---- a due continue: what the session's answer (continueAfterLimit) makes of it ----------------------
+
+/** Lets the session's resume fall due now and runs it as the scheduler does, with the answer `next` set. */
+async function runDue(answer: 'goal' | 'send' | 'wait') {
+  next = answer;
+  delivered.length = 0;
+  scheduler.resumeAt(KEY, Date.now() - 1000);
+  const row = db.prepare('select * from tasks where resume = 1 and target = ?').get(KEY);
+  await (scheduler as any).run(row, { trigger: 'schedule' });
+  next = 'send';
+}
+
+test('a due continue that waits, with its account used up until a time, is set for a minute after that time, and nothing is sent', async () => {
+  const now = Date.now();
+  lifts = now + 2 * HOUR;
+  await runDue('wait');
+  assert.deepEqual(delivered, [], 'the message is not sent into the limit');
+  near(nextAt(), lifts + MINUTE, 'a minute after the limit lifts');
+});
+
+test('a due continue that waits, with no account to take it and no time known for its limit, is set for 15 minutes and held', async () => {
+  const now = Date.now();
+  lifts = null;
+  await runDue('wait');
+  assert.deepEqual(delivered, []);
+  near(nextAt(), now + 15 * MINUTE, 'the early hold: 15 minutes');
+  assert.equal(earlyResumes().has(KEY), true, 'held like an early continue the limit turned away');
+});
+
+test('a due continue that waits, with the limit time unknown, sends its message as it would have', async () => {
+  lifts = undefined;
+  await runDue('wait');
+  assert.equal(delivered.length, 1, 'delivered once');
+  assert.equal(scheduler.resumeFor(KEY), undefined, 'no resume left');
+});
+
+test('a due continue that sends delivers its message once and leaves no resume', async () => {
+  await runDue('send');
+  assert.equal(delivered.length, 1);
+  assert.equal(scheduler.resumeFor(KEY), undefined);
+});
+
+test('a due continue answered goal is not delivered (the goal carried over continues the session)', async () => {
+  await runDue('goal');
+  assert.equal(delivered.length, 0);
+  assert.equal(scheduler.resumeFor(KEY), undefined);
+});
+
+test('syncResumes queues the summary of a waiting session when the account kept for it changes, and not again while it stays', () => {
+  const now = Date.now();
+  lifts = now + 2 * HOUR;
+  scheduler.resumeAt(KEY, now + 5 * HOUR);
+  kept = undefined;
+  scheduler.syncResumes(); // the resume is moved to the limit's time, and the kept state recorded
+  queued.length = 0;
+  kept = { name: 'Work 3', sessions: 4 };
+  scheduler.syncResumes();
+  assert.deepEqual(queued, [KEY], 'the summary is queued once for the change');
+  queued.length = 0;
+  scheduler.syncResumes();
+  assert.deepEqual(queued, [], 'the same kept account again: nothing queued');
+  kept = undefined;
 });
 
 for (const [name, fn] of tests) {

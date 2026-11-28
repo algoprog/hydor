@@ -511,6 +511,11 @@ export interface SessionSummary {
   goal?: GoalInfo;
   /** When "Resume at reset" will continue it (after a usage limit). */
   resumeAt?: number;
+  /**
+   * While it waits out a usage limit: another account with usage left that it does not move to by itself, kept for the
+   * sessions that moved there just before (by name, and how many), so they have room to work.
+   */
+  limitKept?: { name: string; sessions: number };
   /** The added account it runs as (Settings → Accounts); missing for the CLI's own sign-in. */
   account?: string;
   /** Running on its account's API credit (an Anthropic API key) because every Claude account is at its usage limit. */

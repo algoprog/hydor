@@ -29179,5 +29179,7 @@
   "Which folder? Give its whole path": "Quel dossier ? Indiquez son chemin complet",
   "Which project?": "Quel projet ?",
   "You can close this: it carries on, and a notice tells you when it is done.": "Vous pouvez fermer cette fenêtre : l’envoi continue, et une notification vous prévient quand il est terminé.",
-  "· {0} resets first, {1}": "· {0} se réinitialise en premier, {1}"
+  "· {0} resets first, {1}": "· {0} se réinitialise en premier, {1}",
+  "{0} still has usage left, kept for the session that moved there.": "Il reste de l’utilisation sur {0}, gardée pour la session qui y a été déplacée.",
+  "{0} still has usage left, kept for the {1} sessions that moved there.": "Il reste de l’utilisation sur {0}, gardée pour les {1} sessions qui y ont été déplacées."
 }
