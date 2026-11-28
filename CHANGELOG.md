@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.120.0 · 28 November 2026
+
+Projects travel between your machines: copy one to another machine of **Settings → Machines**, move it there, or keep
+the two copies in sync, with everything it holds.
+
+- **Send to another machine…**, in a project's **⋯** menu (on its page and on its card): pick the machine, then
+  **Copy**, **Keep in sync** or **Move**. Before anything goes, the dialog says what will: its files and their size,
+  with the Git history, its skills, memory notes, wiki, documents, kept pages and pictures, and its agents. It also
+  says what is left out because a command makes it again (such as `node_modules`), where the project will land there,
+  and how much room that disk has. A bar shows it going; **Cancel sending** leaves nothing half made on the other
+  machine, and **Open it there** opens the new project. Its conversations, experiment runs and share links stay where
+  they are.
+- **Keep in sync**: while both machines are on, the two copies stay equal both ways: files, skills, wiki, the project's
+  name, description and guidelines, and its notes, every half minute to five minutes, on **Sync now**, and a few
+  seconds after a change. Git's own folder, what Git ignores and folders made again stay out. A file changed on both is
+  kept twice (the later keeps its name, the other is saved beside it as "name (conflict, machine, date)"), and a round
+  that would remove many files waits for **Sync anyway**. The state shows under the project's name and on its card.
+- **Move**: once the copy has arrived whole and been checked, the project leaves this machine. Its folder, skills and
+  dropped-in documents go to the Trash, and its documents, kept things and own agents are removed rather than handed
+  to the rest of your work there.
+- **Safe from the other machine**: nothing that arrives can write outside its new folder, links included, and syncing
+  never reads or writes through a symbolic link.
+- Both machines need Hydor 0.120.0 or newer: the dialog says when one is older. An agent can do it for you too ("Copy
+  my Thesis project to my GPU box").
+
 ## 0.119.0 · 27 November 2026
 
 Custom stands on its own: with only your own models, Hydor never offers, starts or asks you to sign in to a Claude
