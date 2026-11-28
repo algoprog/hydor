@@ -3,6 +3,22 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.121.0 · 28 November 2026
+
+When an account has usage again while many sessions wait, they move there one at a time and leave room for each other,
+instead of all arriving at once and using it up in seconds.
+
+- With **Switch accounts at a limit** on, sessions that move to another account by themselves go one at a time. Each
+  moves only once what the one before it cost shows in that account's usage. Before, they could all move in the same
+  moment: twelve sessions reloading their history used up a Pro plan's five hours in about ten seconds, and then all
+  waited for another account's reset.
+- Once the sessions that moved to an account have used about half the room it had when the first arrived, it takes no
+  more while they work, so they have room to keep going. The others wait for the next account back, and their notice
+  says why: "Work 3 still has usage left, kept for the 4 sessions that moved there."
+- A session due to continue that no account can take yet keeps waiting, instead of sending "Continue where you left
+  off." to an account that would only turn it away.
+- A message you send to a waiting session, or a new session you start, is never held back by this.
+
 ## 0.120.2 · 28 November 2026
 
 Subagents stay on the program you picked: a Claude Code session's subagents think with Claude's models, a Codex
