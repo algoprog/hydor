@@ -20,6 +20,10 @@ tile carries a dot for the same.
    - **By its address**, on a private network or a VPN such as Tailscale: for example `http://100.64.0.5:8790`.
      Set `HOST` on that machine so it listens on that address.
 
+A project can go from one machine to another too: its ⋯ menu → **Send to another machine…** copies it, moves it or keeps it
+in sync with a copy there, with its files and Git history, skills, notes, wiki, documents and agents (its conversations stay
+where they were). Both machines need Hydor 0.120.0 or newer. See [Send a project to another machine](guide/04-projects.md#send-a-project-to-another-machine).
+
 An access token can do all you can do on its machine, so make one for each machine that connects, and revoke
 it when that machine no longer needs it. Dev-server previews work on the machine you opened only.
 

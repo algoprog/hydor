@@ -624,7 +624,7 @@ agents that speak ACP and take MCP servers.
   arrow before it folds its sessions), its ⋯ menu (which also has New folder, a folder of its own for sorting its
   sessions), the search box (Ctrl+K), or a link in a notification or an agent's answer. Page and window have a band in
   the project's colour (its mark, its name, what it is about or its folder, New session and a ⋯ menu: Open its folder in
-  Files, Show in Finder, Only its sessions in the sidebar, Share with people, Delete the project) and the tabs under it:
+  Files, Show in Finder, Only its sessions in the sidebar, Share with people, Send to another machine… when there is another machine, Sync now and Stop syncing once it is kept in sync, Delete the project) and the tabs under it:
   Overview, Files, Memory, Research (only in a project with research in it: runs in its folder, a finding or an evaluation), Skills, Agents and Settings (on a phone the tabs that do not fit are under More at the row's
   end, and the window fills the screen). Esc, ✕ or a click outside closes the window, and so does going to another page,
   such as opening a document from Files; deleting the project from its page goes back to the Projects page. Its Overview has,
@@ -700,6 +700,20 @@ agents that speak ACP and take MCP servers.
   read-only, its experiments' runs and its reading list; they comment under their name (you get a notice and an Inbox
   line), and edit documents if you let them. Never your agents, files, settings or other projects; confidential
   sessions never show; wrong links count as wrong passwords.
+- **Send a project to another machine** (a project's ⋯ → Send to another machine…, with another machine in Settings →
+  Machines; not for a group): pick the machine and how: **Copy** (this one stays), **Keep in sync** or **Move** (it
+  leaves: its folder goes to the Trash). It goes whole: its folder with its Git history, other folders it works with when
+  you tick them, its skills, memory notes, wiki, documents, kept things, agents of its own and its details, as a new
+  project in a folder you can change (new or empty, with the free space shown). What can be made again (`node_modules`,
+  Python environments, caches) stays behind unless you untick it. Conversations, experiment runs, share links, kept
+  things' versions and comments and agents' schedules stay. It runs in the background with a bar and Cancel, a notice at
+  the end and **Open it there**; the machine it goes to must run Hydor 0.120.0 or newer. A copy kept in sync is kept by
+  the machine you opened the app on: files (not `.git`, what Git ignores or rebuilt folders), skills, wiki, details and
+  notes go both ways every 30 seconds to 5 minutes, a few seconds after a change here and on **Sync now**; a file
+  changed on both sides is kept both ways as `name (conflict, machine, date time).ext`; a round that would remove more
+  than 20 files and over half of what it knew of a part is held until **Sync anyway**; the other machine being off shows
+  as Waiting. The project's page and card show the state ("In sync with GPU box · 2m ago") with a panel for what
+  changed on both, **Sync now** and **Stop syncing**; the Overview says "Copied from laptop · 27 Nov".
 - **Share one thing with people** (a page's Share → Share with people; Share on a picture's, video's or sound's page;
   Share with people in a card's ⋯): a document, slides, a spreadsheet, a LaTeX document, a notebook, a page, a design,
   a picture, a video or a sound, with each person by a link of their own (View and comment, or Edit; for a week, a
@@ -2597,7 +2611,8 @@ programs shows each program's version and what is out, with Check now, Update no
   app's version, so opening one with an older Hydor first offers to update it from here (or to open it anyway), and a
   page that fails to draw says so, with Reload, instead of an empty window. A copy from git or Docker older than 0.78.0,
   which can't update itself past Hydor's rewritten history, gets the command to run on it once; newer copies with no
-  commits of their own move to a rewritten history by themselves when they update.
+  commits of their own move to a rewritten history by themselves when they update. A project can be copied to another
+  machine, moved there or kept in sync with a copy there, from its ⋯ menu → Send to another machine… (see Projects).
 - One password guards the app, and a browser stays signed in for 30 days. Wrong passwords are counted by the
   address they come from: after three in an hour the sign-in page also shows a picture of characters to type,
   drawn by the app itself (no outside service), and after ten that address can't sign in for an hour. Ten from

@@ -1,6 +1,6 @@
 # Projects and knowledge
 
-A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), what agents remember about it (notes, a wiki and documents of its own), the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers the Projects page, a project's details, making and using projects and groups of projects, a project's own skills, sharing a project with people, and adding, searching and managing the documents agents search.
+A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), what agents remember about it (notes, a wiki and documents of its own), the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers the Projects page, a project's details, making and using projects and groups, their own skills, sharing a project with people, sending one to another machine, and the documents agents search.
 
 ![A project's own page: its sessions, its newest files and what every session in it gets, under its tabs](images/projects.webp)
 
@@ -54,7 +54,7 @@ Each card shows:
 - "2 working" while its sessions are at work, and a dot when a session finished since you last looked;
 - when it was last at work, and small bars for the messages of its last four weeks.
 
-Point at a card (on a touch screen they are always there) and **New session** starts a session in the project, and **More** (⋯) has the project's menu: **Open its folder in Files**, in the desktop app **Show in Finder**, **Show in File Explorer** or **Show in folder**, **Only its sessions in the sidebar**, **Share with people** and **Delete the project** (see [The project's menu](#the-projects-menu)). Click anywhere else on a card to open the project's own page, with an arrow back to all projects (see [Open a project's details](#open-a-projects-details)). Drop files from your computer on a card to put them in the project's folder.
+Point at a card (on a touch screen they are always there) and **New session** starts a session in the project, and **More** (⋯) has the project's menu: **Open its folder in Files**, in the desktop app **Show in Finder**, **Show in File Explorer** or **Show in folder**, **Only its sessions in the sidebar**, **Share with people**, **Send to another machine…** (once you have another machine; see [Send a project to another machine](#send-a-project-to-another-machine)) and **Delete the project** (see [The project's menu](#the-projects-menu)). A project kept in sync with a copy on another machine shows its state on its card, in a line such as "In sync with GPU box · 2m ago". Click anywhere else on a card to open the project's own page, with an arrow back to all projects (see [Open a project's details](#open-a-projects-details)). Drop files from your computer on a card to put them in the project's folder.
 
 Under the cards, **Folders you work in** lists the folders your sessions worked in lately that no project has yet (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)). **Make a project** on one opens the **New project** window with that folder picked; ✕ (**Not a project: stop suggesting it**) takes it off the list for good. The list is left out while you search.
 
@@ -133,6 +133,8 @@ Open them as described in [Open a project's details](#open-a-projects-details). 
 - **Show in Finder**, **Show in File Explorer** or **Show in folder**: in the desktop app, the project's folder selected in the system's file manager (see [Work with files and folders](/guide/files-git#work-with-files-and-folders)).
 - **Only its sessions in the sidebar**: the session list shows only the sessions in the project, as the sidebar's own filter does (see [Show one project's sessions in the sidebar](#show-one-projects-sessions-in-the-sidebar)). Pick it again to see every session.
 - **Share with people**: invite someone (an advisor, a student) to see the project and comment on its documents at a link of their own (see [Share a project with people](#share-a-project-with-people)).
+- **Send to another machine…**: copy the project to another machine running Hydor, move it there, or keep it in sync with a copy there (see [Send a project to another machine](#send-a-project-to-another-machine)). It shows once you have another machine in [Settings → Machines](/settings?s=machines), and not for a group.
+- **Sync now** and **Stop syncing**: only for a project kept in sync with a copy. **Sync now** shows on the machine that keeps the link (**Sync anyway** instead when a round is held back), and **Stop syncing** on both (see [Keep two copies in sync](#keep-two-copies-in-sync)).
 - **Delete the project** (see [Delete a project](#delete-a-project)).
 
 ### Overview
@@ -145,6 +147,7 @@ The project at a glance, in cards:
 - **Shared with** (beside them, under them on a phone), once you share the project with someone: each person, with their initials and what they did last ("Commented on “Chapter 3” · 2 h ago", "Not opened yet"). Click one, or **Share**, to see and change who it is shared with (see [Share a project with people](#share-a-project-with-people)).
 - **Every session here** (beside them, under them on a phone): what every session in the project gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Memory** (what it remembers, in a line: "12 notes · 8 articles · 5 documents", with the articles only while its wiki memory is on; click for the **Memory** tab), **Skills** (how many of its own) and **Starts as** (its agent).
 - **The projects it brings together**, for a group: each of its projects, with how many sessions it has. Click one to open it.
+- **Where it came from**, under its folder in **Every session here**, for a project sent from another machine: "Copied from laptop · 27 Nov" or "Moved from laptop · 27 Nov". A project kept in sync says so under its name instead (see [See and control the syncing](#see-and-control-the-syncing)).
 
 ### Files
 
@@ -400,6 +403,127 @@ A link that ran out, was stopped or was made again says so when opened ("This li
 
 Each link is a long random code that opens one project for one person. A code that opens nothing counts as a wrong password from where it came: after ten in an hour, that address can't open links or sign in for an hour (see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
 
+## Send a project to another machine
+
+If Hydor runs on more than one machine (see [Use other machines from one app](/guide/devices#use-other-machines-from-one-app)), a project can go from one to another: as a **copy**, **moved** for good, or as a copy you **keep in sync** with the first. It is one dialog, from the project's menu, and the project arrives whole on the other machine: its files with their Git history, its skills, what agents remember about it, its wiki, its documents, what it kept and its agents.
+
+Each machine has to run Hydor 0.120.0 or newer. A machine with an older one says so ("… runs Hydor …: update it there to send projects to it"); update it from where you are (see [When a machine has an older Hydor](/guide/devices#when-a-machine-has-an-older-hydor)). A group of projects can't be sent: send its projects one by one.
+
+### Open the dialog and choose how
+
+1. Open the project's details and click **More** (⋯) at its top, or use the ⋯ on its card on the Projects page. Pick **Send to another machine…**. The item shows once there is another machine to send to.
+2. Under **To**, pick the machine. Each shows its state; one that doesn't answer is greyed out, with why ("Not reachable", "Restarting"). The machine you opened the app on counts too when the project is on another machine's pages: the dialog sends from the machine whose pages you are on.
+3. Under **How**, pick one:
+   - **Copy**: a copy goes there, and this one stays as it is.
+   - **Keep in sync**: a copy goes there, and a change on either one reaches the other while both machines are on (see [Keep two copies in sync](#keep-two-copies-in-sync)). It is greyed out ("One of the two must be this machine") when the project is on one of your other machines and so is the one you send it to: the machine you opened the app on has to be one of the two, since it keeps the link.
+   - **Move**: it goes there and leaves this machine; its folder goes to the Trash here (see [Move a project](#move-a-project)). A line under the choices says so.
+4. Look at **What goes** and **Where on …** (below), then click **Copy**, **Keep in sync** or **Move**, as you picked. **Cancel** leaves without sending anything.
+
+Hydor asks the machine the project is on what it would carry before you send anything, and asks the other machine where it would put it, so the dialog shows real numbers.
+
+### What goes with a project
+
+Under **What goes**, the first line says how much of its folder goes: "1,284 files · 2.3 GB, with its Git history". A line under it, **Also**, lists what else goes, only the kinds the project has: "3 skills · 42 memory notes · its wiki · 5 documents · 12 kept things · its agent". Everything below goes:
+
+- **Its details**: name, colour, what it is about, its guidelines, the agent its sessions start as (when it is a built-in agent or one of the project's own agents; any other is dropped), and its settings for wiki memory, shared knowledge and being searchable from other projects.
+- **Its folder**, with the Git history (the `.git` folder), so it is a working repository there too.
+- **Its other folders**: the folders it works with, only when you tick **Copy its other folders too** (it shows when it has some under your home folder, with their size). They go to the same place under the other machine's home folder when that place is free (missing or empty). When it already holds files there, it is used as it is and nothing is written into it. A folder outside your home folder is never copied.
+- **Its skills**, and which of them are switched on or off for it.
+- **Its memory notes**: the notes, findings and topics about it, kept for its new folder there.
+- **Its wiki**, when it has one (wiki memory on).
+- **Its documents**: the knowledge bases of its own, with the files you added to them. The other machine reads them again. A folder a base reads from inside the project's folder is read from the new folder; one outside it can't go, and the dialog warns ("Documents that read folders outside its folder keep only what is inside it").
+- **What it kept**: its pages, documents, slides, spreadsheets, notebooks, diagrams, boards, pictures, videos and sounds, as they are now, so each opens in its own editor there. The files they have in the project's folder arrive with the folder.
+- **Its agents**: the agents of its own, as they are, without their schedules.
+
+**Leave out what can be made again** is ticked at first: folders a command makes again (such as `node_modules`, Python environments and caches), and files the system leaves around (`.DS_Store`, `Thumbs.db`) stay behind. It shows what that saves ("node_modules, .venv… 1.9 GB"). Untick it to send everything. Whatever you pick, a few things never go: sockets and the like that aren't files, links that lead outside the folder, and the pointer file of a Git worktree. The dialog warns when links stay behind.
+
+A file whose name the other machine's system can't have (a Windows machine has names it doesn't allow, and two names that differ only in capitals are one name on a Mac or Windows disk) is left out, and the end of the sending lists it under **What was left out**.
+
+### What stays behind
+
+The dialog says "Stays here: its conversations, experiment runs and share links." Also not sent: the versions and comments of what the project kept (only its current version goes), its agents' schedules, the start page's picks for the project, and its place in a group. The copy starts with no sessions; start new ones there, and the agents there read the notes, wiki and documents that came along.
+
+### Where it goes
+
+Under **Where on** the machine, the folder it will get there, which you can change. Hydor suggests the same place under that machine's home folder as it has under this one, or the next free one beside it ("-2", "-3"…); for a project outside the home folder, the usual place for new projects there. Under the folder, the free space on that disk: "11.2 GB free there", in red when the project needs more ("Only 1.2 GB free there; it needs 2.3 GB").
+
+The folder must be new or empty: if files are there already, nothing is sent and the dialog says "There are files at … already: pick a new or empty folder". Nothing is ever written over files that are there.
+
+The project arrives as a new project of its own (with a new id). Its Overview says where it came from, under its folder: "Copied from laptop · 27 Nov" or "Moved from laptop · 27 Nov"; a copy kept in sync shows its state under its name instead.
+
+### Watch it go, and open it there
+
+Once you click, the dialog shows a bar: "Sending · 45% · 1.0 of 2.3 GB", with the count of files under it. It carries on in the background: you can **Close** the dialog and go on working, and a notice tells you when it is done ("Thesis is on GPU box now") or why it failed. **Cancel sending** stops it, and the other machine removes everything it had received, so nothing stays there half made.
+
+When it is done the dialog says "“Thesis” is on GPU box now", what became of the original, and **Open it there**, which opens the new project on its machine. If something couldn't be placed (a name the other machine can't have, a document's outside folder), **What was left out** lists it. If it fails, the dialog says why, with **Try again**.
+
+A file that changes while it is being read is left out of that sending rather than copied half changed; send again, or keep the two in sync, to bring it over.
+
+### Keep two copies in sync
+
+**Keep in sync** makes the copy as above and then keeps the two projects equal: a change you make on either one reaches the other. It works while both machines are on; nothing needs to be running in between.
+
+**What is kept in step:**
+
+- the project's **files** (its folder),
+- its **skills** and its **wiki** (when it has one),
+- its **details**: name, colour, what it is about and its guidelines,
+- its **memory notes**: the notes and findings agents wrote. Topics and profiles are each machine's own summaries and stay as they are.
+
+A thing the project kept (a page, a document, a picture…) is a file in its folder, so it syncs as a file, and the other machine's project reads a change in as a new version of that thing.
+
+**What is not:**
+
+- **Git's own folder** (`.git`): each machine keeps its own history. Use Git itself (push and pull) to share commits; what is in the working files syncs as any other change.
+- **What Git ignores**: in a project whose folder is a Git repository, the files Git ignores stay on their machine; the files it tracks and new ones it doesn't ignore sync. A project that isn't a repository syncs all its files.
+- **Folders a command makes again**, such as `node_modules`, Python environments and caches.
+- Its conversations, experiment runs, documents and agents, as for a copy. A project with more than 200,000 files can't be kept in sync.
+
+**When:** one round happens when the link is made, then again every 30 seconds to 5 minutes (the faster the last round was, the sooner the next), when you click **Sync now**, and a few seconds after a change in the project's folder on the machine that keeps the link. A change on the other machine reaches you in the next round. A round carries the changes over in both directions: a new or changed file goes to the other machine, and a file you delete is deleted there too (it goes to that machine's Trash).
+
+If the other machine is off or can't be reached, the project says "Waiting for GPU box" and nothing is lost: it syncs again when the machine is back.
+
+**Which machine keeps the link.** One machine does the syncing: the one you opened the app on when you sent the project (which is why keeping in sync needs one of the two to be that machine). **Sync now** is there only. Both projects show the state, and **Stop syncing** works on either one.
+
+### When both copies change the same file
+
+When a file changed on both machines since the last round, Hydor keeps both versions. The one changed later stays at the file's name, and the other is kept beside it as:
+
+> report (conflict, laptop, 2026-11-27 14.05).docx
+
+that is, the file's name, then "conflict", the name of the machine that version came from and when it was last changed (UTC), then its extension. Both copies get both files. Look at them, keep the one you want and delete the other. A notice tells you, once per round, when it happened, and the project's panel lists them under **Changed on both** (see below).
+
+When a file was deleted on one machine and changed on the other, the changed one wins and comes back to the machine that deleted it. A detail (the name, say) changed on both goes by the machine that keeps the link. A memory note that one machine forgot is forgotten on the other too, and a new note on one is added to the other.
+
+### When a round would remove many files
+
+Syncing carries deletions over, so a mistake could spread: an emptied folder, or a disk that was not mounted, on one machine would empty the other. When one round would remove more than 20 files of one part of the project and more than half of what it knew there, Hydor holds those removals back. The project says "Held back", and the panel says what it would do: "… would remove 1,200 files on GPU box: Sync anyway, or Stop syncing". Nothing else is held up.
+
+Look at what happened on that machine. If the removals are what you meant, click **Sync anyway** (in the panel or the project's menu); otherwise put the files back, or **Stop syncing**. The same hold applies to forgetting many notes.
+
+### See and control the syncing
+
+A project kept in sync shows its state under its name on the project's page, and on its card on the Projects page, with an icon and a line:
+
+- **In sync with GPU box · 2m ago**: the last round ended with everything in step.
+- **Syncing…**: a round is moving files.
+- **Waiting for GPU box**: the other machine can't be reached now.
+- **Held back**: removals are waiting for your word (see above).
+- **Not syncing**: something went wrong; the panel says what.
+
+Click the line to open **Kept in sync**: the state, "Its copy: *Thesis* on *GPU box*", the files that **Changed on both** with the name each was kept as and when, and the buttons:
+
+- **Sync now** starts a round at once (on the machine that keeps the link). When removals are held back it reads **Sync anyway**.
+- **Stop syncing** ends it. On the machine that keeps the link, it ends it for both projects; both copies stay as they are, and nothing is deleted. Done on the other machine, that project stops syncing, and the machine that keeps the link sees it and ends the link, with a notice. If you delete the project on one machine, the link ends too.
+
+The same two are in the project's menu (see [The project's menu](#the-projects-menu)). An agent can do both for you ("Keep this project in sync with the laptop").
+
+### Move a project
+
+**Move** sends the project and, when it has arrived whole and checked, removes it here, with what it held, since all of that is on the other machine now. Unlike **Delete the project** (see [Delete a project](#delete-a-project)), nothing of it stays behind for the rest of your work on this machine: its folder, its skills and the files dropped into its documents go to the Trash (you can get them back from there); its documents, the things it kept and the agents of its own are removed (an agent that also works in other projects stays for them); and its memory notes are forgotten, which you can still see in the memory's history. Its conversations stay on this machine, in no project; a moved project starts with none. If the Trash is on another disk and can't take the folder, the folder stays where it was and the dialog says so.
+
+Nothing is removed until the copy there is whole: if the sending fails or you cancel it, the project is still here. A moved project's page closes after you close the dialog, since it is no longer here. To keep working on both, use **Copy** or **Keep in sync**.
+
 ## Shared knowledge: documents every session can search
 
 Agents can search documents you add once: contracts, manuals, notes, papers, a whole folder. They find passages by their words or by what they mean, and cite the file and page they read. Documents are kept in **knowledge bases**: named collections of files you dropped in and folders on this computer.
@@ -537,3 +661,9 @@ The knowledge tools never bring up another project's documents, not even when an
 - "Who is my Thesis project shared with, and what did each of them do last?"
 - "Answer Maria's comments on Chapter 3, then resolve the ones you dealt with."
 - "Stop sharing my Thesis project with Nikos."
+- "Copy my Thesis project to my GPU box, without node_modules, and tell me when it is there."
+- "Keep this project in sync with the laptop."
+- "Move my Taxes 2026 project to the desktop at home."
+- "Which of my projects are kept in sync with another machine, and which are waiting or held back?"
+- "Sync my Thesis project with the laptop now, and tell me if any file was changed on both."
+- "Stop syncing my Thesis project with the GPU box."

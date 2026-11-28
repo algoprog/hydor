@@ -32,6 +32,16 @@ export function machineInfo() {
   return { host: os.hostname(), version: config.version, home: config.home, platform: process.platform, user };
 }
 
+/** This server's own id as the links between machines name it: made once, kept for good. */
+export function machineId(db: DB): string {
+  let id = kvGet(db, 'machine_id');
+  if (!id) {
+    id = crypto.randomBytes(8).toString('hex');
+    kvSet(db, 'machine_id', id);
+  }
+  return id;
+}
+
 // ---- access tokens: other machines using this one ------------------------------------------------
 
 interface AccessToken {
@@ -535,7 +545,8 @@ export class Machines extends EventEmitter {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
         .slice(0, 24) || 'machine';
-    const taken = new Set(this.defs().map((d) => d.id));
+    // `projects` is the hub's own route (/api/machines/projects/…), so no machine gets it.
+    const taken = new Set([...this.defs().map((d) => d.id), 'projects']);
     let id = base;
     for (let i = 2; taken.has(id); i++) id = `${base}-${i}`;
     return id;

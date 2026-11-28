@@ -30,6 +30,7 @@ import { MemberPicker, memberNames, SpaceMark, startInSpace } from './parts';
 import { deleteSpace, SpaceMenu } from './ProjectMenu';
 import { activityText, PersonMark, useShares } from './ShareDialog';
 import { openShareDialog } from './ShareHost';
+import { cameLine, SyncBadge } from './SyncMark';
 import { RecentFiles } from './RecentFiles';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
@@ -125,6 +126,7 @@ function Top({ s, view, tab, onTab, memory, page }: { s: Space; view?: SpaceView
           <div translate={group ? undefined : 'no'} className="mt-0.5 truncate text-[12.5px] text-fg-3 sm:text-[13.5px]" title={group ? undefined : s.description || s.folder}>
             {group ? tr(`Brings together ${memberNames(s, spaces)}`) : s.description || tildify(s.folder, home)}
           </div>
+          {s.sync && <SyncBadge s={s} className="mt-0.5 max-w-full" />}
         </div>
         <Button size="sm" variant="primary" icon={<SquarePen size={14} />} onClick={() => startInSpace(s)} title={tr(`New session in ${s.name}`)} className="max-sm:w-8 max-sm:px-0">
           <span className="max-sm:hidden">New session</span>
@@ -246,6 +248,8 @@ function OverviewTab({ s, view, keys, memory, onTab }: { s: Space; view?: SpaceV
                 {tildify(s.folder, home)}
               </span>
               {others > 0 && <span className="block text-fg-3">{tr(`and ${others} more ${others === 1 ? 'folder' : 'folders'}`)}</span>}
+              {/* Where its files came from (the header says it already while it is kept in sync). */}
+              {s.came && !s.sync && <span className="block text-fg-3">{cameLine(s.came)}</span>}
             </Fact>
             <Fact icon={<ScrollText size={16} />} label="Guidelines" onClick={() => to('settings')}>
               {s.instructions?.trim() ? (

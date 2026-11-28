@@ -52,6 +52,8 @@ const RULES: Rule[] = [
   ['DELETE', /^\/api\/experiments\/evolutions\//, 'refuse', 'Only the person deletes an evolution: its candidates, their scores and its worktrees go with it.'],
   // What the person has looked at and what they put off is theirs: an agent reading the brief must not mark it seen.
   ['POST', /^\/api\/projects\/[^/]+\/research\/(seen|later)$/, 'refuse', 'Only the person marks the Research tab as looked at, or puts a final test off: read the brief with GET /api/projects/:id/research and tell them what needs them.'],
+  // Between two Hydors: one machine reads a project's bundle or its changes and the other writes them. The app drives it with /api/machines/projects/….
+  ['*', /^\/api\/projects\/(arrive|[^/]+\/(carry\/bundle|leave|sync\/(state|hashes|pull|push|apply)))$/, 'refuse', 'Those routes are how one machine talks to another while a project is sent or kept in sync: they read and write whole folders as one stream. To send a project, use POST /api/machines/projects/send (to see what would go first, GET /api/machines/projects/plan); to keep one in sync, send it with how: "sync"; Sync now and Stop syncing are POST and DELETE on /api/machines/projects/links/:id.'],
   ['*', /^\/api\/auth\//, 'refuse', 'The password and signing in are the user’s alone (Settings → App → Password).'],
   ['*', /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)(\/|$)/, 'refuse', YOUR_TOOLS],
   ['*', /^\/api\/pdf\//, 'refuse', 'Use your PDF tools for that: pdf_look and pdf_form to see a PDF and its form, pdf_fill, pdf_write and pdf_pages to change it.'],
@@ -139,6 +141,8 @@ const RULES: Rule[] = [
   ['W', /^\/api\/setup\//, 'always', 'This changes what Claude Code, Codex or Custom load in every session; an MCP server runs a program on this computer.'],
   ['W', /^\/api\/(custom|browser)\/settings$/, 'always', 'This changes what agents may do without asking.'],
   ['W', /^\/api\/computer\/settings$/, 'always', 'This lets agents see this Mac’s screen and use its mouse and keyboard (each session still asks before its agent starts).'],
+  ['POST', /^\/api\/machines\/projects\/send$/, 'always', 'This copies a project’s files, notes and documents to another machine, or moves it there (its folder here goes to the Trash), or keeps the two in sync, so that what is changed or deleted on one is changed or deleted on the other.'],
+  ['POST', /^\/api\/machines\/projects\/links\/[^/]+\/sync$/, 'always', 'This syncs a project with its copy on another machine now: what is changed or deleted on one side is changed or deleted on the other (with force, removals held back go through too).'],
   ['W', /^\/api\/(update|update\/auto|startup|machines|scm\/accounts|acp-agents|agent-accounts|clients)(\/|$)/, 'always'],
   ['W', /^\/api\/models\/(install|start)$/, 'always', 'This downloads or starts a model on this computer.'],
   ['POST', /^\/api\/images\/local\/setup$/, 'always', 'This sets up the picture tools on this computer: a private Python with what they need (about 145 MB, or about 2.1 GB with an NVIDIA graphics card, to run on it), and each tool’s model (about 200 MB) the first time it is used.'],

@@ -358,8 +358,8 @@ On a Mac, the app puts the command on your PATH by itself.
 **Everywhere**
 
 - Desktop apps for Mac, Windows and Linux, your phone's home screen with notifications, the share sheet on Android
-  and computers, and several machines from one place ([devices](docs/guide/20-devices.md),
-  [several machines](docs/machines.md)).
+  and computers, and several machines from one place, with a project copied, moved or kept in sync between them
+  ([devices](docs/guide/20-devices.md), [several machines](docs/machines.md)).
 - **Your computer too**: in the desktop apps, agents can use your screen, mouse and keyboard once you allow it.
 - **In your terminal**: the `hydor` command talks to an agent, runs one request from a script, and does everything
   the app does, with Tab completion for bash, zsh and fish ([terminal](docs/guide/27-terminal.md)).

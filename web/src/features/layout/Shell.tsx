@@ -32,6 +32,7 @@ import { Lightbox, VideoBox } from '../../components/Lightbox';
 import { EditorHost } from '../mediaedit/host';
 import { CrashGuard } from '../../components/CrashGuard';
 import { ProjectDialogHost } from '../spaces/ProjectDialog';
+import { SendDialogHost } from '../spaces/SendHost';
 import { ShareDialogHost } from '../spaces/ShareHost';
 import { Tour } from '../tour/Tour';
 import { Tips } from '../tips/Tips';
@@ -289,6 +290,7 @@ export function Shell() {
         <StudioHost />
         <ProjectDialogHost />
         <ShareDialogHost />
+<SendDialogHost />
         <Lightbox />
         <VideoBox />
         <Tour />
@@ -329,6 +331,7 @@ export function Shell() {
       <StudioHost />
       <ProjectDialogHost />
       <ShareDialogHost />
+<SendDialogHost />
       <Lightbox />
       <VideoBox />
       <Tour />

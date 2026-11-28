@@ -1,6 +1,6 @@
 # Projetos e conhecimento
 
-Um projeto mantém junto um trabalho inteiro: suas sessões, uma pasta para os arquivos dele (e outras pastas suas com as quais ele trabalha), o que os agentes lembram sobre ele (notas, uma wiki e documentos próprios), as diretrizes que todo agente nele segue, habilidades próprias, o agente com que suas sessões começam e agentes próprios. O Conhecimento compartilhado reúne os documentos e as pastas que você adiciona uma só vez para que todas as sessões possam pesquisá-los e citar o arquivo e a página que leram. Este tópico explica a página Projetos, como abrir os detalhes de um projeto, criar e usar projetos e grupos de projetos, dar habilidades próprias a um projeto, compartilhar um projeto com pessoas e adicionar, pesquisar e gerenciar os documentos que os agentes pesquisam.
+Um projeto mantém um trabalho reunido: suas sessões, uma pasta para os arquivos dele (e outras pastas suas com as quais ele trabalha), o que os agentes lembram sobre ele (notas, uma wiki e documentos próprios), as diretrizes que todo agente nele segue, habilidades próprias, o agente com o qual suas sessões começam e agentes próprios. O Conhecimento compartilhado reúne os documentos e as pastas que você adiciona uma só vez para que toda sessão possa pesquisá-los e citar o arquivo e a página que leu. Este tópico aborda a página Projetos, os detalhes de um projeto, como criar e usar projetos e grupos, as habilidades próprias deles, como compartilhar um projeto com pessoas, como enviar um para outra máquina e os documentos que os agentes pesquisam.
 
 ![A página de um projeto: suas sessões, seus arquivos mais novos e o que toda sessão nele recebe, sob as abas](images/projects.webp)
 
@@ -54,7 +54,7 @@ Cada cartão mostra:
 - "2 trabalhando" enquanto as sessões dele estão trabalhando, e um ponto quando uma sessão terminou desde a sua última visita;
 - quando ele trabalhou pela última vez, e barrinhas com as mensagens das últimas quatro semanas.
 
-Passe o ponteiro sobre um cartão (em uma tela sensível ao toque, eles estão sempre visíveis) e **Nova sessão** começa uma sessão no projeto, e **Mais** (⋯) tem o menu do projeto: **Abrir a pasta em Arquivos**, no app de computador **Mostrar no Finder**, **Mostrar no Explorador de Arquivos** ou **Mostrar na pasta**, **Só as sessões dele na barra lateral**, **Compartilhar com pessoas** e **Excluir o projeto** (veja [O menu do projeto](#the-projects-menu)). Clique em qualquer outro ponto do cartão para abrir a página do próprio projeto, com uma seta de volta para todos os projetos (veja [Abra os detalhes de um projeto](#open-a-projects-details)). Solte arquivos do seu computador sobre um cartão para colocá-los na pasta do projeto.
+Aponte para um cartão (em uma tela de toque eles ficam sempre visíveis) e **Nova sessão** começa uma sessão no projeto, e **Mais** (⋯) tem o menu do projeto: **Abrir a pasta em Arquivos**, no app para desktop **Mostrar no Finder**, **Mostrar no Explorador de Arquivos** ou **Mostrar na pasta**, **Só as sessões dele na barra lateral**, **Compartilhar com pessoas**, **Enviar para outra máquina…** (quando você tiver outra máquina; veja [Enviar um projeto para outra máquina](#send-a-project-to-another-machine)) e **Excluir o projeto** (veja [O menu do projeto](#the-projects-menu)). Um projeto mantido em sincronia com uma cópia em outra máquina mostra o estado dele no cartão, em uma linha como “Em sincronia com GPU box · há 2 min”. Clique em qualquer outro ponto de um cartão para abrir a página do próprio projeto, com uma seta de volta para todos os projetos (veja [Abrir os detalhes de um projeto](#open-a-projects-details)). Solte arquivos do seu computador sobre um cartão para colocá-los na pasta do projeto.
 
 Abaixo dos cartões, **Pastas em que você trabalha** lista as pastas em que suas sessões trabalharam recentemente e que nenhum projeto tem ainda (veja [Pastas em que você trabalha, ainda sem projeto](#folders-you-work-in-not-in-a-project-yet)). **Criar projeto** em uma delas abre a janela **Novo projeto** com essa pasta escolhida; ✕ (**Não é um projeto: parar de sugerir**) a tira da lista de vez. A lista fica de fora enquanto você pesquisa.
 
@@ -133,6 +133,8 @@ Abra-os como descrito em [Abra os detalhes de um projeto](#open-a-projects-detai
 - **Mostrar no Finder**, **Mostrar no Explorador de Arquivos** ou **Mostrar na pasta**: no app para computador, a pasta do projeto selecionada no gerenciador de arquivos do sistema (veja [Trabalhar com arquivos e pastas](/guide/files-git#work-with-files-and-folders)).
 - **Só as sessões dele na barra lateral**: a lista de sessões mostra apenas as sessões do projeto, como faz o filtro da própria barra lateral (veja [Mostrar as sessões de um projeto na barra lateral](#show-one-projects-sessions-in-the-sidebar)). Escolha de novo para ver todas as sessões.
 - **Compartilhar com pessoas**: convide alguém (um orientador, um aluno) para ver o projeto e comentar os documentos dele em um link próprio (veja [Compartilhar um projeto com pessoas](#share-a-project-with-people)).
+- **Enviar para outra máquina…**: copie o projeto para outra máquina que execute o Hydor, mova-o para lá ou mantenha-o em sincronia com uma cópia de lá (veja [Enviar um projeto para outra máquina](#send-a-project-to-another-machine)). Ele aparece quando você tem outra máquina em [Configurações → Máquinas](/settings?s=machines), e não para um grupo.
+- **Sincronizar agora** e **Parar sincronização**: apenas para um projeto mantido em sincronia com uma cópia. **Sincronizar agora** aparece na máquina que mantém o vínculo (**Sincronizar mesmo assim** no lugar dele quando uma rodada está retida), e **Parar sincronização** nas duas (veja [Manter duas cópias em sincronia](#keep-two-copies-in-sync)).
 - **Excluir o projeto** (veja [Excluir um projeto](#delete-a-project)).
 
 ### Visão geral
@@ -145,6 +147,7 @@ O projeto num relance, em cartões:
 - **Compartilhado com** (ao lado deles, embaixo deles no celular), depois que você compartilha o projeto com alguém: cada pessoa, com as iniciais e o que fez por último (“Comentou em “Capítulo 3” · há 2 h”, “Ainda não abriu”). Clique em uma, ou em **Participação**, para ver e alterar com quem ele é compartilhado (veja [Compartilhar um projeto com pessoas](#share-a-project-with-people)).
 - **Todas as sessões daqui** (ao lado deles, embaixo deles no celular): o que toda sessão do projeto recebe. **Pasta** (a pasta dele e com quantas outras ele trabalha: clique para ir à aba **Arquivos**), **Diretrizes** (o início das diretrizes dele: clique para ir a **Configurações**), **Memória** (o que ele lembra, em uma linha: “12 notas · 8 artigos · 5 documentos”, com os artigos só enquanto a memória wiki está ativada; clique para ir à aba **Memória**), **Habilidades** (quantas são só dele) e **Começa como** (o agente dele).
 - **Os projetos que ele reúne**, para um grupo: cada um dos projetos, com quantas sessões tem. Clique em um para abri-lo.
+- **De onde veio**, sob a pasta dele em **Todas as sessões daqui**, para um projeto enviado de outra máquina: “Copiado de laptop · 27 nov” ou “Movido de laptop · 27 nov”. Um projeto mantido em sincronia informa isso sob o nome dele (veja [Ver e controlar a sincronização](#see-and-control-the-syncing)).
 
 ### Arquivos
 
@@ -400,6 +403,127 @@ Um link que expirou, foi desativado ou foi gerado de novo avisa isso quando é a
 
 Cada link é um código aleatório longo que abre um projeto para uma pessoa. Um código que não abre nada conta como uma senha errada do endereço de onde veio: depois de dez em uma hora, esse endereço não pode abrir links nem entrar por uma hora (veja [Acessar o app de outro dispositivo](/guide/devices#reach-the-app-from-another-device)).
 
+## Enviar um projeto para outra máquina
+
+Se o Hydor roda em mais de uma máquina (veja [Usar outras máquinas a partir de um só app](/guide/devices#use-other-machines-from-one-app)), um projeto pode ir de uma para outra: como uma **cópia**, **movida** em definitivo, ou como uma cópia que você **mantém em sincronia** com a primeira. É uma única caixa de diálogo, aberta pelo menu do projeto, e o projeto chega inteiro à outra máquina: seus arquivos com o histórico do Git, suas habilidades, o que os agentes lembram sobre ele, sua wiki, seus documentos, o que ele guardou e seus agentes.
+
+Cada máquina precisa rodar o Hydor 0.120.0 ou mais recente. Uma máquina com uma versão mais antiga avisa (“… runs Hydor …: update it there to send projects to it”); atualize-a de onde você está (veja [Quando uma máquina tem um Hydor mais antigo](/guide/devices#when-a-machine-has-an-older-hydor)). Um grupo de projetos não pode ser enviado: envie os projetos um por um.
+
+### Abrir a caixa de diálogo e escolher como
+
+1. Abra os detalhes do projeto e clique em **Mais** (⋯) no topo, ou use o ⋯ no cartão dele na página Projetos. Escolha **Enviar para outra máquina…**. O item aparece quando há outra máquina para receber o projeto.
+2. Em **Para**, escolha a máquina. Cada uma mostra seu estado; uma que não responde fica esmaecida, com o motivo (“Not reachable”, “Restarting”). A máquina em que você abriu o app também conta quando o projeto está nas páginas de outra máquina: a caixa de diálogo envia a partir da máquina cujas páginas você está vendo.
+3. Em **Como**, escolha uma opção:
+   - **Copiar**: uma cópia vai para lá, e este projeto continua como está.
+   - **Manter em sincronia**: uma cópia vai para lá, e uma alteração em qualquer um dos dois chega ao outro enquanto as duas máquinas estiverem ligadas (veja [Manter duas cópias em sincronia](#keep-two-copies-in-sync)). Fica esmaecida (“One of the two must be this machine”) quando o projeto está em uma de suas outras máquinas e a que vai recebê-lo também é outra: a máquina em que você abriu o app precisa ser uma das duas, pois é ela que mantém o vínculo.
+   - **Mover**: o projeto vai para lá e sai desta máquina; a pasta dele vai para a Lixeira aqui (veja [Mover um projeto](#move-a-project)). Uma linha sob as opções avisa isso.
+4. Confira **O que vai** e **Where on …** (abaixo) e clique em **Copiar**, **Manter em sincronia** ou **Mover**, conforme sua escolha. **Cancelar** sai sem enviar nada.
+
+O Hydor pergunta à máquina em que o projeto está o que ela levaria, antes de você enviar qualquer coisa, e pergunta à outra máquina onde colocaria o projeto, então a caixa de diálogo mostra números reais.
+
+### O que vai com um projeto
+
+Em **O que vai**, a primeira linha diz quanto da pasta do projeto vai: “1,284 files · 2.3 GB, with its Git history”. Uma linha abaixo, **Also**, lista o que mais vai, apenas os tipos que o projeto tem: “3 skills · 42 memory notes · its wiki · 5 documents · 12 kept things · its agent”. Tudo o que está abaixo vai:
+
+- **Its details**: nome, cor, do que se trata, suas diretrizes, o agente com que suas sessões começam (quando é um agente nativo ou um dos agentes do próprio projeto; qualquer outro é descartado) e suas configurações de memória wiki, conhecimento compartilhado e de poder ser pesquisado a partir de outros projetos.
+- **Pasta do app**, com o histórico do Git (a pasta `.git`), para que seja também um repositório funcional lá.
+- **Its other folders**: as pastas com que ele trabalha, somente quando você marca **Copiar também as outras pastas dele** (a opção aparece quando ele tem alguma dentro da sua pasta pessoal, com o tamanho). Elas vão para o mesmo lugar dentro da pasta pessoal da outra máquina quando esse lugar está livre (inexistente ou vazio). Quando já há arquivos lá, a pasta é usada como está e nada é gravado nela. Uma pasta fora da sua pasta pessoal nunca é copiada.
+- **Its skills**, e quais delas estão ativadas ou desativadas para ele.
+- **Its memory notes**: as notas, descobertas e tópicos sobre ele, guardados para a nova pasta dele lá.
+- **Its wiki**, quando ele tem uma (memória wiki ativada).
+- **Its documents**: as bases de conhecimento próprias dele, com os arquivos que você adicionou a elas. A outra máquina as lê de novo. Uma pasta que uma base lê dentro da pasta do projeto é lida a partir da nova pasta; uma fora dela não pode ir, e a caixa de diálogo avisa (“Documents that read folders outside its folder keep only what is inside it”).
+- **What it kept**: suas páginas, documentos, slides, planilhas, notebooks, diagramas, painéis, imagens, vídeos e sons, como estão agora, para que cada um abra no próprio editor lá. Os arquivos que eles têm na pasta do projeto chegam com a pasta.
+- **Its agents**: os agentes próprios dele, como estão, sem suas agendas.
+
+**Deixar de fora o que pode ser refeito** vem marcado de início: pastas que um comando refaz (como `node_modules`, ambientes Python e caches) e arquivos que o sistema deixa por aí (`.DS_Store`, `Thumbs.db`) ficam para trás. A caixa de diálogo mostra quanto isso economiza (“node_modules, .venv… 1.9 GB”). Desmarque para enviar tudo. Qualquer que seja a sua escolha, algumas coisas nunca vão: sockets e similares que não são arquivos, links que levam para fora da pasta e o arquivo-ponteiro de um worktree do Git. A caixa de diálogo avisa quando links ficam para trás.
+
+Um arquivo cujo nome o sistema da outra máquina não aceita (uma máquina Windows tem nomes que não permite, e dois nomes que diferem só por maiúsculas são um único nome em um disco de Mac ou Windows) fica de fora, e o fim do envio o lista em **O que ficou de fora**.
+
+### O que fica para trás
+
+A caixa de diálogo diz “Stays here: its conversations, experiment runs and share links.” Também não são enviados: as versões e os comentários do que o projeto guardou (só a versão atual vai), as agendas de seus agentes, as escolhas da página inicial para o projeto e o lugar dele em um grupo. A cópia começa sem sessões; comece novas lá, e os agentes de lá leem as notas, a wiki e os documentos que vieram junto.
+
+### Para onde vai
+
+Em **Where on** a máquina, a pasta que ele terá lá, que você pode mudar. O Hydor sugere o mesmo lugar dentro da pasta pessoal daquela máquina que o projeto tem nesta, ou o próximo livre ao lado (“-2”, “-3”…); para um projeto fora da pasta pessoal, o lugar habitual dos novos projetos lá. Sob a pasta, o espaço livre naquele disco: “11.2 GB free there”, em vermelho quando o projeto precisa de mais (“Only 1.2 GB free there; it needs 2.3 GB”).
+
+A pasta precisa ser nova ou estar vazia: se já houver arquivos nela, nada é enviado e a caixa de diálogo diz “There are files at … already: pick a new or empty folder”. Nada é jamais gravado por cima de arquivos que já estejam lá.
+
+O projeto chega como um projeto novo e independente (com um novo id). A Visão geral dele diz de onde veio, sob a pasta: “Copied from laptop · 27 Nov” ou “Moved from laptop · 27 Nov”; uma cópia mantida em sincronia mostra o estado dela sob o nome.
+
+### Acompanhar o envio e abrir o projeto lá
+
+Depois que você clica, a caixa de diálogo mostra uma barra: “Sending · 45% · 1.0 of 2.3 GB”, com a contagem de arquivos abaixo. O envio continua em segundo plano: você pode **Fechar** a caixa de diálogo e continuar trabalhando, e um aviso diz quando terminou (“Thesis is on GPU box now”) ou por que falhou. **Cancelar envio** o interrompe, e a outra máquina remove tudo o que já tinha recebido, para que nada fique lá pela metade.
+
+Quando termina, a caixa de diálogo diz “‘Thesis’ is on GPU box now”, o que aconteceu com o original, e mostra **Abrir lá**, que abre o novo projeto na máquina dele. Se algo não pôde ser colocado (um nome que a outra máquina não aceita, uma pasta externa de um documento), **O que ficou de fora** o lista. Se falhar, a caixa de diálogo diz por quê, com **Tentar de novo**.
+
+Um arquivo que muda enquanto está sendo lido fica de fora desse envio em vez de ser copiado pela metade alterado; envie de novo, ou mantenha os dois em sincronia, para trazê-lo.
+
+### Manter duas cópias em sincronia
+
+**Manter em sincronia** faz a cópia como descrito acima e depois mantém os dois projetos iguais: uma alteração que você faz em qualquer um deles chega ao outro. Funciona enquanto as duas máquinas estão ligadas; nada precisa estar rodando no meio do caminho.
+
+**O que é mantido em sincronia:**
+
+- os **arquivos** do projeto (a pasta dele),
+- suas **habilidades** e sua **wiki** (quando ele tem uma),
+- seus **detalhes**: nome, cor, do que se trata e suas diretrizes,
+- suas **notas da memória**: as notas e descobertas que os agentes escreveram. Tópicos e perfis são resumos próprios de cada máquina e ficam como estão.
+
+Algo que o projeto guardou (uma página, um documento, uma imagem…) é um arquivo na pasta dele, então sincroniza como arquivo, e o projeto da outra máquina lê a alteração como uma nova versão daquilo.
+
+**O que não é:**
+
+- **A pasta própria do Git** (`.git`): cada máquina mantém seu próprio histórico. Use o próprio Git (push e pull) para compartilhar commits; o que está nos arquivos de trabalho sincroniza como qualquer outra alteração.
+- **O que o Git ignora**: em um projeto cuja pasta é um repositório Git, os arquivos que o Git ignora ficam na máquina deles; os arquivos que ele rastreia e os novos que ele não ignora sincronizam. Um projeto que não é um repositório sincroniza todos os seus arquivos.
+- **Pastas que um comando refaz**, como `node_modules`, ambientes Python e caches.
+- Suas conversas, execuções de experimentos, documentos e agentes, como numa cópia. Um projeto com mais de 200.000 arquivos não pode ser mantido em sincronia.
+
+**Quando:** uma rodada acontece quando o vínculo é criado, e depois a cada 30 segundos a 5 minutos (quanto mais rápida foi a última rodada, mais cedo vem a próxima), quando você clica em **Sincronizar agora**, e alguns segundos depois de uma alteração na pasta do projeto na máquina que mantém o vínculo. Uma alteração na outra máquina chega até você na rodada seguinte. Uma rodada leva as alterações nos dois sentidos: um arquivo novo ou alterado vai para a outra máquina, e um arquivo que você exclui também é excluído lá (ele vai para a Lixeira daquela máquina).
+
+Se a outra máquina estiver desligada ou inacessível, o projeto diz “Waiting for GPU box” e nada se perde: ele sincroniza de novo quando a máquina voltar.
+
+**Qual máquina mantém o vínculo.** Uma máquina faz a sincronização: aquela em que você abriu o app ao enviar o projeto (por isso manter em sincronia exige que uma das duas seja essa máquina). **Sincronizar agora** só existe nela. Os dois projetos mostram o estado, e **Parar sincronização** funciona em qualquer um deles.
+
+### Quando as duas cópias alteram o mesmo arquivo
+
+Quando um arquivo mudou nas duas máquinas desde a última rodada, o Hydor mantém as duas versões. A alterada por último fica com o nome do arquivo, e a outra é mantida ao lado dela como:
+
+> report (conflict, laptop, 2026-11-27 14.05).docx
+
+ou seja, o nome do arquivo, depois “conflict”, o nome da máquina de onde veio aquela versão e quando foi alterada pela última vez (UTC), e então a extensão. As duas cópias recebem os dois arquivos. Dê uma olhada neles, fique com o que quiser e exclua o outro. Um aviso informa, uma vez por rodada, quando isso aconteceu, e o painel do projeto os lista em **Alterado nas duas** (veja abaixo).
+
+Quando um arquivo foi excluído em uma máquina e alterado na outra, o alterado vence e volta para a máquina que o excluiu. Um detalhe (o nome, por exemplo) alterado nas duas vale o da máquina que mantém o vínculo. Uma nota da memória que uma máquina esqueceu também é esquecida na outra, e uma nota nova em uma é adicionada à outra.
+
+### Quando uma rodada removeria muitos arquivos
+
+A sincronização leva as exclusões de um lado ao outro, então um erro poderia se espalhar: uma pasta esvaziada, ou um disco que não foi montado, em uma máquina esvaziaria a outra. Quando uma rodada removeria mais de 20 arquivos de uma parte do projeto e mais da metade do que ele conhecia ali, o Hydor retém essas remoções. O projeto diz **Retido**, e o painel diz o que faria: “… would remove 1,200 files on GPU box: Sync anyway, or Stop syncing”. Nada mais fica parado.
+
+Veja o que aconteceu naquela máquina. Se as remoções são o que você queria, clique em **Sincronizar mesmo assim** (no painel ou no menu do projeto); caso contrário, recoloque os arquivos ou **Parar sincronização**. A mesma retenção vale para o esquecimento de muitas notas.
+
+### Ver e controlar a sincronização
+
+Um projeto mantido em sincronia mostra o estado sob o nome dele na página do projeto, e no cartão dele na página Projetos, com um ícone e uma linha:
+
+- **In sync with GPU box · 2m ago**: a última rodada terminou com tudo em dia.
+- **Sincronizando…**: uma rodada está movendo arquivos.
+- **Waiting for GPU box**: a outra máquina não pode ser alcançada agora.
+- **Retido**: remoções esperam a sua palavra (veja acima).
+- **Sem sincronia**: algo deu errado; o painel diz o quê.
+
+Clique na linha para abrir **Mantido em sincronia**: o estado, “Its copy: *Thesis* on *GPU box*”, os arquivos **Alterado nas duas** com o nome com que cada um foi mantido e quando, e os botões:
+
+- **Sincronizar agora** inicia uma rodada imediatamente (na máquina que mantém o vínculo). Quando há remoções retidas, ele diz **Sincronizar mesmo assim**.
+- **Parar sincronização** a encerra. Na máquina que mantém o vínculo, encerra para os dois projetos; as duas cópias ficam como estão, e nada é excluído. Se feito na outra máquina, aquele projeto deixa de sincronizar, e a máquina que mantém o vínculo percebe e encerra o vínculo, com um aviso. Se você excluir o projeto em uma máquina, o vínculo também termina.
+
+Os mesmos dois estão no menu do projeto (veja [O menu do projeto](#the-projects-menu)). Um agente pode fazer os dois por você (“Mantenha este projeto em sincronia com o laptop”).
+
+### Mover um projeto
+
+**Mover** envia o projeto e, quando ele chegou inteiro e verificado, o remove daqui, com o que ele continha, já que tudo isso agora está na outra máquina. Ao contrário de **Excluir o projeto** (veja [Excluir um projeto](#delete-a-project)), nada dele fica para trás para o resto do seu trabalho nesta máquina: a pasta, as habilidades e os arquivos soltos nos documentos dele vão para a Lixeira (você pode recuperá-los de lá); seus documentos, o que ele guardou e os agentes próprios são removidos (um agente que também trabalha em outros projetos continua para eles); e suas notas da memória são esquecidas, o que você ainda pode ver no histórico da memória. As conversas dele ficam nesta máquina, sem projeto; um projeto movido começa sem nenhuma. Se a Lixeira estiver em outro disco e não puder receber a pasta, a pasta fica onde estava e a caixa de diálogo avisa.
+
+Nada é removido até que a cópia lá esteja inteira: se o envio falhar ou você o cancelar, o projeto continua aqui. A página de um projeto movido se fecha depois que você fecha a caixa de diálogo, já que ele não está mais aqui. Para continuar trabalhando nos dois, use **Copiar** ou **Manter em sincronia**.
+
 ## Conhecimento compartilhado: documentos que toda sessão pode pesquisar
 
 Os agentes podem pesquisar documentos que você adiciona uma vez: contratos, manuais, notas, artigos, uma pasta inteira. Eles encontram trechos pelas palavras ou pelo significado, e citam o arquivo e a página que leram. Os documentos ficam em **bases de conhecimento**: coleções com nome de arquivos que você soltou e de pastas deste computador.
@@ -537,3 +661,9 @@ As ferramentas de conhecimento nunca trazem os documentos de outro projeto, nem 
 - "Com quem o meu projeto Tese está compartilhado e o que cada pessoa fez por último?"
 - "Responda aos comentários da Maria no Capítulo 3 e depois marque como resolvidos os que você tratou."
 - "Pare de compartilhar meu projeto Tese com o Nikos."
+- “Copie meu projeto Tese para a minha máquina com GPU, sem node_modules, e me avise quando ele chegar lá.”
+- “Mantenha este projeto em sincronia com o laptop.”
+- “Mova meu projeto Impostos 2026 para o desktop de casa.”
+- “Quais dos meus projetos são mantidos em sincronia com outra máquina, e quais estão esperando ou retidos?”
+- “Sincronize meu projeto Tese com o laptop agora e me diga se algum arquivo foi alterado nas duas.”
+- “Pare de sincronizar meu projeto Tese com a máquina com GPU.”

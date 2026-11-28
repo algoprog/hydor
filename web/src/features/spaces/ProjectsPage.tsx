@@ -26,6 +26,7 @@ import { sessionSpaceId } from '../sessions/groups';
 import { unreadOf } from '../sessions/SessionList';
 import { memberNames, NewSpaceDialog, SpaceMark, startInSpace, useSpaceSuggestions } from './parts';
 import { SpaceMenu } from './ProjectMenu';
+import { SyncBadge } from './SyncMark';
 import { useSpaces } from './state';
 
 // ---- what the page keeps ----------------------------------------------------------------------------------------
@@ -295,6 +296,7 @@ function ProjectCard({ s, spaces, doing, weeks }: { s: SpaceView; spaces: SpaceV
           </div>
         )}
         {held && <div className="mt-2.5 text-[12.5px] leading-snug text-fg-2">{held}</div>}
+        {s.sync && <SyncBadge s={s} className="mt-2 max-w-full" />}
         <div className="min-h-3 flex-1" />
         <div className="flex items-center gap-2 border-t border-line pt-3">
           <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{s.lastAt ? (timeAgo(s.lastAt) === 'just now' ? 'Last at work just now' : tr(`Last at work ${timeAgo(s.lastAt)} ago`)) : 'No sessions yet'}</span>

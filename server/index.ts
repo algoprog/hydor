@@ -40,7 +40,8 @@ import { DEFAULT_TASK_ROOT, taskRoot } from './assistants/store.ts';
 import { teamOf, tiersOf } from './assistants/tiers.ts';
 import { WORK_DIR as APPS_WORK_DIR } from './apps/runs.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
-import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
+import { accessOk, accessTokens, bearerOf, createAccessToken, machineId, machineInfo, Machines, revokeAccessToken } from './machines.ts';
+import { useTransferMachines } from './spaces/transfer/endpoints.ts';
 import { briefOf, newsOf } from './machine-news.ts';
 import { createMcpToken, mcpRoutes, mcpTokens, OFFLINE_PAGE_CSP, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
 import { ModelManager } from './models/manager.ts';
@@ -138,6 +139,8 @@ const push = new Push(db, config.dataDir);
 const machines = new Machines(db);
 // Experiments sends jobs to other machines and lists their runs.
 useMachines(machines);
+// Projects are sent to and kept in step with other machines' (spaces/transfer).
+useTransferMachines(machines);
 const SYSTEM_CHANNEL = '@system';
 
 agentBaseEnv(); // capture the login environment once, up front
@@ -2258,10 +2261,10 @@ mcpRoutes(app, db, sessions, (key) => `${publicBase()}/s/${encodeURIComponent(ke
 // ---- machines -----------------------------------------------------------------------------------
 
 /** This machine, as another Hydor sees it. */
-app.get('/api/machine', async () => machineInfo());
+app.get('/api/machine', async () => ({ ...machineInfo(), id: machineId(db) }));
 
 /** The other machines this one uses (Settings → Machines); their pages are /m/<id>/… */
-app.get('/api/machines', async () => ({ self: { ...machineInfo(), status: selfStatus() }, machines: machines.list() }));
+app.get('/api/machines', async () => ({ self: { ...machineInfo(), id: machineId(db), status: selfStatus() }, machines: machines.list() }));
 app.post('/api/machines', async (req) => ({ machine: await machines.add(req.body) }));
 app.patch('/api/machines/:id', async (req) => ({ machine: await machines.update((req.params as { id: string }).id, req.body) }));
 app.delete('/api/machines/:id', async (req) => {

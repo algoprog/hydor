@@ -1,6 +1,6 @@
 # Projekte und Wissen
 
-Ein Projekt bündelt zusammengehörige Arbeit: Sitzungen, einen eigenen Arbeitsordner und weitere verwendete Ordner, Projektwissen aus Notizen, Wiki und eigenen Dokumenten, gemeinsame Agentenrichtlinien, eigene Skills, einen Startagenten und projektspezifische Agenten. Im gemeinsamen Wissen hinterlegst du Dokumente und Ordner einmal, damit alle Sitzungen sie durchsuchen und mit Datei- und Seitenangaben zitieren können. Dieser Beitrag erklärt die Projekte-Seite, wie du die Details eines Projekts öffnest, Projekte und Projektgruppen, projektspezifische Skills, Freigaben für andere Personen sowie die Dokumentenablage und Suche der Agenten.
+Ein Projekt hält eine Arbeit zusammen: ihre Sitzungen, einen Ordner für ihre Dateien (und weitere Ordner von dir, mit denen sie arbeitet), was Agenten sich dazu merken (Notizen, ein Wiki und eigene Dokumente), die Agentenrichtlinien, denen jeder Agent darin folgt, eigene Skills, den Agenten, als der die Sitzungen beginnen, und eigene Agenten. Gemeinsames Wissen enthält die Dokumente und Ordner, die du einmal hinzufügst, damit jede Sitzung sie durchsuchen und die gelesene Datei und Seite zitieren kann. Dieses Thema behandelt die Seite „Projekte“, die Details eines Projekts, das Erstellen und Verwenden von Projekten und Gruppen, ihre eigenen Skills, das Teilen eines Projekts mit anderen, das Senden an einen anderen Computer und die Dokumente, die Agenten durchsuchen.
 
 ![Die eigene Seite eines Projekts: seine Sitzungen, seine neuesten Dateien und was jede Sitzung darin bekommt, unter seinen Tabs](images/projects.webp)
 
@@ -54,7 +54,7 @@ Jede Karte zeigt:
 - „In Bearbeitung: 2“, solange seine Sitzungen arbeiten, und einen Punkt, wenn seit deinem letzten Blick eine Sitzung abgeschlossen wurde;
 - wann zuletzt darin gearbeitet wurde, und kleine Balken für die Nachrichten der letzten vier Wochen.
 
-Zeige auf eine Karte (auf einem Touchscreen sind die Schaltflächen immer da), dann startet **Neue Sitzung** eine Sitzung im Projekt, und **Mehr** (⋯) enthält das Menü des Projekts: **Ordner unter „Dateien“ öffnen**, in der Desktop-App **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**, **Nur Projektsitzungen in der Seitenleiste**, **Mit anderen teilen** und **Projekt löschen** (siehe [Das Menü des Projekts](#the-projects-menu)). Klicke irgendwo sonst auf eine Karte, um die eigene Seite des Projekts zu öffnen, mit einem Pfeil zurück zu allen Projekten (siehe [Die Details eines Projekts öffnen](#open-a-projects-details)). Ziehe Dateien von deinem Computer auf eine Karte, um sie in den Ordner des Projekts zu legen.
+Zeige mit der Maus auf eine Karte (auf einem Touchscreen sind sie immer da): Mit **Neue Sitzung** startest du eine Sitzung im Projekt, und unter **Mehr** (⋯) findest du das Menü des Projekts: **Ordner unter „Dateien“ öffnen**, in der Desktop-App **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**, **Nur Projektsitzungen in der Seitenleiste**, **Mit anderen teilen**, **An anderen Computer senden …** (sobald du einen weiteren Computer hast; siehe [Ein Projekt an einen anderen Computer senden](#send-a-project-to-another-machine)) und **Projekt löschen** (siehe [Das Menü des Projekts](#the-projects-menu)). Ein Projekt, das mit einer Kopie auf einem anderen Computer synchron gehalten wird, zeigt seinen Stand auf seiner Karte in einer Zeile wie „Synchron mit GPU box · vor 2 Min.“. Klicke irgendwo sonst auf eine Karte, um die eigene Seite des Projekts zu öffnen, mit einem Pfeil zurück zu allen Projekten (siehe [Die Details eines Projekts öffnen](#open-a-projects-details)). Ziehe Dateien von deinem Computer auf eine Karte, um sie in den Ordner des Projekts zu legen.
 
 Unter den Karten listet **Ordner, in denen du arbeitest** die Ordner auf, in denen deine Sitzungen in letzter Zeit gearbeitet haben und die noch kein Projekt hat (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)). **Projekt erstellen** bei einem Ordner öffnet das Fenster **Neues Projekt** mit diesem Ordner; ✕ (**Kein Projekt: nicht mehr vorschlagen**) nimmt ihn für immer aus der Liste. Während einer Suche entfällt die Liste.
 
@@ -133,6 +133,8 @@ Wenn der Ordner des Projekts ein Git-Repository ist, bietet das Ende des Menüs 
 - **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**: In der Desktop-App zeigt es den Ordner des Projekts ausgewählt im Dateimanager des Systems (siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)).
 - **Nur Projektsitzungen in der Seitenleiste**: Die Sitzungsliste zeigt nur die Sitzungen im Projekt, so wie es der Filter der Seitenleiste selbst tut (siehe [Die Sitzungen eines Projekts in der Seitenleiste zeigen](#show-one-projects-sessions-in-the-sidebar)). Wähle es noch einmal aus, um wieder alle Sitzungen zu sehen.
 - **Mit anderen teilen**: Lade jemanden (eine Betreuerin, einen Studenten) ein, das Projekt zu sehen und seine Dokumente über einen eigenen Link zu kommentieren (siehe [Ein Projekt mit anderen teilen](#share-a-project-with-people)).
+- **An anderen Computer senden …**: Kopiere das Projekt auf einen anderen Computer, auf dem Hydor läuft, verschiebe es dorthin oder halte es mit einer Kopie dort synchron (siehe [Ein Projekt an einen anderen Computer senden](#send-a-project-to-another-machine)). Der Eintrag erscheint, sobald du in [Einstellungen → Computer](/settings?s=machines) einen weiteren Computer hast, und nicht bei einer Gruppe.
+- **Jetzt synchronisieren** und **Synchronisierung beenden**: nur für ein Projekt, das mit einer Kopie synchron gehalten wird. **Jetzt synchronisieren** erscheint auf dem Computer, der die Verbindung hält (stattdessen **Trotzdem synchronisieren**, wenn eine Runde zurückgehalten wird), und **Synchronisierung beenden** auf beiden (siehe [Zwei Kopien synchron halten](#keep-two-copies-in-sync)).
 - **Projekt löschen**; siehe [Ein Projekt löschen](#delete-a-project).
 
 ### Übersicht
@@ -145,6 +147,7 @@ Karten zeigen das Projekt auf einen Blick:
 - **Geteilt mit**, daneben oder auf dem Smartphone darunter: nach erster Freigabe die Personen mit Initialen und letzter Aktivität, etwa „‚Kapitel 3‘ kommentiert · vor 2 Std.“ oder „Noch nicht geöffnet“. Eine Person oder **Teilen** öffnet die Freigabeverwaltung. Siehe [Projektfreigaben](#share-a-project-with-people).
 - **Jede Sitzung hier** (daneben, auf dem Smartphone darunter): was jede Sitzung im Projekt bekommt. **Ordner** (sein Ordner und wie viele weitere es nutzt: Klicke darauf, um zum Tab **Dateien** zu gelangen), **Richtlinien** (der Anfang seiner Richtlinien: Klicke darauf, um zu **Einstellungen** zu gelangen), **Memory** (was es sich merkt, in einer Zeile: „12 Notizen · 8 Artikel · 5 Dokumente“, wobei die Artikel nur erscheinen, solange sein Wiki-Memory an ist; klicke darauf, um zum Tab **Memory** zu gelangen), **Skills** (wie viele eigene es hat) und **Beginnt als** (sein Agent).
 - **Die Projekte, die es zusammenbringt**, bei einer Gruppe: jedes ihrer Projekte, mit der Anzahl seiner Sitzungen. Klicke eines an, um es zu öffnen.
+- **Woher es kam**, unter seinem Ordner in **Jede Sitzung hier**, bei einem von einem anderen Computer gesendeten Projekt: „Kopiert von laptop · 27. Nov.“ oder „Verschoben von laptop · 27. Nov.“. Ein synchron gehaltenes Projekt sagt das stattdessen unter seinem Namen (siehe [Die Synchronisierung ansehen und steuern](#see-and-control-the-syncing)).
 
 ### Dateien
 
@@ -400,6 +403,127 @@ Ein Link, der abgelaufen ist, angehalten oder neu erstellt wurde, sagt das beim 
 
 Jeder lange Zufallscode öffnet ein Projekt für eine Person. Ungültige Codes zählen wie falsche Passwörter derselben Herkunftsadresse: Nach zehn Versuchen pro Stunde sind Links und Anmeldung für diese Adresse eine Stunde gesperrt. Siehe [Zugriff von einem anderen Gerät](/guide/devices#reach-the-app-from-another-device).
 
+## Ein Projekt an einen anderen Computer senden
+
+Wenn Hydor auf mehr als einem Computer läuft (siehe [Andere Computer aus einer App nutzen](/guide/devices#use-other-machines-from-one-app)), kann ein Projekt von einem zum anderen wandern: als **Kopie**, für immer **verschoben** oder als Kopie, die du mit dem Original **synchron hältst**. Es ist ein einziger Dialog im Menü des Projekts, und das Projekt kommt vollständig auf dem anderen Computer an: seine Dateien mit ihrem Git-Verlauf, seine Skills, was Agenten sich dazu merken, sein Wiki, seine Dokumente, was es behalten hat und seine Agenten.
+
+Auf jedem Computer muss Hydor 0.120.0 oder neuer laufen. Ein Computer mit einer älteren Version sagt das („… runs Hydor …: update it there to send projects to it“); aktualisiere ihn von dort aus, wo du gerade bist (siehe [Wenn ein Computer ein älteres Hydor hat](/guide/devices#when-a-machine-has-an-older-hydor)). Eine Gruppe von Projekten lässt sich nicht senden: Sende ihre Projekte einzeln.
+
+### Den Dialog öffnen und die Art wählen
+
+1. Öffne die Details des Projekts und klicke oben auf **Mehr** (⋯), oder nutze das ⋯ auf der Karte des Projekts auf der Seite „Projekte“. Wähle **An anderen Computer senden …**. Der Eintrag erscheint, sobald es einen anderen Computer als Ziel gibt.
+2. Wähle unter **An** den Computer. Jeder zeigt seinen Zustand; einer, der nicht antwortet, ist ausgegraut, mit dem Grund („Nicht erreichbar“, „Startet neu“). Auch der Computer, auf dem du die App geöffnet hast, zählt, wenn das Projekt auf den Seiten eines anderen Computers liegt: Der Dialog sendet von dem Computer, auf dessen Seiten du dich befindest.
+3. Wähle unter **Wie** eine Möglichkeit:
+   - **Kopieren**: Eine Kopie geht dorthin, und dieses Projekt bleibt, wie es ist.
+   - **Synchron halten**: Eine Kopie geht dorthin, und eine Änderung an einem der beiden Projekte erreicht das andere, solange beide Computer eingeschaltet sind (siehe [Zwei Kopien synchron halten](#keep-two-copies-in-sync)). Die Option ist ausgegraut („Einer der beiden muss dieser Computer sein“), wenn das Projekt auf einem deiner anderen Computer liegt und der Zielcomputer ebenfalls ein anderer ist: Der Computer, auf dem du die App geöffnet hast, muss einer der beiden sein, denn er hält die Verbindung.
+   - **Verschieben**: Das Projekt geht dorthin und verlässt diesen Computer; sein Ordner kommt hier in den Papierkorb (siehe [Ein Projekt verschieben](#move-a-project)). Eine Zeile unter den Optionen weist darauf hin.
+4. Sieh dir **Was mitgeht** und **Wohin auf …** (unten) an und klicke dann auf **Kopieren**, **Synchron halten** oder **Verschieben**, je nach Auswahl. Mit **Abbrechen** verlässt du den Dialog, ohne etwas zu senden.
+
+Hydor fragt den Computer, auf dem das Projekt liegt, was er mitschicken würde, bevor du etwas sendest, und fragt den anderen Computer, wohin er es legen würde. So zeigt der Dialog echte Zahlen.
+
+### Was mit einem Projekt mitgeht
+
+Unter **Was mitgeht** steht in der ersten Zeile, wie viel von seinem Ordner mitgeht: „1.284 Dateien · 2,3 GB, mit seinem Git-Verlauf“. Eine Zeile darunter, **Auch**, listet auf, was sonst noch mitgeht, nur die Arten, die das Projekt hat: „3 Skills · 42 Memory-Notizen · sein Wiki · 5 Dokumente · 12 behaltene Dinge · sein Agent“. Alles Folgende geht mit:
+
+- **Seine Details**: Name, Farbe, worum es geht, seine Richtlinien, der Agent, als der seine Sitzungen starten (wenn es ein eingebauter Agent oder einer der projekteigenen Agenten ist; jeder andere entfällt), und seine Einstellungen für Wiki-Memory, Gemeinsames Wissen und dafür, ob es aus anderen Projekten durchsuchbar ist.
+- **Sein Ordner** mit dem Git-Verlauf (dem Ordner `.git`), sodass er dort ebenfalls ein funktionierendes Repository ist.
+- **Seine anderen Ordner**: die Ordner, mit denen es arbeitet, nur wenn du **Auch seine anderen Ordner kopieren** ankreuzt (die Option erscheint, wenn es welche unter deinem Home-Ordner hat, mit ihrer Größe). Sie gehen an dieselbe Stelle unter dem Home-Ordner des anderen Computers, wenn diese Stelle frei ist (fehlt oder leer ist). Liegen dort schon Dateien, wird der Ordner so verwendet, wie er ist, und es wird nichts hineingeschrieben. Ein Ordner außerhalb deines Home-Ordners wird nie kopiert.
+- **Seine Skills** und welche davon für das Projekt ein- oder ausgeschaltet sind.
+- **Seine Memory-Notizen**: die Notizen, Erkenntnisse und Themen dazu, aufbewahrt für seinen neuen Ordner dort.
+- **Sein Wiki**, wenn es eines hat (Wiki-Memory an).
+- **Seine Dokumente**: die eigenen Wissensbasen mit den Dateien, die du ihnen hinzugefügt hast. Der andere Computer liest sie neu ein. Ein Ordner, aus dem eine Wissensbasis liest und der im Ordner des Projekts liegt, wird aus dem neuen Ordner gelesen; einer außerhalb kann nicht mitgehen, und der Dialog warnt („Dokumente, die Ordner außerhalb seines Ordners lesen, behalten nur, was darin liegt“).
+- **Was es behalten hat**: seine Seiten, Dokumente, Folien, Tabellen, Notebooks, Diagramme, Boards, Bilder, Videos und Töne, so wie sie jetzt sind, sodass jedes dort in seinem eigenen Editor öffnet. Die Dateien, die sie im Ordner des Projekts haben, kommen mit dem Ordner.
+- **Seine Agenten**: die projekteigenen Agenten, so wie sie sind, ohne ihre Zeitpläne.
+
+**Auslassen, was neu erzeugt werden kann** ist anfangs angekreuzt: Ordner, die ein Befehl neu erzeugt (wie `node_modules`, Python-Umgebungen und Caches), und Dateien, die das System herumliegen lässt (`.DS_Store`, `Thumbs.db`), bleiben zurück. Der Dialog zeigt, was das spart („node_modules, .venv… 1,9 GB“). Entferne das Häkchen, um alles zu senden. Was du auch wählst, einige Dinge gehen nie mit: Sockets und Ähnliches, die keine Dateien sind, Links, die aus dem Ordner hinausführen, und die Verweisdatei eines Git-Worktrees. Der Dialog warnt, wenn Links zurückbleiben.
+
+Eine Datei, deren Namen das System des anderen Computers nicht haben kann (ein Windows-Computer hat Namen, die er nicht erlaubt, und zwei Namen, die sich nur in der Groß- und Kleinschreibung unterscheiden, sind auf einem Mac- oder Windows-Datenträger ein und derselbe Name), wird ausgelassen, und am Ende des Sendens steht sie unter **Was ausgelassen wurde**.
+
+### Was zurückbleibt
+
+Der Dialog sagt: „Bleibt hier: seine Unterhaltungen, Experimentläufe und Teilen-Links.“ Ebenfalls nicht gesendet werden: die Versionen und Kommentare dessen, was das Projekt behalten hat (nur die aktuelle Version geht mit), die Zeitpläne seiner Agenten, die Auswahl der Startseite für das Projekt und sein Platz in einer Gruppe. Die Kopie beginnt ohne Sitzungen; starte dort neue, und die Agenten dort lesen die Notizen, das Wiki und die Dokumente, die mitgekommen sind.
+
+### Wohin es geht
+
+Unter **Wohin auf** dem Computer steht der Ordner, den das Projekt dort bekommt, den du ändern kannst. Hydor schlägt dieselbe Stelle unter dem Home-Ordner dieses Computers vor, die es hier hat, oder die nächste freie daneben („-2“, „-3“ …); für ein Projekt außerhalb des Home-Ordners den üblichen Ort für neue Projekte dort. Unter dem Ordner steht der freie Platz auf diesem Datenträger: „11,2 GB frei dort“, in Rot, wenn das Projekt mehr braucht („Nur 1,2 GB frei dort; es braucht 2,3 GB“).
+
+Der Ordner muss neu oder leer sein: Liegen dort schon Dateien, wird nichts gesendet, und der Dialog sagt „Dort liegen schon Dateien in …: Wähle einen neuen oder leeren Ordner“. Vorhandene Dateien werden nie überschrieben.
+
+Das Projekt kommt als neues, eigenes Projekt an (mit einer neuen ID). Seine Übersicht sagt unter seinem Ordner, woher es kam: „Kopiert von Laptop · 27. Nov.“ oder „Verschoben von Laptop · 27. Nov.“; bei einer synchron gehaltenen Kopie steht stattdessen ihr Zustand unter ihrem Namen.
+
+### Zusehen und dort öffnen
+
+Sobald du klickst, zeigt der Dialog einen Balken: „Senden · 45 % · 1,0 von 2,3 GB“, darunter die Anzahl der Dateien. Es läuft im Hintergrund weiter: Du kannst den Dialog mit **Schließen** schließen und weiterarbeiten, und ein Hinweis sagt dir, wann es fertig ist („Thesis ist jetzt auf GPU-Box“) oder warum es fehlgeschlagen ist. **Senden abbrechen** stoppt es, und der andere Computer entfernt alles, was er bekommen hatte, sodass dort nichts halb Fertiges bleibt.
+
+Ist es fertig, sagt der Dialog „„Thesis“ ist jetzt auf GPU-Box“, was aus dem Original geworden ist, und zeigt **Dort öffnen**, womit das neue Projekt auf seinem Computer geöffnet wird. Konnte etwas nicht platziert werden (ein Name, den der andere Computer nicht haben kann, der Außenordner eines Dokuments), listet **Was ausgelassen wurde** es auf. Schlägt das Senden fehl, sagt der Dialog warum, mit **Erneut versuchen**.
+
+Eine Datei, die sich ändert, während sie gelesen wird, wird von diesem Senden ausgelassen, statt halb verändert kopiert zu werden; sende erneut oder halte die beiden synchron, um sie herüberzubringen.
+
+### Zwei Kopien synchron halten
+
+**Synchron halten** erstellt die Kopie wie oben und hält danach die beiden Projekte gleich: Eine Änderung, die du an einem von beiden machst, erreicht das andere. Es funktioniert, solange beide Computer eingeschaltet sind; dazwischen muss nichts laufen.
+
+**Was synchron gehalten wird:**
+
+- die **Dateien** des Projekts (sein Ordner),
+- seine **Skills** und sein **Wiki** (wenn es eines hat),
+- seine **Details**: Name, Farbe, worum es geht und seine Richtlinien,
+- seine **Memory-Notizen**: die Notizen und Erkenntnisse, die Agenten geschrieben haben. Themen und Profile sind die eigenen Zusammenfassungen jedes Computers und bleiben, wie sie sind.
+
+Etwas, das das Projekt behalten hat (eine Seite, ein Dokument, ein Bild …), ist eine Datei in seinem Ordner und wird deshalb als Datei synchronisiert; das Projekt auf dem anderen Computer liest eine Änderung als neue Version dieser Sache ein.
+
+**Was nicht:**
+
+- **Der eigene Ordner von Git** (`.git`): Jeder Computer behält seinen eigenen Verlauf. Nutze Git selbst (Push und Pull), um Commits zu teilen; was in den Arbeitsdateien steht, wird wie jede andere Änderung synchronisiert.
+- **Was Git ignoriert**: In einem Projekt, dessen Ordner ein Git-Repository ist, bleiben die Dateien, die Git ignoriert, auf ihrem Computer; die Dateien, die es verfolgt, und neue, die es nicht ignoriert, werden synchronisiert. Ein Projekt, das kein Repository ist, synchronisiert alle seine Dateien.
+- **Ordner, die ein Befehl neu erzeugt**, wie `node_modules`, Python-Umgebungen und Caches.
+- Seine Unterhaltungen, Experimentläufe, Dokumente und Agenten, wie bei einer Kopie. Ein Projekt mit mehr als 200.000 Dateien kann nicht synchron gehalten werden.
+
+**Wann:** Eine Runde findet statt, wenn die Verbindung hergestellt wird, danach alle 30 Sekunden bis 5 Minuten (je schneller die letzte Runde war, desto früher die nächste), wenn du auf **Jetzt synchronisieren** klickst, und wenige Sekunden nach einer Änderung im Ordner des Projekts auf dem Computer, der die Verbindung hält. Eine Änderung auf dem anderen Computer erreicht dich in der nächsten Runde. Eine Runde bringt die Änderungen in beide Richtungen: Eine neue oder geänderte Datei geht zum anderen Computer, und eine Datei, die du löschst, wird auch dort gelöscht (sie kommt in den Papierkorb jenes Computers).
+
+Ist der andere Computer aus oder nicht erreichbar, sagt das Projekt „Warten auf GPU-Box“, und nichts geht verloren: Es wird wieder synchronisiert, sobald der Computer zurück ist.
+
+**Welcher Computer die Verbindung hält.** Ein Computer übernimmt das Synchronisieren: der, auf dem du die App geöffnet hattest, als du das Projekt gesendet hast (deshalb muss für „Synchron halten“ einer der beiden dieser Computer sein). **Jetzt synchronisieren** gibt es nur dort. Beide Projekte zeigen den Zustand, und **Synchronisierung beenden** funktioniert bei beiden.
+
+### Wenn beide Kopien dieselbe Datei ändern
+
+Hat sich eine Datei seit der letzten Runde auf beiden Computern geändert, behält Hydor beide Versionen. Die später geänderte bleibt unter dem Namen der Datei, und die andere wird daneben aufbewahrt als:
+
+> report (conflict, laptop, 2026-11-27 14.05).docx
+
+also der Name der Datei, dann „conflict“, der Name des Computers, von dem diese Version stammt, und wann sie zuletzt geändert wurde (UTC), dann ihre Endung. Beide Kopien bekommen beide Dateien. Sieh sie dir an, behalte die, die du willst, und lösche die andere. Ein Hinweis sagt dir einmal pro Runde, wenn das passiert ist, und das Panel des Projekts listet sie unter **Auf beiden geändert** auf (siehe unten).
+
+Wurde eine Datei auf einem Computer gelöscht und auf dem anderen geändert, gewinnt die geänderte und kommt auf den Computer zurück, der sie gelöscht hat. Ein Detail (etwa der Name), das auf beiden geändert wurde, richtet sich nach dem Computer, der die Verbindung hält. Eine Memory-Notiz, die ein Computer vergessen hat, wird auch auf dem anderen vergessen, und eine neue Notiz auf einem wird dem anderen hinzugefügt.
+
+### Wenn eine Runde viele Dateien entfernen würde
+
+Das Synchronisieren überträgt auch Löschungen, deshalb könnte sich ein Fehler ausbreiten: Ein geleerter Ordner oder ein nicht eingehängter Datenträger auf einem Computer würde den anderen leeren. Würde eine Runde mehr als 20 Dateien eines Teils des Projekts und mehr als die Hälfte dessen, was sie dort kannte, entfernen, hält Hydor diese Löschungen zurück. Das Projekt sagt „Zurückgehalten“, und das Panel sagt, was es tun würde: „… würde 1.200 Dateien auf GPU-Box entfernen: Trotzdem synchronisieren oder Synchronisierung beenden“. Alles andere wird nicht aufgehalten.
+
+Sieh nach, was auf diesem Computer passiert ist. Sind die Löschungen beabsichtigt, klicke auf **Trotzdem synchronisieren** (im Panel oder im Menü des Projekts); andernfalls stelle die Dateien wieder her oder wähle **Synchronisierung beenden**. Dieselbe Sperre gilt, wenn viele Notizen vergessen werden sollen.
+
+### Die Synchronisierung ansehen und steuern
+
+Ein synchron gehaltenes Projekt zeigt seinen Zustand unter seinem Namen auf der Seite des Projekts und auf seiner Karte auf der Seite „Projekte“, mit einem Symbol und einer Zeile:
+
+- **Synchron mit GPU-Box · vor 2 Min.**: Die letzte Runde endete mit allem im Gleichstand.
+- **Synchronisierung…**: Eine Runde überträgt gerade Dateien.
+- **Warten auf GPU-Box**: Der andere Computer ist gerade nicht erreichbar.
+- **Zurückgehalten**: Löschungen warten auf dein Wort (siehe oben).
+- **Keine Synchronisierung**: Etwas ist schiefgegangen; das Panel sagt, was.
+
+Klicke auf die Zeile, um **Synchron gehalten** zu öffnen: den Zustand, „Seine Kopie: *Thesis* auf *GPU-Box*“, die Dateien, die **Auf beiden geändert** wurden, mit dem Namen, unter dem jede behalten wurde, und wann, und die Schaltflächen:
+
+- **Jetzt synchronisieren** startet sofort eine Runde (auf dem Computer, der die Verbindung hält). Wenn Löschungen zurückgehalten werden, heißt sie **Trotzdem synchronisieren**.
+- **Synchronisierung beenden** beendet sie. Auf dem Computer, der die Verbindung hält, beendet sie sie für beide Projekte; beide Kopien bleiben, wie sie sind, und nichts wird gelöscht. Auf dem anderen Computer ausgeführt, hört dieses Projekt auf zu synchronisieren, und der Computer, der die Verbindung hält, bemerkt das und beendet die Verbindung, mit einem Hinweis. Wenn du das Projekt auf einem Computer löschst, endet die Verbindung ebenfalls.
+
+Dieselben beiden gibt es im Menü des Projekts (siehe [Das Menü des Projekts](#the-projects-menu)). Ein Agent kann beides für dich erledigen („Halte dieses Projekt mit dem Laptop synchron“).
+
+### Ein Projekt verschieben
+
+**Verschieben** sendet das Projekt und entfernt es hier samt allem, was es enthielt, sobald es vollständig und geprüft angekommen ist, denn all das liegt jetzt auf dem anderen Computer. Anders als **Projekt löschen** (siehe [Ein Projekt löschen](#delete-a-project)) bleibt davon nichts für deine übrige Arbeit auf diesem Computer zurück: Sein Ordner, seine Skills und die in seine Dokumente gelegten Dateien kommen in den Papierkorb (du kannst sie von dort zurückholen); seine Dokumente, die Dinge, die es behalten hat, und die projekteigenen Agenten werden entfernt (ein Agent, der auch in anderen Projekten arbeitet, bleibt für diese bestehen); und seine Memory-Notizen werden vergessen, was du im Verlauf des Memory noch sehen kannst. Seine Unterhaltungen bleiben auf diesem Computer, in keinem Projekt; ein verschobenes Projekt beginnt ohne welche. Liegt der Papierkorb auf einem anderen Datenträger und kann den Ordner nicht aufnehmen, bleibt der Ordner, wo er war, und der Dialog sagt das.
+
+Nichts wird entfernt, bevor die Kopie dort vollständig ist: Schlägt das Senden fehl oder brichst du es ab, ist das Projekt weiterhin hier. Die Seite eines verschobenen Projekts schließt sich, nachdem du den Dialog geschlossen hast, da es nicht mehr hier ist. Um an beiden weiterzuarbeiten, nutze **Kopieren** oder **Synchron halten**.
+
 ## Gemeinsames Wissen für alle Sitzungen
 
 Einmal hinzugefügte Verträge, Handbücher, Notizen, Fachartikel und Ordner lassen sich von Agenten nach Wörtern oder Bedeutung durchsuchen. Antworten zitieren Datei und Seite. **Wissensdatenbanken** sind benannte Sammlungen hochgeladener Dateien und lokaler Ordner.
@@ -537,3 +661,9 @@ Wissenstools liefern nie unzugängliche Projektdokumente, auch nicht bei direkte
 - „Mit wem ist Abschlussarbeit geteilt, und was haben diese Personen zuletzt getan?“
 - „Beantworte Marias Kommentare zu Kapitel 3 und erledige die bearbeiteten.“
 - „Beende Nikos' Freigabe für Abschlussarbeit.“
+- „Kopiere mein Projekt Thesis auf meine GPU-Box, ohne node_modules, und sag mir Bescheid, wenn es dort ist.“
+- „Halte dieses Projekt mit dem Laptop synchron.“
+- „Verschiebe mein Projekt Steuern 2026 auf den Desktop zu Hause.“
+- „Welche meiner Projekte werden mit einem anderen Computer synchron gehalten, und welche warten oder sind zurückgehalten?“
+- „Synchronisiere mein Projekt Thesis jetzt mit dem Laptop und sag mir, ob eine Datei auf beiden geändert wurde.“
+- „Beende die Synchronisierung meines Projekts Thesis mit der GPU-Box.“

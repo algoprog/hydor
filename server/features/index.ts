@@ -67,6 +67,8 @@ import { skillpack } from '../skillpack/index.ts';
 import { spaces } from '../spaces/index.ts';
 import { suggest } from '../suggest/index.ts';
 import { sharing } from '../spaces/share.ts';
+import { projectHub } from '../spaces/transfer/hub.ts';
+import { projectTransfer } from '../spaces/transfer/routes.ts';
 import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import { webapps } from '../webapps/index.ts';
@@ -78,4 +80,4 @@ import { slack } from '../chatapps/slack.ts';
 
 // The user's guidelines lead what an agent is told, their profile right after them, then what a confidential session
 // may not do; how to format replies follows the pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, profile, confidential, browserHandoff, pages, myThemesFeature, slidesShow, formatting, answers, shots, search, browser, computer, memory, findings, knowledge, wikiSettingsFeature, wikiSession, wiki, wikiBrowse, wikiDigest, spaces, sharing, children, swarm, goals, research, lean, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, photos, write, media, mediaEdit, videoEdit, soundEdit, connections, mcpServersFeature, outbox, mail, signatures, automations, experiments, jobs, voice, suggest, assistants, apps, webapps, papers, plugins, skillpack, cleanup, shelltools, steps, custom, arena, language, guide, keep, find, releaseNotes, sidebar, sessionFoldersFeature, tips, telegram, discord, slack];
+export const FEATURES: Feature[] = [guidelines, profile, confidential, browserHandoff, pages, myThemesFeature, slidesShow, formatting, answers, shots, search, browser, computer, memory, findings, knowledge, wikiSettingsFeature, wikiSession, wiki, wikiBrowse, wikiDigest, spaces, sharing, projectTransfer, projectHub, children, swarm, goals, research, lean, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, photos, write, media, mediaEdit, videoEdit, soundEdit, connections, mcpServersFeature, outbox, mail, signatures, automations, experiments, jobs, voice, suggest, assistants, apps, webapps, papers, plugins, skillpack, cleanup, shelltools, steps, custom, arena, language, guide, keep, find, releaseNotes, sidebar, sessionFoldersFeature, tips, telegram, discord, slack];

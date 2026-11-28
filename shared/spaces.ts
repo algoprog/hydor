@@ -5,6 +5,8 @@
 // own its sessions get with the skill library (shared/skillpack.ts), and the assistant its sessions start as.
 // What the server and the pages share.
 
+import type { ProjectSyncMark, SendHow } from './transfer.ts';
+
 export interface Space {
   id: string;
   name: string;
@@ -40,6 +42,10 @@ export interface Space {
    * programs whose sessions it found there, or Codex's own project it came from. Absent for one you made.
    */
   found?: FoundIn[];
+  /** It came from another machine (Settings → Machines): that machine's name, when, and how it was sent (shared/transfer.ts). */
+  came?: { from: string; at: number; how: SendHow };
+  /** It is kept in sync with its copy on another machine (shared/transfer.ts); only the sync routes set it. */
+  sync?: ProjectSyncMark;
   createdAt: number;
 }
 

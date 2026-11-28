@@ -1077,6 +1077,19 @@ function adopt(db: DB, id: string, file: string, sha: string): boolean {
   return true;
 }
 
+/**
+ * A kept thing whose file came with its project's folder (a project sent from another machine): the file becomes its own,
+ * as the app left it, so nothing is written again and later changes to it are read back in. False when the thing or the
+ * file is not there. `sha`: the file's bytes' hash as the sending app recorded it (a media item's own hash; null: not known).
+ */
+export function attachKeptFile(db: DB, type: KeptType, id: string, f: { file: string; sha: string | null; auto: number; fileTitle: string | null; adopted?: boolean }): boolean {
+  const row = readRow(db, type, id);
+  const seen = look(f.file);
+  if (!row || !seen) return false;
+  record(db, type, id, { file: f.file, sig: seen.sig, sha: f.sha, auto: f.auto, fileTitle: f.fileTitle ?? row.title, ...(type === 'page' ? { fileVersion: row.version, outside: 0 } : { adopted: f.adopted ? 1 : 0 }) });
+  return true;
+}
+
 /** A file kept from inside its project's folder is its file: no copy is made of it. */
 export function adoptKeptMedia(db: DB, id: string, file: string, sha: string): boolean {
   return !!engine && !engine.stopped && adopt(db, id, file, sha);

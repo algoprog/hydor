@@ -6,6 +6,8 @@ import { api } from './api';
 import { machineId } from './machine';
 
 interface Self {
+  /** This server's own id as the links between machines name it (missing from an older server). */
+  id?: string;
   host: string;
   version: string;
   /** What its sessions come to, for a page of another machine (missing from an older server). */
