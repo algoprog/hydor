@@ -3,6 +3,21 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.120.1 · 28 November 2026
+
+Sessions waiting out a usage limit now agree with the Usage page: when one of your accounts has usage left, they go
+there, and when none has, they say which comes back first.
+
+- The **Usage** page shows each account as its sessions last found it. Before, an added account could show usage left
+  for a few minutes after its sessions had been turned away at its limit, while they waited hours for another
+  account's reset.
+- Right after an account's limit resets, the app checks its usage again before deciding where waiting sessions go, so
+  they move there at once instead of being sent back to the account that is still at its limit.
+- When every account is at its limit, a new session starts on the one that resets first, and the limit notice on the
+  start page names it ("Work resets first, in 3 h 36 min") instead of the farther reset of the account you picked.
+- A session that was continued as soon as usage looked back, and hit the limit again, now shows when it will try
+  again (15 minutes later) instead of a reset hours away. Using a limit reset continues it at once.
+
 ## 0.120.0 · 28 November 2026
 
 Projects travel between your machines: copy one to another machine of **Settings → Machines**, move it there, or keep
